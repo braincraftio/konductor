@@ -1,0 +1,45 @@
+# Bandit configuration for Python security analysis
+# https://bandit.readthedocs.io/
+
+# Tests to skip
+skips:
+  - B101  # assert_used - acceptable in non-production code
+  - B601  # paramiko_calls - if not using paramiko
+  - B602  # subprocess_popen_with_shell_equals_true - sometimes needed
+
+# Test directories to exclude
+exclude_dirs:
+  - /tests/
+  - /test/
+  - /*_test.py
+  - /*_tests.py
+  - /venv/
+  - /.venv/
+  - /node_modules/
+
+# Additional patterns to exclude
+exclude:
+  - '*.pyc'
+  - '__pycache__'
+  - '.git'
+  - '.tox'
+  - '.eggs'
+  - '*.egg'
+
+# Test configuration
+# Format: test_id: {parameter: value}
+tests:
+  B201:  # flask_debug_true
+    level: HIGH
+  B301:  # pickle
+    level: MEDIUM
+  B302:  # marshal
+    level: MEDIUM
+  B303:  # md5
+    level: MEDIUM
+  B304:  # des
+    level: HIGH
+  B305:  # cipher
+    level: HIGH
+  B306:  # mktemp_q
+    level: MEDIUM

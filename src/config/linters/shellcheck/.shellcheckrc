@@ -1,0 +1,11 @@
+# BrainCraft.io ShellCheck Configuration
+# Enforced by flake wrapper - cannot be overridden
+
+# Enable all optional checks
+enable=all
+
+# Require bash explicitly
+shell=bash
+
+# Treat warnings as errors in CI
+# (handled by wrapper flag, not here)

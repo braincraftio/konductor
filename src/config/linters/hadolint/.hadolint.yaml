@@ -1,0 +1,12 @@
+---
+# BrainCraft.io Hadolint Configuration
+# Dockerfile linting rules
+
+ignored:
+  - DL3008 # Pin versions in apt-get (we use Nix for this)
+  - DL3013 # Pin versions in pip (we use uv)
+
+trustedRegistries:
+  - docker.io
+  - ghcr.io
+  - gcr.io

@@ -1,0 +1,32 @@
+---
+# Markdownlint CLI2 configuration
+# This file configures markdownlint-cli2 behavior (not the rules themselves)
+
+# Use existing config for rules
+config: .markdownlint.yaml
+
+# Default glob patterns to process
+# Commented out - globs are now handled programmatically
+# globs: ["**/*.md", "**/*.markdown"]
+
+# Ignores - must be an array of globs
+ignores:
+  # Dependencies
+  - "node_modules/**"
+  - ".npm-global/**"
+  - "vendor/**"
+  # Generated/temporary files
+  - ".reports/**"
+  - "coverage/**"
+  - "docs/generated/**"
+  - ".cache/**"
+  - "tmp/**"
+  - ".tmp/**"
+  # Third-party files
+  - "CHANGELOG.md"
+  - "LICENSE.md"
+  # Version control
+  - ".git/**"
+
+# Disable fixing - pre-commit hooks must be read-only
+fix: false

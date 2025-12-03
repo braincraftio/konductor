@@ -1,0 +1,84 @@
+---
+# Prettier configuration
+# https://prettier.io/docs/en/options.html
+
+# Line length (matches Python black default)
+printWidth: 100
+
+# Tab width
+tabWidth: 2
+
+# Use spaces instead of tabs
+useTabs: false
+
+# Semicolons in JavaScript
+semi: true
+
+# Use single quotes in JavaScript/TypeScript
+singleQuote: true
+
+# Quote props in objects only as needed
+quoteProps: as-needed
+
+# Use single quotes in JSX
+jsxSingleQuote: true
+
+# Trailing commas
+trailingComma: es5
+
+# Bracket spacing
+bracketSpacing: true
+
+# JSX brackets on same line
+bracketSameLine: false
+
+# Arrow function parentheses
+arrowParens: always
+
+# Prose wrap for markdown
+proseWrap: preserve
+
+# HTML whitespace sensitivity
+htmlWhitespaceSensitivity: css
+
+# End of line
+endOfLine: lf
+
+# Embedded language formatting
+embeddedLanguageFormatting: auto
+
+# Single attribute per line
+singleAttributePerLine: false
+
+# Vue files script and style tags indentation
+vueIndentScriptAndStyle: false
+
+# Language-specific overrides
+overrides:
+  # Markdown files
+  - files: ["*.md"]
+    options:
+      proseWrap: always
+      printWidth: 100
+
+  # YAML files
+  - files: ["*.yml", "*.yaml"]
+    options:
+      singleQuote: false
+      printWidth: 120
+
+  # JSON files (handled by Biome, but Prettier for other aspects)
+  - files: ["*.json", "*.jsonc"]
+    options:
+      singleQuote: false
+      trailingComma: none
+
+  # Package.json special handling
+  - files: [package.json]
+    options:
+      printWidth: 1000 # Prevent unnecessary line breaks
+
+  # GitHub Actions
+  - files: [.github/workflows/*.yml, .github/workflows/*.yaml]
+    options:
+      printWidth: 120 # Allow longer lines for actions

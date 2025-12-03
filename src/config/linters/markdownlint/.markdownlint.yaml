@@ -1,0 +1,136 @@
+---
+# Markdownlint configuration
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Extend the Prettier-compatible configuration to ensure tooling integration
+# This disables all rules that conflict with Prettier's formatting
+extends: markdownlint/style/prettier
+
+# Default state for all rules
+default: true
+
+# MD001/heading-increment - Heading levels should only increment by one level at a time
+MD001: true
+
+# MD003/heading-style - Heading style (ATX style with  #)
+MD003:
+  style: atx
+
+# MD004/ul-style - Unordered list style
+MD004:
+  style: dash
+
+# MD005/list-indent - Inconsistent indentation for list items at the same level
+MD005: true
+
+# MD013/line-length - Line length
+MD013: false # Disabled - let Prettier handle line wrapping
+
+# MD014/commands-show-output - Dollar signs used before commands without showing output
+MD014: true
+
+# MD018/no-missing-space-atx - No space after hash on atx style heading
+MD018: true
+
+# MD019/no-multiple-space-atx - Multiple spaces after hash on atx style heading
+MD019: true
+
+# MD023/heading-start-left - Headings must start at the beginning of the line
+MD023: true
+
+# MD024/no-duplicate-heading - Multiple headings with the same content
+MD024:
+  siblings_only: true # Allow same heading in different sections
+
+# MD025/single-title/single-h1 - Multiple top-level headings in the same document
+MD025:
+  level: 1
+
+# MD026/no-trailing-punctuation - Trailing punctuation in heading
+MD026:
+  punctuation: .,;:!。，；：！
+
+# MD028/no-blanks-blockquote - Blank line inside blockquote
+MD028: false # Allow for readability
+
+# MD029/ol-prefix - Ordered list item prefix
+MD029:
+  style: ordered
+
+# MD033/no-inline-html - Inline HTML
+MD033: false # Allow inline HTML for advanced formatting
+
+# MD034/no-bare-urls - Bare URL used
+MD034: true
+
+# MD035/hr-style - Horizontal rule style
+MD035:
+  style: ---
+
+# MD036/no-emphasis-as-heading - Emphasis used instead of a heading
+MD036:
+  punctuation: .,;:!?。，；：！？
+
+# MD037/no-space-in-emphasis - Spaces inside emphasis markers
+MD037: true
+
+# MD040/fenced-code-language - Fenced code blocks should have a language specified
+MD040: true
+
+# MD041/first-line-heading/first-line-h1 - First line in a file should be a top-level heading
+MD041:
+  level: 1
+
+# MD042/no-empty-links - No empty links
+MD042: true
+
+# MD043/required-headings - Required heading structure
+MD043: false # Project-specific, not enforced globally
+
+# MD044/proper-names - Proper names should have the correct capitalization
+MD044:
+  names:
+    - BrainCraft.io
+    - GitHub
+    - GitHub Actions
+    - JavaScript
+    - TypeScript
+    - Python
+    - Kubernetes
+    - VS Code
+    - API
+    - URL
+    - JSON
+    - YAML
+    - HTML
+    - CSS
+    - SQL
+    - .github # Directory name
+    - github # When referring to lowercase contexts
+    - GITHUB_USER # Environment variable
+    - GITHUB_EMAIL # Environment variable
+    - GH_TOKEN # Environment variable
+    - json # When referring to file extensions
+    - yaml # When referring to file extensions
+  code_blocks: false
+  html_elements: false
+
+# MD045/no-alt-text - Images should have alternate text (alt text)
+MD045: true
+
+# MD046/code-block-style - Code block style
+MD046:
+  style: fenced
+
+# MD048/code-fence-style - Code fence style
+MD048:
+  style: backtick
+
+# MD051/link-fragments - Link fragments should be valid
+MD051: true
+
+# MD052/reference-links-images - Reference links and images should use a label that is defined
+MD052: true
+
+# MD053/link-image-reference-definitions - Link and image reference definitions should be needed
+MD053: true
