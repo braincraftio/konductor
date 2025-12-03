@@ -5,7 +5,9 @@
 
 {
   packages = with pkgs; [
-    unstable.claude-code
+    unstable.claude-code # Anthropic Claude Code CLI
+    codex # OpenAI Codex CLI
+    github-copilot-cli # GitHub Copilot CLI
   ];
 
   shellHook = "";
