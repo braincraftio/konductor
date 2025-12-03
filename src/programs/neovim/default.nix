@@ -204,10 +204,20 @@ let
       # Status line
       lualine = {
         enable = true;
-        settings.options = {
-          theme = "catppuccin";
-          component_separators = { left = ""; right = ""; };
-          section_separators = { left = ""; right = ""; };
+        settings = {
+          options = {
+            theme = "catppuccin";
+            component_separators = { left = ""; right = ""; };
+            section_separators = { left = ""; right = ""; };
+          };
+          sections = {
+            lualine_x = [
+              "copilot"
+              "encoding"
+              "fileformat"
+              "filetype"
+            ];
+          };
         };
       };
 
@@ -428,6 +438,7 @@ let
             "<S-Tab>" = "cmp.mapping(cmp.mapping.select_prev_item(), {'i', 's'})";
           };
           sources = [
+            { name = "copilot"; group_index = 2; } # AI suggestions
             { name = "nvim_lsp"; }
             { name = "luasnip"; }
             { name = "path"; }
@@ -611,6 +622,20 @@ let
           notify = false;
         };
       };
+
+      # GitHub Copilot (Lua version for better cmp integration)
+      copilot-lua = {
+        enable = true;
+        settings = {
+          suggestion.enabled = false; # Use cmp instead
+          panel.enabled = false; # Use cmp instead
+          filetypes = {
+            markdown = true;
+            help = false;
+          };
+        };
+      };
+      copilot-cmp.enable = true; # Copilot as cmp source
 
       # Lazy loading
       lz-n = {
