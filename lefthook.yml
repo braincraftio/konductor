@@ -1,0 +1,226 @@
+---
+# lefthook.yml - BrainCraft.io flake configuration
+min_version: 1.12.0
+assert_lefthook_installed: true
+colors: true
+no_tty: false
+
+output:
+  - execution_info
+  - success
+  - failure
+  - summary
+
+# Pre-commit hook - All checks before committing
+pre-commit:
+  parallel: true
+  commands:
+    # Python checks
+    python-style:
+      glob: "*.py"
+      exclude:
+        - "**/venv/**"
+        - "**/.venv/**"
+        - "**/site-packages/**"
+      run: ruff check {staged_files}
+      tags: [python, lint]
+      fail_text: |
+        Python style check failed.
+        How to test: ruff check [files]
+
+    python-types:
+      glob: "*.py"
+      exclude:
+        - "**/venv/**"
+        - "**/.venv/**"
+      run: mypy {staged_files}
+      tags: [python, types]
+      fail_text: |
+        Python type check failed.
+        How to test: mypy [files]
+
+    python-security:
+      glob: "*.py"
+      run: bandit {staged_files}
+      tags: [python, security]
+      fail_text: |
+        Python security check failed.
+        How to test: bandit [files]
+
+    # JavaScript/TypeScript checks
+    js-quality:
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs}"
+      exclude:
+        - "**/node_modules/**"
+        - "**/dist/**"
+        - "**/build/**"
+      run: eslint {staged_files}
+      tags: [javascript, lint]
+      fail_text: |
+        JavaScript quality check failed.
+        How to test: eslint [files]
+
+    js-style:
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs}"
+      exclude:
+        - "**/node_modules/**"
+      run: biome check {staged_files}
+      tags: [javascript, style]
+      fail_text: |
+        JavaScript style check failed.
+        How to test: biome check [files]
+
+    # Prettier formatting check
+    prettier-check:
+      glob: "*.{js,jsx,ts,tsx,json,css,scss,sass,html,md,markdown,yml,yaml}"
+      exclude:
+        - "**/node_modules/**"
+        - "**/dist/**"
+        - "**/build/**"
+      run: prettier --check {staged_files}
+      tags: [format, style]
+      fail_text: |
+        Code formatting check failed.
+        How to test: prettier --check [files]
+        To fix: prettier --write [files]
+
+    # Shell script checks
+    shell-syntax:
+      glob: "*.{sh,bash}"
+      run: shellcheck {staged_files}
+      tags: [bash, lint]
+      fail_text: |
+        Shell syntax check failed.
+        How to test: shellcheck [files]
+
+    # Config file validation
+    yaml-lint:
+      glob: "*.{yml,yaml}"
+      exclude:
+        - "**/node_modules/**"
+        - "**/.pnpm-store/**"
+      run: yamllint {staged_files}
+      tags: [config, yaml]
+      fail_text: |
+        YAML validation failed.
+        How to test: yamllint [files]
+
+    toml-lint:
+      glob: "*.toml"
+      run: taplo check {staged_files}
+      tags: [config, toml]
+      fail_text: |
+        TOML validation failed.
+        How to test: taplo check [files]
+
+    # Nix checks
+    nix-format:
+      glob: "*.nix"
+      run: nixpkgs-fmt --check {staged_files}
+      tags: [nix, format]
+      fail_text: |
+        Nix format check failed.
+        How to test: nixpkgs-fmt --check [files]
+
+    nix-lint:
+      glob: "*.nix"
+      run: statix check {staged_files}
+      tags: [nix, lint]
+      fail_text: |
+        Nix lint check failed.
+        How to test: statix check [files]
+
+    nix-deadcode:
+      glob: "*.nix"
+      run: deadnix --fail {staged_files}
+      tags: [nix, deadcode]
+      fail_text: |
+        Dead Nix code detected.
+        How to test: deadnix --fail [files]
+
+    # Documentation checks
+    markdown-style:
+      glob: "*.{md,markdown}"
+      run: markdownlint-cli2 {staged_files}
+      tags: [docs, markdown]
+      fail_text: |
+        Markdown style check failed.
+        How to test: markdownlint-cli2 [files]
+
+    # Spell checking
+    spell-check:
+      glob: "*.{md,markdown,txt,js,jsx,ts,tsx,py,go,rs}"
+      run: cspell {staged_files}
+      tags: [docs, spelling]
+      fail_text: |
+        Spelling errors detected.
+        How to test: cspell [files]
+
+    markdown-links:
+      glob: "*.{md,markdown}"
+      run: lychee --offline {staged_files}
+      tags: [docs, validation]
+      skip:
+        - merge
+        - rebase
+      fail_text: |
+        Broken links detected.
+        How to test: lychee --offline [files]
+
+    # GitHub Actions
+    actions-lint:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: actionlint
+      tags: [ci, github]
+      fail_text: |
+        GitHub Actions validation failed.
+        How to test: actionlint
+
+    # Docker
+    docker-lint:
+      glob: "**/Dockerfile*"
+      run: hadolint {staged_files}
+      tags: [docker, lint]
+      fail_text: |
+        Dockerfile validation failed.
+        How to test: hadolint [files]
+
+    # Go
+    go-lint:
+      glob: "*.go"
+      run: golangci-lint run
+      tags: [go, lint]
+      fail_text: |
+        Go lint check failed.
+        How to test: golangci-lint run
+
+    # Web
+    html-lint:
+      glob: "*.html"
+      run: htmlhint {staged_files}
+      tags: [web, html]
+      fail_text: |
+        HTML validation failed.
+        How to test: htmlhint [files]
+
+    css-lint:
+      glob: "*.{css,scss,sass}"
+      run: stylelint {staged_files}
+      tags: [web, css]
+      fail_text: |
+        CSS validation failed.
+        How to test: stylelint [files]
+
+    # Security checks (always run)
+    secrets-scan:
+      run: detect-secrets scan --baseline .secrets.baseline
+      tags: [security, critical]
+      fail_text: |
+        Secrets detected in staged files!
+        How to test: detect-secrets scan --baseline .secrets.baseline
+
+# Commit message validation for semantic-release (https://semver.org/)
+commit-msg:
+  commands:
+    conventional-commits:
+      run: commitlint --edit {1}

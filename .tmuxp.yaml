@@ -1,0 +1,23 @@
+# BrainCraft.io Development Session
+# tmuxp session configuration for polyglot development
+# Usage: tmuxp load .tmuxp.yaml
+
+session_name: braincraftio
+start_directory: ./
+
+windows:
+  # Main development window
+  - window_name: "dev"
+    layout: main-horizontal
+    options:
+      main-pane-height: 66%
+    focus: true
+    panes:
+      # Top: Neovim with README
+      - focus: true
+        shell_command:
+          - nvim README.md
+
+      # Bottom: Task list
+      - shell_command:
+          - mise tasks ls --extended

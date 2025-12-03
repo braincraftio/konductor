@@ -1,0 +1,156 @@
+# BrainCraft.io Flake - Development Environment Configuration
+# Enterprise-grade Nix flake development with mise task automation
+#
+# This configuration provides:
+# - Nix flake development workflow automation
+# - Zero-error, zero-warning linting compliance
+# - Bash 3.2 compatibility for macOS/Linux parity
+# - Multi-platform support (macOS arm64/x86, Linux arm64/x86)
+#
+# Usage:
+#   mise run help              # Show all available commands
+#   mise run setup             # First-time environment setup
+#   mise run status            # Check environment health
+#   nix develop                # Enter development shell
+#
+# Documentation: https://github.com/braincraftio/flake
+
+[settings]
+# Core settings
+jobs = 4
+yes = true
+color = true
+verbose = false
+experimental = true
+
+# Task output
+task_output = "prefix"
+status.show_env = true
+
+# Disable tool auto-install - Nix handles all tools
+auto_install = false
+task_run_auto_install = false
+not_found_auto_install = false
+activate_aggressive = false
+legacy_version_file = false
+always_keep_download = false
+
+# Trust configuration
+trusted_config_paths = ["{{ config_root }}", "{{ config_root }}/.config"]
+
+# Task configuration variables
+[vars]
+# Project identity
+project_name = "flake"
+project_org = "braincraftio"
+project_env = "development"
+
+# Nix configuration
+# Container image version is centralized in lib/versions.nix (SSOT)
+# nix_version below is for Lix installer, not container builds
+nix_installer_url = "https://install.lix.systems/lix"
+nix_version = "2.93.0"
+
+# Development shells
+available_shells = "default python go node rust devops full"
+default_shell = "default"
+
+# Binary cache configuration
+cachix_name = "braincraftio"
+
+# Feature flags
+enable_nix_cache = "true"
+
+# Paths (relative to project root)
+flake_dir = "."
+
+# Logging
+log_level = "info"
+
+# Health check thresholds (should match lib/versions.nix nixMinVersion)
+min_nix_version = "2.24.0"
+min_disk_space_gb = "10"
+
+# Environment configuration
+[env]
+_.file = ".env"
+_.path = [
+  "./.config/bin",
+  "$HOME/.nix-profile/bin",
+  "/nix/var/nix/profiles/default/bin",
+]
+
+# Core paths
+PROJECT_ROOT = "{{ config_root }}"
+FLAKE_ROOT = "{{ config_root }}"
+
+# Project settings
+PROJECT_NAME = "{{ vars.project_name }}"
+PROJECT_ORG = "{{ vars.project_org }}"
+PROJECT_ENV = "{{ vars.project_env }}"
+
+# Nix configuration
+NIX_VERSION = "{{ vars.nix_version }}"
+FLAKE_DIR = "{{ config_root }}/{{ vars.flake_dir }}"
+
+# Binary cache
+CACHIX_NAME = "{{ vars.cachix_name }}"
+
+# Development settings
+EDITOR = "code"
+COLORTERM = "truecolor"
+BRAINCRAFTIO_SHELL = "{{ vars.default_shell }}"
+BCIO_SHELL = "{{ vars.default_shell }}"         # Short alias
+
+# Mise task defaults
+MISE_TASK_FORMAT_DEFAULT = "pretty"
+MISE_TASK_QUIET_DEFAULT = "false"
+MISE_TASK_PARALLEL_DEFAULT = "false"
+
+# Task configuration - Include modular task files
+[task_config]
+includes = [
+  ".config/mise/toml/main.toml",
+  ".config/mise/toml/nix.toml",
+  ".config/mise/toml/lint.toml",
+  ".config/mise/toml/format.toml",
+  ".config/mise/toml/docker.toml",
+  ".config/mise/toml/setup.toml",
+]
+
+# Hooks - Automatic Nix shell activation
+# DISABLED: Auto-activation causes recursive loops. Use 'nix develop' manually.
+# [hooks.enter]
+# shell = "bash"
+# script = '''
+# # Auto-enter Nix development shell when in workspace
+# if [ -z "${BRAINCRAFTIO_NIX_ACTIVE:-}" ] && [ -f "flake.nix" ]; then
+#     if command -v nix > /dev/null 2>&1; then
+#         case "$-" in
+#             *i*)
+#                 printf '%s\n' "Entering Nix development environment..."
+#                 export BRAINCRAFTIO_NIX_ACTIVE=1
+#                 exec nix develop
+#                 ;;
+#         esac
+#     fi
+# fi
+# '''
+
+# [hooks.leave]
+# shell = "bash"
+# script = '''
+# # Clean up when leaving the project
+# if [ -n "${BRAINCRAFTIO_SHELL:-}" ]; then
+#     printf '%s\n' "Leaving BrainCraft.io flake project..."
+# fi
+# '''
+
+# Tool versions - Managed by Nix, documented here for reference
+# All tools come from the Nix flake, not mise
+[tools]
+# No tools managed by mise - all tools from Nix flake
+# python = "3.13"  # From Nix
+# node = "24"      # From Nix
+# go = "1.24"      # From Nix
+# rust = "stable"  # From Nix
