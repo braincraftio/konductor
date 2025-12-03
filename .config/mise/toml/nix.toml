@@ -1,0 +1,326 @@
+# nix.toml - Nix flake management tasks for BrainCraft.io
+#
+# Provides:
+# - Nix installation and configuration
+# - Flake operations (update, build, check)
+# - Shell management
+# - Garbage collection
+# - Binary cache operations
+#
+# Task naming convention: nix:action:detail
+
+# =============================================================================
+# NIX INSTALLATION & CONFIGURATION
+# =============================================================================
+
+["nix:install"]
+description = "📦 Install Nix using Lix installer (auto-detects platform) • nin"
+alias = ["nin"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+install_nix
+'''
+
+["nix:configure"]
+description = "🔧 Configure Nix for flake development • nc"
+alias = ["nc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+configure_nix
+'''
+
+["nix:uninstall"]
+description = "🗑️ Uninstall Nix from the system • nun"
+alias = ["nun"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+uninstall_nix
+'''
+
+# =============================================================================
+# FLAKE OPERATIONS
+# =============================================================================
+
+["nix:update"]
+description = "🔄 Update flake.lock to latest input versions • nu"
+alias = ["nu"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+update_flake
+'''
+
+["nix:update:input"]
+description = "🎯 Update a specific flake input • nui"
+alias = ["nui"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT="${1:-}"
+if [ -z "${INPUT}" ]; then
+    printf 'Usage: mise run nix:update:input <input-name>\n' >&2
+    printf 'Example: mise run nix:update:input nixpkgs\n' >&2
+    exit 1
+fi
+
+cd "${MISE_PROJECT_ROOT}"
+printf 'Updating flake input: %s\n' "${INPUT}"
+nix flake lock --update-input "${INPUT}"
+printf 'Done.\n'
+'''
+
+["nix:build"]
+description = "🔨 Build flake outputs • nb"
+alias = ["nb"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+build_flake "${1:-}"
+'''
+
+["nix:check"]
+description = "✓ Validate flake configuration • nck"
+alias = ["nck"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+validate_flake
+'''
+
+["nix:show"]
+description = "📜 Show flake outputs and metadata • ns"
+alias = ["ns"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+cd "${MISE_PROJECT_ROOT}"
+
+print_header "Flake Outputs"
+nix flake show
+
+printf '\n'
+print_header "Flake Metadata"
+nix flake metadata
+'''
+
+# =============================================================================
+# GARBAGE COLLECTION
+# =============================================================================
+
+["nix:gc"]
+description = "🗑️ Garbage collect Nix store • ngc"
+alias = ["ngc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+run_gc "standard"
+'''
+
+["nix:gc:aggressive"]
+description = "☢️ Aggressive garbage collection (removes all old generations) • nga"
+alias = ["nga"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+run_gc "aggressive"
+'''
+
+["nix:optimise"]
+description = "⚙️ Optimise Nix store (deduplicate files) • no"
+alias = ["no"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Optimising Nix Store"
+print_status info "Deduplicating store paths..."
+nix-store --optimise
+print_status success "Store optimisation complete"
+'''
+
+# =============================================================================
+# NIX INFORMATION
+# =============================================================================
+
+["nix:info"]
+description = "ℹ️ Show Nix installation information • nif"
+alias = ["nif"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+print_nix_info
+'''
+
+["nix:doctor"]
+description = "🏥 Run Nix health diagnostics • nd"
+alias = ["nd"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/health-checks.sh"
+
+print_header "Nix Health Diagnostics"
+
+# Critical Nix checks
+print_subheader "Nix Installation"
+run_health_check "Nix installed" "check_nix_installed" "critical"
+run_health_check "Nix daemon running" "check_nix_daemon" "critical"
+run_health_check "Flakes enabled" "check_nix_flakes" "critical"
+
+# Flake checks
+print_subheader "Flake Configuration"
+run_health_check "flake.nix exists" "check_flake_exists" "important"
+run_health_check "flake.lock exists" "check_flake_lock" "important"
+
+# Optional validation
+print_subheader "Validation"
+run_health_check "Flake evaluates" "check_flake_eval" "optional"
+
+print_health_summary
+'''
+
+# =============================================================================
+# BINARY CACHE
+# =============================================================================
+
+["nix:cache:enable"]
+description = "📄 Enable Cachix binary cache • nce"
+alias = ["nce"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+enable_cachix "${CACHIX_NAME:-braincraftio}"
+'''
+
+["nix:cache:push"]
+description = "🚀 Push build outputs to Cachix (requires CACHIX_AUTH_TOKEN) • ncp"
+alias = ["ncp"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+push_to_cache "${CACHIX_NAME:-braincraftio}"
+'''
+
+# =============================================================================
+# REGISTRY MANAGEMENT
+# =============================================================================
+
+["nix:registry:add"]
+description = "➕ Add bcio to local flake registry • nra"
+alias = ["nra"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Adding Flake Registry Entry"
+
+print_status info "Adding bcio to registry..."
+nix registry add bcio github:braincraftio/flake
+
+print_status success "Registry entry added"
+printf '\n%bUsage:%b\n' "${BOLD}" "${NC}"
+printf '  nix develop bcio          # Base shell\n'
+printf '  nix develop bcio#python   # Python shell\n'
+printf '  nix develop bcio#full     # Full environment\n'
+'''
+
+["nix:registry:list"]
+description = "📋 List configured flake registries • nrl"
+alias = ["nrl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Flake Registries"
+nix registry list
+'''
+
+["nix:registry:remove"]
+description = "➖ Remove bcio from local flake registry • nrr"
+alias = ["nrr"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Removing bcio from registry..."
+nix registry remove bcio 2>/dev/null || true
+print_status success "Registry entry removed"
+'''

@@ -1,0 +1,332 @@
+# setup.toml - Setup and initialization tasks for BrainCraft.io Flake
+#
+# Provides:
+# - First-time environment setup
+# - Platform detection
+# - Git configuration
+# - Dependency installation
+# - Environment verification
+#
+# Task naming convention: setup:action:detail
+
+# =============================================================================
+# MAIN SETUP ORCHESTRATION
+# =============================================================================
+
+[setup]
+description = "🚀 First-time environment setup (installs all dependencies) • setup"
+alias = ["init"]
+depends = ["setup:nix", "setup:git", "setup:verify", "setup:summary"]
+
+# =============================================================================
+# NIX SETUP
+# =============================================================================
+
+["setup:nix"]
+description = "❄️ Setup Nix environment • snix"
+alias = ["snix"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+print_header "Nix Setup"
+
+# Check if Nix is installed
+if is_nix_installed; then
+    print_status success "Nix is installed: $(get_nix_version)"
+
+    # Check daemon
+    if is_nix_daemon_running; then
+        print_status success "Nix daemon is running"
+    else
+        print_status warning "Nix daemon is not running"
+        print_status info "Try: sudo systemctl start nix-daemon"
+    fi
+
+    # Check flakes
+    if are_flakes_enabled; then
+        print_status success "Flakes are enabled"
+    else
+        print_status warning "Flakes may not be enabled"
+        print_status info "Run: mise run nix:configure"
+    fi
+else
+    print_status warning "Nix is not installed"
+    print_status info "Run: mise run nix:install"
+
+    # Offer to install
+    if is_interactive; then
+        printf '\nInstall Nix now? [y/N] '
+        read -r response
+        case "${response}" in
+            [yY][eE][sS]|[yY])
+                install_nix
+                ;;
+            *)
+                print_status info "Skipping Nix installation"
+                ;;
+        esac
+    fi
+fi
+'''
+
+# =============================================================================
+# GIT CONFIGURATION
+# =============================================================================
+
+["setup:git"]
+description = "🎨 Configure Git for development • sgit"
+alias = ["sgit"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Git Configuration"
+
+# Check Git installation
+if ! command -v git > /dev/null 2>&1; then
+    print_status error "Git is not installed"
+    exit 1
+fi
+
+print_status success "Git $(git --version | cut -d' ' -f3)"
+
+# Check user config
+USER_NAME=$(git config user.name 2>/dev/null || true)
+USER_EMAIL=$(git config user.email 2>/dev/null || true)
+
+if [ -n "${USER_NAME}" ] && [ -n "${USER_EMAIL}" ]; then
+    print_status success "Git user: ${USER_NAME} <${USER_EMAIL}>"
+else
+    print_status warning "Git user not configured"
+
+    if is_interactive; then
+        printf '\nConfigure Git user? [y/N] '
+        read -r response
+        case "${response}" in
+            [yY][eE][sS]|[yY])
+                printf 'Name: '
+                read -r name
+                printf 'Email: '
+                read -r email
+                git config --global user.name "${name}"
+                git config --global user.email "${email}"
+                print_status success "Git user configured"
+                ;;
+            *)
+                print_status info "Skipping Git configuration"
+                ;;
+        esac
+    fi
+fi
+
+# Configure recommended settings
+print_subheader "Recommended Settings"
+
+# Pull rebase
+PULL_REBASE=$(git config pull.rebase 2>/dev/null || true)
+if [ "${PULL_REBASE}" != "true" ]; then
+    git config --global pull.rebase true
+    print_status info "Set pull.rebase=true"
+fi
+
+# Default branch
+INIT_DEFAULT=$(git config init.defaultBranch 2>/dev/null || true)
+if [ "${INIT_DEFAULT}" != "main" ]; then
+    git config --global init.defaultBranch main
+    print_status info "Set init.defaultBranch=main"
+fi
+
+# Core autocrlf (Unix-style line endings)
+if [ "$(detect_platform)" != "darwin" ]; then
+    git config --global core.autocrlf input
+    print_status info "Set core.autocrlf=input"
+fi
+
+print_status success "Git configuration complete"
+'''
+
+# =============================================================================
+# DEPENDENCY INSTALLATION
+# =============================================================================
+
+["setup:deps"]
+description = "📦 Install project dependencies • sde"
+alias = ["sde"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Installing Dependencies"
+
+cd "${MISE_PROJECT_ROOT}"
+
+PLATFORM=$(detect_platform)
+if [ "${PLATFORM}" = "linux" ]; then
+    print_status info "Checking apt packages for cross-architecture builds..."
+
+    NEED_INSTALL=""
+    for pkg in qemu-user-static binfmt-support; do
+        if ! dpkg -l "${pkg}" 2>/dev/null | grep -q "^ii"; then
+            NEED_INSTALL="${NEED_INSTALL} ${pkg}"
+        fi
+    done
+
+    if [ -z "${NEED_INSTALL}" ]; then
+        print_status success "All apt packages installed"
+    else
+        print_status info "Installing:${NEED_INSTALL}"
+        sudo apt update -qq
+        sudo apt install -y ${NEED_INSTALL}
+        print_status success "APT packages installed"
+    fi
+
+    if [ -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+        print_status success "QEMU aarch64 binfmt registered"
+    else
+        print_status warning "QEMU aarch64 binfmt not registered - reboot may be required"
+    fi
+fi
+
+if command -v mise > /dev/null 2>&1; then
+    print_status info "Installing mise tools..."
+    mise install 2>/dev/null || true
+    print_status success "Mise tools installed"
+fi
+
+print_status info "Trusting mise configuration..."
+mise trust --all 2>/dev/null || true
+
+print_status success "Dependencies installed"
+'''
+
+# =============================================================================
+# VERIFICATION
+# =============================================================================
+
+["setup:verify"]
+description = "✓ Verify environment is correctly configured • sv"
+alias = ["sv"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/health-checks.sh"
+
+print_header "Environment Verification"
+
+reset_health_checks
+
+# Critical checks
+run_health_check "Git installed" "command -v git > /dev/null" "critical"
+run_health_check "Mise installed" "command -v mise > /dev/null" "critical"
+
+# Nix checks (important but not critical for initial setup)
+run_health_check "Nix installed" "check_nix_installed" "important"
+run_health_check "Nix daemon running" "check_nix_daemon" "important"
+
+# Project checks
+run_health_check "In project root" "[ -f flake.nix ] || [ -f .mise.toml ]" "important"
+run_health_check "Disk space (10GB)" "check_disk_space 10" "optional"
+
+print_health_summary
+'''
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+["setup:summary"]
+description = "📊 Show setup summary and next steps • ss"
+alias = ["ss"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Setup Complete"
+
+printf '%bYour Konductor environment is ready!%b\n\n' "${GREEN}" "${NC}"
+
+printf '%bNext Steps:%b\n' "${BOLD}" "${NC}"
+printf '  1. Enter development shell:\n'
+printf '     nix develop\n\n'
+printf '  2. Review available commands:\n'
+printf '     mise run help\n\n'
+printf '  3. Check environment status:\n'
+printf '     mise run status\n\n'
+
+printf '%bAvailable Shells:%b\n' "${BOLD}" "${NC}"
+printf '  nix develop           # Default shell\n'
+printf '  nix develop .#python  # Python development\n'
+printf '  nix develop .#go      # Go development\n'
+printf '  nix develop .#node    # Node.js development\n'
+printf '  nix develop .#rust    # Rust development\n'
+printf '  nix develop .#devops  # DevOps tools\n'
+printf '  nix develop .#full    # All tools\n\n'
+
+printf '%bUseful Commands:%b\n' "${BOLD}" "${NC}"
+printf '  mise run lint         # Lint all files\n'
+printf '  mise run format       # Format all files\n'
+printf '  mise run nix:update   # Update flake inputs\n'
+printf '  mise run nix:gc       # Clean Nix store\n'
+'''
+
+# =============================================================================
+# REGISTRY SETUP
+# =============================================================================
+
+["setup:registry"]
+description = "🖼️ Add braincraftio to Nix flake registry • sreg"
+alias = ["sreg"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Flake Registry Setup"
+
+if ! command -v nix > /dev/null 2>&1; then
+    print_status error "Nix is not installed"
+    exit 1
+fi
+
+# Check if already registered
+if nix registry list 2>/dev/null | grep -q "^flake:braincraftio"; then
+    print_status info "braincraftio already in registry"
+else
+    print_status info "Adding braincraftio to registry..."
+    nix registry add braincraftio github:braincraftio/flake
+    print_status success "Registry entry added"
+fi
+
+printf '\n%bUsage:%b\n' "${BOLD}" "${NC}"
+printf '  nix develop braincraftio          # Enter default shell\n'
+printf '  nix develop braincraftio#python   # Enter Python shell\n'
+printf '  nix develop braincraftio#full     # Enter full shell\n'
+'''
+
+# =============================================================================
+# QUICK SETUP (MINIMAL)
+# =============================================================================
+
+["setup:quick"]
+description = "⚡ Quick setup (skip optional steps) • sq"
+alias = ["sq"]
+depends = ["setup:verify"]

@@ -1,0 +1,238 @@
+# main.toml - Core tasks for BrainCraft.io Flake
+#
+# Provides:
+# - Help and documentation
+# - Environment status and health checks
+# - Shell management
+# - Top-level orchestration tasks
+#
+# Task naming convention: domain:action:detail
+# Aliases: Short forms for common operations
+
+# =============================================================================
+# HELP & DOCUMENTATION
+# =============================================================================
+
+["help"]
+description = "📚 Show available commands and usage information • h"
+alias = ["h", "?"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Source common utilities
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/common.sh"
+
+printf '\n'
+printf '%b' "${BLUE:-}"
+cat << 'BANNER'
+  _  __                _            _
+ | |/ /___  _ __   __| |_   _  ___| |_ ___  _ __
+ | ' // _ \| '_ \ / _` | | | |/ __| __/ _ \| '__|
+ | . \ (_) | | | | (_| | |_| | (__| || (_) | |
+ |_|\_\___/|_| |_|\__,_|\__,_|\___|\__\___/|_|
+BANNER
+printf '%b\n' "${NC:-}"
+
+printf '%bKonductor Development Environment%b\n\n' "${BOLD:-}" "${NC:-}"
+
+printf '%bGetting Started:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run setup        First-time environment setup\n'
+printf '  mise run status       Environment info\n'
+printf '  mise run doctor       Diagnose issues\n'
+printf '\n'
+
+printf '%bDaily Workflow:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run lint         Run all linters\n'
+printf '  mise run format       Format all files\n'
+printf '\n'
+
+printf '%bShells:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  nix develop           Default shell (nvim, tmux, linters)\n'
+printf '  nix develop .#full    All languages + DevOps tools\n'
+printf '  nix develop .#python  Python 3.12 + uv + ruff\n'
+printf '  nix develop .#go      Go 1.24 + gopls + golangci-lint\n'
+printf '  nix develop .#node    Node 22 + pnpm + TypeScript\n'
+printf '  nix develop .#rust    Rust stable + cargo tools\n'
+printf '  nix develop .#devops  kubectl, helm, pulumi, cloud CLIs\n'
+printf '\n'
+
+printf '%bTerminal:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  tmux                  Start terminal multiplexer (C-a prefix)\n'
+printf '  tmuxp load .          Load dev session from .tmuxp.yaml\n'
+printf '  nvim                  Start Neovim with LSP + Catppuccin\n'
+printf '\n'
+
+printf '%bNix:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run nix:check    Validate flake configuration\n'
+printf '  mise run nix:update   Update flake.lock inputs\n'
+printf '  mise run nix:gc       Garbage collect Nix store\n'
+printf '\n'
+
+printf '%bMore:%b\n' "${GRAY:-}" "${NC:-}"
+printf '  mise tasks ls --extended    Full task reference table\n'
+printf '\n'
+'''
+
+# =============================================================================
+# STATUS & HEALTH
+# =============================================================================
+
+[status]
+description = "📊 Show environment status and configuration • st"
+alias = ["st"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/nix.sh"
+
+print_header "Konductor Status"
+
+# Project info
+print_subheader "Project"
+print_table_row "Root" "${MISE_PROJECT_ROOT:-$(pwd)}"
+print_table_row "Project" "${PROJECT_NAME:-flake}"
+print_table_row "Organization" "${PROJECT_ORG:-braincraftio}"
+
+# Nix status
+print_subheader "Nix"
+if is_nix_installed; then
+    print_table_row "Nix" "$(get_nix_version)"
+    print_table_row "Daemon" "$(is_nix_daemon_running && printf 'running' || printf 'stopped')"
+    print_table_row "Flakes" "$(are_flakes_enabled && printf 'enabled' || printf 'disabled')"
+    print_table_row "Store size" "$(get_nix_store_size)"
+else
+    print_table_row "Nix" "not installed"
+fi
+
+# Flake info
+print_subheader "Flake"
+if [ -f "${MISE_PROJECT_ROOT}/flake.nix" ]; then
+    print_table_row "flake.nix" "present"
+    if [ -f "${MISE_PROJECT_ROOT}/flake.lock" ]; then
+        lock_date=$(stat -c %y "${MISE_PROJECT_ROOT}/flake.lock" 2>/dev/null || stat -f %Sm "${MISE_PROJECT_ROOT}/flake.lock" 2>/dev/null || printf 'unknown')
+        print_table_row "flake.lock" "${lock_date}"
+    else
+        print_table_row "flake.lock" "missing"
+    fi
+else
+    print_table_row "flake.nix" "missing"
+fi
+
+# Shell status
+print_subheader "Shell"
+print_table_row "Active shell" "${BRAINCRAFTIO_SHELL:-none}"
+print_table_row "IN_NIX_SHELL" "${IN_NIX_SHELL:-no}"
+
+# Platform
+print_subheader "Platform"
+print_table_row "System" "$(get_nix_system)"
+print_table_row "Platform" "$(detect_platform)"
+print_table_row "Architecture" "$(detect_arch)"
+
+# Environment
+print_subheader "Environment"
+if is_ci; then
+    print_table_row "CI" "yes"
+else
+    print_table_row "CI" "no"
+fi
+if [ -f "/.dockerenv" ] || [ -n "${BRAINCRAFTIO_IN_CONTAINER:-}" ]; then
+    print_table_row "Container" "yes"
+else
+    print_table_row "Container" "no"
+fi
+
+printf '\n'
+'''
+
+[doctor]
+description = "🏥 Run comprehensive health checks • doc"
+alias = ["doc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/health-checks.sh"
+
+run_standard_health_checks "${1:-false}"
+'''
+
+["doctor:quick"]
+description = "⚡ Run quick health checks (skip optional) • dq"
+alias = ["dq"]
+run = "mise run doctor true"
+
+# =============================================================================
+# TOP-LEVEL ORCHESTRATION
+# =============================================================================
+
+["lint"]
+description = "🔍 Run all linters • l"
+alias = ["l"]
+depends = ["lint:nix", "lint:bash", "lint:yaml", "lint:toml", "lint:markdown"]
+
+["format"]
+description = "✨ Format all files • f"
+alias = ["f", "fmt"]
+depends = [
+  "format:nix",
+  "format:bash",
+  "format:yaml",
+  "format:toml",
+  "format:markdown",
+]
+
+["format:check"]
+description = "🔍 Check formatting without changes • fc"
+alias = ["fc"]
+depends = ["format:nix:check", "format:bash:check", "format:toml:check"]
+
+[clean]
+description = "🧹 Clean build artifacts and caches • c"
+alias = ["c"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Cleaning Build Artifacts"
+
+# Remove result symlinks
+if compgen -G "${MISE_PROJECT_ROOT}/result*" > /dev/null; then
+    print_status info "Removing result symlinks..."
+    rm -f "${MISE_PROJECT_ROOT}"/result*
+    print_status success "Result symlinks removed"
+fi
+
+print_status success "Clean complete"
+'''
+
+[version]
+description = "ℹ️ Show version information • v"
+alias = ["v"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf 'Konductor\n'
+printf 'Version: 0.1.0\n'
+printf 'Repository: github:braincraftio/flake\n'
+
+if command -v nix > /dev/null 2>&1; then
+    printf 'Nix: %s\n' "$(nix --version 2>/dev/null | head -1)"
+fi
+
+if command -v mise > /dev/null 2>&1; then
+    printf 'Mise: %s\n' "$(mise --version 2>/dev/null)"
+fi
+'''

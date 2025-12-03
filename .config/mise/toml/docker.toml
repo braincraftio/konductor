@@ -1,0 +1,907 @@
+# docker.toml - Container build and management tasks for BrainCraft.io Flake
+#
+# Build Architecture:
+#   Hybrid nix2container + Dockerfile approach:
+#   1. Nix builds base OCI image with nix2container (proper setuid/PAM)
+#   2. Dockerfile adds runtime directories and validates tools
+#   3. Buildx bake combines arch-specific images into multi-arch manifest
+#
+# Task Namespacing:
+#   docker:build:*      - Container build tasks
+#   docker:buildx:*     - Multi-arch buildx operations
+#   docker:driver:*     - Buildx driver management
+#   docker:container:*  - DevContainer lifecycle
+#   docker:*            - Utilities (status, images, clean)
+#
+# Run as different users:
+#   docker run -u kc2 konductor        # unprivileged (default)
+#   docker run -u kc2admin konductor   # with sudo access
+#   docker run -u root konductor       # debug/root access
+#
+# Reproducibility:
+#   All builds use flake.lock for pinned dependencies.
+#   Same flake.lock = identical container contents.
+
+# =============================================================================
+# DOCKER BUILD - Main entry point
+# =============================================================================
+
+["docker:build"]
+description = "Show container build help"
+alias = ["db"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+printf '\n'
+printf '%b' "${BLUE:-}"
+cat << 'BANNER'
+  _  __                _            _
+ | |/ /___  _ __   __| |_   _  ___| |_ ___  _ __
+ | ' // _ \| '_ \ / _` | | | |/ __| __/ _ \| '__|
+ | . \ (_) | | | | (_| | |_| | (__| || (_) | |
+ |_|\_\___/|_| |_|\__,_|\__,_|\___|\__\___/|_|
+BANNER
+printf '%b\n' "${NC:-}"
+
+printf '%bContainer Build Tasks%b\n\n' "${BOLD:-}" "${NC:-}"
+
+printf '%b━━━ Build Commands ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  docker:build                       Show this help\n'
+printf '  docker:build:nix2container         Build base OCI (native arch)\n'
+printf '  docker:build:nix2container:amd64   Build base OCI for AMD64\n'
+printf '  docker:build:nix2container:arm64   Build base OCI for ARM64\n'
+printf '  docker:build:nix2container:all     Build base OCI for all arches\n'
+printf '  docker:build:image                 Build Dockerfile layer (native arch)\n'
+printf '  docker:build:image:amd64           Build Dockerfile layer for AMD64\n'
+printf '  docker:build:image:arm64           Build Dockerfile layer for ARM64\n'
+printf '  docker:build:image:all             Build Dockerfile layer for all arches\n'
+printf '  docker:build:amd64                 Build complete AMD64 image\n'
+printf '  docker:build:arm64                 Build complete ARM64 image\n'
+printf '  docker:build:all                   Build complete images for all arches\n'
+printf '\n'
+
+printf '%b━━━ Buildx Bake (Multi-Arch) ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  docker:buildx:bake            Build multi-arch via bake.hcl\n'
+printf '  docker:buildx:bake:local      Build native arch (docker driver)\n'
+printf '  docker:buildx:bake:push       Build and push multi-arch\n'
+printf '  docker:buildx:bake:validate   Validate bake.hcl configuration\n'
+printf '\n'
+
+printf '%b━━━ Driver Management ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  docker:driver:create          Create docker-container driver\n'
+printf '  docker:driver:use             Switch to container driver\n'
+printf '  docker:driver:reset           Switch to default docker driver\n'
+printf '  docker:driver:status          Show current driver status\n'
+printf '\n'
+
+printf '%b━━━ DevContainer Lifecycle ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  docker:container:up           Start devcontainer\n'
+printf '  docker:container:down         Stop devcontainer\n'
+printf '  docker:container:shell        Open shell in container\n'
+printf '  docker:container:logs         Show container logs\n'
+printf '\n'
+
+printf '%b━━━ Utilities ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  docker:status                 Show Docker status\n'
+printf '  docker:images                 List Konductor images\n'
+printf '  docker:clean                  Clean Docker resources\n'
+printf '  docker:run                    Run container interactively\n'
+printf '\n'
+
+printf '%b━━━ Quick Start ━━━%b\n' "${GREEN:-}" "${NC:-}"
+printf '  %b# Build complete container (recommended)%b\n' "${GRAY:-}" "${NC:-}"
+printf '  mise run docker:build:all\n'
+printf '\n'
+printf '  %b# Run as unprivileged user (default)%b\n' "${GRAY:-}" "${NC:-}"
+printf '  docker run --rm -it ghcr.io/braincraftio/konductor:latest\n'
+printf '\n'
+printf '  %b# Run as admin (with sudo)%b\n' "${GRAY:-}" "${NC:-}"
+printf '  docker run --rm -it -u kc2admin ghcr.io/braincraftio/konductor:latest\n'
+printf '\n'
+printf '  %b# Test sudo%b\n' "${GRAY:-}" "${NC:-}"
+printf '  docker run --rm -u kc2admin ghcr.io/braincraftio/konductor:latest -c "sudo whoami"\n'
+printf '\n'
+'''
+
+["docker:build:help"]
+description = "Show container build help"
+alias = ["dbh"]
+depends = ["docker:build"]
+
+# =============================================================================
+# DOCKER BUILD - nix2container base images
+# =============================================================================
+
+["docker:build:nix2container"]
+description = "Build nix2container base image (native arch)"
+alias = ["dbn"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+TAG="nix2container"
+
+print_header "Building nix2container Base Image"
+
+cd "${MISE_PROJECT_ROOT}"
+
+print_status info "Building with nix2container..."
+print_status info "  - Proper setuid on sudo binary"
+print_status info "  - PAM configuration for passwordless sudo"
+print_status info "  - Users: kc2 (default), kc2admin (sudo)"
+
+nix build .#oci.copyToDockerDaemon \
+    -L \
+    --no-warn-dirty \
+    --no-write-lock-file \
+    -j auto
+
+if [ ! -d result/bin ]; then
+    print_status error "Nix build failed - no result/bin directory"
+    exit 1
+fi
+
+print_status info "Loading base image into Docker daemon..."
+./result/bin/copy-to-docker-daemon
+
+# Tag as nix2container
+docker tag "${IMAGE}:latest" "${IMAGE}:${TAG}"
+
+print_status success "Base image built: ${IMAGE}:${TAG}"
+
+printf '\n%bNext step:%b\n' "${BOLD}" "${NC}"
+printf '  mise run docker:build:all    # Add Dockerfile refinement\n'
+'''
+
+["docker:build:nix2container:amd64"]
+description = "Build nix2container base image for AMD64"
+alias = ["dbna"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+TAG="nix2container-amd64"
+
+print_header "Building nix2container Base Image (AMD64)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Check if we need cross-compilation
+NATIVE_ARCH=$(uname -m)
+if [[ "${NATIVE_ARCH}" != "x86_64" ]]; then
+    print_status warning "Cross-compiling for AMD64 from ${NATIVE_ARCH}"
+fi
+
+print_status info "Building with nix2container for x86_64-linux..."
+
+nix build .#oci.copyToDockerDaemon \
+    --system x86_64-linux \
+    -L \
+    --no-warn-dirty \
+    --no-write-lock-file \
+    -j auto
+
+if [ ! -d result/bin ]; then
+    print_status error "Nix build failed - no result/bin directory"
+    exit 1
+fi
+
+print_status info "Loading AMD64 base image into Docker daemon..."
+./result/bin/copy-to-docker-daemon
+
+docker tag "${IMAGE}:latest" "${IMAGE}:${TAG}"
+
+print_status success "AMD64 base image built: ${IMAGE}:${TAG}"
+'''
+
+["docker:build:nix2container:arm64"]
+description = "Build nix2container base image for ARM64"
+alias = ["dbnr"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+TAG="nix2container-arm64"
+
+print_header "Building nix2container Base Image (ARM64)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Check if we need cross-compilation
+NATIVE_ARCH=$(uname -m)
+if [[ "${NATIVE_ARCH}" != "aarch64" ]]; then
+    print_status warning "Cross-compiling for ARM64 from ${NATIVE_ARCH}"
+fi
+
+print_status info "Building with nix2container for aarch64-linux..."
+
+nix build .#oci.copyToDockerDaemon \
+    --system aarch64-linux \
+    -L \
+    --no-warn-dirty \
+    --no-write-lock-file \
+    -j auto
+
+if [ ! -d result/bin ]; then
+    print_status error "Nix build failed - no result/bin directory"
+    exit 1
+fi
+
+print_status info "Loading ARM64 base image into Docker daemon..."
+./result/bin/copy-to-docker-daemon
+
+docker tag "${IMAGE}:latest" "${IMAGE}:${TAG}"
+
+print_status success "ARM64 base image built: ${IMAGE}:${TAG}"
+'''
+
+["docker:build:nix2container:all"]
+description = "Build nix2container base images for all architectures"
+alias = ["dbnall"]
+depends = [
+  "docker:build:nix2container:amd64",
+  "docker:build:nix2container:arm64",
+]
+
+# =============================================================================
+# DOCKER BUILD - Dockerfile layer (on top of nix2container)
+# =============================================================================
+
+["docker:build:image"]
+description = "Build Dockerfile layer (native arch)"
+alias = ["dbi"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+
+print_header "Building Dockerfile Layer (native arch)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+docker build \
+    -f Dockerfile \
+    --target production \
+    -t "${IMAGE}:latest" \
+    .
+
+print_status success "Image built: ${IMAGE}:latest"
+'''
+
+["docker:build:image:amd64"]
+description = "Build Dockerfile layer for AMD64"
+alias = ["dbia"]
+depends = ["docker:build:nix2container:amd64"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+
+print_header "Building Dockerfile Layer (AMD64)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+docker build \
+    -f Dockerfile \
+    --platform linux/amd64 \
+    --build-arg BASE_TAG=nix2container-amd64 \
+    --target production \
+    -t "${IMAGE}:amd64" \
+    .
+
+print_status success "Image built: ${IMAGE}:amd64"
+'''
+
+["docker:build:image:arm64"]
+description = "Build Dockerfile layer for ARM64"
+alias = ["dbir"]
+depends = ["docker:build:nix2container:arm64"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+
+print_header "Building Dockerfile Layer (ARM64)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+docker build \
+    -f Dockerfile \
+    --platform linux/arm64 \
+    --build-arg BASE_TAG=nix2container-arm64 \
+    --target production \
+    -t "${IMAGE}:arm64" \
+    .
+
+print_status success "Image built: ${IMAGE}:arm64"
+'''
+
+["docker:build:image:all"]
+description = "Build Dockerfile layer for all architectures"
+alias = ["dbiall"]
+depends = ["docker:build:image:amd64", "docker:build:image:arm64"]
+
+# =============================================================================
+# DOCKER BUILD - Orchestrators
+# =============================================================================
+
+["docker:build:amd64"]
+description = "Build complete AMD64 image (nix2container + Dockerfile)"
+alias = ["dbamd"]
+depends = ["docker:build:image:amd64"]
+
+["docker:build:arm64"]
+description = "Build complete ARM64 image (nix2container + Dockerfile)"
+alias = ["dbarm"]
+depends = ["docker:build:image:arm64"]
+
+["docker:build:all"]
+description = "Build complete images for all architectures"
+alias = ["dba"]
+depends = ["docker:build:amd64", "docker:build:arm64"]
+
+# =============================================================================
+# DOCKER BUILDX BAKE - Multi-arch builds
+# =============================================================================
+
+["docker:buildx:bake"]
+description = "Build multi-arch image via bake.hcl (amd64 + arm64)"
+alias = ["dbb"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Docker Buildx Bake (Multi-Arch)"
+
+cd "${MISE_PROJECT_ROOT}"
+
+print_status info "Prerequisites:"
+print_status info "  1. nix2container base images must exist for each arch"
+print_status info "  2. Build them with: mise run docker:build:nix2container:amd64"
+print_status info "  3. Build them with: mise run docker:build:nix2container:arm64"
+print_status info ""
+print_status info "Building multi-arch image (linux/amd64 + linux/arm64)..."
+print_status warning "This may take a while for cross-platform builds"
+
+docker buildx bake -f bake.hcl konductor
+
+print_status success "Multi-arch image built"
+print_status info "Use --push to push to registry"
+'''
+
+["docker:buildx:bake:local"]
+description = "Build via bake.hcl (native arch, docker driver)"
+alias = ["dbbl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="ghcr.io/braincraftio/konductor"
+
+print_header "Docker Buildx Bake Local"
+
+cd "${MISE_PROJECT_ROOT}"
+
+print_status info "Building with docker driver (native arch only)..."
+
+docker buildx bake -f bake.hcl konductor-local
+
+print_status success "Image built and loaded: ${IMAGE}:local"
+print_status info "Also tagged as: ${IMAGE}:dev"
+
+printf '\n%bTest with:%b\n' "${BOLD}" "${NC}"
+printf '  docker run --rm -it %s:local\n' "${IMAGE}"
+'''
+
+["docker:buildx:bake:push"]
+description = "Build and push multi-arch image to registry"
+alias = ["dbbp"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Docker Buildx Bake Push"
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Check for authentication
+if ! docker info 2>/dev/null | grep -q "Username"; then
+    print_status warning "Not logged in to Docker registry"
+    print_status info "Run: docker login ghcr.io"
+fi
+
+print_status info "Building and pushing multi-arch image..."
+docker buildx bake -f bake.hcl konductor --push
+
+print_status success "Multi-arch image pushed to ghcr.io/braincraftio/konductor"
+'''
+
+["docker:buildx:bake:validate"]
+description = "Validate bake.hcl configuration"
+alias = ["dbbv"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Validating bake.hcl"
+
+cd "${MISE_PROJECT_ROOT}"
+
+if [ ! -f "bake.hcl" ]; then
+    print_status error "bake.hcl not found"
+    exit 1
+fi
+
+print_status info "Checking bake configuration..."
+docker buildx bake -f bake.hcl --print
+
+print_status success "bake.hcl is valid"
+'''
+
+# =============================================================================
+# DRIVER MANAGEMENT
+# =============================================================================
+
+["docker:driver:create"]
+description = "Create docker-container driver for cached builds"
+alias = ["ddc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+BUILDER_NAME="konductor-builder"
+
+print_header "Creating Docker Container Driver"
+
+if docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
+    print_status info "Builder '${BUILDER_NAME}' already exists"
+    docker buildx inspect "${BUILDER_NAME}"
+    exit 0
+fi
+
+print_status info "Creating builder: ${BUILDER_NAME}"
+docker buildx create \
+    --name "${BUILDER_NAME}" \
+    --driver docker-container \
+    --driver-opt network=host \
+    --bootstrap
+
+print_status success "Builder created: ${BUILDER_NAME}"
+
+printf '\n%bUsage:%b\n' "${BOLD}" "${NC}"
+printf '  mise run docker:driver:use    # Switch to container driver\n'
+'''
+
+["docker:driver:use"]
+description = "Switch to docker-container driver"
+alias = ["ddu"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+BUILDER_NAME="konductor-builder"
+
+print_header "Switching to Container Driver"
+
+if ! docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
+    print_status warning "Builder '${BUILDER_NAME}' not found"
+    print_status info "Creating builder..."
+    docker buildx create \
+        --name "${BUILDER_NAME}" \
+        --driver docker-container \
+        --driver-opt network=host \
+        --bootstrap
+fi
+
+docker buildx use "${BUILDER_NAME}"
+
+print_status success "Now using: ${BUILDER_NAME}"
+docker buildx inspect --bootstrap | head -10
+'''
+
+["docker:driver:reset"]
+description = "Switch back to default docker driver"
+alias = ["ddr"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Switching to Default Driver"
+
+docker buildx use default
+
+print_status success "Now using: default (docker driver)"
+docker buildx inspect | head -10
+'''
+
+["docker:driver:status"]
+description = "Show current buildx driver status"
+alias = ["dds"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Buildx Driver Status"
+
+print_subheader "Current Builder"
+docker buildx inspect --bootstrap 2>/dev/null || docker buildx inspect
+
+print_subheader "Available Builders"
+docker buildx ls
+
+printf '\n%bCache capabilities by driver:%b\n' "${BOLD}" "${NC}"
+printf '  docker:           BuildKit layer cache only\n'
+printf '  docker-container: local, registry, gha, s3, azblob\n'
+'''
+
+["docker:driver:clean"]
+description = "Remove konductor-builder and cache"
+alias = ["ddclean"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+BUILDER_NAME="konductor-builder"
+
+print_header "Cleaning Buildx Resources"
+
+docker buildx use default 2>/dev/null || true
+
+if docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
+    print_status info "Removing builder: ${BUILDER_NAME}"
+    docker buildx rm "${BUILDER_NAME}"
+fi
+
+if [ -d /tmp/.buildx-cache ]; then
+    print_status info "Clearing local cache..."
+    rm -rf /tmp/.buildx-cache
+fi
+
+print_status success "Cleanup complete"
+'''
+
+# =============================================================================
+# DEVCONTAINER LIFECYCLE
+# =============================================================================
+
+["docker:container:up"]
+description = "Start the devcontainer"
+alias = ["dcu"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Starting DevContainer"
+
+cd "${MISE_PROJECT_ROOT}"
+
+COMPOSE_FILE=""
+for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
+    if [ -f "${f}" ]; then
+        COMPOSE_FILE="${f}"
+        break
+    fi
+done
+
+if [ -z "${COMPOSE_FILE}" ]; then
+    print_status error "No Docker Compose file found"
+    exit 1
+fi
+
+print_status info "Using compose file: ${COMPOSE_FILE}"
+docker compose -f "${COMPOSE_FILE}" up -d
+
+print_status success "DevContainer started"
+print_status info "Run 'mise run docker:container:shell' to enter"
+'''
+
+["docker:container:down"]
+description = "Stop the devcontainer"
+alias = ["dcd"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Stopping DevContainer"
+
+cd "${MISE_PROJECT_ROOT}"
+
+for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
+    if [ -f "${f}" ]; then
+        docker compose -f "${f}" down
+        print_status success "DevContainer stopped"
+        exit 0
+    fi
+done
+
+print_status warning "No Docker Compose file found"
+'''
+
+["docker:container:shell"]
+description = "Open a shell in the running devcontainer"
+alias = ["dcs"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+cd "${MISE_PROJECT_ROOT}"
+
+for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
+    if [ -f "${f}" ]; then
+        SERVICE=$(docker compose -f "${f}" config --services | head -1)
+        if [ -z "${SERVICE}" ]; then
+            print_status error "No services found in compose file"
+            exit 1
+        fi
+        print_status info "Entering shell in service: ${SERVICE}"
+        docker compose -f "${f}" exec "${SERVICE}" bash -l
+        exit 0
+    fi
+done
+
+print_status error "No Docker Compose file found"
+exit 1
+'''
+
+["docker:container:logs"]
+description = "Show devcontainer logs"
+alias = ["dcl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "${MISE_PROJECT_ROOT}"
+
+for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
+    if [ -f "${f}" ]; then
+        docker compose -f "${f}" logs -f --timestamps
+        exit 0
+    fi
+done
+
+printf 'No Docker Compose file found\n' >&2
+exit 1
+'''
+
+["docker:container:restart"]
+description = "Restart the devcontainer"
+alias = ["dcr"]
+depends = ["docker:container:down", "docker:container:up"]
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+["docker:status"]
+description = "Show Docker and container status"
+alias = ["dst"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Docker Status"
+
+print_subheader "Docker Daemon"
+if docker info > /dev/null 2>&1; then
+    print_status success "Docker daemon is running"
+    print_table_row "Version" "$(docker version --format '{{.Server.Version}}' 2>/dev/null)"
+    print_table_row "API Version" "$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null)"
+else
+    print_status error "Docker daemon is not running"
+    exit 1
+fi
+
+print_subheader "Containers"
+RUNNING=$(docker ps -q | wc -l | tr -d ' ')
+TOTAL=$(docker ps -aq | wc -l | tr -d ' ')
+print_table_row "Running" "${RUNNING}"
+print_table_row "Total" "${TOTAL}"
+
+print_subheader "Konductor Images"
+docker images "ghcr.io/braincraftio/*" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" 2>/dev/null || true
+
+print_subheader "Disk Usage"
+docker system df
+'''
+
+["docker:images"]
+description = "List Konductor container images"
+alias = ["di"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Konductor Container Images"
+
+docker images "ghcr.io/braincraftio/*" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+
+printf '\n%bAll konductor tags:%b\n' "${BOLD}" "${NC}"
+docker images "ghcr.io/braincraftio/konductor" --format "  {{.Tag}}: {{.Size}} ({{.CreatedAt}})"
+'''
+
+["docker:clean"]
+description = "Clean up Docker resources"
+alias = ["dc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Docker Cleanup"
+
+cd "${MISE_PROJECT_ROOT}"
+for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
+    if [ -f "${f}" ]; then
+        print_status info "Stopping containers from ${f}..."
+        docker compose -f "${f}" down -v 2>/dev/null || true
+        break
+    fi
+done
+
+print_status info "Removing dangling images..."
+docker image prune -f
+
+print_status info "Removing stopped containers..."
+docker container prune -f
+
+print_status success "Cleanup complete"
+'''
+
+["docker:clean:all"]
+description = "Aggressive Docker cleanup (removes ALL unused resources)"
+alias = ["dca"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Aggressive Docker Cleanup"
+
+print_status warning "Removing ALL unused Docker resources..."
+docker system prune -a -f --volumes
+
+print_status success "Aggressive cleanup complete"
+'''
+
+["docker:run"]
+description = "Run container interactively"
+alias = ["drun"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+IMAGE="${1:-ghcr.io/braincraftio/konductor:latest}"
+
+print_header "Running Container"
+print_status info "Image: ${IMAGE}"
+print_status info "Mounting current directory to /workspace"
+
+docker run --rm -it \
+    -v "${MISE_PROJECT_ROOT}:/workspace" \
+    -w /workspace \
+    "${IMAGE}" \
+    bash -l
+'''
+
+# =============================================================================
+# NIXOS-GENERATORS (VM Images)
+# =============================================================================
+
+["nixos:qcow2"]
+description = "Build NixOS QCOW2 VM image (KubeVirt, libvirt)"
+alias = ["noq"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Building NixOS QCOW2 VM Image"
+
+cd "${MISE_PROJECT_ROOT}"
+
+print_status info "Building with nixos-generators (qcow format)..."
+print_status info "This creates a bootable VM image with:"
+print_status info "  - Full NixOS system"
+print_status info "  - SSH enabled"
+print_status info "  - QEMU guest agent"
+print_status info "  - sudo-rs with proper PAM"
+
+nix build .#qcow2 \
+    -L \
+    --no-warn-dirty \
+    --no-write-lock-file \
+    -j auto
+
+if [ -L result ]; then
+    SIZE=$(du -h result/*.qcow2 2>/dev/null | cut -f1 || du -h result | cut -f1)
+    print_status success "QCOW2 image built: result -> $(readlink result)"
+    print_status info "Image size: ${SIZE}"
+
+    printf '\n%bUse with libvirt:%b\n' "${BOLD}" "${NC}"
+    printf '  virt-install --import --disk result/*.qcow2 ...\n'
+    printf '\n%bUse with QEMU:%b\n' "${BOLD}" "${NC}"
+    printf '  qemu-system-x86_64 -drive file=result/*.qcow2,format=qcow2 ...\n'
+else
+    print_status error "Build failed - no result symlink"
+    exit 1
+fi
+'''

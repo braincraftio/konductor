@@ -1,0 +1,120 @@
+# lint.toml - Linting tasks for BrainCraft.io Flake
+#
+# Provides:
+# - Nix file linting (statix, deadnix)
+# - Shell script linting (shellcheck)
+# - YAML/TOML validation
+# - Markdown linting
+# - GitHub Actions linting
+#
+# Task naming convention: lint:domain:action
+#
+# Zero-tolerance policy: All linters must pass with zero errors/warnings
+
+# =============================================================================
+# TOP-LEVEL LINT ORCHESTRATION
+# =============================================================================
+
+# Note: The top-level [tasks.lint] is defined in main.toml with depends
+
+# =============================================================================
+# NIX LINTING
+# =============================================================================
+
+["lint:nix"]
+description = "❄️ Lint all Nix files • ln"
+alias = ["ln"]
+depends = ["lint:nix:statix", "lint:nix:deadnix", "lint:nix:flake"]
+
+["lint:nix:statix"]
+description = "🔍 Check Nix files with statix • lns"
+alias = ["lns"]
+run = "statix check ."
+
+["lint:nix:deadnix"]
+description = "☠️ Find dead Nix code with deadnix • lnd"
+alias = ["lnd"]
+run = "deadnix --fail ."
+
+["lint:nix:flake"]
+description = "🔎 Check flake with nix flake check • lnf"
+alias = ["lnf"]
+dir = "{{ config_root }}"
+run = "nix flake check --all-systems"
+
+# =============================================================================
+# SHELL SCRIPT LINTING
+# =============================================================================
+
+["lint:bash"]
+description = "🐚 Lint shell scripts with ShellCheck • lb"
+alias = ["lb", "lint:sh", "lint:shell"]
+run = '''
+#!/usr/bin/env bash
+# Find all .sh and .bash files, plus files with shell shebang (excluding .toml files)
+find . -type f \( -name '*.sh' -o -name '*.bash' \) -not -path './.git/*' -not -path './result/*' -not -path './.venv/*' -exec shellcheck -x {} + || \
+find . -type f -not -name '*.toml' -not -name '*.sh' -not -name '*.bash' -not -path './.git/*' -not -path './result/*' -not -path './.venv/*' -exec grep -l '^#!/.*sh' {} \; | xargs -r shellcheck -x
+'''
+
+# =============================================================================
+# YAML LINTING
+# =============================================================================
+
+["lint:yaml"]
+description = "📄 Lint YAML files with yamllint • ly"
+alias = ["ly"]
+run = "yamllint ."
+
+# =============================================================================
+# TOML LINTING
+# =============================================================================
+
+["lint:toml"]
+description = "📜 Lint TOML files with taplo • lt"
+alias = ["lt"]
+run = "taplo lint"
+
+# =============================================================================
+# MARKDOWN LINTING
+# =============================================================================
+
+["lint:markdown"]
+description = "📝 Lint Markdown files with markdownlint-cli2 • lm"
+alias = ["lm", "lint:md"]
+run = "markdownlint-cli2 '**/*.md'"
+
+# =============================================================================
+# GITHUB ACTIONS LINTING
+# =============================================================================
+
+["lint:actions"]
+description = "🎬 Lint GitHub Actions workflows with actionlint • la"
+alias = ["la", "lint:gha"]
+run = "actionlint"
+
+# =============================================================================
+# DOCKERFILE LINTING
+# =============================================================================
+
+["lint:docker"]
+description = "🐳 Lint Dockerfiles with hadolint (pass files as args) • ld"
+alias = ["ld", "lint:dockerfile"]
+run = '''
+#!/usr/bin/env bash
+if [ $# -eq 0 ]; then
+    echo "Usage: mise run lint:docker Dockerfile..."
+    echo "Arguments are passed directly to hadolint"
+    echo ""
+    exec hadolint --help
+fi
+exec hadolint "$@"
+'''
+
+# =============================================================================
+# LINK CHECKING
+# =============================================================================
+
+["lint:links"]
+description = "🔗 Check for broken links with lychee • ll"
+alias = ["ll"]
+run = "lychee '**/*.md' '**/*.html'"

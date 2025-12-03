@@ -1,0 +1,289 @@
+# format.toml - Formatting tasks for BrainCraft.io Flake
+#
+# Provides:
+# - Nix file formatting (nixpkgs-fmt, alejandra)
+# - Shell script formatting (shfmt)
+# - YAML/TOML formatting
+# - Markdown formatting
+# - JSON formatting
+#
+# Task naming convention: format:domain:action
+#
+# Note: format:check variants validate without modifying files
+
+# =============================================================================
+# TOP-LEVEL FORMAT ORCHESTRATION
+# =============================================================================
+
+# Note: The top-level [tasks.format] is defined in main.toml with depends
+
+# =============================================================================
+# NIX FORMATTING
+# =============================================================================
+
+["format:nix"]
+description = "❄️ Format Nix files with nixpkgs-fmt • fn"
+alias = ["fn"]
+run = "nixpkgs-fmt ."
+
+["format:nix:check"]
+description = "🔍 Check Nix file formatting without changes • fnc"
+alias = ["fnc"]
+run = "nixpkgs-fmt --check ."
+
+# =============================================================================
+# SHELL SCRIPT FORMATTING
+# =============================================================================
+
+["format:bash"]
+description = "🐚 Format shell scripts with shfmt • fb"
+alias = ["fb", "format:sh", "format:shell"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting shell scripts with shfmt..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+# shfmt options:
+# -w: write result to file
+# -i 4: indent with 4 spaces
+# -ci: switch cases are indented
+# -sr: redirect operators are followed by a space
+# -kp: keep column alignment paddings
+# -bn: binary ops may start a line
+
+# Format all shell files
+if shfmt -w -i 4 -ci -sr -kp -bn \
+    .config/mise/lib/*.sh 2>/dev/null; then
+    print_status success "Shell scripts formatted"
+else
+    print_status info "No shell scripts found to format"
+fi
+'''
+
+["format:bash:check"]
+description = "🔍 Check shell script formatting without changes • fbc"
+alias = ["fbc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Checking shell script formatting..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Check formatting (diff mode)
+if shfmt -d -i 4 -ci -sr -kp -bn \
+    .config/mise/lib/*.sh 2>/dev/null; then
+    print_status success "Shell scripts are properly formatted"
+else
+    print_status error "Shell scripts need formatting"
+    print_status info "Run: mise run format:bash"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# YAML FORMATTING
+# =============================================================================
+
+["format:yaml"]
+description = "📄 Format YAML files with prettier • fy"
+alias = ["fy", "format:yml"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting YAML files with prettier..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Format YAML files
+if prettier --write "**/*.{yml,yaml}" 2>/dev/null; then
+    print_status success "YAML files formatted"
+else
+    print_status info "No YAML files found to format"
+fi
+'''
+
+# =============================================================================
+# TOML FORMATTING
+# =============================================================================
+
+["format:toml"]
+description = "📜 Format TOML files with taplo • ft"
+alias = ["ft"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting TOML files with taplo..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+if taplo fmt; then
+    print_status success "TOML files formatted"
+else
+    print_status error "TOML formatting failed"
+    exit 1
+fi
+'''
+
+["format:toml:check"]
+description = "🔍 Check TOML file formatting without changes • ftc"
+alias = ["ftc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Checking TOML file formatting..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+if taplo fmt --check; then
+    print_status success "TOML files are properly formatted"
+else
+    print_status error "TOML files need formatting"
+    print_status info "Run: mise run format:toml"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# MARKDOWN FORMATTING
+# =============================================================================
+
+["format:markdown"]
+description = "📝 Format Markdown files with prettier • fm"
+alias = ["fm", "format:md"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting Markdown files with prettier..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+if prettier --write "**/*.md" 2>/dev/null; then
+    print_status success "Markdown files formatted"
+else
+    print_status info "No Markdown files found to format"
+fi
+'''
+
+# =============================================================================
+# JSON FORMATTING
+# =============================================================================
+
+["format:json"]
+description = "📋 Format JSON files with prettier • fj"
+alias = ["fj"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting JSON files with prettier..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+if prettier --write "**/*.json" 2>/dev/null; then
+    print_status success "JSON files formatted"
+else
+    print_status info "No JSON files found to format"
+fi
+'''
+
+# =============================================================================
+# WHITESPACE CLEANUP
+# =============================================================================
+
+["format:whitespace"]
+description = "🧹 Fix trailing whitespace and ensure final newlines • fw"
+alias = ["fw", "format:ws"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Fixing whitespace issues..."
+
+cd "${MISE_PROJECT_ROOT}"
+
+# Files to process (text files only, exclude binary and generated)
+EXTENSIONS="sh|bash|nix|toml|yaml|yml|md|json|txt|py|go|rs|js|ts"
+
+# Find and fix trailing whitespace
+FIXED=0
+while IFS= read -r -d '' file; do
+    # Skip binary files
+    if file "${file}" | grep -q "binary"; then
+        continue
+    fi
+
+    # Remove trailing whitespace
+    if sed -i.bak 's/[[:space:]]*$//' "${file}" 2>/dev/null; then
+        rm -f "${file}.bak"
+        FIXED=$((FIXED + 1))
+    fi
+done < <(find . \
+    -type f \
+    \( -name "*.sh" -o -name "*.bash" -o -name "*.nix" \
+       -o -name "*.toml" -o -name "*.yaml" -o -name "*.yml" \
+       -o -name "*.md" -o -name "*.json" \) \
+    -not -path "./.git/*" \
+    -not -path "./result/*" \
+    -print0 2>/dev/null)
+
+# Ensure files end with newline
+while IFS= read -r -d '' file; do
+    if [ -s "${file}" ]; then
+        # Check if file ends with newline
+        if [ "$(tail -c1 "${file}" | wc -l)" -eq 0 ]; then
+            printf '\n' >> "${file}"
+        fi
+    fi
+done < <(find . \
+    -type f \
+    \( -name "*.sh" -o -name "*.bash" -o -name "*.nix" \
+       -o -name "*.toml" -o -name "*.yaml" -o -name "*.yml" \
+       -o -name "*.md" -o -name "*.json" \) \
+    -not -path "./.git/*" \
+    -not -path "./result/*" \
+    -print0 2>/dev/null)
+
+print_status success "Whitespace cleanup complete"
+'''
+
+# =============================================================================
+# FORMAT ALL (CONVENIENCE)
+# =============================================================================
+
+["format:all"]
+description = "✨ Format all files (alias for format) • fa"
+alias = ["fa"]
+depends = ["format"]
