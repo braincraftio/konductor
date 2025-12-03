@@ -19,10 +19,8 @@
   # ===========================================================================
   # XDG Base Directory Specification
   # ===========================================================================
-  XDG_CONFIG_HOME = "$HOME/.config";
-  XDG_CACHE_HOME = "$HOME/.cache";
-  XDG_DATA_HOME = "$HOME/.local/share";
-  XDG_STATE_HOME = "$HOME/.local/state";
+  # NOTE: XDG vars are set in shellHook (base.nix) to properly expand $HOME
+  # Do NOT set them here - Nix env attrs don't expand shell variables
 
   # ===========================================================================
   # Terminal Configuration
