@@ -68,7 +68,7 @@ flake_dir = "."
 log_level = "info"
 
 # Health check thresholds (should match lib/versions.nix nixMinVersion)
-min_nix_version = "2.24.0"
+min_nix_version = "2.25.11"
 min_disk_space_gb = "10"
 
 # Environment configuration
