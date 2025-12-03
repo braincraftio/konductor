@@ -150,6 +150,18 @@ let
       { mode = "v"; key = "<leader>as"; action = "<cmd>ClaudeCodeSend<cr>"; options.desc = "Send to Claude"; }
       { mode = "n"; key = "<leader>aa"; action = "<cmd>ClaudeCodeDiffAccept<cr>"; options.desc = "Accept diff"; }
       { mode = "n"; key = "<leader>ad"; action = "<cmd>ClaudeCodeDiffDeny<cr>"; options.desc = "Deny diff"; }
+
+      # Copilot inline keymaps (copilot-lua plugin)
+      { mode = "n"; key = "<leader>aP"; action = "<cmd>Copilot panel<cr>"; options.desc = "Copilot suggestions panel"; }
+      { mode = "n"; key = "<leader>ae"; action = "<cmd>Copilot enable<cr>"; options.desc = "Copilot enable"; }
+      { mode = "n"; key = "<leader>aX"; action = "<cmd>Copilot disable<cr>"; options.desc = "Copilot disable"; }
+      { mode = "n"; key = "<leader>at"; action = "<cmd>Copilot status<cr>"; options.desc = "Copilot status"; }
+      # Note: <leader>ap (Copilot CLI) and <leader>ax (Codex CLI) are defined in extraConfigLua as toggleable terminals
+
+      # File tree keymaps
+      { mode = "n"; key = "<leader>ft"; action = "<cmd>Neotree toggle<cr>"; options.desc = "Toggle file tree"; }
+      { mode = "n"; key = "<leader>fe"; action = "<cmd>Neotree focus<cr>"; options.desc = "Focus file tree"; }
+      { mode = "n"; key = "<leader>fF"; action = "<cmd>Neotree reveal<cr>"; options.desc = "Reveal in file tree"; }
     ];
 
     # Terminal autocommands
@@ -949,6 +961,36 @@ let
         lazygit:toggle()
       end
       vim.api.nvim_set_keymap("n", "<leader>tg", "<cmd>lua _lazygit_toggle()<CR>", {noremap = true, silent = true, desc = "LazyGit"})
+
+      -- Copilot CLI Integration (vertical split on right, like Claude)
+      local copilot_cli = Terminal:new({
+        cmd = "copilot",
+        hidden = true,
+        direction = "vertical",
+        dir = vim.fn.getcwd(),
+        on_open = function(term)
+          vim.cmd("startinsert!")
+        end,
+      })
+      function _copilot_cli_toggle()
+        copilot_cli:toggle()
+      end
+      vim.api.nvim_set_keymap("n", "<leader>ap", "<cmd>lua _copilot_cli_toggle()<CR>", {noremap = true, silent = true, desc = "Copilot CLI"})
+
+      -- Codex CLI Integration (vertical split on right, like Claude)
+      local codex_cli = Terminal:new({
+        cmd = "codex",
+        hidden = true,
+        direction = "vertical",
+        dir = vim.fn.getcwd(),
+        on_open = function(term)
+          vim.cmd("startinsert!")
+        end,
+      })
+      function _codex_cli_toggle()
+        codex_cli:toggle()
+      end
+      vim.api.nvim_set_keymap("n", "<leader>ax", "<cmd>lua _codex_cli_toggle()<CR>", {noremap = true, silent = true, desc = "Codex CLI"})
     '';
   };
 
