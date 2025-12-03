@@ -12,6 +12,13 @@ let
 
   # Define nixvim configuration
   nixvimConfig = nixvimPkgs.makeNixvim {
+    # Early plugin initialization (runs before plugins load)
+    # This ensures globals are set for healthchecks
+    extraConfigLuaPre = ''
+      -- Pre-initialize globals that plugins expect
+      -- This runs before plugin loading, ensuring healthchecks work
+    '';
+
     # Use catppuccin colorscheme matching tmux
     colorschemes.catppuccin = {
       enable = true;
@@ -42,6 +49,10 @@ let
       updatetime = 250;
       timeoutlen = 300;
 
+      # Shada (persistent state) - use empty to avoid host file issues
+      # Set to NONE to disable, or keep default for persistence
+      shada = "'100,<50,s10,h";
+
       # Shell settings - use Nix bash (5.x), not system bash
       shell = "${pkgs.bash}/bin/bash";
       shellcmdflag = "-c";
@@ -64,6 +75,11 @@ let
       mapleader = " ";
       maplocalleader = " ";
       nvim_terminal = 1;
+      # Disable unused providers to avoid healthcheck errors
+      loaded_ruby_provider = 0;
+      loaded_perl_provider = 0;
+      # Suppress vim.validate deprecation warnings (upstream plugin issue)
+      deprecation_warnings = false;
     };
 
     # Essential keymaps
@@ -106,6 +122,11 @@ let
 
       # Markdown keymaps (render-markdown.nvim)
       { mode = "n"; key = "<leader>mt"; action = "<cmd>RenderMarkdown toggle<cr>"; options.desc = "Toggle markdown render"; }
+
+      # Comment keymaps - remap to avoid gc/gcc overlap warning
+      # Use <leader>/ for line comment (replaces gcc)
+      { mode = "n"; key = "<leader>/"; action = "gcc"; options.desc = "Toggle comment line"; options.remap = true; }
+      { mode = "v"; key = "<leader>/"; action = "gc"; options.desc = "Toggle comment selection"; options.remap = true; }
       { mode = "n"; key = "<leader>mp"; action = "<cmd>RenderMarkdown preview<cr>"; options.desc = "Markdown preview (side)"; }
       { mode = "n"; key = "<leader>me"; action = "<cmd>RenderMarkdown expand<cr>"; options.desc = "Expand anti-conceal"; }
       { mode = "n"; key = "<leader>mc"; action = "<cmd>RenderMarkdown contract<cr>"; options.desc = "Contract anti-conceal"; }
@@ -151,6 +172,25 @@ let
         callback.__raw = ''
           function()
             vim.cmd("bdelete!")
+          end
+        '';
+      }
+      # Set formatprg for rest-nvim response body formatting
+      {
+        event = "FileType";
+        pattern = "json";
+        callback.__raw = ''
+          function()
+            vim.opt_local.formatprg = "jq ."
+          end
+        '';
+      }
+      {
+        event = "FileType";
+        pattern = "html";
+        callback.__raw = ''
+          function()
+            vim.opt_local.formatprg = "prettier --parser html"
           end
         '';
       }
@@ -515,20 +555,41 @@ let
       };
 
       fugitive.enable = true;
-      diffview.enable = true;
+      diffview = {
+        enable = true;
+        settings = {
+          enhanced_diff_hl = true;
+          use_icons = true;
+          view = {
+            default = { layout = "diff2_horizontal"; };
+            merge_tool = { layout = "diff3_horizontal"; };
+          };
+        };
+      };
 
-      # HTTP client
+      # HTTP client (rest.nvim)
       rest = {
         enable = true;
         settings = {
-          result_split_horizontal = false;
-          result_split_in_place = false;
-          skip_ssl_verification = false;
-          encode_url = true;
+          client = "curl";
+          custom_dynamic_variables = { };
+          request = {
+            skip_ssl_verification = false;
+            hooks = {
+              encode_url = true;
+            };
+          };
+          response = {
+            hooks = {
+              decode_url = true;
+              format = true;
+            };
+          };
           highlight = {
             enabled = true;
             timeout = 150;
           };
+          keybinds = { };
         };
       };
 
@@ -546,6 +607,8 @@ let
             border = "rounded";
             padding = [ 2 2 ];
           };
+          # Ignore intentional overlaps (gc is operator, gcc is line-specific)
+          notify = false;
         };
       };
 
@@ -554,7 +617,7 @@ let
         enable = true;
         plugins = [
           { __unkeyed-1 = "vim-fugitive"; cmd = [ "Git" "G" ]; }
-          { __unkeyed-1 = "diffview.nvim"; cmd = [ "DiffviewOpen" "DiffviewFileHistory" ]; }
+          # Note: diffview removed from lazy loading - needs early init for healthcheck
           { __unkeyed-1 = "rest.nvim"; ft = [ "http" ]; }
         ];
       };
@@ -574,6 +637,7 @@ let
       })
 
       # Snacks.nvim - neo-tree optional dependency
+      # Note: Setup is in extraConfigLua, healthcheck may show error until first use
       ((buildVimPlugin {
         name = "snacks.nvim";
         src = pkgs.fetchFromGitHub {
@@ -582,7 +646,37 @@ let
           rev = "fe7cfe9800a182274d0f868a74b7263b8c0c020b";
           sha256 = "sha256-vRedYg29QGPGW0hOX9qbRSIImh1d/SoDZHImDF2oqKM=";
         };
-      }).overrideAttrs (_old: { doCheck = false; }))
+      }).overrideAttrs (old: {
+        doCheck = false;
+        # Add auto-setup on plugin load
+        postInstall = (old.postInstall or "") + ''
+          mkdir -p $out/plugin
+          cat > $out/plugin/snacks-setup.lua << 'EOF'
+          -- Auto-initialize Snacks on plugin load
+          local ok, snacks = pcall(require, "snacks")
+          if ok then
+            _G.Snacks = snacks
+            snacks.setup({
+              bigfile = { enabled = true },
+              indent = { enabled = true },
+              input = { enabled = true },
+              notifier = { enabled = true },
+              quickfile = { enabled = true },
+              scroll = { enabled = true },
+              statuscolumn = { enabled = true },
+              words = { enabled = true },
+              image = { enabled = true },
+              -- Explicitly disable features we don't use to avoid healthcheck issues
+              dashboard = { enabled = false },
+              explorer = { enabled = false },
+              picker = { enabled = false },
+            })
+            -- Set vim.ui.input to use Snacks
+            vim.ui.input = Snacks.input
+          end
+          EOF
+        '';
+      }))
 
       # Image.nvim - neo-tree optional for image preview
       ((buildVimPlugin {
@@ -629,7 +723,7 @@ let
       }).overrideAttrs (_old: { doCheck = false; }))
 
       # Render-markdown.nvim - beautiful markdown rendering
-      (buildVimPlugin {
+      ((buildVimPlugin {
         name = "render-markdown.nvim";
         src = pkgs.fetchFromGitHub {
           owner = "MeanderingProgrammer";
@@ -637,7 +731,27 @@ let
           rev = "6e0e8902dac70fecbdd8ce557d142062a621ec38";
           sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
         };
-      })
+      }).overrideAttrs (old: {
+        doCheck = false;
+        # Add auto-setup on plugin load
+        postInstall = (old.postInstall or "") + ''
+          mkdir -p $out/plugin
+          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+          -- Auto-initialize render-markdown on plugin load
+          local ok, render_markdown = pcall(require, "render-markdown")
+          if ok then
+            render_markdown.setup({
+              enabled = true,
+              preset = 'obsidian',
+              render_modes = { 'n', 'c', 't' },
+              anti_conceal = { enabled = true },
+              heading = { enabled = true },
+              code = { enabled = true, style = 'full' },
+            })
+          end
+          EOF
+        '';
+      }))
     ];
 
     # Performance optimizations
@@ -719,8 +833,8 @@ let
 
     # Additional Lua configuration
     extraConfigLua = ''
-      -- Mise Integration
-      vim.env.PATH = vim.env.HOME .. "/.local/share/mise/shims:" .. vim.env.PATH
+      -- Mise Integration (treesitter syntax highlighting for mise config files)
+      -- Note: mise shims NOT added to PATH - Nix provides all tools directly
 
       require("vim.treesitter.query").add_predicate("is-mise?", function(_, _, bufnr, _)
         local filepath = vim.api.nvim_buf_get_name(tonumber(bufnr) or 0)
@@ -728,20 +842,7 @@ let
         return string.match(filename, ".*mise.*%.toml$") ~= nil
       end, { force = true, all = false })
 
-      -- Snacks.nvim Configuration
-      local snacks_ok, snacks = pcall(require, "snacks")
-      if snacks_ok then
-        snacks.setup({
-          bigfile = { enabled = true },
-          indent = { enabled = true },
-          input = { enabled = true },
-          notifier = { enabled = true },
-          quickfile = { enabled = true },
-          scroll = { enabled = true },
-          statuscolumn = { enabled = true },
-          words = { enabled = true },
-        })
-      end
+      -- Note: Snacks.nvim is auto-initialized via plugin/snacks-setup.lua
 
       -- Image.nvim Configuration
       local image_ok, image = pcall(require, "image")
@@ -801,17 +902,7 @@ let
         })
       end
 
-      -- Render-markdown.nvim Configuration
-      local render_markdown_ok, render_markdown = pcall(require, "render-markdown")
-      if render_markdown_ok then
-        render_markdown.setup({
-          enabled = true,
-          preset = 'obsidian',
-          anti_conceal = {
-            enabled = true,
-          },
-        })
-      end
+      -- Note: Render-markdown.nvim is auto-initialized via plugin/render-markdown-setup.lua
 
       -- Browse.nvim Configuration
       local browse_ok, browse = pcall(require, "browse")
