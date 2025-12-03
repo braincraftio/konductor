@@ -162,10 +162,9 @@ let
     chmod -R u+rwX,go+rX $out/home/kc2 $out/home/kc2admin $out/root
   '';
 
-  # Standard directories
+  # Standard directories (no /tmp - must be created at runtime in Dockerfile)
   standardDirs = pkgs.runCommand "standard-dirs" { } ''
-    mkdir -p $out/tmp $out/var/empty
-    chmod 1777 $out/tmp
+    mkdir -p $out/var/empty
   '';
 
   # Nix configuration for containers

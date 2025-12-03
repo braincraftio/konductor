@@ -7,8 +7,11 @@
 ARG BASE_TAG=nix2container
 FROM ghcr.io/braincraftio/konductor:${BASE_TAG} AS base
 
-# Fix home directory ownership and permissions
+# Create writable /tmp (nix store paths are read-only)
 USER root
+RUN rm -rf /tmp && mkdir -p /tmp && chmod 1777 /tmp
+
+# Fix home directory ownership and permissions
 RUN chown -R 1000:1000 /home/kc2 && chmod -R u+rwX /home/kc2 && \
     chown -R 1001:1001 /home/kc2admin && chmod -R u+rwX /home/kc2admin
 
