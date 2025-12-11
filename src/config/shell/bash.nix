@@ -1,33 +1,64 @@
 # src/config/shell/bash.nix
-# Bash shell configuration with hermetic config files
-# Uses centralized shell-content from SSOT
+# Hermetic wrapper for bash shell configuration
+#
+# Config is maintained in native format (.bashrc) for easy contribution.
+# This follows the same pattern as markdownlint-cli2 wrapper.
 
 { pkgs, lib, ... }:
 
 let
-  # Import centralized shell content
-  shellContent = import ../../lib/shell-content.nix { inherit lib; };
+  # Config file - native bashrc, copied directly to nix store
+  bashrcFile = pkgs.writeTextFile {
+    name = "konductor-bashrc";
+    destination = "/.bashrc";
+    text = builtins.readFile ./.bashrc;
+  };
 
-  # Write configuration files - use devshell version (env set by mkShell)
-  bashrc = pkgs.writeText "konductor-bashrc" shellContent.bashrcContentDevshell;
-  bashProfile = pkgs.writeText "konductor-bash_profile" shellContent.bashProfileContent;
-  inputrc = pkgs.writeText "konductor-inputrc" shellContent.inputrcContent;
+  # Inputrc for readline configuration
+  inputrcFile = pkgs.writeTextFile {
+    name = "konductor-inputrc";
+    destination = "/.inputrc";
+    text = ''
+      set enable-keypad on
+      set input-meta on
+      set output-meta on
+      set convert-meta off
+      "\e[A": previous-history
+      "\e[B": next-history
+      "\e[C": forward-char
+      "\e[D": backward-char
+      "\e[H": beginning-of-line
+      "\e[F": end-of-line
+      "\e[3~": delete-char
+      set completion-ignore-case on
+      set show-all-if-ambiguous on
+      set colored-stats on
+    '';
+  };
 
 in
 {
-  # Wrapped bash package (not typically wrapped, but config provided)
-  package = pkgs.bashInteractive;
-  unwrapped = pkgs.bashInteractive;
-
-  # Config files
-  configFiles = {
-    inherit bashrc bashProfile inputrc;
+  # Wrapped bash that sources our hermetic bashrc
+  package = pkgs.writeShellApplication {
+    name = "bash";
+    runtimeInputs = [ pkgs.bashInteractive ];
+    text = ''
+      export INPUTRC="${inputrcFile}/.inputrc"
+      exec bash --rcfile "${bashrcFile}/.bashrc" "$@"
+    '';
   };
 
-  # Content for embedding in other configs
-  inherit (shellContent) bashrcContentDevshell bashrcContentStandalone bashProfileContent inputrcContent;
+  unwrapped = pkgs.bashInteractive;
 
-  # Metadata
+  # Export config files for other uses (devshells, containers)
+  configFiles = {
+    bashrc = bashrcFile;
+    inputrc = inputrcFile;
+  };
+
+  # Raw content for injection into shellHooks
+  bashrcContent = builtins.readFile ./.bashrc;
+
   meta = {
     description = "Bash shell with Konductor configuration";
     configurable = true;

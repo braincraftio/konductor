@@ -8,6 +8,11 @@
 
 { pkgs, versions, packages, ... }:
 
+let
+  # Read native bashrc for aliases and shell setup
+  bashrcContent = builtins.readFile ../config/shell/.bashrc;
+in
+
 pkgs.mkShell {
   name = "default";
 
@@ -23,6 +28,9 @@ pkgs.mkShell {
     export XDG_CACHE_HOME="$HOME/.cache"
     export XDG_DATA_HOME="$HOME/.local/share"
     export XDG_STATE_HOME="$HOME/.local/state"
+
+    # Source hermetic bashrc (aliases, shell options, prompt)
+    ${bashrcContent}
 
     # Welcome message
     echo ""

@@ -210,7 +210,7 @@ Each shell extends the base shell using `overrideAttrs` pattern:
 #### OCI Container (nix2container)
 
 Multi-architecture container images (amd64 + arm64) built with nix2container
-and Docker Buildx for production deployment.
+and Docker Buildx.
 
 ```bash
 # Single architecture (native)
