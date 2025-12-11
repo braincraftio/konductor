@@ -12,11 +12,10 @@ builds.
 
 ## Overview
 
-Konductor is a production-grade Nix flake providing reproducible,
-multi-target development environments for polyglot projects. Built on the
-Single Source of Truth pattern, Konductor delivers consistent tooling across
-development shells, OCI containers, QCOW2 virtual machines, and system
-modules.
+Konductor is a Nix flake providing reproducible, multi-target development
+environments for polyglot projects. Built on the Single Source of Truth
+pattern, it delivers consistent tooling across development shells, OCI
+containers, QCOW2 virtual machines, and system modules.
 
 The flake architecture achieves hermetic configuration management through Nix
 wrapper scripts that inject config file paths at runtime, ensuring consistent
