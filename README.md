@@ -97,10 +97,50 @@ See [Lix installation guide](https://lix.systems/install/) for NixOS, nix-darwin
 
 </details>
 
-### Optional: Automated Setup with Mise
+### Use Konductor via Nix Registry
 
-For users who prefer task automation, Konductor provides mise tasks for
-setup and development workflows. Mise is optional but recommended.
+Register the flake for convenient access from any directory:
+
+```bash
+# Add konductor to your nix registry (one-time setup)
+nix registry add konductor github:braincraftio/konductor
+
+# Enter full polyglot environment from anywhere
+nix develop konductor#full
+```
+
+### Use Konductor from Local Clone
+
+Clone and run from the local directory:
+
+```bash
+git clone https://github.com/braincraftio/konductor.git
+nix develop ./konductor#full
+```
+
+### Development Shells
+
+```bash
+# Full polyglot environment (all languages + IDE)
+nix develop konductor#full
+
+# Language-specific shells
+nix develop konductor#python   # Python 3.12 + uv + ruff + mypy
+nix develop konductor#go       # Go 1.24 + gopls + delve
+nix develop konductor#node     # Node.js 22 + pnpm + biome
+nix develop konductor#rust     # Rust 1.82.0 + cargo + clippy
+
+# IDE-only shell (Neovim + Tmux + LazyGit)
+nix develop konductor#dev
+
+# Default shell (core tools, no language runtimes)
+nix develop konductor
+```
+
+### Optional: Task Automation with Mise
+
+For contributors and users who prefer task automation, Konductor provides
+mise tasks for development workflows.
 
 <details>
 <summary><b>Install Mise (if not installed)</b></summary>
@@ -124,48 +164,13 @@ more installation options (brew, apt, dnf, etc.).
 
 </details>
 
-With mise installed, clone and run the automated setup:
+With mise installed (from cloned repo):
 
 ```bash
-git clone https://github.com/braincraftio/konductor.git
 cd konductor
-mise run setup
-```
-
-### Enter Development Shells
-
-```bash
-# Default shell (core tools, no language runtimes)
-nix develop
-
-# Language-specific shells
-nix develop .#python   # Python 3.12 + uv + ruff + mypy
-nix develop .#go       # Go 1.24 + gopls + delve
-nix develop .#node     # Node.js 22 + pnpm + biome
-nix develop .#rust     # Rust 1.82.0 + cargo + clippy
-
-# IDE shell (Neovim + Tmux + LazyGit)
-nix develop .#dev
-
-# Everything (all languages + IDE)
-nix develop .#full
-```
-
-### Run Tasks
-
-```bash
-# Show all available commands
-mise run help
-
-# Lint and format codebase
-mise run lint
-mise run format
-
-# Update flake dependencies
-mise run nix:update
-
-# Health check environment
-mise run doctor
+mise run help    # Show all commands
+mise run lint    # Run all linters
+mise run format  # Format codebase
 ```
 
 ### Build Deployment Targets
