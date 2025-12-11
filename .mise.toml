@@ -76,7 +76,6 @@ min_disk_space_gb = "10"
 _.file = ".env"
 _.path = [
   "./.config/bin",
-  "$HOME/.nix-profile/bin",
   "/nix/var/nix/profiles/default/bin",
 ]
 

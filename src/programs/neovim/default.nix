@@ -399,6 +399,9 @@ let
           };
         };
         servers = {
+          # Explicitly disable removed LSP servers
+          ansiblels.enable = false;
+
           # Nix
           nil_ls = {
             enable = true;

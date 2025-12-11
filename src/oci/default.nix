@@ -9,11 +9,13 @@ let
   env = import ../lib/env.nix;
   shellContent = import ../lib/shell-content.nix { inherit lib; };
 
-  # Import packages (unwrapped for containers)
+  # Config provides wrapped linters/formatters with hermetic configuration
+  # This is REQUIRED - unwrapped tools violate configuration standards
+  config = import ../config { inherit pkgs lib versions; };
+
+  # Import packages with wrapped config (hermetic linters/formatters)
   packages = import ../packages {
-    inherit pkgs lib;
-    config = null;
-    inherit versions;
+    inherit pkgs lib config versions;
   };
 
   # Import programs (neovim, tmux) - same as flake devShells

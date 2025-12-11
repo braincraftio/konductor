@@ -21,15 +21,10 @@ in
       pkgs.nixpkgs-fmt
       pkgs.black
       pkgs.isort
-    ] else with pkgs; [
-      # Unwrapped formatters for containers
-      shfmt
-      nixpkgs-fmt
-      gofumpt
-      black
-      isort
-      nodePackages.prettier
-    ];
+    ] else
+      # ERROR: config must be provided for wrapped formatters
+      # Unwrapped formatters violate hermetic configuration standards
+      throw "formatters.nix requires config parameter - unwrapped formatters are not permitted";
 
   shellHook = "";
   env = { };

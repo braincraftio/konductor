@@ -1,32 +1,133 @@
 ---
 # Markdownlint CLI2 configuration
-# This file configures markdownlint-cli2 behavior (not the rules themselves)
+# https://github.com/DavidAnson/markdownlint-cli2
+#
+# Rules are defined inline under 'config:' for hermetic nix store compatibility.
+# The separate file reference pattern (config: path/to/file) doesn't work
+# reliably when configs are in /nix/store.
 
-# Use existing config for rules
-config: .markdownlint.yaml
-
-# Default glob patterns to process
-# Commented out - globs are now handled programmatically
-# globs: ["**/*.md", "**/*.markdown"]
-
-# Ignores - must be an array of globs
+# Ignores - files/directories to skip
 ignores:
-  # Dependencies
   - "node_modules/**"
   - ".npm-global/**"
   - "vendor/**"
-  # Generated/temporary files
   - ".reports/**"
   - "coverage/**"
   - "docs/generated/**"
   - ".cache/**"
   - "tmp/**"
   - ".tmp/**"
-  # Third-party files
   - "CHANGELOG.md"
   - "LICENSE.md"
-  # Version control
   - ".git/**"
 
-# Disable fixing - pre-commit hooks must be read-only
+# Disable auto-fix (pre-commit hooks must be read-only)
 fix: false
+
+# =============================================================================
+# Linting Rules Configuration
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+# =============================================================================
+config:
+  # ---------------------------------------------------------------------------
+  # Prettier-compatible overrides (from markdownlint/style/prettier.json)
+  # Disables rules that conflict with Prettier formatting
+  # ---------------------------------------------------------------------------
+  blanks-around-fences: false
+  blanks-around-headings: false
+  blanks-around-lists: false
+  code-fence-style: false
+  emphasis-style: false
+  heading-start-left: false
+  heading-style: false
+  hr-style: false
+  line-length: false
+  list-indent: false
+  list-marker-space: false
+  no-blanks-blockquote: false
+  no-hard-tabs: false
+  no-missing-space-atx: false
+  no-missing-space-closed-atx: false
+  no-multiple-blanks: false
+  no-multiple-space-atx: false
+  no-multiple-space-blockquote: false
+  no-multiple-space-closed-atx: false
+  no-trailing-spaces: false
+  ol-prefix: false
+  strong-style: false
+  ul-indent: false
+
+  # ---------------------------------------------------------------------------
+  # Project-specific rules
+  # ---------------------------------------------------------------------------
+
+  # Allow inline HTML for <details>, <summary>, collapsible sections
+  MD033: false
+
+  # Heading style (ATX with #)
+  MD003:
+    style: atx
+
+  # Unordered list style (dash)
+  MD004:
+    style: dash
+
+  # Allow same heading text in different sections
+  MD024:
+    siblings_only: true
+
+  # Single H1 at top of document
+  MD025:
+    level: 1
+
+  # Trailing punctuation in headings
+  MD026:
+    punctuation: ".,;:!。，；：！"
+
+  # Ordered list prefix style
+  MD029:
+    style: ordered
+
+  # Horizontal rule style
+  MD035:
+    style: "---"
+
+  # Emphasis as heading (allow with punctuation)
+  MD036:
+    punctuation: ".,;:!?。，；：！？"
+
+  # First line should be H1
+  MD041:
+    level: 1
+
+  # Required headings - disabled (project-specific)
+  MD043: false
+
+  # Proper names capitalization
+  MD044:
+    names:
+      - BrainCraft.io
+      - GitHub
+      - GitHub Actions
+      - JavaScript
+      - TypeScript
+      - Python
+      - Kubernetes
+      - VS Code
+      - API
+      - URL
+      - JSON
+      - YAML
+      - HTML
+      - CSS
+      - SQL
+    code_blocks: false
+    html_elements: false
+
+  # Code block style
+  MD046:
+    style: fenced
+
+  # Code fence style
+  MD048:
+    style: backtick

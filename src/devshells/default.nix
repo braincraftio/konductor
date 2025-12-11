@@ -16,8 +16,13 @@
 { pkgs, lib, versions, programs, ... }:
 
 let
+  # Config provides wrapped linters/formatters with hermetic configuration
+  # This is REQUIRED - unwrapped tools violate configuration standards
+  config = import ../config { inherit pkgs lib versions; };
+
   # Single source of truth for package composition
-  packages = import ../packages { inherit pkgs lib versions; };
+  # Config is passed to ensure all linters/formatters are wrapped
+  packages = import ../packages { inherit pkgs lib versions config; };
 
   # Base shell configuration (shared by all devshells)
   baseShell = import ./base.nix { inherit pkgs lib versions packages; };

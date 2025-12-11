@@ -1,6 +1,11 @@
 # src/lib/env.nix
 # SSOT for ALL environment variables across ALL targets
 # NO DUPLICATION - this is the ONLY place where env vars are defined
+#
+# NOTE: XDG Base Directory variables are NOT set here because they require
+# shell expansion of $HOME. Setting them in Nix env creates literal "$HOME"
+# directories. XDG vars are set in shellHook (devshells) and envExports
+# (containers/VMs) where bash properly expands $HOME.
 
 {
   # ===========================================================================
@@ -15,12 +20,6 @@
   # ===========================================================================
   LANG = "C.UTF-8";
   LC_ALL = "C.UTF-8";
-
-  # ===========================================================================
-  # XDG Base Directory Specification
-  # ===========================================================================
-  # NOTE: XDG vars are set in shellHook (base.nix) to properly expand $HOME
-  # Do NOT set them here - Nix env attrs don't expand shell variables
 
   # ===========================================================================
   # Terminal Configuration

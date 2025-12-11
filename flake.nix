@@ -16,27 +16,42 @@
   # ===========================================================================
   inputs = {
     # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    # GitHub API rate limits can cause 403 errors - use FlakeHub or configure access token
+    # See docs/GITHUB_AUTHENTICATION.md for token setup
+    # nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    # nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511.*";
+    nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
+    # flake-utils.url = "github:numtide/flake-utils";
+    flake-utils.url = "https://flakehub.com/f/numtide/flake-utils/*";
 
+    # nix2container not available on FlakeHub - requires GitHub token for updates
     nix2container = {
-      url = "github:nlewo/nix2container";
+      # url = "github:nlewo/nix2container";
+      url = "git+https://github.com/nlewo/nix2container";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nixos-generators = {
-      url = "github:nix-community/nixos-generators";
+      # url = "github:nix-community/nixos-generators";
+      url = "https://flakehub.com/f/nix-community/nixos-generators/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     rust-overlay = {
-      url = "github:oxalica/rust-overlay";
+      # url = "github:oxalica/rust-overlay";
+      # url = "git+https://github.com/oxalica/rust-overlay";
+      url = "https://flakehub.com/f/oxalica/rust-overlay/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
+    # FIXME: ansible-language-server was removed from nixpkgs 25.11
+    # Upstream issue needed in nixvim to handle this gracefully
     nixvim = {
+      # url = "github:nix-community/nixvim/nixos-25.05";
+      # url = "https://flakehub.com/f/nix-community/nixvim/*";
+      # url = "https://flakehub.com/f/nix-community/nixvim/0.1.805";
       url = "github:nix-community/nixvim/nixos-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -115,19 +130,23 @@
     // {
       overlays.default = nixpkgs.lib.composeManyExtensions overlays;
 
-      # NixOS module - recognized by both Nix and Lix
+      # NixOS module - standard flake output per `nix flake check --help`
       nixosModules = {
         konductor = import ./src/modules/nixos.nix;
         default = import ./src/modules/nixos.nix;
       };
 
-      # Home Manager module
-      homeModules = {
+      # Home Manager module - convention from nix-community/home-manager
+      # Not a standard flake output - `nix flake check` warns "unknown flake output"
+      # This is expected and harmless; home-manager recognizes this output
+      homeManagerModules = {
         konductor = import ./src/modules/home-manager.nix;
         default = import ./src/modules/home-manager.nix;
       };
 
-      # nix-darwin module - recognized by both Nix and Lix
+      # nix-darwin module - convention from LnL7/nix-darwin
+      # Not a standard flake output - `nix flake check` warns "unknown flake output"
+      # This is expected and harmless; nix-darwin recognizes this output
       darwinModules = {
         konductor = import ./src/modules/darwin.nix;
         default = import ./src/modules/darwin.nix;

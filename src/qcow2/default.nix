@@ -8,9 +8,13 @@ let
   users = import ../lib/users.nix;
   env = import ../lib/env.nix;
 
-  # Import packages from src/packages/
+  # Config provides wrapped linters/formatters with hermetic configuration
+  # This is REQUIRED - unwrapped tools violate configuration standards
+  config = import ../config { inherit pkgs lib versions; };
+
+  # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
-    inherit pkgs lib versions;
+    inherit pkgs lib versions config;
   };
 
 in

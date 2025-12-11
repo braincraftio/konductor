@@ -26,16 +26,10 @@ in
       pkgs.actionlint
       pkgs.statix
       pkgs.deadnix
-    ] else with pkgs; [
-      # Unwrapped linters for containers
-      shellcheck
-      ruff
-      yamllint
-      hadolint
-      actionlint
-      statix
-      deadnix
-    ];
+    ] else
+      # ERROR: config must be provided for wrapped linters
+      # Unwrapped linters violate hermetic configuration standards
+      throw "linters.nix requires config parameter - unwrapped linters are not permitted";
 
   shellHook = "";
   env = { };

@@ -2,7 +2,7 @@
 # Home Manager module
 #
 # Usage:
-#   imports = [ inputs.konductor.homeModules.default ];
+#   imports = [ inputs.konductor.homeManagerModules.default ];
 #   konductor.enable = true;
 
 { config, pkgs, lib, ... }:
