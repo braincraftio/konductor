@@ -324,3 +324,129 @@ print_status info "Removing bcio from registry..."
 nix registry remove bcio 2>/dev/null || true
 print_status success "Registry entry removed"
 '''
+
+# =============================================================================
+# QCOW2 VM IMAGE
+# =============================================================================
+
+["nix:qcow2"]
+description = "💽 Build QCOW2 VM image and prepare for local testing • nq"
+alias = ["nq"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Building QCOW2 VM Image"
+
+# Build the qcow2 image
+print_status info "Building QCOW2 image (this may take a few minutes)..."
+cd "${MISE_PROJECT_ROOT}"
+nix build .#qcow2
+
+# Take ownership of result directory (nix store is read-only)
+print_status info "Taking ownership of result directory..."
+sudo chown -R "${USER}:${USER}" result/
+sudo chmod -R u+w result/
+
+# Create cloud-init user-data for local testing
+print_status info "Creating cloud-init configuration..."
+CLOUD_INIT_DIR="/tmp/konductor-cloud-init"
+mkdir -p "${CLOUD_INIT_DIR}"
+
+# Detect user SSH public key
+SSH_KEY=""
+if [ -f "${HOME}/.ssh/id_ed25519.pub" ]; then
+    SSH_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
+elif [ -f "${HOME}/.ssh/id_rsa.pub" ]; then
+    SSH_KEY=$(cat "${HOME}/.ssh/id_rsa.pub")
+fi
+
+# Create meta-data
+cat > "${CLOUD_INIT_DIR}/meta-data" << 'METADATA'
+instance-id: konductor-local
+local-hostname: konductor
+METADATA
+
+# Create user-data
+cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
+#cloud-config
+users:
+  - name: kc2
+    gecos: Konductor User
+    groups: users
+    shell: /bin/bash
+    plain_text_passwd: kc2
+    lock_passwd: false
+USERDATA
+
+# Add kc2admin with sudo access
+cat >> "${CLOUD_INIT_DIR}/user-data" << USERDATA
+  - name: kc2admin
+    gecos: Konductor Admin
+    groups: users, wheel
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    plain_text_passwd: kc2admin
+    lock_passwd: false
+USERDATA
+
+# Add SSH key if available
+if [ -n "${SSH_KEY}" ]; then
+    cat >> "${CLOUD_INIT_DIR}/user-data" << USERDATA
+    ssh_authorized_keys:
+      - ${SSH_KEY}
+USERDATA
+    print_status success "SSH key detected and added to cloud-init"
+else
+    print_status warn "No SSH key found in ~/.ssh/ - password auth only"
+fi
+
+# Create cloud-init ISO (NoCloud datasource)
+print_status info "Creating cloud-init ISO..."
+if command -v genisoimage >/dev/null 2>&1; then
+    genisoimage -output "${CLOUD_INIT_DIR}/seed.iso" \
+        -volid cidata -joliet -rock \
+        "${CLOUD_INIT_DIR}/user-data" "${CLOUD_INIT_DIR}/meta-data" 2>/dev/null
+elif command -v mkisofs >/dev/null 2>&1; then
+    mkisofs -output "${CLOUD_INIT_DIR}/seed.iso" \
+        -volid cidata -joliet -rock \
+        "${CLOUD_INIT_DIR}/user-data" "${CLOUD_INIT_DIR}/meta-data" 2>/dev/null
+else
+    print_status error "Neither genisoimage nor mkisofs found. Install cdrtools or cdrkit."
+    exit 1
+fi
+
+print_status success "QCOW2 image ready!"
+
+printf '\n'
+print_header "Launch Commands"
+
+printf '\n%bSerial Console (interactive):%b\n' "${BOLD}" "${NC}"
+printf '  qemu-system-x86_64 -m 4096 -hda %s/result/nixos.qcow2 \\\n' "${MISE_PROJECT_ROOT}"
+printf '    -cdrom %s/seed.iso \\\n' "${CLOUD_INIT_DIR}"
+printf '    -enable-kvm -nographic -serial mon:stdio \\\n'
+printf '    -net nic -net user,hostfwd=tcp::2222-:22\n'
+
+printf '\n%bHeadless (SSH access):%b\n' "${BOLD}" "${NC}"
+printf '  qemu-system-x86_64 -m 4096 -hda %s/result/nixos.qcow2 \\\n' "${MISE_PROJECT_ROOT}"
+printf '    -cdrom %s/seed.iso \\\n' "${CLOUD_INIT_DIR}"
+printf '    -enable-kvm -daemonize \\\n'
+printf '    -net nic -net user,hostfwd=tcp::2222-:22\n'
+printf '\n  # Then SSH:\n'
+printf '  ssh -p 2222 kc2@localhost\n'
+printf '  ssh -p 2222 kc2admin@localhost  # (sudo access)\n'
+
+printf '\n%bCredentials:%b\n' "${BOLD}" "${NC}"
+printf '  kc2      / kc2       (unprivileged user)\n'
+printf '  kc2admin / kc2admin  (sudo access)\n'
+
+if [ -n "${SSH_KEY}" ]; then
+    printf '\n%bSSH Key:%b Your public key has been injected\n' "${BOLD}" "${NC}"
+fi
+
+printf '\n%bKVM Access:%b If permission denied, run:\n' "${BOLD}" "${NC}"
+printf '  sudo usermod -aG kvm $USER && newgrp kvm\n'
+'''

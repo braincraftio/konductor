@@ -182,9 +182,7 @@ docker load < result
 docker run --rm -it $(cat result)
 
 # QCOW2 VM image (Linux only)
-nix build .#qcow2
-sudo chown -R $USER:$USER result/ && sudo chmod -R u+w result/
-qemu-system-x86_64 -m 4096 -hda result/nixos.qcow2 -enable-kvm
+mise run nix:qcow2
 ```
 
 ---
@@ -251,29 +249,39 @@ support for AWS, GCP, Azure, and OpenStack provisioning.
 sudo usermod -aG kvm $USER
 newgrp kvm
 
-# Build image and take ownership (nix store is read-only)
-nix build .#qcow2
-sudo chown -R $USER:$USER result/ && sudo chmod -R u+w result/
+# Build image and create cloud-init ISO
+mise run nix:qcow2
+```
 
-# Test locally with GUI
-qemu-system-x86_64 \
-  -m 4096 \
+Launch with serial console (interactive):
+
+```bash
+qemu-system-x86_64 -m 4096 \
   -hda result/nixos.qcow2 \
-  -enable-kvm \
+  -cdrom /tmp/konductor-cloud-init/seed.iso \
+  -enable-kvm -nographic -serial mon:stdio \
   -net nic -net user,hostfwd=tcp::2222-:22
+```
 
-# Or headless with serial console
-qemu-system-x86_64 \
-  -m 4096 \
+Launch headless (SSH access):
+
+```bash
+qemu-system-x86_64 -m 4096 \
   -hda result/nixos.qcow2 \
-  -enable-kvm \
-  -nographic \
-  -serial mon:stdio \
+  -cdrom /tmp/konductor-cloud-init/seed.iso \
+  -enable-kvm -daemonize \
   -net nic -net user,hostfwd=tcp::2222-:22
 
 # SSH access
 ssh -p 2222 kc2@localhost
+ssh -p 2222 kc2admin@localhost  # sudo access
 ```
+
+Credentials (set via cloud-init):
+
+- `kc2` / `kc2` - unprivileged user
+- `kc2admin` / `kc2admin` - sudo access
+- SSH key auto-injected from `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`
 
 Configuration includes:
 
