@@ -5,7 +5,17 @@
 {
   description = "Konductor: Polyglot Development Environment";
 
+  # ===========================================================================
+  # Flake Inputs
+  # ===========================================================================
+  # VERSION SYNC: nixpkgs channel version is defined in src/lib/versions.nix
+  # Flake inputs cannot import nix files, so version must be duplicated here.
+  # When updating nixos.channel in versions.nix, also update:
+  #   - nixpkgs.url branch below
+  #   - nixvim.url branch below (must match nixpkgs)
+  # ===========================================================================
   inputs = {
+    # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
@@ -25,9 +35,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     nixvim = {
-      url = "github:nix-community/nixvim";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
+      url = "github:nix-community/nixvim/nixos-25.11";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 

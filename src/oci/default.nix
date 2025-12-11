@@ -1,7 +1,7 @@
 # src/oci/default.nix
-# OCI container build
+# OCI container target
 
-{ pkgs, lib, nix2container, ... }:
+{ pkgs, lib, inputs, nix2container }:
 
 let
   versions = import ../lib/versions.nix;
@@ -9,10 +9,15 @@ let
   env = import ../lib/env.nix;
   shellContent = import ../lib/shell-content.nix { inherit lib; };
 
-  # Import packages from src/packages/
-  devshellPackages = import ../packages {
-    inherit pkgs lib versions;
+  # Import packages (unwrapped for containers)
+  packages = import ../packages {
+    inherit pkgs lib;
+    config = null;
+    inherit versions;
   };
+
+  # Import programs (neovim, tmux) - same as flake devShells
+  programs = import ../programs { inherit pkgs lib inputs; };
 
   # Nix build users configuration
   nixbld = {
@@ -162,9 +167,10 @@ let
     chmod -R u+rwX,go+rX $out/home/kc2 $out/home/kc2admin $out/root
   '';
 
-  # Standard directories (no /tmp - must be created at runtime in Dockerfile)
+  # Standard directories
   standardDirs = pkgs.runCommand "standard-dirs" { } ''
-    mkdir -p $out/var/empty
+    mkdir -p $out/tmp $out/var/empty
+    chmod 1777 $out/tmp
   '';
 
   # Nix configuration for containers
@@ -172,11 +178,8 @@ let
     experimental-features = nix-command flakes
     sandbox = false
     filter-syscalls = false
-    accept-flake-config = true
-    trusted-users = root kc2 kc2admin
-    substituters = https://cache.nixos.org https://nix-community.cachix.org
-    trusted-substituters = https://cache.nixos.org https://nix-community.cachix.org
-    trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+    extra-substituters = https://nix-community.cachix.org
+    extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
   '';
 
   # Pre-configured flake registry
@@ -193,8 +196,10 @@ let
   # Root filesystem combining all system files
   rootEnv = pkgs.buildEnv {
     name = "konductor-root";
-    # Use devshellPackages.default (no languages, no IDE)
-    paths = devshellPackages.default ++ [
+    paths = packages.default
+      ++ programs.neovim.packages
+      ++ programs.tmux.packages
+      ++ [
       passwdFile
       groupFile
       shadowFile
@@ -310,6 +315,6 @@ in
       };
     };
 
-    maxLayers = 100;
+    maxLayers = 256;
   };
 }

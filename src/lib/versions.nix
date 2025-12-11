@@ -4,6 +4,18 @@
 
 {
   # ===========================================================================
+  # NixOS/Nixpkgs Release Channel
+  # ===========================================================================
+  # IMPORTANT: This is the canonical version reference.
+  # When changing, also update these locations (flake inputs cannot import nix files):
+  #   - flake.nix: nixpkgs.url and nixvim.url branches
+  #   - src/qcow2/default.nix: system.stateVersion
+  nixos = {
+    channel = "25.11";       # NixOS release channel (e.g., "25.11", "24.11")
+    stateVersion = "25.11";  # NixOS stateVersion for VMs
+  };
+
+  # ===========================================================================
   # Language Runtimes
   # ===========================================================================
   languages = {

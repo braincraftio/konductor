@@ -22,7 +22,8 @@ in
     modules = [
       {
         # Basic system configuration
-        system.stateVersion = "25.11";
+        # stateVersion from src/lib/versions.nix nixos.stateVersion
+        system.stateVersion = versions.nixos.stateVersion;
         networking.hostName = "konductor";
         networking.useNetworkd = true;
         systemd.network.enable = true;
