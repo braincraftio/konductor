@@ -1,5 +1,8 @@
 # src/config/shell/starship.nix
-# Starship prompt configuration
+# Starship prompt configuration wrapper
+#
+# Config is defined inline (no separate file needed for this simple config).
+# The wrapper forces config via STARSHIP_CONFIG env var with no escape hatch.
 
 { pkgs }:
 
@@ -39,12 +42,25 @@ let
     style = "bold blue"
   '';
 
-  configFile = pkgs.writeText "konductor-starship.toml" configContent;
+  # Config file - written to nix store
+  configFile = pkgs.writeTextFile {
+    name = "konductor-starship-config";
+    destination = "/starship.toml";
+    text = configContent;
+  };
 
 in
 {
-  # Starship package
-  package = pkgs.starship;
+  # Wrapped starship that forces hermetic config
+  package = pkgs.writeShellApplication {
+    name = "starship";
+    runtimeInputs = [ pkgs.starship ];
+    text = ''
+      export STARSHIP_CONFIG="${configFile}/starship.toml"
+      exec starship "$@"
+    '';
+  };
+
   unwrapped = pkgs.starship;
 
   # Config file

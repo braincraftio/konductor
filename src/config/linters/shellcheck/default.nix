@@ -1,11 +1,18 @@
 # src/config/linters/shellcheck/default.nix
 # Hermetic wrapper for shellcheck
+#
+# Config is maintained in native format (.shellcheckrc) for easy contribution.
+# The wrapper forces config via --rcfile flag with no escape hatch.
 
 { pkgs, ... }:
 
 let
-  localConfigFile = ./.shellcheckrc;
-  configFile = "${localConfigFile}";
+  # Config file - native format, copied to nix store
+  configFile = pkgs.writeTextFile {
+    name = "shellcheck-config";
+    destination = "/.shellcheckrc";
+    text = builtins.readFile ./.shellcheckrc;
+  };
 in
 {
   # Wrapped version
@@ -13,7 +20,7 @@ in
     name = "shellcheck";
     runtimeInputs = [ pkgs.shellcheck ];
     text = ''
-      exec shellcheck --rcfile="${configFile}" "$@"
+      exec shellcheck --rcfile="${configFile}/.shellcheckrc" "$@"
     '';
   };
 

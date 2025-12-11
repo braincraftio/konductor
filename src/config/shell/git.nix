@@ -1,6 +1,8 @@
 # src/config/shell/git.nix
-# Git configuration
-# Uses centralized shell-content from SSOT
+# Git configuration wrapper
+#
+# Config is generated from centralized shell-content.nix SSOT.
+# The wrapper forces config via GIT_CONFIG_GLOBAL env var with no escape hatch.
 
 { pkgs, lib }:
 
@@ -8,12 +10,25 @@ let
   # Import centralized shell content
   shellContent = import ../../lib/shell-content.nix { inherit lib; };
 
-  configFile = pkgs.writeText "konductor-gitconfig" shellContent.gitconfigContent;
+  # Config file - written to nix store
+  configFile = pkgs.writeTextFile {
+    name = "konductor-gitconfig";
+    destination = "/.gitconfig";
+    text = shellContent.gitconfigContent;
+  };
 
 in
 {
-  # Git package
-  package = pkgs.git;
+  # Wrapped git that forces hermetic config
+  package = pkgs.writeShellApplication {
+    name = "git";
+    runtimeInputs = [ pkgs.git ];
+    text = ''
+      export GIT_CONFIG_GLOBAL="${configFile}/.gitconfig"
+      exec git "$@"
+    '';
+  };
+
   unwrapped = pkgs.git;
 
   # Config file
