@@ -183,6 +183,7 @@ docker run --rm -it $(cat result)
 
 # QCOW2 VM image (Linux only)
 nix build .#qcow2
+sudo chown -R $USER:$USER result/ && sudo chmod -R u+w result/
 qemu-system-x86_64 -m 4096 -hda result/nixos.qcow2 -enable-kvm
 ```
 
@@ -246,13 +247,28 @@ NixOS 25.11 virtual machine images for cloud deployment with cloud-init
 support for AWS, GCP, Azure, and OpenStack provisioning.
 
 ```bash
-nix build .#qcow2
+# Ensure KVM access (one-time setup)
+sudo usermod -aG kvm $USER
+newgrp kvm
 
-# Test locally
+# Build image and take ownership (nix store is read-only)
+nix build .#qcow2
+sudo chown -R $USER:$USER result/ && sudo chmod -R u+w result/
+
+# Test locally with GUI
 qemu-system-x86_64 \
   -m 4096 \
   -hda result/nixos.qcow2 \
   -enable-kvm \
+  -net nic -net user,hostfwd=tcp::2222-:22
+
+# Or headless with serial console
+qemu-system-x86_64 \
+  -m 4096 \
+  -hda result/nixos.qcow2 \
+  -enable-kvm \
+  -nographic \
+  -serial mon:stdio \
   -net nic -net user,hostfwd=tcp::2222-:22
 
 # SSH access
