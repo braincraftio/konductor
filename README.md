@@ -6,7 +6,7 @@ complete configuration isolation and reproducible builds.
 [![Nix Flake](https://img.shields.io/badge/Nix-Flake-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![NixOS 25.11](https://img.shields.io/badge/NixOS-25.11-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/containercraft/konductor)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/braincraftio/konductor)
 
 ---
 
