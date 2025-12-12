@@ -417,14 +417,14 @@ write_files:
     permissions: '0440'
 
 runcmd:
-  # Pre-build devshell closure (full path required - runcmd has minimal PATH)
-  - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
-  # Start services after devshell is ready
-  - systemctl start docker
-  - systemctl start libvirtd
-  # Mount 9p workspace if virtfs device exists (runs last to ensure device is ready)
+  # Mount 9p workspace first (if virtfs device exists)
   - mkdir -p /workspace
   - mount -t 9p -o trans=virtio host /workspace || true
+  # Start services
+  - systemctl start docker
+  - systemctl start libvirtd
+  # Pre-build devshell closure (runs in background, can take minutes)
+  - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
 USERDATA
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"

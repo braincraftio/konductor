@@ -233,8 +233,8 @@ docker run --rm -it -u kc2admin ghcr.io/braincraftio/konductor:latest
 
 User model:
 
-- `kc2` (UID 1000): Default unprivileged user for CI/CD workflows
 - `kc2admin` (UID 1001): Admin user with passwordless sudo (wheel group)
+- `kc2` (UID 1002): Unprivileged user for CI/CD workflows
 
 Includes: Core tools, network utilities, linters, formatters, Neovim, Tmux
 
@@ -266,6 +266,7 @@ mise run nix:qcow2
 | `mise run nix:qcow2:start` | `nqs` | Start existing VM in background |
 | `mise run nix:qcow2:stop` | `nqx` | Stop running VM |
 | `mise run nix:qcow2:deploy` | `nqd` | Build + start VM (full rebuild) |
+| `mise run nix:qcow2:deploy:console` | `nqdc` | Build + start VM with serial console |
 
 </details>
 
@@ -323,7 +324,7 @@ ssh -p 2222 kc2@localhost
 ssh -p 2222 kc2admin@localhost
 ```
 
-SSH sessions automatically enter the default devshell (`nix develop konductor`).
+SSH sessions automatically enter the default devshell (uses `/workspace` if mounted, otherwise `nix develop konductor`).
 
 **Launch with shared repo (full performance + 9p filesystem):**
 
@@ -339,12 +340,7 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 8192 -cpu host -smp 4 \
   -nographic -serial mon:stdio
 ```
 
-Inside VM - mount the shared repo:
-
-```bash
-sudo mkdir -p /workspace
-sudo mount -t 9p -o trans=virtio host /workspace
-```
+Inside VM, `/workspace` is auto-mounted by cloud-init. Enter the self-hosting shell:
 
 ```bash
 cd /workspace && nix develop konductor#konductor
@@ -359,10 +355,10 @@ cd /workspace && nix develop konductor#konductor
 
 **Cloud-init auto-setup:**
 
+- 9p workspace mounted at `/workspace` (when virtfs device present)
 - Docker and libvirtd services started (not enabled on boot for lean startup)
 - Default devshell pre-built in image for instant shell entry
 - SSH sessions auto-enter devshell for interactive use
-- 9p workspace mounted at `/workspace` when virtfs device present
 
 **Configuration includes:**
 
