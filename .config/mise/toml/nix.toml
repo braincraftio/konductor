@@ -341,6 +341,17 @@ SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
 
 print_header "Building QCOW2 VM Image"
 
+# Remove previous build and clean nix store to ensure fresh image
+if [ -L "${MISE_PROJECT_ROOT}/result" ] || [ -e "${MISE_PROJECT_ROOT}/result" ]; then
+    print_status info "Cleaning previous QCOW2 build..."
+    OLD_PATH=$(readlink -f "${MISE_PROJECT_ROOT}/result" 2>/dev/null || true)
+    rm -rf "${MISE_PROJECT_ROOT}/result"
+    # Delete old store path if it exists
+    if [ -n "$OLD_PATH" ] && [ -d "$OLD_PATH" ]; then
+        nix store delete "$OLD_PATH" 2>/dev/null || true
+    fi
+fi
+
 # Build the qcow2 image
 print_status info "Building QCOW2 image (this may take a few minutes)..."
 cd "${MISE_PROJECT_ROOT}"
