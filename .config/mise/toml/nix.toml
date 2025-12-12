@@ -381,13 +381,27 @@ instance-id: konductor-local
 local-hostname: konductor
 METADATA
 
+# Get host user info for dynamic user creation
+HOST_USER="${USER:-$(whoami)}"
+HOST_UID="$(id -u)"
+
 # Create user-data with full konductor setup
 # Build user list with optional SSH key
 if [ -n "${SSH_KEY}" ]; then
     print_status success "SSH key detected and added to cloud-init"
+    print_status info "Host user '${HOST_USER}' (uid ${HOST_UID}) will be created in VM"
     cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
 #cloud-config
 users:
+  - name: ${HOST_USER}
+    uid: ${HOST_UID}
+    gecos: Host User (${HOST_USER})
+    groups: users, wheel, docker, libvirtd, kvm
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${SSH_KEY}
   - name: kc2
     gecos: Konductor User
     groups: users, docker, libvirtd, kvm
@@ -417,6 +431,10 @@ write_files:
         echo ""
       fi
     permissions: '0644'
+  - path: /etc/sudoers.d/kc2-power
+    content: |
+      kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
+    permissions: '0440'
 
 runcmd:
   # Pre-build devshell closure (full path required - runcmd has minimal PATH)
@@ -430,9 +448,18 @@ runcmd:
 USERDATA
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"
-    cat > "${CLOUD_INIT_DIR}/user-data" << 'USERDATA'
+    print_status info "Host user '${HOST_USER}' (uid ${HOST_UID}) will be created in VM"
+    cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
 #cloud-config
 users:
+  - name: ${HOST_USER}
+    uid: ${HOST_UID}
+    gecos: Host User (${HOST_USER})
+    groups: users, wheel, docker, libvirtd, kvm
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    plain_text_passwd: ${HOST_USER}
+    lock_passwd: false
   - name: kc2
     gecos: Konductor User
     groups: users, docker, libvirtd, kvm
@@ -451,17 +478,21 @@ write_files:
   - path: /etc/profile.d/konductor.sh
     content: |
       # Auto-hint for konductor devshell
-      if [ -z "$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
+      if [ -z "\$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
         echo ""
         echo "Konductor VM ready! Enter devshell with:"
         echo "  nix develop konductor#konductor"
         echo ""
       fi
     permissions: '0644'
+  - path: /etc/sudoers.d/kc2-power
+    content: |
+      kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
+    permissions: '0440'
 
 runcmd:
   # Pre-build devshell closure (full path required - runcmd has minimal PATH)
-  - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
+  - /run/current-system/sw/bin/nix build "konductor#devShells.\$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
   - systemctl start docker
   - systemctl start libvirtd
@@ -524,6 +555,7 @@ printf '  sudo mount -t 9p -o trans=virtio host /workspace\n'
 printf '  cd /workspace && nix develop konductor#konductor\n'
 
 printf '\n%bCredentials:%b\n' "${BOLD}" "${NC}"
+printf '  %s (SSH key only, sudo access)\n' "${HOST_USER}"
 printf '  kc2      / kc2       (unprivileged user)\n'
 printf '  kc2admin / kc2admin  (sudo access)\n'
 
@@ -532,10 +564,59 @@ if [ -n "${SSH_KEY}" ]; then
 fi
 
 printf '\n%bCloud-Init Auto-Setup:%b\n' "${BOLD}" "${NC}"
+printf '  - Host user %s (uid %s) created with sudo access\n' "${HOST_USER}" "${HOST_UID}"
 printf '  - docker and libvirtd services started\n'
+printf '  - /workspace auto-mounted (if virtfs provided)\n'
 printf '  - konductor#konductor devshell pre-built\n'
 printf '  - Enter with: nix develop konductor#konductor\n'
 
 printf '\n%bKVM Access:%b If permission denied, run:\n' "${BOLD}" "${NC}"
 printf '  sudo usermod -aG kvm $USER && newgrp kvm\n'
+'''
+
+# =============================================================================
+# QCOW2 Run Task
+# =============================================================================
+
+["nix:qcow2:run"]
+description = "🚀 Build and launch QCOW2 VM with shared workspace • nqr"
+alias = ["nqr"]
+depends = ["nix:qcow2"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Launching QCOW2 VM"
+
+CLOUD_INIT_DIR="/tmp/konductor-cloud-init"
+
+# Check KVM access
+if [ ! -w /dev/kvm ]; then
+    print_status error "No write access to /dev/kvm"
+    printf '\nRun: sudo usermod -aG kvm $USER && newgrp kvm\n'
+    exit 1
+fi
+
+print_status info "Starting VM with shared workspace at /workspace"
+print_status info "SSH: ssh ${USER}@localhost -p 2222"
+print_status info "Exit: Ctrl-A X (or 'sudo poweroff' in VM)"
+printf '\n'
+
+exec qemu-system-x86_64 \
+    -machine q35,accel=kvm \
+    -m 8192 \
+    -cpu host \
+    -smp 4 \
+    -drive file="${MISE_PROJECT_ROOT}/result/nixos.qcow2,if=virtio,format=qcow2" \
+    -drive file="${CLOUD_INIT_DIR}/seed.iso,media=cdrom" \
+    -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+    -device virtio-net-pci,netdev=net0 \
+    -device virtio-balloon-pci \
+    -device virtio-rng-pci \
+    -virtfs "local,path=${MISE_PROJECT_ROOT},mount_tag=host,security_model=mapped-xattr" \
+    -nographic \
+    -serial mon:stdio
 '''
