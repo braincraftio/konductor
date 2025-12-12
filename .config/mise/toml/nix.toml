@@ -386,7 +386,8 @@ HOST_USER="${USER:-$(whoami)}"
 HOST_UID="$(id -u)"
 
 # Create user-data with full konductor setup
-# Build user list with optional SSH key
+# Note: kc2admin (uid 1001) and kc2 (uid 1002) are pre-created in NixOS image
+# uid 1000 is reserved for the dynamic host user for 9p file ownership compatibility
 if [ -n "${SSH_KEY}" ]; then
     print_status success "SSH key detected and added to cloud-init"
     print_status info "Host user '${HOST_USER}' (uid ${HOST_UID}) will be created in VM"
@@ -397,26 +398,15 @@ users:
     uid: ${HOST_UID}
     gecos: Host User (${HOST_USER})
     groups: users, wheel, docker, libvirtd, kvm
-    shell: /bin/bash
+    shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - ${SSH_KEY}
-  - name: kc2
-    gecos: Konductor User
-    groups: users, docker, libvirtd, kvm
-    shell: /bin/bash
-    plain_text_passwd: kc2
-    lock_passwd: false
+  - name: kc2admin
     ssh_authorized_keys:
       - ${SSH_KEY}
-  - name: kc2admin
-    gecos: Konductor Admin
-    groups: users, wheel, docker, libvirtd, kvm
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    plain_text_passwd: kc2admin
-    lock_passwd: false
+  - name: kc2
     ssh_authorized_keys:
       - ${SSH_KEY}
 
@@ -448,7 +438,7 @@ runcmd:
 USERDATA
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"
-    print_status info "Host user '${HOST_USER}' (uid ${HOST_UID}) will be created in VM"
+    print_status info "Host user '${HOST_USER}' (uid ${HOST_UID}) will be created in VM (password: ${HOST_USER})"
     cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
 #cloud-config
 users:
@@ -456,22 +446,9 @@ users:
     uid: ${HOST_UID}
     gecos: Host User (${HOST_USER})
     groups: users, wheel, docker, libvirtd, kvm
-    shell: /bin/bash
+    shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     plain_text_passwd: ${HOST_USER}
-    lock_passwd: false
-  - name: kc2
-    gecos: Konductor User
-    groups: users, docker, libvirtd, kvm
-    shell: /bin/bash
-    plain_text_passwd: kc2
-    lock_passwd: false
-  - name: kc2admin
-    gecos: Konductor Admin
-    groups: users, wheel, docker, libvirtd, kvm
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    plain_text_passwd: kc2admin
     lock_passwd: false
 
 write_files:

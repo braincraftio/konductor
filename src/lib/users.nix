@@ -2,10 +2,12 @@
 # SSOT for user/group definitions across all targets
 
 {
-  # Admin user with sudo (uid 1000 for host file ownership compatibility)
+  # uid 1000 reserved for dynamic host user (created by cloud-init)
+
+  # Admin user with sudo
   kc2admin = {
-    uid = 1000;
-    gid = 1000;
+    uid = 1001;
+    gid = 1001;
     name = "kc2admin";
     home = "/home/kc2admin";
     shell = "/bin/bash";
@@ -15,8 +17,8 @@
 
   # Unprivileged user
   kc2 = {
-    uid = 1001;
-    gid = 1001;
+    uid = 1002;
+    gid = 1002;
     name = "kc2";
     home = "/home/kc2";
     shell = "/bin/bash";
@@ -26,8 +28,8 @@
 
   # Group definitions
   groups = {
-    kc2admin = { gid = 1000; members = [ "kc2" ]; };
-    kc2 = { gid = 1001; members = [ ]; };
+    kc2admin = { gid = 1001; members = [ "kc2" ]; };
+    kc2 = { gid = 1002; members = [ ]; };
     wheel = { gid = 10; members = [ "kc2admin" ]; };
   };
 }

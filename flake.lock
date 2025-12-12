@@ -31,7 +31,7 @@
         "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "revCount": 102,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/numtide/flake-utils/0.1.102%2Brev-11707dc2f618dd54ca8739b309ec4fc024de578b/0193276d-5b8f-7dbc-acf1-41cb7b54ad2e/source.tar.gz?rev=11707dc2f618dd54ca8739b309ec4fc024de578b&revCount=102"
+        "url": "https://api.flakehub.com/f/pinned/numtide/flake-utils/0.1.102%2Brev-11707dc2f618dd54ca8739b309ec4fc024de578b/0193276d-5b8f-7dbc-acf1-41cb7b54ad2e/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -132,7 +132,7 @@
         "rev": "032a1878682fafe829edfcf5fdfad635a2efe748",
         "revCount": 485,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/nix-community/nixos-generators/0.1.485%2Brev-032a1878682fafe829edfcf5fdfad635a2efe748/019ac48c-d508-7464-bf8b-01592eec05ad/source.tar.gz?rev=032a1878682fafe829edfcf5fdfad635a2efe748&revCount=485"
+        "url": "https://api.flakehub.com/f/pinned/nix-community/nixos-generators/0.1.485%2Brev-032a1878682fafe829edfcf5fdfad635a2efe748/019ac48c-d508-7464-bf8b-01592eec05ad/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -146,7 +146,7 @@
         "rev": "09eb77e94fa25202af8f3e81ddc7353d9970ac1b",
         "revCount": 903162,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2511.903162%2Brev-09eb77e94fa25202af8f3e81ddc7353d9970ac1b/019b095a-7dde-7122-8fd5-afa2e9e17894/source.tar.gz?rev=09eb77e94fa25202af8f3e81ddc7353d9970ac1b&revCount=903162"
+        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2511.903162%2Brev-09eb77e94fa25202af8f3e81ddc7353d9970ac1b/019b095a-7dde-7122-8fd5-afa2e9e17894/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -160,7 +160,7 @@
         "rev": "09eb77e94fa25202af8f3e81ddc7353d9970ac1b",
         "revCount": 903162,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2511.903162%2Brev-09eb77e94fa25202af8f3e81ddc7353d9970ac1b/019b095a-7dde-7122-8fd5-afa2e9e17894/source.tar.gz?rev=09eb77e94fa25202af8f3e81ddc7353d9970ac1b&revCount=903162"
+        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.2511.903162%2Brev-09eb77e94fa25202af8f3e81ddc7353d9970ac1b/019b095a-7dde-7122-8fd5-afa2e9e17894/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -232,12 +232,12 @@
         ]
       },
       "locked": {
-        "lastModified": 1765465581,
-        "narHash": "sha256-fCXT0aZXmTalM3NPCTedVs9xb0egBG5BOZkcrYo5PGE=",
-        "rev": "99cc5667eece98bb35dcf35f7e511031a8b7a125",
-        "revCount": 2007,
+        "lastModified": 1765507345,
+        "narHash": "sha256-fq34mBLvAgv93EuZjGp7cVV633pxnph9AVuB/Ql5y5Q=",
+        "rev": "a9471b23bf656d69ceb2d5ddccdc5082d51fc0e3",
+        "revCount": 2008,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/oxalica/rust-overlay/0.1.2007%2Brev-99cc5667eece98bb35dcf35f7e511031a8b7a125/019b0df4-fe6d-75b6-b42f-d47b08b11356/source.tar.gz?rev=99cc5667eece98bb35dcf35f7e511031a8b7a125&revCount=2007"
+        "url": "https://api.flakehub.com/f/pinned/oxalica/rust-overlay/0.1.2008%2Brev-a9471b23bf656d69ceb2d5ddccdc5082d51fc0e3/019b1072-4ebb-718c-b24f-255af4c79493/source.tar.gz"
       },
       "original": {
         "type": "tarball",
