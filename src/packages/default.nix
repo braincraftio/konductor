@@ -9,6 +9,7 @@
 #   - Individual category lists (core, network, system, cli, etc.)
 #   - Individual language lists (pythonPackages, goPackages, etc.)
 #   - IDE packages (idePackages)
+#   - Konductor self-hosting packages (konductorPackages)
 #   - Composed 'default' set for base devshell/OCI/QCOW2
 
 { pkgs, lib, config ? null, versions }:
@@ -24,6 +25,7 @@ let
   formatters = import ./formatters.nix { inherit pkgs config; };
   ai = import ./ai.nix { inherit pkgs; };
   ide = import ./ide.nix { inherit pkgs; };
+  konductor = import ./konductor.nix { inherit pkgs; };
 
 in
 rec {
@@ -67,6 +69,13 @@ rec {
   # ===========================================================================
 
   idePackages = ide.packages;
+
+  # ===========================================================================
+  # KONDUCTOR SELF-HOSTING (added in konductor shell)
+  # ===========================================================================
+
+  # Full konductor module (packages, shellHook, env)
+  inherit konductor;
 
   # ===========================================================================
   # Individual Categories (for fine-grained control)

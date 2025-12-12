@@ -1,7 +1,12 @@
 # src/qcow2/default.nix
 # QCOW2 VM build using nixos-generators
 #
-# Self-hosting capable: can build konductor OCI, QCOW2, and run full CI
+# Lean base image with services pre-configured but disabled.
+# Self-hosting tools fetched on-demand via: nix develop konductor#konductor
+#
+# Cloud-init workflow:
+#   1. Enable services: systemctl enable --now docker libvirtd
+#   2. Enter devshell: nix develop konductor#konductor
 
 { pkgs, lib, nixos-generators, system, ... }:
 
@@ -18,29 +23,6 @@ let
   devshellPackages = import ../packages {
     inherit pkgs lib versions config;
   };
-
-  # Self-hosting packages for building konductor artifacts
-  selfHostingPackages = with pkgs; [
-    # Container tooling
-    docker
-    docker-compose
-    docker-buildx
-    buildkit
-
-    # VM/QCOW2 tooling
-    qemu_kvm
-    qemu-utils
-    libvirt
-    virt-manager
-
-    # Cloud-init ISO creation
-    cdrkit
-
-    # CI/CD essentials
-    git
-    gh
-    gnumake
-  ];
 
 in
 {
@@ -79,10 +61,15 @@ in
         # Sudo without password
         security.sudo.wheelNeedsPassword = false;
 
-        # Packages: devshell defaults + self-hosting tools
+        # Packages: devshell defaults + essentials
+        # Self-hosting tools (docker, qemu, libvirt) via: nix develop konductor#konductor
         environment.systemPackages = devshellPackages.default
-          ++ selfHostingPackages
-          ++ [ pkgs.cachix ];
+          ++ (with pkgs; [
+            git
+            gh
+            gnumake
+            cachix
+          ]);
 
         # Environment variables from centralized configuration
         environment.variables = lib.mapAttrs (_name: value: lib.mkForce value) env;
@@ -108,15 +95,17 @@ in
           };
         };
 
-        # Docker for container builds
+        # Docker - pre-configured but disabled by default
+        # Enable via cloud-init: systemctl enable --now docker
         virtualisation.docker = {
-          enable = true;
-          enableOnBoot = true;
+          enable = lib.mkDefault false;
+          enableOnBoot = lib.mkDefault false;
         };
 
-        # Libvirt for nested VM builds
+        # Libvirt - pre-configured but disabled by default
+        # Enable via cloud-init: systemctl enable --now libvirtd
         virtualisation.libvirtd = {
-          enable = true;
+          enable = lib.mkDefault false;
           qemu = {
             package = pkgs.qemu_kvm;
             runAsRoot = true;
@@ -124,8 +113,8 @@ in
           };
         };
 
-        # Disk size for VM (larger for self-hosting)
-        virtualisation.diskSize = lib.mkDefault (50 * 1024); # 50GB
+        # Disk size for VM
+        virtualisation.diskSize = lib.mkDefault (20 * 1024); # 20GB (lean image)
 
         # Virtio drivers for performance
         boot.initrd.availableKernelModules = [
@@ -158,6 +147,7 @@ in
             ];
           };
           # Pre-configured flake registry
+          # Usage: nix develop konductor#konductor
           registry.konductor = {
             from = { type = "indirect"; id = "konductor"; };
             to = { type = "github"; owner = "braincraftio"; repo = "konductor"; };

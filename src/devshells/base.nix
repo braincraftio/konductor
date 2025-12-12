@@ -46,6 +46,7 @@ pkgs.mkShell {
     echo "  nix develop .#rust       Rust ${versions.languages.rust.display}"
     echo "  nix develop .#dev        IDE (neovim + tmux)"
     echo "  nix develop .#full       Everything"
+    echo "  nix develop .#konductor  Self-hosting (full + docker/qemu/libvirt)"
     echo ""
     echo "Commands:  mise run help"
     echo ""

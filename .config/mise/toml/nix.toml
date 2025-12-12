@@ -370,38 +370,86 @@ instance-id: konductor-local
 local-hostname: konductor
 METADATA
 
-# Create user-data
-cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
+# Create user-data with full konductor setup
+# Build user list with optional SSH key
+if [ -n "${SSH_KEY}" ]; then
+    print_status success "SSH key detected and added to cloud-init"
+    cat > "${CLOUD_INIT_DIR}/user-data" << USERDATA
 #cloud-config
 users:
   - name: kc2
     gecos: Konductor User
-    groups: users
+    groups: users, docker, libvirtd, kvm
     shell: /bin/bash
     plain_text_passwd: kc2
     lock_passwd: false
-USERDATA
-
-# Add kc2admin with sudo access
-cat >> "${CLOUD_INIT_DIR}/user-data" << USERDATA
+    ssh_authorized_keys:
+      - ${SSH_KEY}
   - name: kc2admin
     gecos: Konductor Admin
-    groups: users, wheel
+    groups: users, wheel, docker, libvirtd, kvm
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     plain_text_passwd: kc2admin
     lock_passwd: false
-USERDATA
-
-# Add SSH key if available
-if [ -n "${SSH_KEY}" ]; then
-    cat >> "${CLOUD_INIT_DIR}/user-data" << USERDATA
     ssh_authorized_keys:
       - ${SSH_KEY}
+
+write_files:
+  - path: /etc/profile.d/konductor.sh
+    content: |
+      # Auto-hint for konductor devshell
+      if [ -z "\$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
+        echo ""
+        echo "Konductor VM ready! Enter devshell with:"
+        echo "  nix develop konductor#konductor"
+        echo ""
+      fi
+    permissions: '0644'
+
+runcmd:
+  - systemctl enable --now docker
+  - systemctl enable --now libvirtd
+  - su - kc2 -c 'nix develop konductor#konductor --command true'
+  - su - kc2admin -c 'nix develop konductor#konductor --command true'
 USERDATA
-    print_status success "SSH key detected and added to cloud-init"
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"
+    cat > "${CLOUD_INIT_DIR}/user-data" << 'USERDATA'
+#cloud-config
+users:
+  - name: kc2
+    gecos: Konductor User
+    groups: users, docker, libvirtd, kvm
+    shell: /bin/bash
+    plain_text_passwd: kc2
+    lock_passwd: false
+  - name: kc2admin
+    gecos: Konductor Admin
+    groups: users, wheel, docker, libvirtd, kvm
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    plain_text_passwd: kc2admin
+    lock_passwd: false
+
+write_files:
+  - path: /etc/profile.d/konductor.sh
+    content: |
+      # Auto-hint for konductor devshell
+      if [ -z "$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
+        echo ""
+        echo "Konductor VM ready! Enter devshell with:"
+        echo "  nix develop konductor#konductor"
+        echo ""
+      fi
+    permissions: '0644'
+
+runcmd:
+  - systemctl enable --now docker
+  - systemctl enable --now libvirtd
+  - su - kc2 -c 'nix develop konductor#konductor --command true'
+  - su - kc2admin -c 'nix develop konductor#konductor --command true'
+USERDATA
 fi
 
 # Create cloud-init ISO (NoCloud datasource)
@@ -454,7 +502,7 @@ printf '    -nographic -serial mon:stdio\n'
 printf '\n  # Inside VM: mount shared repo\n'
 printf '  sudo mkdir -p /mnt/host\n'
 printf '  sudo mount -t 9p -o trans=virtio host /mnt/host\n'
-printf '  cd /mnt/host && nix develop .#full\n'
+printf '  cd /mnt/host && nix develop konductor#konductor\n'
 
 printf '\n%bCredentials:%b\n' "${BOLD}" "${NC}"
 printf '  kc2      / kc2       (unprivileged user)\n'
@@ -463,6 +511,11 @@ printf '  kc2admin / kc2admin  (sudo access)\n'
 if [ -n "${SSH_KEY}" ]; then
     printf '\n%bSSH Key:%b Your public key has been injected\n' "${BOLD}" "${NC}"
 fi
+
+printf '\n%bCloud-Init Auto-Setup:%b\n' "${BOLD}" "${NC}"
+printf '  - docker and libvirtd services enabled\n'
+printf '  - konductor#konductor devshell pre-built\n'
+printf '  - Enter with: nix develop konductor#konductor\n'
 
 printf '\n%bKVM Access:%b If permission denied, run:\n' "${BOLD}" "${NC}"
 printf '  sudo usermod -aG kvm $USER && newgrp kvm\n'
