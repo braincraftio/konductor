@@ -304,12 +304,12 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 8192 -cpu host -smp 4 \
 Inside VM - mount the shared repo:
 
 ```bash
-sudo mkdir -p /mnt/host
-sudo mount -t 9p -o trans=virtio host /mnt/host
+sudo mkdir -p /workspace
+sudo mount -t 9p -o trans=virtio host /workspace
 ```
 
 ```bash
-cd /mnt/host && nix develop konductor#konductor
+cd /workspace && nix develop konductor#konductor
 ```
 
 **Credentials (set via cloud-init):**

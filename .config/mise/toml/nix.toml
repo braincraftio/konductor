@@ -418,7 +418,12 @@ write_files:
       fi
     permissions: '0644'
 
+mounts:
+  - [ host, /workspace, 9p, "trans=virtio,version=9p2000.L", "0", "0" ]
+
 runcmd:
+  # Create workspace mount point
+  - mkdir -p /workspace
   # Pre-build devshell closure (full path required - runcmd has minimal PATH)
   - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
@@ -456,7 +461,12 @@ write_files:
       fi
     permissions: '0644'
 
+mounts:
+  - [ host, /workspace, 9p, "trans=virtio,version=9p2000.L", "0", "0" ]
+
 runcmd:
+  # Create workspace mount point
+  - mkdir -p /workspace
   # Pre-build devshell closure (full path required - runcmd has minimal PATH)
   - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
@@ -513,9 +523,9 @@ printf '    -device virtio-rng-pci \\\n'
 printf '    -virtfs local,path=%s,mount_tag=host,security_model=mapped-xattr \\\n' "${MISE_PROJECT_ROOT}"
 printf '    -nographic -serial mon:stdio\n'
 printf '\n  # Inside VM: mount shared repo\n'
-printf '  sudo mkdir -p /mnt/host\n'
-printf '  sudo mount -t 9p -o trans=virtio host /mnt/host\n'
-printf '  cd /mnt/host && nix develop konductor#konductor\n'
+printf '  sudo mkdir -p /workspace\n'
+printf '  sudo mount -t 9p -o trans=virtio host /workspace\n'
+printf '  cd /workspace && nix develop konductor#konductor\n'
 
 printf '\n%bCredentials:%b\n' "${BOLD}" "${NC}"
 printf '  kc2      / kc2       (unprivileged user)\n'
