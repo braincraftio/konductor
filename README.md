@@ -256,25 +256,44 @@ mise run nix:qcow2
 Launch with serial console (interactive):
 
 ```bash
-qemu-system-x86_64 -m 4096 \
-  -hda result/nixos.qcow2 \
-  -cdrom /tmp/konductor-cloud-init/seed.iso \
-  -enable-kvm -nographic -serial mon:stdio \
-  -net nic -net user,hostfwd=tcp::2222-:22
+qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
+  -drive file=result/nixos.qcow2,if=virtio,format=qcow2 \
+  -drive file=/tmp/konductor-cloud-init/seed.iso,media=cdrom \
+  -nic user,hostfwd=tcp::2222-:22 \
+  -nographic -serial mon:stdio
 ```
 
 Launch headless (SSH access):
 
 ```bash
-qemu-system-x86_64 -m 4096 \
-  -hda result/nixos.qcow2 \
-  -cdrom /tmp/konductor-cloud-init/seed.iso \
-  -enable-kvm -daemonize \
-  -net nic -net user,hostfwd=tcp::2222-:22
+qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
+  -drive file=result/nixos.qcow2,if=virtio,format=qcow2 \
+  -drive file=/tmp/konductor-cloud-init/seed.iso,media=cdrom \
+  -nic user,hostfwd=tcp::2222-:22 \
+  -daemonize
 
 # SSH access
 ssh -p 2222 kc2@localhost
 ssh -p 2222 kc2admin@localhost  # sudo access
+```
+
+Launch with shared repo (development):
+
+```bash
+qemu-system-x86_64 -machine q35,accel=kvm -m 8192 -cpu host -smp 4 \
+  -drive file=result/nixos.qcow2,if=virtio,format=qcow2 \
+  -drive file=/tmp/konductor-cloud-init/seed.iso,media=cdrom \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -device virtio-net-pci,netdev=net0 \
+  -device virtio-balloon-pci \
+  -device virtio-rng-pci \
+  -virtfs local,path=.,mount_tag=host,security_model=mapped-xattr \
+  -nographic -serial mon:stdio
+
+# Inside VM: mount the shared repo
+sudo mkdir -p /mnt/host
+sudo mount -t 9p -o trans=virtio host /mnt/host
+cd /mnt/host && nix develop .#full
 ```
 
 Credentials (set via cloud-init):
