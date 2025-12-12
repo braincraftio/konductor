@@ -408,11 +408,11 @@ write_files:
     permissions: '0644'
 
 runcmd:
-  - systemctl enable --now docker
-  - systemctl enable --now libvirtd
-  # Pre-build devshell (--refresh handles FlakeHub URL mismatches, || true ignores failures)
-  - su - kc2 -c 'nix develop konductor#konductor --refresh --command true' || true
-  - su - kc2admin -c 'nix develop konductor#konductor --refresh --command true' || true
+  # Pre-build devshell closure (--no-link avoids result symlink, --refresh handles FlakeHub URL drift)
+  - nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
+  # Start services after devshell is ready
+  - systemctl start docker
+  - systemctl start libvirtd
 USERDATA
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"
@@ -446,11 +446,11 @@ write_files:
     permissions: '0644'
 
 runcmd:
-  - systemctl enable --now docker
-  - systemctl enable --now libvirtd
-  # Pre-build devshell (--refresh handles FlakeHub URL mismatches, || true ignores failures)
-  - su - kc2 -c 'nix develop konductor#konductor --refresh --command true' || true
-  - su - kc2admin -c 'nix develop konductor#konductor --refresh --command true' || true
+  # Pre-build devshell closure (--no-link avoids result symlink, --refresh handles FlakeHub URL drift)
+  - nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
+  # Start services after devshell is ready
+  - systemctl start docker
+  - systemctl start libvirtd
 USERDATA
 fi
 
@@ -515,7 +515,7 @@ if [ -n "${SSH_KEY}" ]; then
 fi
 
 printf '\n%bCloud-Init Auto-Setup:%b\n' "${BOLD}" "${NC}"
-printf '  - docker and libvirtd services enabled\n'
+printf '  - docker and libvirtd services started\n'
 printf '  - konductor#konductor devshell pre-built\n'
 printf '  - Enter with: nix develop konductor#konductor\n'
 

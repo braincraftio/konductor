@@ -320,7 +320,7 @@ cd /mnt/host && nix develop konductor#konductor
 
 **Cloud-init auto-setup:**
 
-- Docker and libvirtd services enabled on boot
+- Docker and libvirtd services started (not enabled on boot for lean startup)
 - `konductor#konductor` devshell pre-built for both users
 - Login prompt shows hint to enter devshell
 

@@ -1,11 +1,11 @@
 # src/qcow2/default.nix
 # QCOW2 VM build using nixos-generators
 #
-# Lean base image with services pre-configured but disabled.
+# Services installed but not auto-started (lean boot).
 # Self-hosting tools fetched on-demand via: nix develop konductor#konductor
 #
 # Cloud-init workflow:
-#   1. Enable services: systemctl enable --now docker libvirtd
+#   1. Start services: systemctl start docker libvirtd
 #   2. Enter devshell: nix develop konductor#konductor
 
 { pkgs, lib, nixos-generators, system, ... }:
@@ -95,23 +95,26 @@ in
           };
         };
 
-        # Docker - pre-configured but disabled by default
-        # Enable via cloud-init: systemctl enable --now docker
+        # Docker - installed but not started on boot
+        # Start via: systemctl start docker
         virtualisation.docker = {
-          enable = lib.mkDefault false;
-          enableOnBoot = lib.mkDefault false;
+          enable = true;
+          enableOnBoot = false;
         };
 
-        # Libvirt - pre-configured but disabled by default
-        # Enable via cloud-init: systemctl enable --now libvirtd
+        # Libvirt - installed but not started on boot
+        # Start via: systemctl start libvirtd
         virtualisation.libvirtd = {
-          enable = lib.mkDefault false;
+          enable = true;
           qemu = {
             package = pkgs.qemu_kvm;
             runAsRoot = true;
             swtpm.enable = true;
           };
         };
+
+        # Don't auto-start libvirtd (cloud-init will start it if needed)
+        systemd.services.libvirtd.wantedBy = lib.mkForce [ ];
 
         # Disk size for VM
         virtualisation.diskSize = lib.mkDefault (20 * 1024); # 20GB (lean image)
