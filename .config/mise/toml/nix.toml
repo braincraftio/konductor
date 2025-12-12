@@ -411,16 +411,6 @@ users:
       - ${SSH_KEY}
 
 write_files:
-  - path: /etc/profile.d/konductor.sh
-    content: |
-      # Auto-hint for konductor devshell
-      if [ -z "\$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
-        echo ""
-        echo "Konductor VM ready! Enter devshell with:"
-        echo "  nix develop konductor#konductor"
-        echo ""
-      fi
-    permissions: '0644'
   - path: /etc/sudoers.d/kc2-power
     content: |
       kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
@@ -452,16 +442,6 @@ users:
     lock_passwd: false
 
 write_files:
-  - path: /etc/profile.d/konductor.sh
-    content: |
-      # Auto-hint for konductor devshell
-      if [ -z "\$KONDUCTOR_SHELL" ] && [ -t 0 ]; then
-        echo ""
-        echo "Konductor VM ready! Enter devshell with:"
-        echo "  nix develop konductor#konductor"
-        echo ""
-      fi
-    permissions: '0644'
   - path: /etc/sudoers.d/kc2-power
     content: |
       kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
@@ -552,13 +532,12 @@ printf '  sudo usermod -aG kvm $USER && newgrp kvm\n'
 '''
 
 # =============================================================================
-# QCOW2 Run Task
+# QCOW2 VM Management Tasks
 # =============================================================================
 
-["nix:qcow2:run"]
-description = "🚀 Build and launch QCOW2 VM with shared workspace • nqr"
-alias = ["nqr"]
-depends = ["nix:qcow2"]
+["nix:qcow2:start"]
+description = "▶️  Start existing QCOW2 VM in background (non-destructive) • nqs"
+alias = ["nqs"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
@@ -566,20 +545,159 @@ set -euo pipefail
 SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
 . "${SCRIPT_DIR}/common.sh"
 
-print_header "Launching QCOW2 VM"
+print_header "Starting QCOW2 VM"
 
 CLOUD_INIT_DIR="/tmp/konductor-cloud-init"
+PIDFILE="/tmp/konductor-vm.pid"
+LOGFILE="/tmp/konductor-vm.log"
 
-# Check KVM access
+# Check if VM is already running
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    print_status warn "VM already running (PID: $(cat "$PIDFILE"))"
+    print_status info "SSH: ssh localhost -p 2222"
+    print_status info "Stop: mise run nix:qcow2:stop"
+    exit 0
+fi
+
+# Check prerequisites
+if [ ! -f "${MISE_PROJECT_ROOT}/result/nixos.qcow2" ]; then
+    print_status error "QCOW2 image not found. Run: mise run nix:qcow2"
+    exit 1
+fi
+
+if [ ! -f "${CLOUD_INIT_DIR}/seed.iso" ]; then
+    print_status error "Cloud-init ISO not found. Run: mise run nix:qcow2"
+    exit 1
+fi
+
 if [ ! -w /dev/kvm ]; then
     print_status error "No write access to /dev/kvm"
     printf '\nRun: sudo usermod -aG kvm $USER && newgrp kvm\n'
     exit 1
 fi
 
-print_status info "Starting VM with shared workspace at /workspace"
-print_status info "SSH: ssh ${USER}@localhost -p 2222"
-print_status info "Exit: Ctrl-A X (or 'sudo poweroff' in VM)"
+print_status info "Starting VM in background..."
+
+qemu-system-x86_64 \
+    -machine q35,accel=kvm \
+    -m 8192 \
+    -cpu host \
+    -smp 4 \
+    -drive file="${MISE_PROJECT_ROOT}/result/nixos.qcow2,if=virtio,format=qcow2" \
+    -drive file="${CLOUD_INIT_DIR}/seed.iso,media=cdrom" \
+    -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+    -device virtio-net-pci,netdev=net0 \
+    -device virtio-balloon-pci \
+    -device virtio-rng-pci \
+    -virtfs "local,path=${MISE_PROJECT_ROOT},mount_tag=host,security_model=mapped-xattr" \
+    -daemonize \
+    -pidfile "$PIDFILE" \
+    -serial file:"$LOGFILE" \
+    -display none
+
+sleep 1
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    print_status success "VM started (PID: $(cat "$PIDFILE"))"
+    print_status info "SSH: ssh localhost -p 2222"
+    print_status info "Log: tail -f $LOGFILE"
+    print_status info "Stop: mise run nix:qcow2:stop"
+else
+    print_status error "VM failed to start. Check: $LOGFILE"
+    exit 1
+fi
+'''
+
+["nix:qcow2:stop"]
+description = "⏹️  Stop running QCOW2 VM • nqx"
+alias = ["nqx"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Stopping QCOW2 VM"
+
+PIDFILE="/tmp/konductor-vm.pid"
+STOPPED=false
+
+# First try pidfile
+if [ -f "$PIDFILE" ]; then
+    PID="$(cat "$PIDFILE")"
+    if kill -0 "$PID" 2>/dev/null; then
+        print_status info "Stopping VM (PID: $PID)..."
+        kill "$PID"
+        sleep 2
+        if kill -0 "$PID" 2>/dev/null; then
+            print_status warn "VM still running, sending SIGKILL..."
+            kill -9 "$PID" 2>/dev/null || true
+        fi
+        STOPPED=true
+    fi
+    rm -f "$PIDFILE"
+fi
+
+# Also check for orphaned qemu-system-x86_64 using port 2222
+PORT_PID=$(ss -tlnp 2>/dev/null | grep ':2222 ' | grep -oP 'pid=\K[0-9]+' || true)
+if [ -n "$PORT_PID" ]; then
+    # Verify it's actually qemu before killing
+    PROC_NAME=$(ps -p "$PORT_PID" -o comm= 2>/dev/null || true)
+    if [[ "$PROC_NAME" == qemu-system-* ]]; then
+        print_status info "Found orphaned VM on port 2222 (PID: $PORT_PID), stopping..."
+        kill "$PORT_PID" 2>/dev/null || true
+        sleep 2
+        if kill -0 "$PORT_PID" 2>/dev/null; then
+            kill -9 "$PORT_PID" 2>/dev/null || true
+        fi
+        STOPPED=true
+    else
+        print_status warn "Port 2222 in use by non-QEMU process ($PROC_NAME), skipping"
+    fi
+fi
+
+if [ "$STOPPED" = true ]; then
+    print_status success "VM stopped"
+else
+    print_status warn "No VM found running"
+fi
+'''
+
+["nix:qcow2:deploy"]
+description = "🚀 Build and start QCOW2 VM in background • nqd"
+alias = ["nqd"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mise run nix:qcow2:stop 2>/dev/null || true
+mise run nix:qcow2
+mise run nix:qcow2:start
+'''
+
+["nix:qcow2:deploy:console"]
+description = "🖥️  Build and start QCOW2 VM with serial console • nqdc"
+alias = ["nqdc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mise run nix:qcow2
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+CLOUD_INIT_DIR="/tmp/konductor-cloud-init"
+
+print_header "Launching QCOW2 VM (Console)"
+
+if [ ! -w /dev/kvm ]; then
+    print_status error "No write access to /dev/kvm"
+    printf '\nRun: sudo usermod -aG kvm $USER && newgrp kvm\n'
+    exit 1
+fi
+
+print_status info "Starting VM with serial console..."
+print_status info "SSH: ssh localhost -p 2222"
+print_status info "Exit: Ctrl-A X"
 printf '\n'
 
 exec qemu-system-x86_64 \

@@ -257,6 +257,18 @@ sudo usermod -aG kvm $USER && newgrp kvm
 mise run nix:qcow2
 ```
 
+<details>
+<summary><b>Optional: Mise task shortcuts</b></summary>
+
+| Task | Alias | Description |
+|------|-------|-------------|
+| `mise run nix:qcow2` | `nq` | Build QCOW2 image + cloud-init ISO |
+| `mise run nix:qcow2:start` | `nqs` | Start existing VM in background |
+| `mise run nix:qcow2:stop` | `nqx` | Stop running VM |
+| `mise run nix:qcow2:deploy` | `nqd` | Build + start VM (full rebuild) |
+
+</details>
+
 **Launch with serial console (interactive):**
 
 ```bash
@@ -277,6 +289,30 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
   -daemonize
 ```
 
+**SSH Configuration:**
+
+Add to `~/.ssh/config` for easy access:
+
+```bash
+cat >> ~/.ssh/config << EOF
+Host konductor
+    HostName localhost
+    Port 2222
+    User $(whoami)
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOF
+```
+
+Then connect:
+
+```bash
+ssh konductor
+```
+
+Or connect directly:
+
 ```bash
 # SSH access
 ssh -p 2222 kc2@localhost
@@ -286,6 +322,8 @@ ssh -p 2222 kc2@localhost
 # SSH with sudo access
 ssh -p 2222 kc2admin@localhost
 ```
+
+SSH sessions automatically enter the default devshell (`nix develop konductor`).
 
 **Launch with shared repo (full performance + 9p filesystem):**
 
@@ -314,23 +352,25 @@ cd /workspace && nix develop konductor#konductor
 
 **Credentials (set via cloud-init):**
 
-- `kc2` / `kc2` - unprivileged user
-- `kc2admin` / `kc2admin` - sudo access
+- Dynamic user (UID 1000) - matches your host `$USER`, SSH key auth only
+- `kc2admin` / `kc2admin` (UID 1001) - admin with sudo access
+- `kc2` / `kc2` (UID 1002) - unprivileged user
 - SSH key auto-injected from `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`
 
 **Cloud-init auto-setup:**
 
 - Docker and libvirtd services started (not enabled on boot for lean startup)
-- `konductor#konductor` devshell pre-built for both users
-- Login prompt shows hint to enter devshell
+- Default devshell pre-built in image for instant shell entry
+- SSH sessions auto-enter devshell for interactive use
+- 9p workspace mounted at `/workspace` when virtfs device present
 
 **Configuration includes:**
 
 - NixOS 25.11 with systemd-networkd (DHCP on all interfaces)
 - Cloud-init enabled for automated provisioning
-- OpenSSH with hardened settings (disable root login for production)
+- OpenSSH with password and key authentication
 - QEMU guest agent for time sync, snapshots, host communication
-- Virtio drivers for disk, network, balloon, and RNG
+- Virtio drivers for disk, network, balloon, RNG, and 9p
 
 **Use cases:** KVM, libvirt, Proxmox, cloud orchestration platforms
 

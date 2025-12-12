@@ -61,6 +61,20 @@ in
         # Sudo without password
         security.sudo.wheelNeedsPassword = false;
 
+        # Auto-enter default devshell for interactive SSH sessions
+        programs.bash.interactiveShellInit = ''
+          if [ -z "$KONDUCTOR_SHELL" ] && [[ $- == *i* ]] && [ -n "$SSH_CONNECTION" ]; then
+            export KONDUCTOR_SHELL=1
+            # Use /workspace if mounted (local dev), else fall back to registry
+            if [ -d /workspace ] && [ -f /workspace/flake.nix ]; then
+              cd /workspace
+              exec nix develop
+            else
+              exec nix develop konductor
+            fi
+          fi
+        '';
+
         # Packages: devshell defaults + essentials
         # Self-hosting tools (docker, qemu, libvirt) via: nix develop konductor#konductor
         environment.systemPackages = devshellPackages.default
@@ -141,7 +155,7 @@ in
             experimental-features = [ "nix-command" "flakes" ];
             auto-optimise-store = true;
             accept-flake-config = true;
-            trusted-users = [ "root" "kc2" "kc2admin" ];
+            trusted-users = [ "root" "@wheel" ];
             substituters = [ "https://cache.nixos.org" "https://nix-community.cachix.org" ];
             trusted-substituters = [ "https://cache.nixos.org" "https://nix-community.cachix.org" ];
             trusted-public-keys = [
