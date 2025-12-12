@@ -410,8 +410,9 @@ write_files:
 runcmd:
   - systemctl enable --now docker
   - systemctl enable --now libvirtd
-  - su - kc2 -c 'nix develop konductor#konductor --command true'
-  - su - kc2admin -c 'nix develop konductor#konductor --command true'
+  # Pre-build devshell (--refresh handles FlakeHub URL mismatches, || true ignores failures)
+  - su - kc2 -c 'nix develop konductor#konductor --refresh --command true' || true
+  - su - kc2admin -c 'nix develop konductor#konductor --refresh --command true' || true
 USERDATA
 else
     print_status warn "No SSH key found in ~/.ssh/ - password auth only"
@@ -447,8 +448,9 @@ write_files:
 runcmd:
   - systemctl enable --now docker
   - systemctl enable --now libvirtd
-  - su - kc2 -c 'nix develop konductor#konductor --command true'
-  - su - kc2admin -c 'nix develop konductor#konductor --command true'
+  # Pre-build devshell (--refresh handles FlakeHub URL mismatches, || true ignores failures)
+  - su - kc2 -c 'nix develop konductor#konductor --refresh --command true' || true
+  - su - kc2admin -c 'nix develop konductor#konductor --refresh --command true' || true
 USERDATA
 fi
 
