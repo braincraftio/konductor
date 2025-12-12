@@ -1,26 +1,24 @@
 # Konductor Nix Flake
 
-Hermetic polyglot development environments for local, container, and virtual
-machine deployment with complete configuration isolation and reproducible
-builds.
+Hermetic polyglot development environments for local, container, and virtual machine deployment with
+complete configuration isolation and reproducible builds.
 
 [![Nix Flake](https://img.shields.io/badge/Nix-Flake-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![NixOS 25.11](https://img.shields.io/badge/NixOS-25.11-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/containercraft/konductor)
 
 ---
 
 ## Overview
 
-Konductor is a Nix flake providing reproducible, multi-target development
-environments for polyglot projects. Built on the Single Source of Truth
-pattern, it delivers consistent tooling across development shells, OCI
-containers, QCOW2 virtual machines, and system modules.
+Konductor is a Nix flake providing reproducible, multi-target development environments for polyglot
+projects. Built on the Single Source of Truth pattern, it delivers consistent tooling across
+development shells, OCI containers, QCOW2 virtual machines, and system modules.
 
-The flake architecture achieves hermetic configuration management through Nix
-wrapper scripts that inject config file paths at runtime, ensuring consistent
-behavior across all environments without relying on user home directories or
-project dotfiles.
+The flake architecture achieves hermetic configuration management through Nix wrapper scripts that
+inject config file paths at runtime, ensuring consistent behavior across all environments without
+relying on user home directories or project dotfiles.
 
 ### Key Features
 
@@ -34,8 +32,8 @@ project dotfiles.
 
 ### Target Audience
 
-Konductor targets senior developers and platform engineers who value
-reproducibility over convenience and architecture over ad-hoc scripting.
+Konductor targets senior developers and platform engineers who value reproducibility over
+convenience and architecture over ad-hoc scripting.
 
 ---
 
@@ -43,8 +41,7 @@ reproducibility over convenience and architecture over ad-hoc scripting.
 
 ### Prerequisites
 
-Konductor requires [Lix](https://lix.systems/) (a Nix variant) with flakes
-enabled.
+Konductor requires [Lix](https://lix.systems/) (a Nix variant) with flakes enabled.
 
 ```bash
 # Check existing installation
@@ -139,8 +136,8 @@ nix develop konductor
 
 ### Optional: Task Automation with Mise
 
-For contributors and users who prefer task automation, Konductor provides
-mise tasks for development workflows.
+For contributors and users who prefer task automation, Konductor provides mise tasks for development
+workflows.
 
 <details>
 <summary><b>Install Mise (if not installed)</b></summary>
@@ -159,8 +156,8 @@ echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc
 source ~/.bashrc  # or source ~/.zshrc
 ```
 
-See [mise getting started](https://mise.jdx.dev/getting-started.html) for
-more installation options (brew, apt, dnf, etc.).
+See [mise getting started](https://mise.jdx.dev/getting-started.html) for more installation options
+(brew, apt, dnf, etc.).
 
 </details>
 
@@ -193,16 +190,16 @@ mise run nix:qcow2
 
 Konductor provides 8 specialized shells using compositional hierarchy:
 
-| Shell | Command | Description | Key Packages |
-|-------|---------|-------------|--------------|
-| default | `nix develop` | Foundation shell | git, jq, ripgrep, fzf |
-| python | `nix develop .#python` | Python 3.12 dev | uv, ruff, mypy, bandit |
-| go | `nix develop .#go` | Go 1.24 dev | gopls, delve, linter |
-| node | `nix develop .#node` | JavaScript/TS dev | pnpm, biome, prettier |
-| rust | `nix develop .#rust` | Rust 1.82.0 dev | cargo, clippy, analyzer |
-| dev | `nix develop .#dev` | IDE tools | Neovim, Tmux, LazyGit |
-| full | `nix develop .#full` | Everything | All languages + IDE |
-| konductor | `nix develop .#konductor` | Self-hosting | full + docker/qemu/libvirt |
+| Shell     | Command                   | Description       | Key Packages               |
+| --------- | ------------------------- | ----------------- | -------------------------- |
+| default   | `nix develop`             | Foundation shell  | git, jq, ripgrep, fzf      |
+| python    | `nix develop .#python`    | Python 3.12 dev   | uv, ruff, mypy, bandit     |
+| go        | `nix develop .#go`        | Go 1.24 dev       | gopls, delve, linter       |
+| node      | `nix develop .#node`      | JavaScript/TS dev | pnpm, biome, prettier      |
+| rust      | `nix develop .#rust`      | Rust 1.82.0 dev   | cargo, clippy, analyzer    |
+| dev       | `nix develop .#dev`       | IDE tools         | Neovim, Tmux, LazyGit      |
+| full      | `nix develop .#full`      | Everything        | All languages + IDE        |
+| konductor | `nix develop .#konductor` | Self-hosting      | full + docker/qemu/libvirt |
 
 Each shell extends the base shell using `overrideAttrs` pattern:
 
@@ -214,8 +211,7 @@ Each shell extends the base shell using `overrideAttrs` pattern:
 
 #### OCI Container (nix2container)
 
-Multi-architecture container images (amd64 + arm64) built with nix2container
-and Docker Buildx.
+Multi-architecture container images (amd64 + arm64) built with nix2container and Docker Buildx.
 
 ```bash
 # Single architecture (native)
@@ -242,8 +238,8 @@ Excludes: Language runtimes (use `nix develop konductor#{python,go}` inside)
 
 #### QCOW2 VM (nixos-generators)
 
-NixOS 25.11 virtual machine images for cloud deployment with cloud-init
-support for AWS, GCP, Azure, and OpenStack provisioning.
+NixOS 25.11 virtual machine images for cloud deployment with cloud-init support for AWS, GCP, Azure,
+and OpenStack provisioning.
 
 **Build image and create cloud-init ISO:**
 
@@ -260,12 +256,12 @@ mise run nix:qcow2
 <details>
 <summary><b>Optional: Mise task shortcuts</b></summary>
 
-| Task | Alias | Description |
-|------|-------|-------------|
-| `mise run nix:qcow2` | `nq` | Build QCOW2 image + cloud-init ISO |
-| `mise run nix:qcow2:start` | `nqs` | Start existing VM in background |
-| `mise run nix:qcow2:stop` | `nqx` | Stop running VM |
-| `mise run nix:qcow2:deploy` | `nqd` | Build + start VM (full rebuild) |
+| Task                                | Alias  | Description                          |
+| ----------------------------------- | ------ | ------------------------------------ |
+| `mise run nix:qcow2`                | `nq`   | Build QCOW2 image + cloud-init ISO   |
+| `mise run nix:qcow2:start`          | `nqs`  | Start existing VM in background      |
+| `mise run nix:qcow2:stop`           | `nqx`  | Stop running VM                      |
+| `mise run nix:qcow2:deploy`         | `nqd`  | Build + start VM (full rebuild)      |
 | `mise run nix:qcow2:deploy:console` | `nqdc` | Build + start VM with serial console |
 
 </details>
@@ -324,7 +320,8 @@ ssh -p 2222 kc2@localhost
 ssh -p 2222 kc2admin@localhost
 ```
 
-SSH sessions automatically enter the default devshell (uses `/workspace` if mounted, otherwise `nix develop konductor`).
+SSH sessions automatically enter the default devshell (uses `/workspace` if mounted, otherwise
+`nix develop konductor`).
 
 **Launch with shared repo (full performance + 9p filesystem):**
 
@@ -434,10 +431,9 @@ The flake provides comprehensive development tooling:
 
 Hermetic configuration system with zero-trust config resolution:
 
-- 13 linters: shellcheck, ruff, mypy, eslint, golangci-lint, yamllint,
-  markdownlint, hadolint, htmlhint, stylelint, statix, deadnix, lychee
-- 8 formatters: nixpkgs-fmt, shfmt, ruff, black, prettier, taplo, biome,
-  gofumpt
+- 13 linters: shellcheck, ruff, mypy, eslint, golangci-lint, yamllint, markdownlint, hadolint,
+  htmlhint, stylelint, statix, deadnix, lychee
+- 8 formatters: nixpkgs-fmt, shfmt, ruff, black, prettier, taplo, biome, gofumpt
 - All tools wrapped with `/nix/store` config paths (no user override)
 
 ### Design Principles
@@ -530,8 +526,8 @@ base (default shell)
 
 Python 3.12 development environment with modern tooling:
 
-Packages: Python 3.12, uv (ultra-fast package manager), ruff, mypy, bandit,
-black, isort, ipython, pytest
+Packages: Python 3.12, uv (ultra-fast package manager), ruff, mypy, bandit, black, isort, ipython,
+pytest
 
 Environment variables:
 
@@ -553,8 +549,7 @@ Environment variables:
 - `GOPATH=$HOME/go`: Go workspace location
 - `GOBIN=$GOPATH/bin`: Go binary installation directory
 
-Auto-setup: Creates workspace structure (`src/`, `bin/`, `pkg/`), adds
-`$GOBIN` to PATH
+Auto-setup: Creates workspace structure (`src/`, `bin/`, `pkg/`), adds `$GOBIN` to PATH
 
 #### Node Shell
 
@@ -573,8 +568,8 @@ Auto-setup: Creates pnpm home, adds to PATH for global package access
 
 Rust 1.82.0 development with precise version control:
 
-Packages: Rust 1.82.0 stable (via rust-overlay), cargo, rustfmt, clippy,
-rust-analyzer, cargo-watch, cargo-edit
+Packages: Rust 1.82.0 stable (via rust-overlay), cargo, rustfmt, clippy, rust-analyzer, cargo-watch,
+cargo-edit
 
 Environment variables:
 
@@ -587,39 +582,36 @@ Auto-setup: Creates cargo home, adds `$CARGO_HOME/bin` to PATH
 
 IDE-focused environment without language runtimes:
 
-Packages: Neovim (nixvim with 20+ plugins, 10 LSPs), Tmux (catppuccin
-theme), LazyGit, Helix, htop, bottom, bat, eza, dust, tree
+Packages: Neovim (nixvim with 20+ plugins, 10 LSPs), Tmux (catppuccin theme), LazyGit, Helix, htop,
+bottom, bat, eza, dust, tree
 
-Use case: Working on projects that provide their own language tooling via
-project-local flake or other means
+Use case: Working on projects that provide their own language tooling via project-local flake or
+other means
 
 #### Full Shell
 
 Complete polyglot environment combining all capabilities:
 
-Includes: All language packages (Python, Go, Node, Rust) plus all IDE
-packages (Neovim, Tmux, tools)
+Includes: All language packages (Python, Go, Node, Rust) plus all IDE packages (Neovim, Tmux, tools)
 
-Environment: All language-specific environment variables and workspace setups
-combined with carefully ordered PATH management
+Environment: All language-specific environment variables and workspace setups combined with
+carefully ordered PATH management
 
 Display: Shows all four language versions on shell entry for verification
 
-Use case: Polyglot projects requiring multiple language runtimes
-simultaneously
+Use case: Polyglot projects requiring multiple language runtimes simultaneously
 
 #### Konductor Shell
 
 Self-hosting environment for building Konductor artifacts:
 
-Includes: Everything from full shell plus container and VM build tools
-(docker, docker-compose, buildkit, skopeo, crane, qemu, libvirt, virt-manager,
-cdrkit, cachix)
+Includes: Everything from full shell plus container and VM build tools (docker, docker-compose,
+buildkit, skopeo, crane, qemu, libvirt, virt-manager, cdrkit, cachix)
 
 Environment: `DOCKER_HOST` and `DOCKER_BUILDKIT=1` configured
 
-Use case: Building OCI containers and QCOW2 images inside Konductor VM,
-CI/CD pipelines, konductor development
+Use case: Building OCI containers and QCOW2 images inside Konductor VM, CI/CD pipelines, konductor
+development
 
 ---
 
@@ -627,20 +619,20 @@ CI/CD pipelines, konductor development
 
 Konductor uses mise for task automation with 100+ tasks across 6 domains:
 
-| Task | Alias | Description |
-|------|-------|-------------|
-| `help` | `h`, `?` | Show all commands with ASCII banner |
-| `status` | `st` | Environment introspection (project, Nix, shell) |
-| `doctor` | `doc` | Comprehensive health checks (Nix, flake, Git) |
-| `lint` | `l` | Run all linters (nix, bash, YAML, toml, etc.) |
-| `format` | `f`, `fmt` | Format all files (auto-fix enabled) |
-| `format:check` | `fc` | Validate formatting (CI mode, no writes) |
-| `nix:update` | - | Update flake.lock (all inputs) |
-| `nix:gc` | - | Garbage collect unreferenced store paths |
-| `nix:cache:push` | - | Push build outputs to Cachix (requires token) |
-| `docker:build` | `db` | Build OCI container (nix2container + Dockerfile) |
-| `docker:buildx:bake` | - | Multi-arch build via bake.hcl (amd64 + arm64) |
-| `setup` | - | First-time setup (install Nix, configure Git) |
+| Task                 | Alias      | Description                                      |
+| -------------------- | ---------- | ------------------------------------------------ |
+| `help`               | `h`, `?`   | Show all commands with ASCII banner              |
+| `status`             | `st`       | Environment introspection (project, Nix, shell)  |
+| `doctor`             | `doc`      | Comprehensive health checks (Nix, flake, Git)    |
+| `lint`               | `l`        | Run all linters (nix, bash, YAML, toml, etc.)    |
+| `format`             | `f`, `fmt` | Format all files (auto-fix enabled)              |
+| `format:check`       | `fc`       | Validate formatting (CI mode, no writes)         |
+| `nix:update`         | -          | Update flake.lock (all inputs)                   |
+| `nix:gc`             | -          | Garbage collect unreferenced store paths         |
+| `nix:cache:push`     | -          | Push build outputs to Cachix (requires token)    |
+| `docker:build`       | `db`       | Build OCI container (nix2container + Dockerfile) |
+| `docker:buildx:bake` | -          | Multi-arch build via bake.hcl (amd64 + arm64)    |
+| `setup`              | -          | First-time setup (install Nix, configure Git)    |
 
 View all tasks:
 
@@ -756,8 +748,8 @@ Clone and customize the flake for project-specific requirements:
 
 ```bash
 # Clone and customize
-git clone https://github.com/braincraftio/konductor.git my-konductor
-cd my-konductor
+git clone https://github.com/braincraftio/konductor.git ~/.konductor
+cd ~/.konductor
 
 # Edit version lockfile
 vim src/lib/versions.nix
@@ -765,7 +757,7 @@ vim src/lib/versions.nix
 
 # Rebuild and test
 nix develop .#python
-python --version  # Should show 3.13
+python --version
 ```
 
 #### Option 2: Use as Flake Input
@@ -819,8 +811,8 @@ Linter/formatter configs (`src/config/linters/*`, `src/config/formatters/*`):
 
 ## Contributing
 
-Contributions welcome. Konductor follows Conventional Commits specification
-and enforces linting/formatting via Lefthook pre-commit hooks.
+Contributions welcome. Konductor follows Conventional Commits specification and enforces
+linting/formatting via Lefthook pre-commit hooks.
 
 Workflow:
 
@@ -875,14 +867,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Official Documentation:
 
-- [Nix Flakes](https://nixos.wiki/wiki/Flakes) - Reproducible dependency
-  management
-- [nixvim](https://github.com/nix-community/nixvim) - Neovim configuration
-  framework
-- [nix2container](https://github.com/nlewo/nix2container) - Efficient OCI
-  image builder
-- [nixos-generators](https://github.com/nix-community/nixos-generators) - VM
-  image generator
+- [Nix Flakes](https://nixos.wiki/wiki/Flakes) - Reproducible dependency management
+- [nixvim](https://github.com/nix-community/nixvim) - Neovim configuration framework
+- [nix2container](https://github.com/nlewo/nix2container) - Efficient OCI image builder
+- [nixos-generators](https://github.com/nix-community/nixos-generators) - VM image generator
 
 Community:
 
