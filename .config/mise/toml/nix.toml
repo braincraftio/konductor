@@ -408,8 +408,8 @@ write_files:
     permissions: '0644'
 
 runcmd:
-  # Pre-build devshell closure (--no-link avoids result symlink, --refresh handles FlakeHub URL drift)
-  - nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
+  # Pre-build devshell closure (full path required - runcmd has minimal PATH)
+  - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
   - systemctl start docker
   - systemctl start libvirtd
@@ -446,8 +446,8 @@ write_files:
     permissions: '0644'
 
 runcmd:
-  # Pre-build devshell closure (--no-link avoids result symlink, --refresh handles FlakeHub URL drift)
-  - nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
+  # Pre-build devshell closure (full path required - runcmd has minimal PATH)
+  - /run/current-system/sw/bin/nix build "konductor#devShells.$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
   - systemctl start docker
   - systemctl start libvirtd
