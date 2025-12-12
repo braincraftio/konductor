@@ -23,12 +23,6 @@ pkgs.mkShell {
     export KONDUCTOR_SHELL="default"
     export name="default"
 
-    # XDG Base Directory (force-set to ensure $HOME expands correctly)
-    export XDG_CONFIG_HOME="$HOME/.config"
-    export XDG_CACHE_HOME="$HOME/.cache"
-    export XDG_DATA_HOME="$HOME/.local/share"
-    export XDG_STATE_HOME="$HOME/.local/state"
-
     # Source hermetic bashrc (aliases, shell options, prompt)
     ${bashrcContent}
 

@@ -130,6 +130,47 @@ in
         # Don't auto-start libvirtd (cloud-init will start it if needed)
         systemd.services.libvirtd.wantedBy = lib.mkForce [ ];
 
+        # 9p workspace mount service - auto-mounts /workspace if virtfs is available
+        # Runs on boot with retries to handle device availability timing
+        systemd.services.workspace-mount = {
+          description = "Mount 9p workspace from host";
+          after = [ "local-fs.target" ];
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "mount-workspace" ''
+              set -euo pipefail
+              MOUNT_POINT="/workspace"
+              MOUNT_TAG="host"
+              MAX_RETRIES=5
+              RETRY_DELAY=2
+
+              # Create mount point if needed
+              mkdir -p "$MOUNT_POINT"
+
+              # Check if already mounted
+              if mountpoint -q "$MOUNT_POINT"; then
+                echo "Workspace already mounted"
+                exit 0
+              fi
+
+              # Try to mount with retries (device may not be immediately available)
+              for i in $(seq 1 $MAX_RETRIES); do
+                if mount -t 9p -o trans=virtio "$MOUNT_TAG" "$MOUNT_POINT" 2>/dev/null; then
+                  echo "Workspace mounted successfully"
+                  exit 0
+                fi
+                echo "Mount attempt $i/$MAX_RETRIES failed, retrying in ''${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+              done
+
+              echo "No 9p virtfs device available (VM started without -virtfs)"
+              exit 0
+            '';
+          };
+        };
+
         # Disk size for VM
         virtualisation.diskSize = lib.mkDefault (20 * 1024); # 20GB (lean image)
 

@@ -529,6 +529,10 @@ printf '  - Enter with: nix develop konductor#konductor\n'
 
 printf '\n%bKVM Access:%b If permission denied, run:\n' "${BOLD}" "${NC}"
 printf '  sudo usermod -aG kvm $USER && newgrp kvm\n'
+
+printf '\n'
+print_header "QCOW2 Image Details"
+qemu-img info "${MISE_PROJECT_ROOT}/result/nixos.qcow2"
 '''
 
 # =============================================================================
@@ -627,7 +631,7 @@ if [ -f "$PIDFILE" ]; then
     PID="$(cat "$PIDFILE")"
     if kill -0 "$PID" 2>/dev/null; then
         print_status info "Stopping VM (PID: $PID)..."
-        kill "$PID"
+        kill "$PID" 2>/dev/null || true
         sleep 2
         if kill -0 "$PID" 2>/dev/null; then
             print_status warn "VM still running, sending SIGKILL..."
@@ -638,23 +642,18 @@ if [ -f "$PIDFILE" ]; then
     rm -f "$PIDFILE"
 fi
 
-# Also check for orphaned qemu-system-x86_64 using port 2222
-PORT_PID=$(ss -tlnp 2>/dev/null | grep ':2222 ' | grep -oP 'pid=\K[0-9]+' || true)
-if [ -n "$PORT_PID" ]; then
-    # Verify it's actually qemu before killing
-    PROC_NAME=$(ps -p "$PORT_PID" -o comm= 2>/dev/null || true)
-    if [[ "$PROC_NAME" == qemu-system-* ]]; then
-        print_status info "Found orphaned VM on port 2222 (PID: $PORT_PID), stopping..."
-        kill "$PORT_PID" 2>/dev/null || true
-        sleep 2
-        if kill -0 "$PORT_PID" 2>/dev/null; then
-            kill -9 "$PORT_PID" 2>/dev/null || true
-        fi
-        STOPPED=true
-    else
-        print_status warn "Port 2222 in use by non-QEMU process ($PROC_NAME), skipping"
+# Find and kill all qemu processes using our QCOW2 image
+QCOW2_PATH="${MISE_PROJECT_ROOT}/result/nixos.qcow2"
+for PID in $(pgrep -f "qemu-system.*nixos.qcow2" 2>/dev/null || true); do
+    print_status info "Found QEMU process (PID: $PID), stopping..."
+    kill "$PID" 2>/dev/null || true
+    sleep 1
+    if kill -0 "$PID" 2>/dev/null; then
+        print_status warn "Process still running, sending SIGKILL..."
+        kill -9 "$PID" 2>/dev/null || true
     fi
-fi
+    STOPPED=true
+done
 
 if [ "$STOPPED" = true ]; then
     print_status success "VM stopped"

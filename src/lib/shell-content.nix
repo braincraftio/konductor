@@ -42,17 +42,10 @@ let
   '';
 
   # Environment variable exports for standalone shells (containers, VMs)
-  # XDG vars use $HOME which bash expands at runtime
   envExports = ''
     # Locale
     export LANG=${env.LANG}
     export LC_ALL=${env.LC_ALL}
-
-    # XDG Base Directory (force-set to ensure $HOME expands correctly)
-    export XDG_CONFIG_HOME="$HOME/.config"
-    export XDG_CACHE_HOME="$HOME/.cache"
-    export XDG_DATA_HOME="$HOME/.local/share"
-    export XDG_STATE_HOME="$HOME/.local/state"
 
     # Editor
     export EDITOR=${env.EDITOR}
