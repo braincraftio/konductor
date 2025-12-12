@@ -191,17 +191,18 @@ mise run nix:qcow2
 
 ### Development Shells
 
-Konductor provides 7 specialized shells using compositional hierarchy:
+Konductor provides 8 specialized shells using compositional hierarchy:
 
 | Shell | Command | Description | Key Packages |
 |-------|---------|-------------|--------------|
 | default | `nix develop` | Foundation shell | git, jq, ripgrep, fzf |
-| Python | `nix develop .#python` | Python 3.12 dev | uv, ruff, mypy, bandit |
+| python | `nix develop .#python` | Python 3.12 dev | uv, ruff, mypy, bandit |
 | go | `nix develop .#go` | Go 1.24 dev | gopls, delve, linter |
 | node | `nix develop .#node` | JavaScript/TS dev | pnpm, biome, prettier |
 | rust | `nix develop .#rust` | Rust 1.82.0 dev | cargo, clippy, analyzer |
 | dev | `nix develop .#dev` | IDE tools | Neovim, Tmux, LazyGit |
 | full | `nix develop .#full` | Everything | All languages + IDE |
+| konductor | `nix develop .#konductor` | Self-hosting | full + docker/qemu/libvirt |
 
 Each shell extends the base shell using `overrideAttrs` pattern:
 
@@ -244,16 +245,19 @@ Excludes: Language runtimes (use `nix develop konductor#{python,go}` inside)
 NixOS 25.11 virtual machine images for cloud deployment with cloud-init
 support for AWS, GCP, Azure, and OpenStack provisioning.
 
+**Build image and create cloud-init ISO:**
+
 ```bash
 # Ensure KVM access (one-time setup)
-sudo usermod -aG kvm $USER
-newgrp kvm
+sudo usermod -aG kvm $USER && newgrp kvm
+```
 
+```bash
 # Build image and create cloud-init ISO
 mise run nix:qcow2
 ```
 
-Launch with serial console (interactive):
+**Launch with serial console (interactive):**
 
 ```bash
 qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
@@ -263,7 +267,7 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
   -nographic -serial mon:stdio
 ```
 
-Launch headless (SSH access):
+**Launch headless (SSH access):**
 
 ```bash
 qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
@@ -271,13 +275,19 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
   -drive file=/tmp/konductor-cloud-init/seed.iso,media=cdrom \
   -nic user,hostfwd=tcp::2222-:22 \
   -daemonize
-
-# SSH access
-ssh -p 2222 kc2@localhost
-ssh -p 2222 kc2admin@localhost  # sudo access
 ```
 
-Launch with shared repo (development):
+```bash
+# SSH access
+ssh -p 2222 kc2@localhost
+```
+
+```bash
+# SSH with sudo access
+ssh -p 2222 kc2admin@localhost
+```
+
+**Launch with shared repo (full performance + 9p filesystem):**
 
 ```bash
 qemu-system-x86_64 -machine q35,accel=kvm -m 8192 -cpu host -smp 4 \
@@ -289,27 +299,40 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 8192 -cpu host -smp 4 \
   -device virtio-rng-pci \
   -virtfs local,path=.,mount_tag=host,security_model=mapped-xattr \
   -nographic -serial mon:stdio
-
-# Inside VM: mount the shared repo
-sudo mkdir -p /mnt/host
-sudo mount -t 9p -o trans=virtio host /mnt/host
-cd /mnt/host && nix develop .#full
 ```
 
-Credentials (set via cloud-init):
+Inside VM - mount the shared repo:
+
+```bash
+sudo mkdir -p /mnt/host
+sudo mount -t 9p -o trans=virtio host /mnt/host
+```
+
+```bash
+cd /mnt/host && nix develop konductor#konductor
+```
+
+**Credentials (set via cloud-init):**
 
 - `kc2` / `kc2` - unprivileged user
 - `kc2admin` / `kc2admin` - sudo access
 - SSH key auto-injected from `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`
 
-Configuration includes:
+**Cloud-init auto-setup:**
+
+- Docker and libvirtd services enabled on boot
+- `konductor#konductor` devshell pre-built for both users
+- Login prompt shows hint to enter devshell
+
+**Configuration includes:**
 
 - NixOS 25.11 with systemd-networkd (DHCP on all interfaces)
 - Cloud-init enabled for automated provisioning
 - OpenSSH with hardened settings (disable root login for production)
 - QEMU guest agent for time sync, snapshots, host communication
+- Virtio drivers for disk, network, balloon, and RNG
 
-Use cases: KVM, libvirt, Proxmox, cloud orchestration platforms
+**Use cases:** KVM, libvirt, Proxmox, cloud orchestration platforms
 
 #### System Modules
 
@@ -461,7 +484,8 @@ base (default shell)
   ├─> node (base + Node.js 22 + pnpm)
   ├─> rust (base + Rust 1.82.0 + cargo)
   ├─> dev (base + neovim + tmux + IDE tools)
-  └─> full (base + all languages + neovim + tmux + IDE tools)
+  ├─> full (base + all languages + neovim + tmux + IDE tools)
+  └─> konductor (full + docker + qemu + libvirt + buildkit)
 ```
 
 ### Language Shell Features
@@ -548,6 +572,19 @@ Display: Shows all four language versions on shell entry for verification
 Use case: Polyglot projects requiring multiple language runtimes
 simultaneously
 
+#### Konductor Shell
+
+Self-hosting environment for building Konductor artifacts:
+
+Includes: Everything from full shell plus container and VM build tools
+(docker, docker-compose, buildkit, skopeo, crane, qemu, libvirt, virt-manager,
+cdrkit, cachix)
+
+Environment: `DOCKER_HOST` and `DOCKER_BUILDKIT=1` configured
+
+Use case: Building OCI containers and QCOW2 images inside Konductor VM,
+CI/CD pipelines, konductor development
+
 ---
 
 ## Task Runner System
@@ -617,17 +654,19 @@ flake/
 │   │   ├── languages.nix        # Language toolchains
 │   │   ├── linters.nix          # Wrapped linters
 │   │   ├── formatters.nix       # Wrapped formatters
-│   │   └── ide.nix              # IDE enhancements
+│   │   ├── ide.nix              # IDE enhancements
+│   │   └── konductor.nix        # Self-hosting tools
 │   │
 │   ├── devshells/
-│   │   ├── default.nix          # Exports all 7 shells
+│   │   ├── default.nix          # Exports all 8 shells
 │   │   ├── base.nix             # Foundation shell
 │   │   ├── python.nix           # base + Python
 │   │   ├── go.nix               # base + Go
 │   │   ├── node.nix             # base + Node
 │   │   ├── rust.nix             # base + Rust
 │   │   ├── dev.nix              # base + IDE
-│   │   └── full.nix             # base + all + IDE
+│   │   ├── full.nix             # base + all + IDE
+│   │   └── konductor.nix        # full + self-hosting tools
 │   │
 │   ├── programs/
 │   │   ├── neovim/default.nix   # nixvim config (20+ plugins)
@@ -661,7 +700,7 @@ Statistics:
 
 - Nix Code: ~4,100 lines authored
 - Mise Tasks: 100+ tasks, 1,697 lines across 6 modules
-- Development Shells: 7 specialized environments
+- Development Shells: 8 specialized environments
 - Linters: 13 with hermetic configuration
 - Formatters: 8 with consistent style rules
 - Container Volumes: 14 for persistence
