@@ -25,6 +25,7 @@
     # Infrastructure as Code
     pulumi # IaC with real programming languages
     pulumictl # Pulumi CLI utilities
+    pulumiPackages.pulumi-language-python # Python language plugin
   ];
 
   shellHook = "";

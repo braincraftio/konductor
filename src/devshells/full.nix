@@ -4,7 +4,7 @@
 #
 # Package composition defined in: ../packages/
 
-{ baseShell, packages, versions, programs, ... }:
+{ baseShell, packages, versions, programs, pkgs, ... }:
 
 let
   langs = versions.languages;
@@ -28,6 +28,9 @@ baseShell.overrideAttrs (old: {
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="full"
     export name="full"
+
+    # Native library support for pip-installed packages (grpc, etc.)
+    export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
 
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
