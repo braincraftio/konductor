@@ -1,5 +1,7 @@
 # src/qcow2/default.nix
 # QCOW2 VM build using nixos-generators
+#
+# Self-hosting capable: can build konductor OCI, QCOW2, and run full CI
 
 { pkgs, lib, nixos-generators, system, ... }:
 
@@ -16,6 +18,29 @@ let
   devshellPackages = import ../packages {
     inherit pkgs lib versions config;
   };
+
+  # Self-hosting packages for building konductor artifacts
+  selfHostingPackages = with pkgs; [
+    # Container tooling
+    docker
+    docker-compose
+    docker-buildx
+    buildkit
+
+    # VM/QCOW2 tooling
+    qemu_kvm
+    qemu-utils
+    libvirt
+    virt-manager
+
+    # Cloud-init ISO creation
+    cdrkit
+
+    # CI/CD essentials
+    git
+    gh
+    gnumake
+  ];
 
 in
 {
@@ -41,21 +66,22 @@ in
           isNormalUser = true;
           inherit (users.kc2) uid home;
           description = users.kc2.gecos;
-          extraGroups = [ "wheel" ];
+          extraGroups = [ "wheel" "docker" "libvirtd" "kvm" ];
         };
 
         users.users.kc2admin = {
           isNormalUser = true;
           inherit (users.kc2admin) uid home;
           description = users.kc2admin.gecos;
-          extraGroups = [ "wheel" ];
+          extraGroups = [ "wheel" "docker" "libvirtd" "kvm" ];
         };
 
         # Sudo without password
         security.sudo.wheelNeedsPassword = false;
 
-        # Packages from devshellPackages.default (no languages, no IDE)
+        # Packages: devshell defaults + self-hosting tools
         environment.systemPackages = devshellPackages.default
+          ++ selfHostingPackages
           ++ [ pkgs.cachix ];
 
         # Environment variables from centralized configuration
@@ -82,8 +108,40 @@ in
           };
         };
 
-        # Disk size for VM
-        virtualisation.diskSize = lib.mkDefault (20 * 1024); # 20GB
+        # Docker for container builds
+        virtualisation.docker = {
+          enable = true;
+          enableOnBoot = true;
+        };
+
+        # Libvirt for nested VM builds
+        virtualisation.libvirtd = {
+          enable = true;
+          qemu = {
+            package = pkgs.qemu_kvm;
+            runAsRoot = true;
+            swtpm.enable = true;
+          };
+        };
+
+        # Disk size for VM (larger for self-hosting)
+        virtualisation.diskSize = lib.mkDefault (50 * 1024); # 50GB
+
+        # Virtio drivers for performance
+        boot.initrd.availableKernelModules = [
+          "virtio_net"
+          "virtio_pci"
+          "virtio_mmio"
+          "virtio_blk"
+          "virtio_scsi"
+          "virtio_balloon"
+          "virtio_console"
+          "9p"
+          "9pnet_virtio"
+        ];
+
+        # Spice/QEMU guest tools for clipboard, display, etc.
+        services.spice-vdagentd.enable = true;
 
         # Nix configuration
         nix = {
