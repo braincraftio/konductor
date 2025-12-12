@@ -33,7 +33,10 @@ baseShell.overrideAttrs (old: {
     # Self-hosting: container + VM build tools
     ++ konductor.packages;
 
-  shellHook = old.shellHook + ''
+  shellHook = ''
+    # Skip base banner - we show our own
+    export KONDUCTOR_SKIP_BANNER=1
+  '' + old.shellHook + ''
     export KONDUCTOR_SHELL="konductor"
     export name="konductor"
 
