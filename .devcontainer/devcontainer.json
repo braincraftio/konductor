@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "name": "Konductor",
+
+  "dockerComposeFile": "compose/systemd.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace/konductor",
+
+  "shutdownAction": "stopCompose",
+  "overrideCommand": false,
+
+  "remoteUser": "debian",
+  "containerUser": "root",
+  "updateRemoteUserUID": true,
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "dockerDashComposeVersion": "v2",
+      "installDockerBuildx": true,
+      "moby": false,
+      "version": "latest"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "anthropic.claude-code",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash",
+            "args": ["-l"]
+          },
+          "nix-develop": {
+            "path": "/bin/bash",
+            "args": ["-l", "-c", "nix develop .#full"]
+          }
+        },
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    }
+  }
+}

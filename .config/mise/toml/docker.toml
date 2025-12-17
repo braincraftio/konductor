@@ -7,11 +7,11 @@
 #   3. Buildx bake combines arch-specific images into multi-arch manifest
 #
 # Task Namespacing:
-#   docker:build:*      - Container build tasks
+#   docker:build:*      - Container image build tasks
 #   docker:buildx:*     - Multi-arch buildx operations
 #   docker:driver:*     - Buildx driver management
-#   docker:container:*  - DevContainer lifecycle
-#   docker:*            - Utilities (status, images, clean)
+#   docker:up/down/etc  - DevContainer lifecycle
+#   docker:status/etc   - Utilities
 #
 # Run as different users:
 #   docker run -u kc2 konductor        # unprivileged (default)
@@ -79,31 +79,27 @@ printf '  docker:driver:status          Show current driver status\n'
 printf '\n'
 
 printf '%b━━━ DevContainer Lifecycle ━━━%b\n' "${CYAN:-}" "${NC:-}"
-printf '  docker:container:up           Start devcontainer\n'
-printf '  docker:container:down         Stop devcontainer\n'
-printf '  docker:container:shell        Open shell in container\n'
-printf '  docker:container:logs         Show container logs\n'
+printf '  docker:up                     Start devcontainer\n'
+printf '  docker:down                   Stop devcontainer\n'
+printf '  docker:logs                   Show container logs\n'
+printf '  docker:restart                Restart devcontainer\n'
+printf '  docker:rebuild                Rebuild from scratch\n'
+printf '  docker:test                   Health check\n'
 printf '\n'
 
 printf '%b━━━ Utilities ━━━%b\n' "${CYAN:-}" "${NC:-}"
 printf '  docker:status                 Show Docker status\n'
 printf '  docker:images                 List Konductor images\n'
 printf '  docker:clean                  Clean Docker resources\n'
-printf '  docker:run                    Run container interactively\n'
+printf '  docker:clean:all              Aggressive cleanup (all unused)\n'
 printf '\n'
 
 printf '%b━━━ Quick Start ━━━%b\n' "${GREEN:-}" "${NC:-}"
-printf '  %b# Build complete container (recommended)%b\n' "${GRAY:-}" "${NC:-}"
-printf '  mise run docker:build:all\n'
+printf '  %b# Start devcontainer%b\n' "${GRAY:-}" "${NC:-}"
+printf '  mise run docker:up\n'
 printf '\n'
-printf '  %b# Run as unprivileged user (default)%b\n' "${GRAY:-}" "${NC:-}"
-printf '  docker run --rm -it ghcr.io/braincraftio/konductor:latest\n'
-printf '\n'
-printf '  %b# Run as admin (with sudo)%b\n' "${GRAY:-}" "${NC:-}"
-printf '  docker run --rm -it -u kc2admin ghcr.io/braincraftio/konductor:latest\n'
-printf '\n'
-printf '  %b# Test sudo%b\n' "${GRAY:-}" "${NC:-}"
-printf '  docker run --rm -u kc2admin ghcr.io/braincraftio/konductor:latest -c "sudo whoami"\n'
+printf '  %b# Enter nix develop shell%b\n' "${GRAY:-}" "${NC:-}"
+printf '  docker compose exec konductor nix develop\n'
 printf '\n'
 '''
 
@@ -616,71 +612,84 @@ print_status success "Cleanup complete"
 '''
 
 # =============================================================================
-# DEVCONTAINER LIFECYCLE
+# CONTAINER LIFECYCLE - Systemd + Multi-user Nix DevContainer
 # =============================================================================
 
-["docker:container:up"]
+["docker:up"]
 description = "Start the devcontainer"
-alias = ["dcu"]
+alias = ["du"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
 SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
 . "${SCRIPT_DIR}/common.sh"
+
+COMPOSE_FILE="${MISE_PROJECT_ROOT}/{{ vars.devcontainer_compose }}"
+CONTAINER_NAME="{{ vars.devcontainer_name }}"
 
 print_header "Starting DevContainer"
 
-cd "${MISE_PROJECT_ROOT}"
-
-COMPOSE_FILE=""
-for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
-    if [ -f "${f}" ]; then
-        COMPOSE_FILE="${f}"
-        break
-    fi
-done
-
-if [ -z "${COMPOSE_FILE}" ]; then
-    print_status error "No Docker Compose file found"
+if [ ! -f "${COMPOSE_FILE}" ]; then
+    print_status error "Compose file not found: ${COMPOSE_FILE}"
     exit 1
 fi
 
-print_status info "Using compose file: ${COMPOSE_FILE}"
-docker compose -f "${COMPOSE_FILE}" up -d
+if docker ps --format {% raw %}'{{.Names}}'{% endraw %} | grep -q "^${CONTAINER_NAME}$"; then
+    print_status info "Already running: ${CONTAINER_NAME}"
+    exit 0
+fi
 
-print_status success "DevContainer started"
-print_status info "Run 'mise run docker:container:shell' to enter"
+print_status info "Building and starting..."
+docker compose -f "${COMPOSE_FILE}" up -d --build
+
+print_status info "Waiting for systemd..."
+sleep 5
+
+if docker exec "${CONTAINER_NAME}" systemctl is-active nix-daemon.socket >/dev/null 2>&1; then
+    print_status success "DevContainer ready with nix-daemon"
+else
+    print_status warning "Started (nix-daemon may still be initializing)"
+fi
 '''
 
-["docker:container:down"]
+["docker:down"]
 description = "Stop the devcontainer"
-alias = ["dcd"]
+alias = ["dd"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
 SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
 . "${SCRIPT_DIR}/common.sh"
+
+COMPOSE_FILE="${MISE_PROJECT_ROOT}/{{ vars.devcontainer_compose }}"
 
 print_header "Stopping DevContainer"
 
-cd "${MISE_PROJECT_ROOT}"
-
-for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
-    if [ -f "${f}" ]; then
-        docker compose -f "${f}" down
-        print_status success "DevContainer stopped"
-        exit 0
-    fi
-done
-
-print_status warning "No Docker Compose file found"
+docker compose -f "${COMPOSE_FILE}" down
+print_status success "Stopped (volumes preserved)"
 '''
 
-["docker:container:shell"]
-description = "Open a shell in the running devcontainer"
-alias = ["dcs"]
+["docker:logs"]
+description = "View devcontainer logs"
+alias = ["dl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMPOSE_FILE="${MISE_PROJECT_ROOT}/{{ vars.devcontainer_compose }}"
+docker compose -f "${COMPOSE_FILE}" logs -f --timestamps
+'''
+
+["docker:restart"]
+description = "Restart the devcontainer"
+alias = ["dr"]
+depends = ["docker:down", "docker:up"]
+
+["docker:rebuild"]
+description = "Rebuild devcontainer from scratch"
+alias = ["drb"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
@@ -688,49 +697,74 @@ set -euo pipefail
 SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
 . "${SCRIPT_DIR}/common.sh"
 
-cd "${MISE_PROJECT_ROOT}"
+COMPOSE_FILE="${MISE_PROJECT_ROOT}/{{ vars.devcontainer_compose }}"
 
-for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
-    if [ -f "${f}" ]; then
-        SERVICE=$(docker compose -f "${f}" config --services | head -1)
-        if [ -z "${SERVICE}" ]; then
-            print_status error "No services found in compose file"
-            exit 1
-        fi
-        print_status info "Entering shell in service: ${SERVICE}"
-        docker compose -f "${f}" exec "${SERVICE}" bash -l
-        exit 0
-    fi
-done
+print_header "Rebuilding DevContainer"
 
-print_status error "No Docker Compose file found"
-exit 1
+docker compose -f "${COMPOSE_FILE}" down
+docker compose -f "${COMPOSE_FILE}" build --no-cache
+docker compose -f "${COMPOSE_FILE}" up -d
+
+sleep 5
+print_status success "Rebuilt and started"
 '''
 
-["docker:container:logs"]
-description = "Show devcontainer logs"
-alias = ["dcl"]
+["docker:test"]
+description = "Test devcontainer health"
+alias = ["dt"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "${MISE_PROJECT_ROOT}"
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
 
-for f in compose.yml compose.yaml docker-compose.yml .devcontainer/docker-compose.yml; do
-    if [ -f "${f}" ]; then
-        docker compose -f "${f}" logs -f --timestamps
-        exit 0
-    fi
-done
+CONTAINER_NAME="{{ vars.devcontainer_name }}"
 
-printf 'No Docker Compose file found\n' >&2
-exit 1
+print_header "DevContainer Health Check"
+
+# Container
+print_subheader "Container"
+if ! docker ps --format {% raw %}'{{.Names}}'{% endraw %} | grep -q "^${CONTAINER_NAME}$"; then
+    print_status error "Not running"
+    exit 1
+fi
+print_status success "Running"
+
+# Systemd
+print_subheader "Systemd"
+STATE=$(docker exec "${CONTAINER_NAME}" systemctl is-system-running 2>/dev/null || echo "unknown")
+if [ "${STATE}" = "running" ]; then
+    print_status success "systemd: ${STATE}"
+else
+    print_status warning "systemd: ${STATE}"
+fi
+
+# Nix daemon
+print_subheader "Nix Daemon"
+if docker exec "${CONTAINER_NAME}" systemctl is-active nix-daemon.socket >/dev/null 2>&1; then
+    print_status success "nix-daemon.socket active"
+else
+    print_status error "nix-daemon.socket not active"
+fi
+
+# Nix command
+print_subheader "Nix"
+NIX_VER=$(docker exec -u debian "${CONTAINER_NAME}" bash -lc "nix --version" 2>/dev/null || echo "failed")
+if [[ "${NIX_VER}" == *"nix"* ]]; then
+    print_status success "${NIX_VER}"
+else
+    print_status error "Nix not accessible"
+fi
+
+# Quick nix develop test
+print_subheader "Nix Develop"
+if docker exec -u debian "${CONTAINER_NAME}" bash -lc "cd /workspace/konductor && nix develop .#full --command true" 2>/dev/null; then
+    print_status success "nix develop .#full works"
+else
+    print_status warning "nix develop needs more time or failed"
+fi
 '''
-
-["docker:container:restart"]
-description = "Restart the devcontainer"
-alias = ["dcr"]
-depends = ["docker:container:down", "docker:container:up"]
 
 # =============================================================================
 # UTILITIES
@@ -835,29 +869,6 @@ print_status warning "Removing ALL unused Docker resources..."
 docker system prune -a -f --volumes
 
 print_status success "Aggressive cleanup complete"
-'''
-
-["docker:run"]
-description = "Run container interactively"
-alias = ["drun"]
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
-. "${SCRIPT_DIR}/common.sh"
-
-IMAGE="${1:-ghcr.io/braincraftio/konductor:latest}"
-
-print_header "Running Container"
-print_status info "Image: ${IMAGE}"
-print_status info "Mounting current directory to /workspace"
-
-docker run --rm -it \
-    -v "${MISE_PROJECT_ROOT}:/workspace" \
-    -w /workspace \
-    "${IMAGE}" \
-    bash -l
 '''
 
 # =============================================================================

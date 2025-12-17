@@ -1,0 +1,20 @@
+# Konductor Development Environment - Docker Compose Configuration
+#
+# Usage:
+#   docker compose up                   # Start devcontainer
+#   docker compose up -d                # Start in background
+#   docker compose down                 # Stop all services
+#   docker compose exec konductor bash  # Shell into container
+#   docker compose logs -f              # Follow logs
+#
+# DevContainer:
+#   docker exec -t konductor nix develop          # Enter nix shell (default)
+#   docker exec -t konductor nix develop .#full   # Full development shell
+#
+# Build:
+#   docker compose build                # Rebuild image
+#   docker compose build --no-cache     # Rebuild from scratch
+name: konductor
+
+include:
+  - path: .devcontainer/compose/systemd.yml

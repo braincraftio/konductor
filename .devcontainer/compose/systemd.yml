@@ -1,0 +1,92 @@
+# Konductor DevContainer - Docker Compose Configuration
+# Systemd-based container with multi-user Nix daemon
+
+services:
+  konductor:
+    build:
+      context: ..
+      dockerfile: Dockerfile.systemd
+
+    image: ghcr.io/braincraftio/konductor:devcontainer
+    container_name: konductor
+    hostname: konductor
+
+    # Systemd must be PID 1
+    init: false
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 30s
+
+    # Development environment - full access
+    privileged: true
+    network_mode: host
+
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+      - label:disable
+
+    # Required for systemd cgroup management
+    cgroup: host
+
+    environment:
+      # Systemd container markers
+      container: docker
+      SYSTEMD_COLORS: "true"
+      SYSTEMD_LOG_LEVEL: info
+
+      # User session configuration
+      XDG_RUNTIME_DIR: /run/user/1000
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+
+      # Nix daemon configuration
+      NIX_BUILD_CORES: 0
+      NIX_MAX_JOBS: auto
+
+      # Docker BuildKit
+      DOCKER_BUILDKIT: "1"
+
+    # Systemd requires tmpfs for runtime directories
+    tmpfs:
+      - /run:exec,mode=755,size=256M,uid=0,gid=0
+      - /run/lock:noexec,nosuid,nodev,mode=1777,size=64M
+      - /run/user/1000:exec,mode=700,size=128M,uid=1000,gid=1000
+
+    volumes:
+      # Cgroup mount for systemd
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+
+      # Workspace mount
+      - ../..:/workspace/konductor:cached
+
+      # Docker socket for Docker-outside-of-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # Nix store persistence
+      - nix-store:/nix
+
+    # Resource limits
+    ulimits:
+      nofile:
+        soft: 524288
+        hard: 524288
+      nproc:
+        soft: 131072
+        hard: 131072
+
+    user: root
+    working_dir: /workspace/konductor
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+    labels:
+      com.konductor.managed: "true"
+      com.konductor.type: "systemd"
+
+volumes:
+  nix-store:
+    driver: local

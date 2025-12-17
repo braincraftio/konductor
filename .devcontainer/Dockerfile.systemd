@@ -1,0 +1,188 @@
+# syntax=docker/dockerfile:1
+# Konductor DevContainer - Systemd + Multi-user Nix
+# Minimal base for `nix develop .#full` workflow
+FROM docker.io/library/debian:13
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Essential packages only - everything else comes from Nix
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Systemd and init
+    systemd \
+    systemd-sysv \
+    dbus \
+    dbus-user-session \
+    # Minimal tools for bootstrap
+    sudo \
+    curl \
+    ca-certificates \
+    git \
+    xz-utils \
+    # Shell
+    bash \
+    bash-completion \
+    # Process utilities (needed for systemd)
+    procps \
+    psmisc \
+    lsof \
+    # Locale support
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Configure locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+    echo "C.UTF-8 UTF-8" >> /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales && \
+    update-locale LANG=C.UTF-8
+
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C:en
+
+# System-wide PATH including Nix (for docker exec without shell)
+ENV PATH="/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Clean up systemd for container operation
+RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
+    /etc/systemd/system/*.wants/* \
+    /lib/systemd/system/local-fs.target.wants/* \
+    /lib/systemd/system/sockets.target.wants/*udev* \
+    /lib/systemd/system/sockets.target.wants/*initctl* \
+    /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
+    /lib/systemd/system/systemd-update-utmp* \
+    /lib/systemd/system/getty.target
+
+# Disable unnecessary systemd services
+RUN systemctl mask \
+    systemd-logind.service \
+    getty.target \
+    console-getty.service \
+    systemd-networkd.service \
+    systemd-resolved.service \
+    systemd-timesyncd.service \
+    systemd-hostnamed.service \
+    systemd-machined.service \
+    systemd-journald.service \
+    systemd-journal-flush.service \
+    systemd-journald.socket \
+    systemd-journald-dev-log.socket
+
+# Install Nix (Determinate Systems installer - multi-user daemon mode)
+RUN curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
+    sh -s -- install linux \
+    --extra-conf "sandbox = false" \
+    --extra-conf "experimental-features = nix-command flakes" \
+    --extra-conf "trusted-users = root debian @wheel @sudo" \
+    --extra-conf "max-jobs = auto" \
+    --extra-conf "cores = 0" \
+    --extra-conf "keep-outputs = true" \
+    --extra-conf "keep-derivations = true" \
+    --extra-conf "fallback = true" \
+    --extra-conf "warn-dirty = false" \
+    --extra-conf "accept-flake-config = true" \
+    --no-start-daemon \
+    --no-confirm
+
+# Enable Nix daemon systemd services
+RUN systemctl enable nix-daemon.socket nix-daemon.service
+
+# Add konductor flake to registry for `nix develop konductor` UX
+RUN /nix/var/nix/profiles/default/bin/nix registry add konductor github:braincraftio/konductor
+
+# Configure Nix daemon systemd override
+# IMPORTANT: Do NOT set NIX_REMOTE for the daemon itself
+RUN mkdir -p /etc/systemd/system/nix-daemon.service.d && \
+    cat > /etc/systemd/system/nix-daemon.service.d/override.conf << 'EOF'
+[Service]
+Environment="PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Restart=always
+RestartSec=5
+EOF
+
+# Copy sudoers configuration BEFORE creating user
+COPY rootfs/etc/sudoers.d/debian /etc/sudoers.d/debian
+RUN chmod 0440 /etc/sudoers.d/debian
+
+# Copy profile.d scripts
+COPY rootfs/etc/profile.d/ /etc/profile.d/
+RUN chmod 0644 /etc/profile.d/*.sh
+
+# Docker socket link service (for non-privileged mode with docker-host.sock mount)
+# Uncomment if using isolated mode with /var/run/docker.sock:/var/run/docker-host.sock
+# COPY rootfs/etc/systemd/system/docker-socket-link.service /etc/systemd/system/
+# RUN systemctl enable docker-socket-link.service
+
+# Create docker group
+RUN groupadd -f -g 800 docker || true
+
+# Copy skeleton files BEFORE user creation (useradd -m copies from /etc/skel)
+COPY rootfs/etc/skel/.bashrc /etc/skel/.bashrc
+COPY rootfs/etc/skel/.profile /etc/skel/.profile
+COPY rootfs/etc/skel/.config/mise/config.toml /etc/skel/.config/mise/config.toml
+
+# Create debian user with required groups (useradd -m copies /etc/skel with correct ownership)
+RUN useradd -m -s /bin/bash -u 1000 -G sudo,nixbld,systemd-journal,docker debian
+
+# Install mise for the debian user
+USER debian
+WORKDIR /home/debian
+
+RUN curl https://mise.run | sh && \
+    /home/debian/.local/bin/mise --version
+
+# Generate bash completion for mise
+RUN mkdir -p /home/debian/.local/share/bash-completion/completions && \
+    /home/debian/.local/bin/mise completion bash > /home/debian/.local/share/bash-completion/completions/mise
+
+# Create mise state directory
+RUN mkdir -p /home/debian/.local/state/mise && \
+    chmod 755 /home/debian/.local/state /home/debian/.local/state/mise
+
+# Switch back to root for final configuration
+USER root
+WORKDIR /
+
+# Fix ownership of all user files
+RUN chown -R debian:debian /home/debian/
+
+# Set up user runtime directory for systemd user sessions
+RUN mkdir -p /run/user/1000 && \
+    chown -R debian:debian /run/user/1000 && \
+    chmod 700 /run/user/1000
+
+# Create systemd tmpfiles config
+RUN cat > /etc/tmpfiles.d/konductor.conf << 'EOF'
+d /run/user/1000 0700 debian debian -
+d /run/user/1000/systemd 0755 debian debian -
+EOF
+
+# Prevent apt from starting services during package installation
+RUN echo 'exit 0' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d
+
+# Health check script
+RUN cat > /usr/local/bin/healthcheck << 'EOF'
+#!/bin/bash
+systemctl is-active --quiet nix-daemon.socket
+EOF
+RUN chmod +x /usr/local/bin/healthcheck
+
+# Verify installations
+RUN /home/debian/.local/bin/mise --version && \
+    /nix/var/nix/profiles/default/bin/nix --version
+
+# Systemd signal handling
+STOPSIGNAL SIGRTMIN+3
+
+# Volume mount points
+VOLUME ["/sys/fs/cgroup", "/workspace"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["/usr/local/bin/healthcheck"]
+
+WORKDIR /workspace/konductor
+SHELL ["/bin/bash", "-c"]
+
+# Systemd as PID 1
+ENTRYPOINT ["/lib/systemd/systemd"]
+CMD []

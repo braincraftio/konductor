@@ -64,6 +64,11 @@ enable_nix_cache = "true"
 # Paths (relative to project root)
 flake_dir = "."
 
+# DevContainer configuration
+devcontainer_compose = "compose.yaml"
+devcontainer_name = "konductor"
+devcontainer_service = "konductor"
+
 # Logging
 log_level = "info"
 
