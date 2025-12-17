@@ -162,6 +162,33 @@ let
       { mode = "n"; key = "<leader>ft"; action = "<cmd>Neotree toggle<cr>"; options.desc = "Toggle file tree"; }
       { mode = "n"; key = "<leader>fe"; action = "<cmd>Neotree focus<cr>"; options.desc = "Focus file tree"; }
       { mode = "n"; key = "<leader>fF"; action = "<cmd>Neotree reveal<cr>"; options.desc = "Reveal in file tree"; }
+
+      # Buffer navigation (barbar)
+      { mode = "n"; key = "<S-h>"; action = "<cmd>BufferPrevious<cr>"; options.desc = "Previous buffer"; }
+      { mode = "n"; key = "<S-l>"; action = "<cmd>BufferNext<cr>"; options.desc = "Next buffer"; }
+      { mode = "n"; key = "[b"; action = "<cmd>BufferPrevious<cr>"; options.desc = "Previous buffer"; }
+      { mode = "n"; key = "]b"; action = "<cmd>BufferNext<cr>"; options.desc = "Next buffer"; }
+      { mode = "n"; key = "<A-<>"; action = "<cmd>BufferMovePrevious<cr>"; options.desc = "Move buffer left"; }
+      { mode = "n"; key = "<A->>"; action = "<cmd>BufferMoveNext<cr>"; options.desc = "Move buffer right"; }
+      { mode = "n"; key = "<leader>bp"; action = "<cmd>BufferPin<cr>"; options.desc = "Pin buffer"; }
+      { mode = "n"; key = "<leader>bP"; action = "<cmd>BufferCloseAllButPinned<cr>"; options.desc = "Close unpinned buffers"; }
+      { mode = "n"; key = "<leader>bo"; action = "<cmd>BufferCloseAllButCurrentOrPinned<cr>"; options.desc = "Close other buffers"; }
+      { mode = "n"; key = "<leader>br"; action = "<cmd>BufferCloseBuffersRight<cr>"; options.desc = "Close buffers to right"; }
+      { mode = "n"; key = "<leader>bl"; action = "<cmd>BufferCloseBuffersLeft<cr>"; options.desc = "Close buffers to left"; }
+      { mode = "n"; key = "<leader>bs"; action = "<cmd>BufferPick<cr>"; options.desc = "Pick buffer (jump mode)"; }
+      { mode = "n"; key = "<leader>bS"; action = "<cmd>BufferPickDelete<cr>"; options.desc = "Pick buffer to close"; }
+      { mode = "n"; key = "<leader>b1"; action = "<cmd>BufferGoto 1<cr>"; options.desc = "Go to buffer 1"; }
+      { mode = "n"; key = "<leader>b2"; action = "<cmd>BufferGoto 2<cr>"; options.desc = "Go to buffer 2"; }
+      { mode = "n"; key = "<leader>b3"; action = "<cmd>BufferGoto 3<cr>"; options.desc = "Go to buffer 3"; }
+      { mode = "n"; key = "<leader>b4"; action = "<cmd>BufferGoto 4<cr>"; options.desc = "Go to buffer 4"; }
+      { mode = "n"; key = "<leader>b5"; action = "<cmd>BufferGoto 5<cr>"; options.desc = "Go to buffer 5"; }
+      { mode = "n"; key = "<leader>b0"; action = "<cmd>BufferLast<cr>"; options.desc = "Go to last buffer"; }
+      { mode = "n"; key = "<leader>bd"; action = "<cmd>BufferClose<cr>"; options.desc = "Close buffer"; }
+      { mode = "n"; key = "<leader>bR"; action = "<cmd>BufferRestore<cr>"; options.desc = "Restore closed buffer"; }
+      # Buffer sorting
+      { mode = "n"; key = "<leader>bsn"; action = "<cmd>BufferOrderByName<cr>"; options.desc = "Sort by name"; }
+      { mode = "n"; key = "<leader>bsd"; action = "<cmd>BufferOrderByDirectory<cr>"; options.desc = "Sort by directory"; }
+      { mode = "n"; key = "<leader>bsl"; action = "<cmd>BufferOrderByLanguage<cr>"; options.desc = "Sort by language"; }
     ];
 
     # Terminal autocommands
@@ -232,6 +259,7 @@ let
           };
         };
       };
+
 
       # Fuzzy finder
       telescope = {
@@ -665,6 +693,27 @@ let
 
     # Extra plugins not yet in nixpkgs
     extraPlugins = with pkgs.vimUtils; [
+      # Barbar.nvim - tabline with re-orderable, auto-sizing, clickable tabs
+      ((buildVimPlugin {
+        name = "barbar.nvim";
+        src = pkgs.fetchFromGitHub {
+          owner = "romgrk";
+          repo = "barbar.nvim";
+          rev = "v1.9.1";
+          sha256 = "sha256-XEHEK2Z97YSS4/flsXSdle/mHKhp6maEg4uXwst88m8=";
+        };
+      }).overrideAttrs (old: {
+        doCheck = false;
+        # Auto-setup barbar on plugin load
+        postInstall = (old.postInstall or "") + ''
+          mkdir -p $out/plugin
+          cat > $out/plugin/barbar-setup.lua << 'EOF'
+          -- Disable auto-setup, we configure manually
+          vim.g.barbar_auto_setup = false
+          EOF
+        '';
+      }))
+
       # Claude Code integration
       (buildVimPlugin {
         name = "claudecode.nvim";
@@ -873,6 +922,91 @@ let
 
     # Additional Lua configuration
     extraConfigLua = ''
+      -- Barbar.nvim Configuration (tabline)
+      require('barbar').setup({
+        -- Enable animations
+        animation = true,
+
+        -- Auto-hide when few buffers
+        auto_hide = 1,
+
+        -- Enable tabpages indicator
+        tabpages = true,
+
+        -- Clickable tabs
+        clickable = true,
+
+        -- Focus behavior when closing
+        focus_on_close = 'left',
+
+        -- Hide extensions for cleaner look
+        hide = { extensions = false, inactive = false },
+
+        -- Highlight settings
+        highlight_alternate = false,
+        highlight_inactive_file_icons = false,
+        highlight_visible = true,
+
+        -- Icons configuration
+        icons = {
+          buffer_index = false,
+          buffer_number = false,
+          button = "",
+          diagnostics = {
+            [vim.diagnostic.severity.ERROR] = { enabled = true, icon = " " },
+            [vim.diagnostic.severity.WARN] = { enabled = true, icon = " " },
+            [vim.diagnostic.severity.INFO] = { enabled = false },
+            [vim.diagnostic.severity.HINT] = { enabled = true, icon = "󰌵" },
+          },
+          gitsigns = {
+            added = { enabled = true, icon = "+" },
+            changed = { enabled = true, icon = "~" },
+            deleted = { enabled = true, icon = "-" },
+          },
+          filetype = {
+            custom_colors = false,
+            enabled = true,
+          },
+          separator = { left = "▎", right = "" },
+          separator_at_end = true,
+          modified = { button = "●" },
+          pinned = { button = "", filename = true },
+          preset = "default",
+          alternate = { filetype = { enabled = false } },
+          current = { buffer_index = false },
+          inactive = { button = "×" },
+          visible = { modified = { buffer_number = false } },
+        },
+
+        -- Insert new buffers after current
+        insert_at_end = false,
+        insert_at_start = false,
+
+        -- Padding
+        maximum_padding = 1,
+        minimum_padding = 1,
+
+        -- Buffer name length
+        maximum_length = 30,
+        minimum_length = 0,
+
+        -- Jump-to-buffer letters based on buffer name
+        semantic_letters = true,
+
+        -- Sidebar offset for neo-tree
+        sidebar_filetypes = {
+          ['neo-tree'] = { event = 'BufWipeout', text = 'File Explorer', align = 'left' },
+        },
+
+        -- Letter order for jump mode (qwerty optimized)
+        letters = 'asdfjkl;ghnmxcvbziowerutyqpASDFJKLGHNMXCVBZIOWERUTYQP',
+
+        -- Sorting
+        sort = {
+          ignore_case = true,
+        },
+      })
+
       -- Mise Integration (treesitter syntax highlighting for mise config files)
       -- Note: mise shims NOT added to PATH - Nix provides all tools directly
 
