@@ -7,6 +7,9 @@
   # Version-pinned packages
   (import ./versions.nix)
 
+  # Vim plugin fixes (lualine sandbox test failures)
+  (import ./vim-plugins.nix)
+
   # Unstable packages overlay
   (_final: prev: {
     unstable = import nixpkgs-unstable {

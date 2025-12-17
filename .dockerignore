@@ -58,8 +58,9 @@
 # =============================================================================
 # BUILD ARTIFACTS & CACHES
 # =============================================================================
-**/result
-**/result-*
+# result symlinks needed for qcow2 build
+# **/result
+# **/result-*
 **/.direnv/
 **/.devenv/
 **/__pycache__/
