@@ -45,6 +45,9 @@ let
       termguicolors = true;
       cursorline = true;
 
+      # Session options - include globals for barbar buffer order persistence
+      sessionoptions = "blank,buffers,curdir,folds,help,tabpages,winsize,globals";
+
       # Performance
       updatetime = 250;
       timeoutlen = 300;
@@ -94,6 +97,10 @@ let
       { mode = "n"; key = "<leader>lf"; action = "<cmd>lua vim.lsp.buf.format()<cr>"; options.desc = "Format buffer"; }
       { mode = "n"; key = "<leader>li"; action = "<cmd>LspInfo<cr>"; options.desc = "LSP Info"; }
       { mode = "n"; key = "<leader>lr"; action = "<cmd>LspRestart<cr>"; options.desc = "LSP Restart"; }
+      { mode = "n"; key = "<leader>ll"; action = "<cmd>lua vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())<cr>"; options.desc = "Toggle inlay hints"; }
+      { mode = "n"; key = "<leader>ls"; action = "<cmd>Telescope lsp_document_symbols<cr>"; options.desc = "Document symbols"; }
+      { mode = "n"; key = "<leader>lS"; action = "<cmd>Telescope lsp_workspace_symbols<cr>"; options.desc = "Workspace symbols"; }
+      { mode = "n"; key = "<leader>lD"; action = "<cmd>Telescope diagnostics<cr>"; options.desc = "Workspace diagnostics"; }
 
       # Terminal keymaps
       { mode = "n"; key = "<leader>tt"; action = "<cmd>ToggleTerm<cr>"; options.desc = "Toggle terminal"; }
@@ -168,27 +175,58 @@ let
       { mode = "n"; key = "<S-l>"; action = "<cmd>BufferNext<cr>"; options.desc = "Next buffer"; }
       { mode = "n"; key = "[b"; action = "<cmd>BufferPrevious<cr>"; options.desc = "Previous buffer"; }
       { mode = "n"; key = "]b"; action = "<cmd>BufferNext<cr>"; options.desc = "Next buffer"; }
+      { mode = "n"; key = "<A-,>"; action = "<cmd>BufferPrevious<cr>"; options.desc = "Previous buffer"; }
+      { mode = "n"; key = "<A-.>"; action = "<cmd>BufferNext<cr>"; options.desc = "Next buffer"; }
       { mode = "n"; key = "<A-<>"; action = "<cmd>BufferMovePrevious<cr>"; options.desc = "Move buffer left"; }
       { mode = "n"; key = "<A->>"; action = "<cmd>BufferMoveNext<cr>"; options.desc = "Move buffer right"; }
+      # Buffer position jumping
+      { mode = "n"; key = "<A-1>"; action = "<cmd>BufferGoto 1<cr>"; options.desc = "Go to buffer 1"; }
+      { mode = "n"; key = "<A-2>"; action = "<cmd>BufferGoto 2<cr>"; options.desc = "Go to buffer 2"; }
+      { mode = "n"; key = "<A-3>"; action = "<cmd>BufferGoto 3<cr>"; options.desc = "Go to buffer 3"; }
+      { mode = "n"; key = "<A-4>"; action = "<cmd>BufferGoto 4<cr>"; options.desc = "Go to buffer 4"; }
+      { mode = "n"; key = "<A-5>"; action = "<cmd>BufferGoto 5<cr>"; options.desc = "Go to buffer 5"; }
+      { mode = "n"; key = "<A-6>"; action = "<cmd>BufferGoto 6<cr>"; options.desc = "Go to buffer 6"; }
+      { mode = "n"; key = "<A-7>"; action = "<cmd>BufferGoto 7<cr>"; options.desc = "Go to buffer 7"; }
+      { mode = "n"; key = "<A-8>"; action = "<cmd>BufferGoto 8<cr>"; options.desc = "Go to buffer 8"; }
+      { mode = "n"; key = "<A-9>"; action = "<cmd>BufferGoto 9<cr>"; options.desc = "Go to buffer 9"; }
+      { mode = "n"; key = "<A-0>"; action = "<cmd>BufferLast<cr>"; options.desc = "Go to last buffer"; }
+      # Buffer pinning
+      { mode = "n"; key = "<A-p>"; action = "<cmd>BufferPin<cr>"; options.desc = "Pin/unpin buffer"; }
       { mode = "n"; key = "<leader>bp"; action = "<cmd>BufferPin<cr>"; options.desc = "Pin buffer"; }
       { mode = "n"; key = "<leader>bP"; action = "<cmd>BufferCloseAllButPinned<cr>"; options.desc = "Close unpinned buffers"; }
+      { mode = "n"; key = "<leader>bgp"; action = "<cmd>BufferGotoPinned<cr>"; options.desc = "Go to pinned buffer"; }
+      { mode = "n"; key = "<leader>bgu"; action = "<cmd>BufferGotoUnpinned<cr>"; options.desc = "Go to unpinned buffer"; }
+      # Buffer closing
+      { mode = "n"; key = "<A-c>"; action = "<cmd>BufferClose<cr>"; options.desc = "Close buffer"; }
+      { mode = "n"; key = "<leader>bd"; action = "<cmd>BufferClose<cr>"; options.desc = "Close buffer"; }
+      { mode = "n"; key = "<leader>bD"; action = "<cmd>BufferWipeout<cr>"; options.desc = "Wipeout buffer"; }
       { mode = "n"; key = "<leader>bo"; action = "<cmd>BufferCloseAllButCurrentOrPinned<cr>"; options.desc = "Close other buffers"; }
+      { mode = "n"; key = "<leader>bO"; action = "<cmd>BufferCloseAllButCurrent<cr>"; options.desc = "Close all but current"; }
+      { mode = "n"; key = "<leader>bv"; action = "<cmd>BufferCloseAllButVisible<cr>"; options.desc = "Close hidden buffers"; }
       { mode = "n"; key = "<leader>br"; action = "<cmd>BufferCloseBuffersRight<cr>"; options.desc = "Close buffers to right"; }
       { mode = "n"; key = "<leader>bl"; action = "<cmd>BufferCloseBuffersLeft<cr>"; options.desc = "Close buffers to left"; }
+      { mode = "n"; key = "<leader>bR"; action = "<cmd>BufferRestore<cr>"; options.desc = "Restore closed buffer"; }
+      # Buffer picking (jump mode)
+      { mode = "n"; key = "<C-p>"; action = "<cmd>BufferPick<cr>"; options.desc = "Pick buffer (jump)"; }
       { mode = "n"; key = "<leader>bs"; action = "<cmd>BufferPick<cr>"; options.desc = "Pick buffer (jump mode)"; }
       { mode = "n"; key = "<leader>bS"; action = "<cmd>BufferPickDelete<cr>"; options.desc = "Pick buffer to close"; }
+      # Buffer position (leader variants)
       { mode = "n"; key = "<leader>b1"; action = "<cmd>BufferGoto 1<cr>"; options.desc = "Go to buffer 1"; }
       { mode = "n"; key = "<leader>b2"; action = "<cmd>BufferGoto 2<cr>"; options.desc = "Go to buffer 2"; }
       { mode = "n"; key = "<leader>b3"; action = "<cmd>BufferGoto 3<cr>"; options.desc = "Go to buffer 3"; }
       { mode = "n"; key = "<leader>b4"; action = "<cmd>BufferGoto 4<cr>"; options.desc = "Go to buffer 4"; }
       { mode = "n"; key = "<leader>b5"; action = "<cmd>BufferGoto 5<cr>"; options.desc = "Go to buffer 5"; }
       { mode = "n"; key = "<leader>b0"; action = "<cmd>BufferLast<cr>"; options.desc = "Go to last buffer"; }
-      { mode = "n"; key = "<leader>bd"; action = "<cmd>BufferClose<cr>"; options.desc = "Close buffer"; }
-      { mode = "n"; key = "<leader>bR"; action = "<cmd>BufferRestore<cr>"; options.desc = "Restore closed buffer"; }
+      { mode = "n"; key = "<leader>bf"; action = "<cmd>BufferFirst<cr>"; options.desc = "Go to first buffer"; }
+      # Buffer scrolling (when tabs overflow)
+      { mode = "n"; key = "<leader>b["; action = "<cmd>BufferScrollLeft<cr>"; options.desc = "Scroll tabline left"; }
+      { mode = "n"; key = "<leader>b]"; action = "<cmd>BufferScrollRight<cr>"; options.desc = "Scroll tabline right"; }
       # Buffer sorting
-      { mode = "n"; key = "<leader>bsn"; action = "<cmd>BufferOrderByName<cr>"; options.desc = "Sort by name"; }
-      { mode = "n"; key = "<leader>bsd"; action = "<cmd>BufferOrderByDirectory<cr>"; options.desc = "Sort by directory"; }
-      { mode = "n"; key = "<leader>bsl"; action = "<cmd>BufferOrderByLanguage<cr>"; options.desc = "Sort by language"; }
+      { mode = "n"; key = "<leader>bon"; action = "<cmd>BufferOrderByName<cr>"; options.desc = "Sort by name"; }
+      { mode = "n"; key = "<leader>bod"; action = "<cmd>BufferOrderByDirectory<cr>"; options.desc = "Sort by directory"; }
+      { mode = "n"; key = "<leader>bol"; action = "<cmd>BufferOrderByLanguage<cr>"; options.desc = "Sort by language"; }
+      { mode = "n"; key = "<leader>bob"; action = "<cmd>BufferOrderByBufferNumber<cr>"; options.desc = "Sort by buffer number"; }
+      { mode = "n"; key = "<leader>bow"; action = "<cmd>BufferOrderByWindowNumber<cr>"; options.desc = "Sort by window number"; }
     ];
 
     # Terminal autocommands
@@ -211,6 +249,32 @@ let
         callback.__raw = ''
           function()
             vim.cmd("bdelete!")
+          end
+        '';
+      }
+      # LSP document highlighting on cursor hold
+      {
+        event = "LspAttach";
+        callback.__raw = ''
+          function(args)
+            local client = vim.lsp.get_client_by_id(args.data.client_id)
+            if client and client.supports_method("textDocument/documentHighlight") then
+              local group = vim.api.nvim_create_augroup("lsp_document_highlight_" .. args.buf, { clear = true })
+              vim.api.nvim_create_autocmd("CursorHold", {
+                group = group,
+                buffer = args.buf,
+                callback = function()
+                  vim.lsp.buf.document_highlight()
+                end,
+              })
+              vim.api.nvim_create_autocmd("CursorMoved", {
+                group = group,
+                buffer = args.buf,
+                callback = function()
+                  vim.lsp.buf.clear_references()
+                end,
+              })
+            end
           end
         '';
       }
@@ -410,59 +474,204 @@ let
       # LSP configuration
       lsp = {
         enable = true;
+        # Inlay hints (type annotations inline)
+        inlayHints = true;
         keymaps = {
           silent = true;
           diagnostic = {
-            "<leader>j" = "goto_next";
-            "<leader>k" = "goto_prev";
+            "<leader>ld" = "open_float";
+            "[d" = "goto_prev";
+            "]d" = "goto_next";
+            "[e" = {
+              action = "goto_prev";
+              desc = "Previous error";
+            };
+            "]e" = {
+              action = "goto_next";
+              desc = "Next error";
+            };
           };
           lspBuf = {
+            # Navigation
             gd = "definition";
+            gD = "declaration";
             gr = "references";
             gI = "implementation";
             gy = "type_definition";
+            # Documentation
             K = "hover";
+            "<C-k>" = "signature_help";
+            # Actions
             "<leader>ca" = "code_action";
             "<leader>rn" = "rename";
+            # Workspace
+            "<leader>wa" = "add_workspace_folder";
+            "<leader>wr" = "remove_workspace_folder";
           };
         };
         servers = {
           # Explicitly disable removed LSP servers
           ansiblels.enable = false;
 
-          # Nix
+          # Nix - nil with nixpkgs-fmt
           nil_ls = {
             enable = true;
-            settings.formatting.command = [ "nixpkgs-fmt" ];
+            settings = {
+              formatting.command = [ "nixpkgs-fmt" ];
+              nix = {
+                flake = {
+                  autoArchive = true;
+                  autoEvalInputs = true;
+                };
+              };
+            };
           };
-          # Lua
+
+          # Lua - configured for Neovim development
           lua_ls = {
             enable = true;
-            settings.telemetry.enable = false;
+            settings = {
+              telemetry.enable = false;
+              completion.callSnippet = "Replace";
+              diagnostics = {
+                globals = [ "vim" "Snacks" ];
+              };
+              workspace = {
+                checkThirdParty = false;
+              };
+              hint = {
+                enable = true;
+                arrayIndex = "Disable";
+                setType = true;
+                paramName = "All";
+                paramType = true;
+              };
+            };
           };
+
           # Bash
-          bashls.enable = true;
-          # YAML
-          yamlls.enable = true;
+          bashls = {
+            enable = true;
+            settings.bashIde = {
+              globPattern = "*@(.sh|.inc|.bash|.command)";
+            };
+          };
+
+          # YAML with schema support
+          yamlls = {
+            enable = true;
+            settings.yaml = {
+              keyOrdering = false;
+              schemas = {
+                kubernetes = "/*.k8s.yaml";
+                "http://json.schemastore.org/github-workflow" = ".github/workflows/*";
+                "http://json.schemastore.org/github-action" = ".github/action.{yml,yaml}";
+                "http://json.schemastore.org/prettierrc" = ".prettierrc.{yml,yaml}";
+              };
+              validate = true;
+              completion = true;
+            };
+          };
+
           # Markdown
           marksman.enable = true;
-          # JSON
-          jsonls.enable = true;
-          # Python
+
+          # JSON with schema support
+          jsonls = {
+            enable = true;
+            settings.json = {
+              validate.enable = true;
+            };
+          };
+
+          # Python - pyright with enhanced analysis
           pyright = {
             enable = true;
-            settings.python.analysis.typeCheckingMode = "basic";
+            settings.python = {
+              analysis = {
+                typeCheckingMode = "basic";
+                autoSearchPaths = true;
+                useLibraryCodeForTypes = true;
+                diagnosticMode = "workspace";
+              };
+            };
           };
-          # Go
-          gopls.enable = true;
-          # Rust
+
+          # Go - gopls with all features
+          gopls = {
+            enable = true;
+            settings.gopls = {
+              analyses = {
+                unusedparams = true;
+                shadow = true;
+                nilness = true;
+                unusedwrite = true;
+                useany = true;
+              };
+              staticcheck = true;
+              gofumpt = true;
+              usePlaceholders = true;
+              hints = {
+                assignVariableTypes = true;
+                compositeLiteralFields = true;
+                compositeLiteralTypes = true;
+                constantValues = true;
+                functionTypeParameters = true;
+                parameterNames = true;
+                rangeVariableTypes = true;
+              };
+            };
+          };
+
+          # Rust - rust-analyzer with clippy
           rust_analyzer = {
             enable = true;
             installCargo = false;
             installRustc = false;
+            settings = {
+              checkOnSave = true;
+              check.command = "clippy";
+              cargo = {
+                allFeatures = true;
+                loadOutDirsFromCheck = true;
+              };
+              procMacro.enable = true;
+              inlayHints = {
+                bindingModeHints.enable = true;
+                closureReturnTypeHints.enable = "always";
+                lifetimeElisionHints.enable = "always";
+                parameterHints.enable = true;
+                typeHints.enable = true;
+              };
+            };
           };
+
           # TypeScript/JavaScript
-          ts_ls.enable = true;
+          ts_ls = {
+            enable = true;
+            settings = {
+              typescript = {
+                inlayHints = {
+                  includeInlayParameterNameHints = "all";
+                  includeInlayParameterNameHintsWhenArgumentMatchesName = false;
+                  includeInlayFunctionParameterTypeHints = true;
+                  includeInlayVariableTypeHints = true;
+                  includeInlayPropertyDeclarationTypeHints = true;
+                  includeInlayFunctionLikeReturnTypeHints = true;
+                };
+              };
+              javascript = {
+                inlayHints = {
+                  includeInlayParameterNameHints = "all";
+                  includeInlayParameterNameHintsWhenArgumentMatchesName = false;
+                  includeInlayFunctionParameterTypeHints = true;
+                  includeInlayVariableTypeHints = true;
+                  includeInlayPropertyDeclarationTypeHints = true;
+                  includeInlayFunctionLikeReturnTypeHints = true;
+                };
+              };
+            };
+          };
         };
       };
 
@@ -922,90 +1131,182 @@ let
 
     # Additional Lua configuration
     extraConfigLua = ''
+      -- Diagnostic display configuration
+      vim.diagnostic.config({
+        virtual_text = {
+          spacing = 4,
+          prefix = "●",
+        },
+        signs = {
+          text = {
+            [vim.diagnostic.severity.ERROR] = " ",
+            [vim.diagnostic.severity.WARN] = " ",
+            [vim.diagnostic.severity.HINT] = "󰌵",
+            [vim.diagnostic.severity.INFO] = " ",
+          },
+        },
+        underline = true,
+        update_in_insert = false,
+        severity_sort = true,
+        float = {
+          border = "rounded",
+          source = "if_many",
+          header = "",
+          prefix = "",
+        },
+      })
+
       -- Barbar.nvim Configuration (tabline)
       require('barbar').setup({
-        -- Enable animations
+        -- Enable animations for smooth transitions
         animation = true,
 
-        -- Auto-hide when few buffers
-        auto_hide = 1,
+        -- Auto-hide disabled (-1) to always show tabline
+        auto_hide = -1,
 
-        -- Enable tabpages indicator
+        -- Enable tabpages indicator (top right)
         tabpages = true,
 
-        -- Clickable tabs
+        -- Clickable tabs (left=go, middle=close)
         clickable = true,
 
-        -- Focus behavior when closing
+        -- Exclude non-file buffers from tabline
+        exclude_ft = { 'qf', 'fugitive', 'fugitiveblame', 'httpResult', 'DressingInput' },
+        exclude_name = { '[No Name]', 'COMMIT_EDITMSG' },
+
+        -- Focus left buffer when closing (alternatives: 'previous', 'right')
         focus_on_close = 'left',
 
-        -- Hide extensions for cleaner look
-        hide = { extensions = false, inactive = false },
+        -- Hide settings
+        hide = {
+          extensions = false,    -- Show file extensions
+          inactive = false,      -- Show inactive buffers
+        },
 
-        -- Highlight settings
-        highlight_alternate = false,
-        highlight_inactive_file_icons = false,
-        highlight_visible = true,
+        -- Highlight settings for buffer states
+        highlight_alternate = false,              -- Don't highlight alternate buffer differently
+        highlight_inactive_file_icons = true,     -- Color icons even on inactive buffers
+        highlight_visible = true,                 -- Highlight visible buffers in splits
 
         -- Icons configuration
         icons = {
-          buffer_index = false,
-          buffer_number = false,
+          -- Buffer identification
+          buffer_index = false,  -- Don't show buffer index
+          buffer_number = false, -- Don't show buffer number
+
+          -- Close button icon
           button = "",
+
+          -- LSP Diagnostics in tabline
           diagnostics = {
-            [vim.diagnostic.severity.ERROR] = { enabled = true, icon = " " },
-            [vim.diagnostic.severity.WARN] = { enabled = true, icon = " " },
-            [vim.diagnostic.severity.INFO] = { enabled = false },
-            [vim.diagnostic.severity.HINT] = { enabled = true, icon = "󰌵" },
+            [vim.diagnostic.severity.ERROR] = { enabled = true, icon = ' ' },
+            [vim.diagnostic.severity.WARN] = { enabled = true, icon = ' ' },
+            [vim.diagnostic.severity.INFO] = { enabled = true, icon = ' ' },
+            [vim.diagnostic.severity.HINT] = { enabled = true, icon = '󰌵' },
           },
+
+          -- Git status via gitsigns integration
           gitsigns = {
-            added = { enabled = true, icon = "+" },
-            changed = { enabled = true, icon = "~" },
-            deleted = { enabled = true, icon = "-" },
+            added = { enabled = true, icon = '+' },
+            changed = { enabled = true, icon = '~' },
+            deleted = { enabled = true, icon = '-' },
           },
+
+          -- File type icons (requires nvim-web-devicons)
           filetype = {
-            custom_colors = false,
+            custom_colors = false,  -- Use nvim-web-devicons colors
             enabled = true,
           },
-          separator = { left = "▎", right = "" },
-          separator_at_end = true,
-          modified = { button = "●" },
+
+          -- Tab separators - using slanted style
+          separator = { left = "", right = "" },
+          separator_at_end = false,
+
+          -- Modified buffer indicator
+          modified = { button = '●' },
+
+          -- Pinned buffer indicator
           pinned = { button = "", filename = true },
-          preset = "default",
-          alternate = { filetype = { enabled = false } },
+
+          -- Visual preset: 'default', 'powerline', or 'slanted'
+          preset = 'slanted',
+
+          -- Per-state icon overrides
+          alternate = { filetype = { enabled = true } },
           current = { buffer_index = false },
-          inactive = { button = "×" },
+          inactive = { button = '×' },
           visible = { modified = { buffer_number = false } },
         },
 
-        -- Insert new buffers after current
+        -- Buffer insertion position
         insert_at_end = false,
         insert_at_start = false,
 
-        -- Padding
-        maximum_padding = 1,
+        -- Padding around tab names
+        maximum_padding = 2,
         minimum_padding = 1,
 
-        -- Buffer name length
+        -- Buffer name length limits
         maximum_length = 30,
         minimum_length = 0,
 
-        -- Jump-to-buffer letters based on buffer name
+        -- Jump mode: assign letters based on buffer filename
         semantic_letters = true,
 
-        -- Sidebar offset for neo-tree
+        -- Sidebar offsets for file explorers
         sidebar_filetypes = {
-          ['neo-tree'] = { event = 'BufWipeout', text = 'File Explorer', align = 'left' },
+          ['neo-tree'] = { event = 'BufWipeout', text = '  Files', align = 'center' },
+          NvimTree = true,
+          undotree = { text = 'Undo Tree', align = 'center' },
+          Outline = { text = 'Symbols', align = 'right' },
+          DiffviewFiles = { text = 'Diff View', align = 'left' },
         },
 
-        -- Letter order for jump mode (qwerty optimized)
+        -- Letter order for jump mode (home row first for qwerty)
         letters = 'asdfjkl;ghnmxcvbziowerutyqpASDFJKLGHNMXCVBZIOWERUTYQP',
 
-        -- Sorting
+        -- Name for unnamed buffers
+        no_name_title = '[No Name]',
+
+        -- Sorting options
         sort = {
           ignore_case = true,
         },
       })
+
+      -- Catppuccin highlight integration for barbar
+      -- Links barbar highlights to catppuccin-compatible groups
+      local function setup_barbar_highlights()
+        local colors = require('catppuccin.palettes').get_palette('macchiato')
+        if not colors then return end
+
+        -- Set highlight groups for barbar with catppuccin colors
+        vim.api.nvim_set_hl(0, 'BufferCurrent', { fg = colors.text, bg = colors.surface0, bold = true })
+        vim.api.nvim_set_hl(0, 'BufferCurrentMod', { fg = colors.peach, bg = colors.surface0, bold = true })
+        vim.api.nvim_set_hl(0, 'BufferCurrentSign', { fg = colors.blue, bg = colors.surface0 })
+        vim.api.nvim_set_hl(0, 'BufferCurrentTarget', { fg = colors.red, bg = colors.surface0, bold = true })
+
+        vim.api.nvim_set_hl(0, 'BufferVisible', { fg = colors.subtext0, bg = colors.mantle })
+        vim.api.nvim_set_hl(0, 'BufferVisibleMod', { fg = colors.peach, bg = colors.mantle })
+        vim.api.nvim_set_hl(0, 'BufferVisibleSign', { fg = colors.blue, bg = colors.mantle })
+
+        vim.api.nvim_set_hl(0, 'BufferInactive', { fg = colors.overlay0, bg = colors.mantle })
+        vim.api.nvim_set_hl(0, 'BufferInactiveMod', { fg = colors.peach, bg = colors.mantle })
+        vim.api.nvim_set_hl(0, 'BufferInactiveSign', { fg = colors.surface1, bg = colors.mantle })
+
+        vim.api.nvim_set_hl(0, 'BufferTabpages', { fg = colors.blue, bg = colors.mantle, bold = true })
+        vim.api.nvim_set_hl(0, 'BufferTabpageFill', { bg = colors.mantle })
+        vim.api.nvim_set_hl(0, 'BufferOffset', { fg = colors.text, bg = colors.mantle, bold = true })
+        vim.api.nvim_set_hl(0, 'BufferScrollArrow', { fg = colors.blue, bg = colors.mantle })
+      end
+
+      -- Apply highlights after colorscheme loads
+      vim.api.nvim_create_autocmd('ColorScheme', {
+        pattern = 'catppuccin*',
+        callback = setup_barbar_highlights,
+      })
+      -- Also apply now if catppuccin is already loaded
+      pcall(setup_barbar_highlights)
 
       -- Mise Integration (treesitter syntax highlighting for mise config files)
       -- Note: mise shims NOT added to PATH - Nix provides all tools directly
