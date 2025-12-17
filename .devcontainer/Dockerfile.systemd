@@ -107,6 +107,9 @@ RUN chmod 0440 /etc/sudoers.d/debian
 COPY rootfs/etc/profile.d/ /etc/profile.d/
 RUN chmod 0644 /etc/profile.d/*.sh
 
+# Git system configuration (safe.directory, rebase defaults, etc.)
+COPY rootfs/etc/gitconfig /etc/gitconfig
+
 # Docker socket link service (for non-privileged mode with docker-host.sock mount)
 # Uncomment if using isolated mode with /var/run/docker.sock:/var/run/docker-host.sock
 # COPY rootfs/etc/systemd/system/docker-socket-link.service /etc/systemd/system/
@@ -180,9 +183,13 @@ VOLUME ["/sys/fs/cgroup", "/workspace"]
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD ["/usr/local/bin/healthcheck"]
 
-WORKDIR /workspace/konductor
-SHELL ["/bin/bash", "-c"]
+WORKDIR /workspace
+
+# Environment for non-interactive bash -c to inherit nix paths
+ENV BASH_ENV="/etc/profile.d/nix-daemon-client.sh"
+
+# Default shell with login for proper environment
+SHELL ["/bin/bash", "-l", "-c"]
 
 # Systemd as PID 1
 ENTRYPOINT ["/lib/systemd/systemd"]
-CMD []

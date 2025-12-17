@@ -1,0 +1,29 @@
+# System-wide Git configuration for Konductor devcontainer
+
+[safe]
+	directory = *
+
+[init]
+	defaultBranch = main
+
+[pull]
+	rebase = true
+
+[push]
+	default = current
+	autoSetupRemote = true
+
+[fetch]
+	prune = true
+
+[rerere]
+	enabled = true
+
+[core]
+	autocrlf = input
+
+[column]
+	ui = auto
+
+[branch]
+	sort = -committerdate

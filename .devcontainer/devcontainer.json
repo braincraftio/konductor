@@ -3,8 +3,8 @@
   "name": "Konductor",
 
   "dockerComposeFile": "compose/systemd.yml",
-  "service": "devcontainer",
-  "workspaceFolder": "/workspace/konductor",
+  "service": "konductor",
+  "workspaceFolder": "/workspace",
 
   "shutdownAction": "stopCompose",
   "overrideCommand": false,
