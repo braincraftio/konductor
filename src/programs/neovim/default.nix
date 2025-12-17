@@ -675,29 +675,153 @@ let
         };
       };
 
-      # Completion
+      # Completion engine (L4 Mature)
       cmp = {
         enable = true;
         autoEnableSources = true;
         settings = {
+          # Performance tuning
+          performance = {
+            debounce = 60;
+            throttle = 30;
+            fetching_timeout = 500;
+            async_budget = 1;
+            max_view_entries = 100;
+          };
+
+          # Preselect behavior
+          preselect = "cmp.PreselectMode.Item";
+
+          # Completion triggering
+          completion = {
+            completeopt = "menu,menuone,noselect";
+            keyword_length = 1;
+          };
+
+          # Matching behavior
+          matching = {
+            disallow_fuzzy_matching = false;
+            disallow_partial_fuzzy_matching = true;
+            disallow_partial_matching = false;
+            disallow_prefix_unmatching = false;
+          };
+
+          # Window styling - bordered with proper highlights
+          window = {
+            completion = {
+              border = "rounded";
+              winhighlight = "Normal:CmpNormal,FloatBorder:CmpBorder,CursorLine:CmpSel,Search:None";
+              scrollbar = true;
+              col_offset = 0;
+              side_padding = 1;
+            };
+            documentation = {
+              border = "rounded";
+              winhighlight = "Normal:CmpDocNormal,FloatBorder:CmpDocBorder";
+              max_height = 20;
+              max_width = 80;
+            };
+          };
+
+          # Formatting - icons and labels
+          formatting = {
+            fields = [ "kind" "abbr" "menu" ];
+            expandable_indicator = true;
+            format.__raw = ''
+              function(entry, vim_item)
+                -- Kind icons
+                local kind_icons = {
+                  Text = "󰉿",
+                  Method = "󰆧",
+                  Function = "󰊕",
+                  Constructor = "",
+                  Field = "󰜢",
+                  Variable = "󰀫",
+                  Class = "󰠱",
+                  Interface = "",
+                  Module = "",
+                  Property = "󰜢",
+                  Unit = "󰑭",
+                  Value = "󰎠",
+                  Enum = "",
+                  Keyword = "󰌋",
+                  Snippet = "",
+                  Color = "󰏘",
+                  File = "󰈙",
+                  Reference = "󰈇",
+                  Folder = "󰉋",
+                  EnumMember = "",
+                  Constant = "󰏿",
+                  Struct = "󰙅",
+                  Event = "",
+                  Operator = "󰆕",
+                  TypeParameter = "",
+                  Copilot = "",
+                }
+                vim_item.kind = string.format('%s %s', kind_icons[vim_item.kind] or "", vim_item.kind)
+                -- Source labels
+                vim_item.menu = ({
+                  copilot = "[AI]",
+                  nvim_lsp = "[LSP]",
+                  luasnip = "[Snip]",
+                  buffer = "[Buf]",
+                  path = "[Path]",
+                  cmdline = "[Cmd]",
+                })[entry.source.name] or ""
+                return vim_item
+              end
+            '';
+          };
+
+          # Sorting - explicit comparators
+          sorting = {
+            priority_weight = 2;
+            comparators = [
+              "require('cmp.config.compare').offset"
+              "require('cmp.config.compare').exact"
+              "require('cmp.config.compare').score"
+              "require('cmp.config.compare').recently_used"
+              "require('cmp.config.compare').locality"
+              "require('cmp.config.compare').kind"
+              "require('cmp.config.compare').length"
+              "require('cmp.config.compare').order"
+            ];
+          };
+
+          # Keymaps - comprehensive navigation
           mapping = {
             "<C-Space>" = "cmp.mapping.complete()";
             "<C-d>" = "cmp.mapping.scroll_docs(-4)";
-            "<C-f>" = "cmp.mapping.scroll_docs(4)";
-            "<C-e>" = "cmp.mapping.close()";
-            "<CR>" = "cmp.mapping.confirm({ select = true })";
-            "<Tab>" = "cmp.mapping(cmp.mapping.select_next_item(), {'i', 's'})";
-            "<S-Tab>" = "cmp.mapping(cmp.mapping.select_prev_item(), {'i', 's'})";
+            "<C-u>" = "cmp.mapping.scroll_docs(4)";
+            "<C-e>" = "cmp.mapping.abort()";
+            "<C-y>" = "cmp.mapping.confirm({ select = true })";
+            "<CR>" = "cmp.mapping.confirm({ select = false })";
+            "<Tab>" = "cmp.mapping(cmp.mapping.select_next_item({ behavior = cmp.SelectBehavior.Select }), {'i', 's'})";
+            "<S-Tab>" = "cmp.mapping(cmp.mapping.select_prev_item({ behavior = cmp.SelectBehavior.Select }), {'i', 's'})";
+            "<C-n>" = "cmp.mapping.select_next_item({ behavior = cmp.SelectBehavior.Insert })";
+            "<C-p>" = "cmp.mapping.select_prev_item({ behavior = cmp.SelectBehavior.Insert })";
           };
+
+          # Sources - ordered by priority with group indices
           sources = [
-            { name = "copilot"; group_index = 2; } # AI suggestions
-            { name = "nvim_lsp"; }
-            { name = "luasnip"; }
-            { name = "path"; }
-            { name = "buffer"; }
+            { name = "copilot"; group_index = 1; priority = 100; }
+            { name = "nvim_lsp"; group_index = 1; priority = 90; }
+            { name = "luasnip"; group_index = 1; priority = 80; }
+            { name = "path"; group_index = 2; priority = 70; }
+            { name = "buffer"; group_index = 2; priority = 60; keyword_length = 3; }
           ];
+
+          # Experimental features
+          experimental = {
+            ghost_text = {
+              hl_group = "CmpGhostText";
+            };
+          };
         };
       };
+
+      # Cmdline completion
+      cmp-cmdline.enable = true;
 
       # Snippets
       luasnip = {
@@ -1154,6 +1278,41 @@ let
           header = "",
           prefix = "",
         },
+      })
+
+      -- nvim-cmp Highlight Groups (catppuccin integration)
+      local colors = require("catppuccin.palettes").get_palette("macchiato")
+      vim.api.nvim_set_hl(0, "CmpNormal", { bg = colors.surface0 })
+      vim.api.nvim_set_hl(0, "CmpBorder", { fg = colors.blue, bg = colors.surface0 })
+      vim.api.nvim_set_hl(0, "CmpSel", { bg = colors.surface1, bold = true })
+      vim.api.nvim_set_hl(0, "CmpDocNormal", { bg = colors.surface0 })
+      vim.api.nvim_set_hl(0, "CmpDocBorder", { fg = colors.teal, bg = colors.surface0 })
+      vim.api.nvim_set_hl(0, "CmpGhostText", { fg = colors.overlay0, italic = true })
+      -- Kind-specific highlights
+      vim.api.nvim_set_hl(0, "CmpItemKindCopilot", { fg = colors.green })
+      vim.api.nvim_set_hl(0, "CmpItemKindSnippet", { fg = colors.mauve })
+      vim.api.nvim_set_hl(0, "CmpItemKindFunction", { fg = colors.blue })
+      vim.api.nvim_set_hl(0, "CmpItemKindMethod", { fg = colors.blue })
+      vim.api.nvim_set_hl(0, "CmpItemKindVariable", { fg = colors.flamingo })
+      vim.api.nvim_set_hl(0, "CmpItemKindKeyword", { fg = colors.red })
+
+      -- nvim-cmp Cmdline Configuration
+      local cmp = require('cmp')
+      -- Cmdline : completion
+      cmp.setup.cmdline(':', {
+        mapping = cmp.mapping.preset.cmdline(),
+        sources = cmp.config.sources({
+          { name = 'path' }
+        }, {
+          { name = 'cmdline', option = { ignore_cmds = { 'Man', '!' } } }
+        })
+      })
+      -- Cmdline / and ? search completion
+      cmp.setup.cmdline({ '/', '?' }, {
+        mapping = cmp.mapping.preset.cmdline(),
+        sources = {
+          { name = 'buffer' }
+        }
       })
 
       -- Barbar.nvim Configuration (tabline)
