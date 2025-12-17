@@ -89,6 +89,14 @@ RUN systemctl enable nix-daemon.socket nix-daemon.service
 # Add konductor flake to registry for `nix develop konductor` UX
 RUN /nix/var/nix/profiles/default/bin/nix registry add konductor github:braincraftio/konductor
 
+# Copy konductor repo to well-known location (secrets filtered by .dockerignore)
+COPY . /etc/skel/.konductor
+RUN chmod -R a+rX /etc/skel/.konductor
+
+# Pre-build default devshell to populate nix cache
+RUN cd /etc/skel/.konductor && \
+    /nix/var/nix/profiles/default/bin/nix develop --profile /nix/var/nix/profiles/konductor-default -c true
+
 # Configure Nix daemon systemd override
 # IMPORTANT: Do NOT set NIX_REMOTE for the daemon itself
 RUN mkdir -p /etc/systemd/system/nix-daemon.service.d && \
@@ -100,15 +108,15 @@ RestartSec=5
 EOF
 
 # Copy sudoers configuration BEFORE creating user
-COPY rootfs/etc/sudoers.d/debian /etc/sudoers.d/debian
+COPY .devcontainer/rootfs/etc/sudoers.d/debian /etc/sudoers.d/debian
 RUN chmod 0440 /etc/sudoers.d/debian
 
 # Copy profile.d scripts
-COPY rootfs/etc/profile.d/ /etc/profile.d/
+COPY .devcontainer/rootfs/etc/profile.d/ /etc/profile.d/
 RUN chmod 0644 /etc/profile.d/*.sh
 
 # Git system configuration (safe.directory, rebase defaults, etc.)
-COPY rootfs/etc/gitconfig /etc/gitconfig
+COPY .devcontainer/rootfs/etc/gitconfig /etc/gitconfig
 
 # Docker socket link service (for non-privileged mode with docker-host.sock mount)
 # Uncomment if using isolated mode with /var/run/docker.sock:/var/run/docker-host.sock
@@ -119,9 +127,9 @@ COPY rootfs/etc/gitconfig /etc/gitconfig
 RUN groupadd -f -g 800 docker || true
 
 # Copy skeleton files BEFORE user creation (useradd -m copies from /etc/skel)
-COPY rootfs/etc/skel/.bashrc /etc/skel/.bashrc
-COPY rootfs/etc/skel/.profile /etc/skel/.profile
-COPY rootfs/etc/skel/.config/mise/config.toml /etc/skel/.config/mise/config.toml
+COPY .devcontainer/rootfs/etc/skel/.bashrc /etc/skel/.bashrc
+COPY .devcontainer/rootfs/etc/skel/.profile /etc/skel/.profile
+COPY .devcontainer/rootfs/etc/skel/.config/mise/config.toml /etc/skel/.config/mise/config.toml
 
 # Create debian user with required groups (useradd -m copies /etc/skel with correct ownership)
 RUN useradd -m -s /bin/bash -u 1000 -G sudo,nixbld,systemd-journal,docker debian

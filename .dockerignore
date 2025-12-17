@@ -1,0 +1,123 @@
+# Konductor Docker Build Context Exclusions
+# Strict allowlist approach - exclude everything, then include what's needed
+
+# =============================================================================
+# SECRETS & CREDENTIALS (NEVER include)
+# =============================================================================
+**/.env
+**/.env.*
+**/secrets/
+**/credentials/
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+**/id_rsa*
+**/id_ed25519*
+**/id_ecdsa*
+**/.ssh/
+**/.gnupg/
+**/.aws/
+**/.azure/
+**/.gcloud/
+**/.kube/config
+**/*.secret
+**/*.secrets
+**/secret.*
+**/secrets.*
+
+# Claude Code settings (contains API keys!)
+.claude/
+**/.claude/
+
+# =============================================================================
+# GIT (keep for nix flake resolution)
+# =============================================================================
+# Nix flakes require .git - only exclude non-essential metadata
+.git/hooks/
+.git/FETCH_HEAD
+.git/ORIG_HEAD
+.git/COMMIT_EDITMSG
+.gitattributes
+
+# =============================================================================
+# IDE & EDITOR
+# =============================================================================
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*.swo
+**/*~
+**/.*.sw?
+**/*.bak
+**/*.orig
+**/tags
+**/TAGS
+
+# =============================================================================
+# BUILD ARTIFACTS & CACHES
+# =============================================================================
+**/result
+**/result-*
+**/.direnv/
+**/.devenv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/node_modules/
+**/target/
+**/dist/
+**/build/
+**/.cache/
+**/*.egg-info/
+**/.eggs/
+**/.tox/
+**/.nox/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/coverage/
+**/.coverage
+**/htmlcov/
+
+# =============================================================================
+# TEMPORARY & LOGS
+# =============================================================================
+**/*.log
+**/*.tmp
+**/*.temp
+**/tmp/
+**/temp/
+**/logs/
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+
+# =============================================================================
+# DOCUMENTATION (not needed for build)
+# =============================================================================
+docs/
+**/*.md
+!README.md
+LICENSE*
+CHANGELOG*
+CONTRIBUTING*
+AUTHORS*
+SECURITY*
+
+# =============================================================================
+# CONTAINER BUILD ARTIFACTS
+# =============================================================================
+**/.devcontainer.*/
+!.devcontainer/
+
+# =============================================================================
+# LOCAL WORKING FILES
+# =============================================================================
+INCOMPLETE.md
+TASKS*.md
+checkhealth*
+*.nixvim
+scratch/
+notes/

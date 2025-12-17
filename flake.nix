@@ -18,12 +18,14 @@
     # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
     # GitHub API rate limits can cause 403 errors - use FlakeHub or configure access token
     # See docs/GITHUB_AUTHENTICATION.md for token setup
-    # nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    # nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511.*";
-    nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
-    # flake-utils.url = "github:numtide/flake-utils";
-    flake-utils.url = "https://flakehub.com/f/numtide/flake-utils/*";
+    # FlakeHub URL caching causes mismatch errors - use GitHub directly
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511.*";
+    # nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
+    # FlakeHub URL caching causes mismatch errors - use GitHub directly
+    flake-utils.url = "github:numtide/flake-utils";
+    # flake-utils.url = "https://flakehub.com/f/numtide/flake-utils/*";
 
     # nix2container not available on FlakeHub - requires GitHub token for updates
     nix2container = {
@@ -33,15 +35,16 @@
     };
 
     nixos-generators = {
-      # url = "github:nix-community/nixos-generators";
-      url = "https://flakehub.com/f/nix-community/nixos-generators/*";
+      # FlakeHub URL caching causes mismatch errors - use GitHub directly
+      url = "github:nix-community/nixos-generators";
+      # url = "https://flakehub.com/f/nix-community/nixos-generators/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     rust-overlay = {
-      # url = "github:oxalica/rust-overlay";
-      # url = "git+https://github.com/oxalica/rust-overlay";
-      url = "https://flakehub.com/f/oxalica/rust-overlay/*";
+      # FlakeHub URL caching causes mismatch errors - use GitHub directly
+      url = "github:oxalica/rust-overlay";
+      # url = "https://flakehub.com/f/oxalica/rust-overlay/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

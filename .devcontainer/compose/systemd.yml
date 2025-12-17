@@ -4,8 +4,8 @@
 services:
   konductor:
     build:
-      context: ..
-      dockerfile: Dockerfile.systemd
+      context: ../..
+      dockerfile: .devcontainer/Dockerfile.systemd
 
     image: ghcr.io/braincraftio/konductor:devcontainer
     container_name: konductor
