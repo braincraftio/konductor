@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: konductor-vm-advanced
+
+# Inherit from base
+resources:
+  - ../../base
+  - network-attachment-definitions.yaml
+  - networkdata.yaml
+
+# Override namespace
+namespace: konductor
+
+# Patches for advanced configuration
+patches:
+  - target:
+      kind: Secret
+      name: konductor-userdata
+    path: userdata.yaml
+  - target:
+      kind: VirtualMachine
+      name: konductor
+    path: virtualmachine.yaml
+
+# Common labels
+labels:
+  - pairs:
+      app.kubernetes.io/name: konductor
+      app.kubernetes.io/component: virtual-machine
+      app.kubernetes.io/part-of: konductor
+      app.kubernetes.io/variant: advanced
+    includeSelectors: false

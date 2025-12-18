@@ -1,0 +1,153 @@
+# =============================================================================
+# Konductor NixOS VM - KubeVirt ContainerDisk Deployment (Base)
+# =============================================================================
+# Ephemeral NixOS development workstation using containerDisk pattern.
+# Disk resets on VM restart - ideal for dev/test workloads.
+#
+# This base configuration uses pod networking for maximum portability.
+# See overlays/advanced/ for persistent storage and advanced networking.
+#
+# Prerequisites:
+#   - KubeVirt installed (https://kubevirt.io/quickstart_minikube/)
+#   - QEMU Guest Agent support in KubeVirt
+#
+# Deploy:
+#   # Create SSH key secret from your public key
+#   kubectl create secret generic konductor-ssh-key -n konductor \
+#     --from-file=key=$HOME/.ssh/id_ed25519.pub
+#
+#   # Deploy the VM
+#   kubectl apply -k https://github.com/containercraft/konductor//deploy/kubevirt/base
+#
+# Access:
+#   SSH:     ssh kc2@<VM_IP> or ssh kc2admin@<VM_IP>
+#   Console: virtctl console konductor -n konductor
+#   VNC:     virtctl vnc konductor -n konductor
+#
+# Users:
+#   kc2      - Unprivileged user (uid 1000)
+#   kc2admin - Privileged user with sudo access
+# =============================================================================
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: konductor-userdata
+  labels:
+    app: konductor
+type: Opaque
+stringData:
+  userdata: |
+    #cloud-config
+    # -------------------------------------------------------------------------
+    # User Configuration
+    # -------------------------------------------------------------------------
+    # SSH keys are injected via QEMU Guest Agent from konductor-ssh-key secret.
+    # Create the secret: kubectl create secret generic konductor-ssh-key \
+    #   -n konductor --from-file=key=$HOME/.ssh/id_ed25519.pub
+    # -------------------------------------------------------------------------
+    users:
+      - name: kc2
+        uid: 1000
+        gecos: Konductor Unprivileged User
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        lock_passwd: true
+      - name: kc2admin
+        gecos: Konductor Admin User
+        groups: users, wheel, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+
+    # -------------------------------------------------------------------------
+    # Startup Commands
+    # -------------------------------------------------------------------------
+    runcmd:
+      - [systemctl, start, docker]
+      - [systemctl, start, libvirtd]
+      # Pre-build the konductor devshell for faster first use
+      - [/run/current-system/sw/bin/nix, build, "github:containercraft/konductor#konductor", --no-link, --refresh]
+
+    final_message: |
+      ## template: jinja
+      Cloud-Init: v{{version}} | Datasource: {{datasource}} | Boot: {{uptime}}s
+      Access: ssh kc2@<IP> or ssh kc2admin@<IP>
+      Shell: nix develop github:containercraft/konductor#konductor
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: konductor
+  labels:
+    app: konductor
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        app: konductor
+        kubevirt.io/domain: konductor
+    spec:
+      hostname: konductor
+      terminationGracePeriodSeconds: 30
+      # -----------------------------------------------------------------------
+      # SSH Key Injection via QEMU Guest Agent
+      # -----------------------------------------------------------------------
+      # Keys are injected from the konductor-ssh-key secret into authorized_keys
+      # for both kc2 and kc2admin users. Create the secret with:
+      #   kubectl create secret generic konductor-ssh-key -n konductor \
+      #     --from-file=key=$HOME/.ssh/id_ed25519.pub
+      # -----------------------------------------------------------------------
+      accessCredentials:
+        - sshPublicKey:
+            source:
+              secret:
+                secretName: konductor-ssh-key
+            propagationMethod:
+              qemuGuestAgent:
+                users:
+                  - kc2
+                  - kc2admin
+      domain:
+        cpu:
+          cores: 2
+          sockets: 1
+          threads: 1
+          model: host-passthrough
+        resources:
+          requests:
+            memory: 4Gi
+          # Uncomment to set limits:
+          # limits:
+          #   memory: 8Gi
+        machine:
+          type: q35
+        devices:
+          autoattachSerialConsole: true
+          autoattachGraphicsDevice: true
+          rng: {}
+          disks:
+            - name: root-disk
+              bootOrder: 1
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              model: virtio
+              masquerade: {}
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: root-disk
+          containerDisk:
+            image: docker.io/containercraft/konductor@sha256:c0499607a28da69a3a0a55600bffeebed781aa59d188413540ed38ae986ea766
+            path: /disk/nixos.qcow2
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            secretRef:
+              name: konductor-userdata

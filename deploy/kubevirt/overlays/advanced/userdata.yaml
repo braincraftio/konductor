@@ -1,0 +1,88 @@
+# =============================================================================
+# User Data Patch - Advanced Configuration
+# =============================================================================
+# Patches base userdata with:
+#   - systemd-networkd bridge configuration files
+#   - ARP/MAC learning commands for physical network
+#   - Power management sudoers for kc2 user
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: konductor-userdata
+stringData:
+  userdata: |
+    #cloud-config
+    users:
+      - name: kc2
+        uid: 1000
+        gecos: Konductor Unprivileged User
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        lock_passwd: true
+      - name: kc2admin
+        gecos: Konductor Admin User
+        groups: users, wheel, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+
+    write_files:
+      # Allow kc2 to poweroff/reboot without sudo password
+      - path: /etc/sudoers.d/kc2-power
+        content: |
+          kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
+        permissions: '0440'
+      # Create br0 bridge device (cloud-init v2 doesn't create .netdev)
+      - path: /etc/systemd/network/05-br0.netdev
+        content: |
+          [NetDev]
+          Name=br0
+          Kind=bridge
+
+          [Bridge]
+          STP=false
+          ForwardDelaySec=0
+        permissions: '0644'
+      # Configure br0 with no IP
+      - path: /etc/systemd/network/05-br0.network
+        content: |
+          [Match]
+          Name=br0
+
+          [Network]
+          DHCP=no
+          IPv6AcceptRA=no
+          LinkLocalAddressing=no
+        permissions: '0644'
+      # Configure enp2s0 as br0 port with no IP
+      - path: /etc/systemd/network/05-enp2s0.network
+        content: |
+          [Match]
+          Name=enp2s0
+
+          [Network]
+          Bridge=br0
+          DHCP=no
+          IPv6AcceptRA=no
+          LinkLocalAddressing=no
+
+          [Link]
+          RequiredForOnline=no
+        permissions: '0644'
+
+    runcmd:
+      # Restart networkd to apply bridge config
+      - [systemctl, restart, systemd-networkd]
+      # Force ARP/MAC learning by pinging gateway and sending gratuitous ARP
+      - [sh, -c, "sleep 5 && ping -c 5 $(ip route | awk '/default/ {print $3}' | head -1) || true"]
+      - [sh, -c, "arping -c 3 -U -I enp1s0 $(ip -4 addr show enp1s0 | awk '/inet / {print $2}' | cut -d/ -f1) 2>/dev/null || true"]
+      - [systemctl, start, docker]
+      - [systemctl, start, libvirtd]
+      - [/run/current-system/sw/bin/nix, build, "github:containercraft/konductor#konductor", --no-link, --refresh]
+
+    final_message: |
+      ## template: jinja
+      Cloud-Init: v{{version}} | Datasource: {{datasource}} | Boot: {{uptime}}s
+      Access: ssh kc2@<IP> or ssh kc2admin@<IP>
+      Shell: nix develop github:containercraft/konductor#konductor

@@ -1,0 +1,17 @@
+# =============================================================================
+# Konductor Namespace
+# =============================================================================
+# Namespace for konductor VM workloads.
+# PSA labels allow privileged workloads (required for KubeVirt VMs).
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: konductor
+  labels:
+    app.kubernetes.io/name: konductor
+    app.kubernetes.io/component: namespace
+    # Pod Security Admission - allow privileged for VM workloads
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

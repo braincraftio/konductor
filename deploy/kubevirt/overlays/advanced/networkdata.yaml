@@ -1,0 +1,39 @@
+# =============================================================================
+# Network Data Secret - Advanced Configuration
+# =============================================================================
+# Cloud-init v2 network configuration for dual-NIC setup:
+#   - enp1s0: Primary interface with DHCP (macvtap to physical NIC)
+#   - enp2s0: Secondary interface as br0 bridge slave (for nested virt)
+#   - br0: Bridge device with no IP (used by nested VMs)
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: konductor-networkdata
+  labels:
+    app: konductor
+type: Opaque
+stringData:
+  networkdata: |
+    version: 2
+    renderer: networkd
+    ethernets:
+      enp1s0:
+        dhcp4: true
+        dhcp6: false
+        dhcp-identifier: mac
+      enp2s0:
+        dhcp4: false
+        dhcp6: false
+        link-local: []
+        optional: true
+    bridges:
+      br0:
+        interfaces:
+          - enp2s0
+        dhcp4: false
+        dhcp6: false
+        link-local: []
+        parameters:
+          stp: false
+          forward-delay: 0

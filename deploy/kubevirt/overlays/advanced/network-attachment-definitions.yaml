@@ -1,0 +1,61 @@
+# =============================================================================
+# NetworkAttachmentDefinitions for Advanced Konductor Deployment
+# =============================================================================
+# These NADs provide L2 network connectivity for KubeVirt VMs:
+#
+#   1. macvtap: Direct L2 access to physical NIC
+#      - Provides DHCP connectivity to external network
+#      - Requires macvtap-cni device plugin on nodes
+#      - Customize 'lowerDevice' annotation to match your physical NIC
+#
+#   2. br0: Open vSwitch bridge for nested virtualization
+#      - Internal bridge with no external connectivity
+#      - Used by nested VMs inside the Konductor VM
+#      - Requires OVS CNI plugin and OVS installed on nodes
+#
+# Prerequisites:
+#   - Multus CNI installed
+#   - macvtap-cni device plugin (for macvtap)
+#   - Open vSwitch + ovs-cni (for OVS bridge)
+#
+# Customization:
+#   - Change 'enp3s0' to your physical NIC name in the resourceName annotation
+#   - Adjust bridge name 'br0' if using different OVS bridge
+#   - Add VLAN tags, MTU, or trunk config as needed
+# =============================================================================
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvtap
+  labels:
+    app: konductor
+  annotations:
+    # Maps to macvtap device plugin resource
+    # Format: macvtap.network.kubevirt.io/<physical-nic-name>
+    # Change 'enp3s0' to match your node's physical NIC
+    k8s.v1.cni.cncf.io/resourceName: macvtap.network.kubevirt.io/enp3s0
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "name": "macvtap",
+      "type": "macvtap",
+      "mtu": 1500
+    }
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: br0
+  labels:
+    app: konductor
+spec:
+  config: |
+    {
+      "cniVersion": "0.4.0",
+      "name": "br0",
+      "type": "ovs",
+      "bridge": "br0",
+      "mtu": 1500
+    }

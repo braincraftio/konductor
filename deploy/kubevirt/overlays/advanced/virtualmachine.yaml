@@ -1,0 +1,101 @@
+# =============================================================================
+# VirtualMachine Patch - Advanced Configuration
+# =============================================================================
+# Patches the base VM with:
+#   - DataVolumeTemplate with persistent storage (imported from registry)
+#   - Higher resources (16Gi RAM, 4 cores + hyperthreading)
+#   - host-passthrough CPU for nested virtualization
+#   - macvtap primary interface (direct L2 to physical NIC)
+#   - OVS bridge secondary interface (for nested VMs)
+#   - networkdata secret reference
+#
+# Prerequisites:
+#   - KubeVirt with CDI installed
+#   - StorageClass: ceph-nvme-vm-block (or modify below)
+#   - NetworkAttachmentDefinitions: enp3s0-macvtap, ovs-br0
+#   - KubeVirt macvtap binding plugin enabled
+# =============================================================================
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: konductor
+spec:
+  dataVolumeTemplates:
+    - metadata:
+        name: konductor-root
+        labels:
+          app: konductor
+      spec:
+        pvc:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 64Gi
+          storageClassName: ceph-nvme-vm-block
+        source:
+          registry:
+            url: docker://docker.io/containercraft/konductor:qcow2
+  template:
+    spec:
+      accessCredentials:
+        - sshPublicKey:
+            source:
+              secret:
+                secretName: konductor-ssh-key
+            propagationMethod:
+              qemuGuestAgent:
+                users:
+                  - kc2
+                  - kc2admin
+      domain:
+        cpu:
+          cores: 4
+          sockets: 1
+          threads: 2
+          model: host-passthrough
+        resources:
+          requests:
+            memory: 16Gi
+        devices:
+          autoattachPodInterface: false
+          autoattachSerialConsole: true
+          autoattachGraphicsDevice: true
+          networkInterfaceMultiqueue: true
+          rng: {}
+          disks:
+            - name: root-disk
+              bootOrder: 1
+              cache: writeback
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            # macvtap: Direct L2 access to 10GbE physical NIC
+            - name: enp1s0
+              model: virtio
+              binding:
+                name: macvtap
+            # OVS bridge: For nested virt (no IP)
+            - name: enp2s0
+              model: virtio
+              bridge: {}
+      networks:
+        - name: enp1s0
+          multus:
+            networkName: macvtap
+        - name: enp2s0
+          multus:
+            networkName: br0
+      volumes:
+        - name: root-disk
+          persistentVolumeClaim:
+            claimName: konductor-root
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            secretRef:
+              name: konductor-userdata
+            networkDataSecretRef:
+              name: konductor-networkdata
