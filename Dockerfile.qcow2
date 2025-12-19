@@ -1,0 +1,34 @@
+# Konductor QCOW2 ContainerDisk Image
+#
+# This is a minimal FROM scratch image containing:
+#   - /disk/nixos.qcow2: The optimized NixOS VM disk image
+#   - /opt/konductor: Source code for provenance and airgap builds
+#
+# Build:
+#   ./build-optimize-qcow2.sh
+#   QCOW2=$(ls konductor-*.qcow2 | head -1)
+#   docker build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2" -t containercraft/konductor:qcow2 .
+#
+# Usage with KubeVirt:
+#   kubectl apply -k deploy/kubevirt/base
+#
+# The QCOW2 image includes pre-cached devshell for airgap environments.
+
+FROM scratch
+
+# QCOW2 filename (e.g., konductor-20251218.qcow2)
+ARG QCOW2_FILE
+
+# Copy the optimized QCOW2 disk image
+# KubeVirt containerDisk expects the disk at /disk/
+COPY ${QCOW2_FILE} /disk/nixos.qcow2
+
+# TODO: Future work - copy source for provenance/airgap in container layer
+# Currently disabled; source is already baked into /opt/konductor inside the qcow2
+# To avoid build context bloat, consider building qcow2 in /tmp outside repo
+# COPY flake.nix flake.lock lefthook.yml /opt/konductor/
+# COPY src/ /opt/konductor/src/
+# COPY .git/ /opt/konductor/.git/
+# COPY deploy/ /opt/konductor/deploy/
+# COPY docs/ /opt/konductor/docs/
+# COPY README.md LICENSE /opt/konductor/

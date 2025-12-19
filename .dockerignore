@@ -96,12 +96,9 @@
 **/desktop.ini
 
 # =============================================================================
-# DOCUMENTATION (not needed for build)
+# DOCUMENTATION (keep for provenance)
 # =============================================================================
-docs/
-**/*.md
-!README.md
-LICENSE*
+# docs/ and LICENSE included for provenance
 CHANGELOG*
 CONTRIBUTING*
 AUTHORS*
@@ -114,6 +111,16 @@ SECURITY*
 !.devcontainer/
 
 # =============================================================================
+# BUILD ARTIFACTS (large files)
+# =============================================================================
+# Exclude qcow2 files except the konductor build output
+*.qcow2
+*.qcow2.tmp
+!konductor-*.qcow2
+result
+result-*
+
+# =============================================================================
 # LOCAL WORKING FILES
 # =============================================================================
 INCOMPLETE.md
@@ -122,3 +129,4 @@ checkhealth*
 *.nixvim
 scratch/
 notes/
+tmp.tmp/

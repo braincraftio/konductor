@@ -30,12 +30,38 @@ in
   image = nixos-generators.nixosGenerate {
     inherit system;
     format = "qcow";
+    # Note: copyChannel is not exposed by nixos-generators wrapper
+    # Channel copy prevented via installer.cloneConfig = false below
     modules = [
       {
         # Basic system configuration
         # stateVersion from src/lib/versions.nix nixos.stateVersion
         system.stateVersion = versions.nixos.stateVersion;
         networking.hostName = "konductor";
+
+        # =====================================================================
+        # Image Size Optimization
+        # =====================================================================
+        # Disable documentation (saves ~1.5GB: ghc-doc, rust-docs, man pages)
+        documentation.enable = false;
+        documentation.doc.enable = false;
+        documentation.info.enable = false;
+        documentation.man.enable = false;
+        documentation.nixos.enable = false;
+
+        # Don't include default packages (nano, perl, rsync, strace)
+        environment.defaultPackages = lib.mkForce [];
+
+        # Disable command-not-found (requires nixpkgs channel)
+        programs.command-not-found.enable = false;
+
+        # TODO: Investigate channel copy reduction (~400MB)
+        # - nixos-generators doesn't expose `copyChannel` parameter from make-disk-image.nix
+        # - `system.installer.channel.enable` doesn't exist in NixOS
+        # - Options: 1) Use make-disk-image.nix directly instead of nixos-generators
+        #            2) Create custom format module that passes copyChannel = false
+        #            3) Find correct NixOS option to disable channel copy
+        # - See: nixos/lib/make-disk-image.nix in nixpkgs
         networking.useNetworkd = true;
         systemd.network.enable = true;
         systemd.network.networks."10-ethernet" = {
@@ -65,13 +91,15 @@ in
         programs.bash.interactiveShellInit = ''
           if [ -z "$KONDUCTOR_SHELL" ] && [[ $- == *i* ]] && [ -n "$SSH_CONNECTION" ]; then
             export KONDUCTOR_SHELL=1
-            # Use /workspace if mounted (local dev), else fall back to registry
+            # Priority: /workspace (dev) > /opt/konductor (airgap) > normal shell
             if [ -d /workspace ] && [ -f /workspace/flake.nix ]; then
               cd /workspace
-              exec nix develop
-            else
-              exec nix develop konductor
+              exec nix develop || :
+            elif [ -d /opt/konductor ] && [ -f /opt/konductor/flake.nix ]; then
+              cd /opt/konductor
+              exec nix develop --offline || :
             fi
+            # No flake found or exec failed, continue with normal shell
           fi
         '';
 
