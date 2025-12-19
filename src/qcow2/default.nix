@@ -105,6 +105,17 @@ in
           dotenv_if_exists "$HOME/.env"
         '';
 
+        # /etc/profile.d/konductor-proxy.sh - sources proxy env for shell sessions
+        # Cloud-init writes /etc/konductor/proxy.env, this script sources it
+        environment.etc."profile.d/konductor-proxy.sh".text = ''
+          # Source proxy configuration if present (set by cloud-init)
+          if [ -f /etc/konductor/proxy.env ]; then
+            set -a
+            . /etc/konductor/proxy.env
+            set +a
+          fi
+        '';
+
         # Packages: devshell defaults + essentials
         # Self-hosting tools (docker, qemu, libvirt) via: nix develop konductor#konductor
         environment.systemPackages = devshellPackages.default
@@ -197,6 +208,57 @@ in
 
               echo "No 9p virtfs device available (VM started without -virtfs)"
               exit 0
+            '';
+          };
+        };
+
+        # =====================================================================
+        # Proxy Configuration (Cloud-init Runtime)
+        # =====================================================================
+        # Applies proxy settings from cloud-init before nix-daemon starts.
+        # Cloud-init writes /etc/konductor/proxy.env, this service creates
+        # a systemd drop-in for nix-daemon to read it.
+        #
+        # Usage: Cloud-init user-data writes proxy.env file:
+        #   write_files:
+        #     - path: /etc/konductor/proxy.env
+        #       content: |
+        #         http_proxy=http://proxy.example.com:8080
+        #         https_proxy=http://proxy.example.com:8080
+        #         HTTP_PROXY=http://proxy.example.com:8080
+        #         HTTPS_PROXY=http://proxy.example.com:8080
+        #         no_proxy=localhost,127.0.0.1,10.0.0.0/8
+        #         NO_PROXY=localhost,127.0.0.1,10.0.0.0/8
+        systemd.services.konductor-proxy-setup = {
+          description = "Configure proxy for nix-daemon from cloud-init";
+          before = [ "nix-daemon.service" ];
+          wantedBy = [ "nix-daemon.service" ];
+          unitConfig = {
+            ConditionPathExists = "/etc/konductor/proxy.env";
+          };
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "setup-nix-proxy" ''
+              set -euo pipefail
+              PROXY_ENV="/etc/konductor/proxy.env"
+              DROPIN_DIR="/run/systemd/system/nix-daemon.service.d"
+
+              echo "Configuring nix-daemon proxy from $PROXY_ENV"
+
+              # Create drop-in directory
+              mkdir -p "$DROPIN_DIR"
+
+              # Create drop-in that loads the proxy environment file
+              cat > "$DROPIN_DIR/proxy.conf" << EOF
+              [Service]
+              EnvironmentFile=$PROXY_ENV
+              EOF
+
+              # Reload systemd to pick up the drop-in
+              systemctl daemon-reload
+
+              echo "Proxy configuration applied to nix-daemon"
             '';
           };
         };
