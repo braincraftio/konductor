@@ -15,6 +15,7 @@
     starship # Cross-shell prompt
     unstable.mise # Task runner and version manager
     direnv # Directory-based environments
+    unstable.runme # Executable markdown documentation
 
     # Kubernetes tools
     kubectl # Kubernetes CLI

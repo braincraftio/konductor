@@ -1,0 +1,27 @@
+# runme.yaml - Runme project configuration
+# https://docs.runme.dev/configuration
+
+project:
+  # Project root (default: current directory)
+  root: .
+
+  # Search upward for .git to determine project root
+  find_repo_upward: true
+
+  # Environment file configuration
+  env:
+    # Load order for .env files (later overrides earlier)
+    sources:
+      - .env.local    # Local developer overrides (gitignored)
+      - .env          # Shared defaults
+
+# File discovery settings
+ignore:
+  - node_modules
+  - .venv
+  - .direnv
+  - result
+  - "*.qcow2"
+
+# Default filename to look for
+filename: README.md

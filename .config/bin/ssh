@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# SSH wrapper for Konductor build VM
+# Usage: ssh localhost 'command'
+
+# Find project root relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Find the real ssh binary
+find_ssh_command() {
+    local ssh_locations=(
+        "/usr/bin/ssh"
+        "/bin/ssh"
+        "/usr/local/bin/ssh"
+        "/opt/homebrew/bin/ssh"
+    )
+
+    # Check specific locations first
+    for location in "${ssh_locations[@]}"; do
+        [[ -x "$location" ]] && echo "$location" && return 0
+    done
+
+    # Fall back to searching PATH, excluding this wrapper
+    local path_ssh
+    path_ssh=$(which ssh 2>/dev/null | grep -v ".config/bin/ssh" | head -1)
+    [[ -n "$path_ssh" ]] && echo "$path_ssh" && return 0
+
+    return 1
+}
+
+SSH_BIN=$(find_ssh_command)
+if [[ -z "$SSH_BIN" ]]; then
+    echo "Error: ssh command not found" >&2
+    exit 1
+fi
+
+exec "$SSH_BIN" -F "$PROJECT_ROOT/.ssh/config" "$@"

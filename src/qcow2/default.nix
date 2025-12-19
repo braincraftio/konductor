@@ -87,20 +87,22 @@ in
         # Sudo without password
         security.sudo.wheelNeedsPassword = false;
 
-        # Auto-enter default devshell for interactive SSH sessions
-        programs.bash.interactiveShellInit = ''
-          if [ -z "$KONDUCTOR_SHELL" ] && [[ $- == *i* ]] && [ -n "$SSH_CONNECTION" ]; then
-            export KONDUCTOR_SHELL=1
-            # Priority: /workspace (dev) > /opt/konductor (airgap) > normal shell
-            if [ -d /workspace ] && [ -f /workspace/flake.nix ]; then
-              cd /workspace
-              exec nix develop || :
-            elif [ -d /opt/konductor ] && [ -f /opt/konductor/flake.nix ]; then
-              cd /opt/konductor
-              exec nix develop --offline || :
-            fi
-            # No flake found or exec failed, continue with normal shell
-          fi
+        # Direnv for automatic flake loading
+        programs.direnv = {
+          enable = true;
+          nix-direnv.enable = true;
+        };
+
+        # /etc/skel/.envrc - copied to new user home directories
+        # Auto-loads flake offline and picks up .env for secrets (KubeVirt secret mounts)
+        environment.etc."skel/.envrc".text = ''
+          # Konductor airgap configuration
+          # Loads pre-cached flake from /opt/konductor (offline mode)
+          use flake /opt/konductor --offline
+
+          # Load secrets from .env (supports KubeVirt secret mounts)
+          dotenv_if_exists .env
+          dotenv_if_exists "$HOME/.env"
         '';
 
         # Packages: devshell defaults + essentials

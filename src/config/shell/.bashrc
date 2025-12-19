@@ -78,7 +78,8 @@ fi
 # ===========================================================================
 # Direnv
 # ===========================================================================
-if command -v direnv >/dev/null 2>&1; then
+# Skip direnv hook if already inside a nix shell to prevent double-loading
+if command -v direnv >/dev/null 2>&1 && [ -z "$IN_NIX_SHELL" ]; then
   eval "$(direnv hook bash)"
 fi
 
