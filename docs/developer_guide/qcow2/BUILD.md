@@ -6,25 +6,39 @@ runme:
   version: v3
 ---
 
-# Konductor QCOW2 Build
+# Build Konductor QCOW2
 
-Airgap-ready NixOS QCOW2 with pre-cached devshell (~3.5GB compressed).
+Build an airgap-ready NixOS VM image with pre-cached development environment.
 
-## Cleanup
+**Output**: `konductor-YYYYMMDD.qcow2` (~3.5GB compressed, boots offline with full devshell)
+
+## Quick Start
+
+```sh {"name":"run-all","excludeFromRunAll":"true"}
+runme run --filename docs/developer_guide/qcow2/BUILD.md --all
+```
+
+---
+
+## Phase 1: Build
+
+Nix builds the NixOS system closure into an unoptimized QCOW2.
+
+```sh {"name":"nix-build"}
+nix build .#qcow2
+sudo chown -R "${USER}:${USER}" result/
+sudo chmod -R u+w result/
+```
+
+## Phase 2: Prepare
+
+Generate ephemeral build credentials and cloud-init for VM access.
 
 ```sh {"name":"cleanup"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
 sudo guestunmount /tmp/nixmount 2>/dev/null || true
 sudo rm -rf /tmp/nixmount /tmp/konductor-build-ssh /tmp/konductor-build-cloud-init
-```
-
-## Build
-
-```sh {"name":"nix-build"}
-nix build .#qcow2
-sudo chown -R "${USER}:${USER}" result/
-sudo chmod -R u+w result/
 ```
 
 ```sh {"name":"ssh-key"}
@@ -61,9 +75,9 @@ genisoimage -output /tmp/konductor-build-cloud-init/seed.iso -volid cidata -joli
     /tmp/konductor-build-cloud-init/user-data /tmp/konductor-build-cloud-init/meta-data 2>/dev/null
 ```
 
-## Pre-boot Cleanup
+Reset image to pristine state before first boot.
 
-```sh {"name":"preboot-cleanup"}
+```sh {"name":"reset-image"}
 export LIBGUESTFS_BACKEND=direct
 sudo mkdir -p /tmp/nixmount
 sudo guestmount -a result/nixos.qcow2 -m /dev/sda3 /tmp/nixmount
@@ -73,7 +87,9 @@ sudo guestunmount /tmp/nixmount
 sync && sleep 2
 ```
 
-## VM
+## Phase 3: Configure
+
+Boot VM and install development environment for airgap operation.
 
 ```sh {"name":"start-vm"}
 qemu-system-x86_64 \
@@ -101,6 +117,8 @@ until .config/bin/ssh localhost true 2>/dev/null; do sleep 5; done
 .config/bin/ssh localhost 'sudo mkdir -p /workspace && sudo mount -t 9p -o trans=virtio host /workspace'
 ```
 
+Copy source to /opt/konductor.
+
 ```sh {"name":"copy-source"}
 .config/bin/ssh localhost 'sudo mkdir -p /opt/konductor && sudo rsync -a --delete \
     --exclude={result,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,"*.tmp","*.pyc",".DS_Store","*.qcow2","*.qcow2.tmp",.claude} \
@@ -108,12 +126,16 @@ until .config/bin/ssh localhost true 2>/dev/null; do sleep 5; done
 .config/bin/ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R root:root /opt/konductor'
 ```
 
+Pre-cache devshell for offline use.
+
 ```sh {"name":"cache-devshell"}
 .config/bin/ssh localhost 'git config --global --add safe.directory /opt/konductor'
 .config/bin/ssh localhost 'nix build /opt/konductor#devShells.x86_64-linux.konductor --out-link /home/kc2admin/konductor-devshell'
 .config/bin/ssh localhost 'sudo ln -sf /home/kc2admin/konductor-devshell /nix/var/nix/gcroots/konductor-devshell'
 .config/bin/ssh localhost 'nix develop /opt/konductor#konductor --command true'
 ```
+
+Minimize image size.
 
 ```sh {"name":"vm-cleanup"}
 .config/bin/ssh localhost 'sudo nix-collect-garbage -d'
@@ -132,7 +154,9 @@ sleep 10
 rm -f /tmp/konductor-build-vm.pid
 ```
 
-## Finalize
+## Phase 4: Package
+
+Clean build artifacts from image.
 
 ```sh {"name":"postboot-cleanup"}
 export LIBGUESTFS_BACKEND=direct
@@ -147,10 +171,14 @@ sync && sleep 2
 sudo rmdir /tmp/nixmount
 ```
 
+Compress with ZSTD.
+
 ```sh {"name":"compress"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
 ```
+
+Sparsify for minimal size.
 
 ```sh {"name":"sparsify"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
@@ -163,13 +191,19 @@ rm -f "${QCOW2_OUTPUT}.tmp"
 rm -rf /tmp/konductor-build-ssh /tmp/konductor-build-cloud-init /tmp/konductor-build-vm.log
 ```
 
+## Phase 5: Verify
+
 ```sh {"name":"verify","interactive":"false"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 du -h "$QCOW2_OUTPUT"
 qemu-img info "$QCOW2_OUTPUT"
 ```
 
+---
+
 ## Container
+
+Package as KubeVirt containerDisk for Kubernetes deployment.
 
 ```sh {"name":"build-container"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
@@ -181,6 +215,8 @@ docker build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" -t "$CON
 : ${CONTAINER_IMAGE:=docker.io/containercraft/konductor:qcow2}
 docker push "$CONTAINER_IMAGE"
 ```
+
+---
 
 ## Troubleshooting
 
