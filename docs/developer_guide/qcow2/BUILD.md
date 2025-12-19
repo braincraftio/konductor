@@ -2,6 +2,7 @@
 cwd: ../../..
 shell: bash
 skipPrompts: true
+tag: target:qcow2,scope:dev,scope:ci
 runme:
   version: v3
 ---
@@ -14,15 +15,17 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 
 - [Output](#output)
 - [Prerequisites](#prerequisites)
-- [Usage](#usage)
-- [Build Phases](#build-phases)
+- [Quick Start](#quick-start)
+- [Build Pipeline](#build-pipeline)
   - [Phase 1: Build](#phase-1-build)
   - [Phase 2: Prepare](#phase-2-prepare)
   - [Phase 3: Configure](#phase-3-configure)
   - [Phase 4: Package](#phase-4-package)
   - [Phase 5: Verify](#phase-5-verify)
-- [Container](#container)
-- [Troubleshooting](#troubleshooting)
+- [Container Publish](#container-publish)
+- [Developer Tools](#developer-tools)
+
+---
 
 ## Output
 
@@ -32,69 +35,63 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 | `containercraft/konductor:qcow2` | ~3.5GB | KubeVirt containerDisk for Kubernetes deployment |
 
 The image includes:
+
 - NixOS with cloud-init for dynamic configuration
 - Pre-cached Konductor devshell at `/opt/konductor`
 - Users: `kc2` (unprivileged), `kc2admin` (sudo)
 - Services: SSH, QEMU guest agent, Docker, Libvirt (not auto-started)
 
+---
+
 ## Prerequisites
 
-Required tools (available in the Konductor devshell):
+| Tool | Purpose | Tag |
+|------|---------|-----|
+| `nix` | Build NixOS system closure | `requires:nix` |
+| `qemu-system-x86_64` | Run build VM with KVM acceleration | `requires:kvm` |
+| `guestmount` / `virt-sparsify` | Mount and optimize QCOW2 images | `requires:guestfs` |
+| `genisoimage` | Create cloud-init ISO | - |
+| `docker` | Build containerDisk image | `requires:docker` |
 
-| Tool | Purpose |
-|------|---------|
-| `nix` | Build NixOS system closure |
-| `qemu-system-x86_64` | Run build VM with KVM acceleration |
-| `guestmount` / `virt-sparsify` | Mount and optimize QCOW2 images |
-| `genisoimage` | Create cloud-init ISO |
-| `docker` | Build containerDisk image |
+---
 
-## Usage
+## Quick Start
 
-This document is executable via [runme](https://runme.dev). All code blocks run from the repository root.
-
-**Run complete build:**
-```sh {"name":"run-all","excludeFromRunAll":"true"}
+```sh {"name":"nix-build-qcow2","excludeFromRunAll":"true","tag":"type:entry"}
 runme run --filename docs/developer_guide/qcow2/BUILD.md --all
 ```
 
-**Run specific phase:**
-```sh {"excludeFromRunAll":"true","interactive":"false","name":"usage-phase"}
-# List available tasks
-runme list --filename docs/developer_guide/qcow2/BUILD.md
+`runme run nix-build-qcow2`
 
-# Run single task
-runme run --filename docs/developer_guide/qcow2/BUILD.md nix-build
+---
 
-# Run from specific phase
-runme run --filename docs/developer_guide/qcow2/BUILD.md start-vm
-```
-
-**Configuration** (optional, defaults shown):
-```sh {"excludeFromRunAll":"true","interactive":"false","name":"usage-config"}
-export QCOW2_OUTPUT=konductor-$(date +%Y%m%d).qcow2
-export CONTAINER_IMAGE=docker.io/containercraft/konductor:qcow2
-```
-
-## Build Phases
-
-### Overview
+## Build Pipeline
 
 ```text
-Phase 1: Build      → Nix builds NixOS system closure
-Phase 2: Prepare    → Generate SSH key, cloud-init, reset image
-Phase 3: Configure  → Boot VM, copy source, cache devshell
-Phase 4: Package    → Clean artifacts, compress, sparsify
-Phase 5: Verify     → Validate output
+runme run nix-build-qcow2
+
+phase:build  →  phase:prepare    →  phase:configure     →  phase:package     →  phase:verify
+    │                │                    │                      │                   │
+    ▼                ▼                    ▼                      ▼                   ▼
+  -nix           -cleanup             -vm-start             -image-clean         -verify
+                 -ssh-keygen          -vm-wait              -image-compress
+                 -cloudinit-gen       -mount-workspace      -image-sparsify
+                 -image-reset         -copy-source          -temp-cleanup
+                                      -cache-warm
+                                      -vm-gc
+                                      -vm-zero
+                                      -vm-stop
+
+All tasks prefixed: nix-build-qcow2-{task}
 ```
 
 ---
 
-### Phase 1: Build
+## Phase 1: Build
 
 Nix builds the NixOS system closure and creates an unoptimized QCOW2 at `result/nixos.qcow2`.
 
-```sh {"name":"nix-build"}
+```sh {"name":"nix-build-qcow2-nix","tag":"phase:build,requires:nix"}
 nix build .#qcow2
 sudo chown -R "${USER}:${USER}" result/
 sudo chmod -R u+w result/
@@ -102,23 +99,23 @@ sudo chmod -R u+w result/
 
 ---
 
-### Phase 2: Prepare
+## Phase 2: Prepare
 
 Clean previous build state and generate ephemeral credentials for VM access.
 
-```sh {"name":"cleanup"}
+```sh {"name":"nix-build-qcow2-cleanup","tag":"phase:prepare,type:destructive","excludeFromRunAll":"true"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
 sudo guestunmount /tmp/nixmount 2>/dev/null || true
 sudo rm -rf /tmp/nixmount /tmp/konductor-build-ssh /tmp/konductor-build-cloud-init
 ```
 
-```sh {"name":"ssh-key"}
+```sh {"name":"nix-build-qcow2-ssh-keygen","tag":"phase:prepare"}
 mkdir -p /tmp/konductor-build-ssh
 ssh-keygen -t ed25519 -f /tmp/konductor-build-ssh/id_ed25519 -N "" -q
 ```
 
-```sh {"name":"cloud-init"}
+```sh {"name":"nix-build-qcow2-cloudinit-gen","tag":"phase:prepare"}
 mkdir -p /tmp/konductor-build-cloud-init
 BUILD_SSH_KEY=$(cat /tmp/konductor-build-ssh/id_ed25519.pub)
 
@@ -149,7 +146,7 @@ genisoimage -output /tmp/konductor-build-cloud-init/seed.iso -volid cidata -joli
 
 Reset image to pristine state (remove host keys, machine-id, cloud-init state).
 
-```sh {"name":"reset-image"}
+```sh {"name":"nix-build-qcow2-image-reset","tag":"phase:prepare,requires:guestfs"}
 export LIBGUESTFS_BACKEND=direct
 sudo mkdir -p /tmp/nixmount
 sudo guestmount -a result/nixos.qcow2 -m /dev/sda3 /tmp/nixmount
@@ -161,11 +158,11 @@ sync && sleep 2
 
 ---
 
-### Phase 3: Configure
+## Phase 3: Configure
 
 Boot VM with virtfs mount to host workspace, then install devshell for airgap operation.
 
-```sh {"name":"start-vm"}
+```sh {"name":"nix-build-qcow2-vm-start","tag":"phase:configure,requires:kvm"}
 qemu-system-x86_64 \
     -machine q35,accel=kvm \
     -m 8192 \
@@ -182,18 +179,18 @@ qemu-system-x86_64 \
     -display none
 ```
 
-```sh {"name":"wait-ssh"}
+```sh {"name":"nix-build-qcow2-vm-wait","tag":"phase:configure,duration:slow"}
 sleep 30
 until .config/bin/ssh localhost true 2>/dev/null; do sleep 5; done
 ```
 
-```sh {"name":"mount-workspace"}
+```sh {"name":"nix-build-qcow2-mount-workspace","tag":"phase:configure"}
 .config/bin/ssh localhost 'sudo mkdir -p /workspace && sudo mount -t 9p -o trans=virtio host /workspace'
 ```
 
 Copy source to `/opt/konductor` (excludes build artifacts, caches, secrets).
 
-```sh {"name":"copy-source"}
+```sh {"name":"nix-build-qcow2-copy-source","tag":"phase:configure"}
 .config/bin/ssh localhost 'sudo mkdir -p /opt/konductor && sudo rsync -a --delete \
     --exclude={result,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,"*.tmp","*.pyc",".DS_Store","*.qcow2","*.qcow2.tmp",.claude} \
     /workspace/ /opt/konductor/'
@@ -202,7 +199,7 @@ Copy source to `/opt/konductor` (excludes build artifacts, caches, secrets).
 
 Build and cache devshell with GC root to survive garbage collection.
 
-```sh {"name":"cache-devshell"}
+```sh {"name":"nix-build-qcow2-cache-warm","tag":"phase:configure,duration:slow,requires:nix"}
 .config/bin/ssh localhost 'git config --global --add safe.directory /opt/konductor'
 .config/bin/ssh localhost 'nix build /opt/konductor#devShells.x86_64-linux.konductor --out-link /home/kc2admin/konductor-devshell'
 .config/bin/ssh localhost 'sudo ln -sf /home/kc2admin/konductor-devshell /nix/var/nix/gcroots/konductor-devshell'
@@ -211,17 +208,17 @@ Build and cache devshell with GC root to survive garbage collection.
 
 Minimize image size (garbage collect, clear logs/caches, zero free space for compression).
 
-```sh {"name":"vm-cleanup"}
+```sh {"name":"nix-build-qcow2-vm-gc","tag":"phase:configure"}
 .config/bin/ssh localhost 'sudo nix-collect-garbage -d'
 .config/bin/ssh localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
 .config/bin/ssh localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
 
-```sh {"name":"zero-free-space"}
+```sh {"name":"nix-build-qcow2-vm-zero","tag":"phase:configure,duration:slow"}
 .config/bin/ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
 ```
 
-```sh {"name":"stop-vm"}
+```sh {"name":"nix-build-qcow2-vm-stop","tag":"phase:configure"}
 .config/bin/ssh localhost 'sudo poweroff' 2>/dev/null || true
 sleep 10
 [ -f /tmp/konductor-build-vm.pid ] && kill "$(cat /tmp/konductor-build-vm.pid)" 2>/dev/null || true
@@ -230,11 +227,11 @@ rm -f /tmp/konductor-build-vm.pid
 
 ---
 
-### Phase 4: Package
+## Phase 4: Package
 
 Clean build artifacts (SSH keys, gitconfig) from the image.
 
-```sh {"name":"postboot-cleanup"}
+```sh {"name":"nix-build-qcow2-image-clean","tag":"phase:package,requires:guestfs"}
 export LIBGUESTFS_BACKEND=direct
 sudo mkdir -p /tmp/nixmount
 sudo guestmount -a result/nixos.qcow2 -m /dev/sda3 /tmp/nixmount
@@ -249,67 +246,73 @@ sudo rmdir /tmp/nixmount
 
 Compress with ZSTD (best ratio for QCOW2).
 
-```sh {"name":"compress"}
+```sh {"name":"nix-build-qcow2-image-compress","tag":"phase:package,duration:slow"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
 ```
 
 Sparsify to reclaim zero-filled space.
 
-```sh {"name":"sparsify"}
+```sh {"name":"nix-build-qcow2-image-sparsify","tag":"phase:package,duration:slow,requires:guestfs"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 export LIBGUESTFS_BACKEND=direct
 sudo virt-sparsify --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
 rm -f "${QCOW2_OUTPUT}.tmp"
 ```
 
-```sh {"name":"final-cleanup"}
+```sh {"name":"nix-build-qcow2-temp-cleanup","tag":"phase:package"}
 rm -rf /tmp/konductor-build-ssh /tmp/konductor-build-cloud-init /tmp/konductor-build-vm.log
 ```
 
 ---
 
-### Phase 5: Verify
+## Phase 5: Verify
 
-```sh {"name":"verify","interactive":"false"}
+```sh {"name":"nix-build-qcow2-verify","tag":"phase:verify,type:readonly","interactive":"false"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+echo "=== QCOW2 Build Complete ==="
 du -h "$QCOW2_OUTPUT"
 qemu-img info "$QCOW2_OUTPUT"
 ```
 
 ---
 
-## Container
+## Container Publish
 
 Package QCOW2 as a KubeVirt containerDisk for Kubernetes deployment.
 
-```sh {"name":"build-container"}
+```sh {"name":"nix-build-qcow2-container-build","tag":"phase:publish,requires:docker","excludeFromRunAll":"true"}
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 : ${CONTAINER_IMAGE:=docker.io/containercraft/konductor:qcow2}
 docker build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" -t "$CONTAINER_IMAGE" .
 ```
 
-```sh {"name":"push-container","excludeFromRunAll":"true"}
+```sh {"name":"nix-build-qcow2-container-push","tag":"phase:publish,requires:docker","excludeFromRunAll":"true"}
 : ${CONTAINER_IMAGE:=docker.io/containercraft/konductor:qcow2}
 docker push "$CONTAINER_IMAGE"
 ```
 
 ---
 
-## Troubleshooting
+## Developer Tools
+
+Debug and troubleshooting utilities (excluded from `--all`).
 
 **View boot log:**
-```sh {"name":"console-log","excludeFromRunAll":"true"}
+
+```sh {"name":"nix-build-qcow2-debug-log","tag":"type:debug","excludeFromRunAll":"true"}
 tail -100 /tmp/konductor-build-vm.log
 ```
 
 **Force kill stuck VM:**
-```sh {"name":"kill-vm","excludeFromRunAll":"true"}
+
+```sh {"name":"nix-build-qcow2-vm-kill","tag":"type:destructive","excludeFromRunAll":"true"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f /tmp/konductor-build-vm.pid
 ```
 
 **SSH into running VM:**
-```sh {"name":"ssh-vm","excludeFromRunAll":"true"}
+
+```sh {"name":"nix-build-qcow2-vm-ssh","tag":"type:debug","excludeFromRunAll":"true"}
 .config/bin/ssh localhost
 ```

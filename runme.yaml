@@ -1,5 +1,7 @@
 # runme.yaml - Runme project configuration
-# https://docs.runme.dev/configuration
+# Reference: docs/developer_guide/runme/TASKS.md
+
+version: v1alpha1
 
 project:
   # Project root (default: current directory)
@@ -8,20 +10,39 @@ project:
   # Search upward for .git to determine project root
   find_repo_upward: true
 
-  # Environment file configuration
+  # Default markdown file when no --filename specified
+  filename: README.md
+
+  # Gitignore-style patterns to exclude from task discovery
+  ignore:
+    - node_modules
+    - .venv
+    - .direnv
+    - vendor
+    - result
+    - "*.qcow2"
+    - "*.qcow2.tmp"
+    - .git
+    - .claude
+
+  # Respect .gitignore files (default: true)
+  disable_gitignore: false
+
+  # Environment configuration
   env:
     # Load order for .env files (later overrides earlier)
     sources:
       - .env.local    # Local developer overrides (gitignored)
       - .env          # Shared defaults
 
-# File discovery settings
-ignore:
-  - node_modules
-  - .venv
-  - .direnv
-  - result
-  - "*.qcow2"
+# Task filters (applied to beta commands)
+# Reference: TASKS.v2.md Filter System
+filters:
+  # Include only named blocks by default
+  - type: block
+    condition: "isNamed == true"
 
-# Default filename to look for
-filename: README.md
+# Logging configuration
+log:
+  enabled: false
+  path: /tmp/runme.log
