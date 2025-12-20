@@ -18,13 +18,14 @@
   # ===========================================================================
   # Language Runtimes
   # ===========================================================================
+  # TODO: Review language versions periodically for LTS/stable updates
   languages = {
     python = {
-      version = "312"; # Maps to pkgs.python312
-      display = "3.12"; # Human-readable
+      version = "313"; # Maps to pkgs.python313
+      display = "3.13"; # Human-readable
     };
     go = {
-      version = "1_24"; # Maps to pkgs.go_1_24
+      version = "1_24"; # Maps to pkgs.go_1_24 (1.23 is EOL)
       display = "1.24";
     };
     node = {
@@ -32,8 +33,8 @@
       display = "22";
     };
     rust = {
-      version = "1.82.0"; # Maps to rust-bin.stable."1.82.0"
-      display = "1.82.0";
+      version = "1.92.0"; # Maps to rust-bin.stable."1.92.0"
+      display = "1.92.0";
     };
   };
 

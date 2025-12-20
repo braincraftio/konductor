@@ -10,9 +10,10 @@
 #   go        - Go development
 #   node      - Node.js development
 #   rust      - Rust development
-#   dev       - Human workflow (IDE: neovim + tmux)
+#   dev       - Human workflow (IDE: neovim + tmux + forgejo-cli)
 #   full      - Everything (all languages + dev)
 #   konductor - Self-hosting (full + container/VM build tools)
+#   ci        - CI/CD runner (all languages + forgejo + build tools)
 
 { pkgs, lib, versions, programs, ... }:
 
@@ -49,4 +50,8 @@ in
   # Konductor: Self-hosting - full + container/VM build tools
   # Use inside QCOW2 VM to get docker, qemu, libvirt, etc.
   konductor = import ./konductor.nix { inherit baseShell pkgs packages versions programs; };
+
+  # CI: Forgejo Actions runner environment
+  # All languages + forgejo runner/cli + container/VM build tools
+  ci = import ./ci.nix { inherit baseShell pkgs packages versions programs; };
 }

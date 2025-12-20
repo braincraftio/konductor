@@ -117,7 +117,7 @@
         {
           # Development shells from src/devshells
           devShells = {
-            inherit (devshells) default python go node rust dev full konductor;
+            inherit (devshells) default python go node rust dev full konductor ci;
           };
 
           # Packages (build outputs, not shells)

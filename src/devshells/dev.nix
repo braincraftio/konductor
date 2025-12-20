@@ -1,6 +1,6 @@
 # src/devshells/dev.nix
 # Human workflow shell with IDE tools
-# Adds neovim + tmux for interactive development
+# Adds neovim + tmux + forgejo-cli for interactive development
 #
 # Package composition defined in: ../packages/
 
@@ -10,10 +10,11 @@ baseShell.overrideAttrs (old: {
   name = "dev";
 
   # packages.idePackages from ./packages.nix (single source of truth)
-  # plus neovim and tmux from programs
+  # plus neovim, tmux, and forgejo-cli from programs
   buildInputs = old.buildInputs
     ++ programs.neovim.packages
     ++ programs.tmux.packages
+    ++ programs.forgejo.cliPackages
     ++ packages.idePackages;
 
   shellHook = old.shellHook + ''
@@ -23,6 +24,6 @@ baseShell.overrideAttrs (old: {
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
-    echo "IDE ready: nvim, tmux"
+    echo "IDE ready: nvim, tmux, forgejo-cli"
   '';
 })
