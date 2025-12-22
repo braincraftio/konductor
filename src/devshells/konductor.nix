@@ -8,8 +8,9 @@
 # Tools are fetched from Nix cache on-demand, keeping the base image lean.
 #
 # Package composition defined in: ../packages/
+# SSH config from: ../config/shell/ssh.nix
 
-{ baseShell, pkgs, packages, versions, programs, ... }:
+{ baseShell, pkgs, packages, versions, programs, config, ... }:
 
 let
   langs = versions.languages;
@@ -39,6 +40,9 @@ baseShell.overrideAttrs (old: {
   '' + old.shellHook + ''
     export KONDUCTOR_SHELL="konductor"
     export name="konductor"
+
+    # SSH config generation from centralized src/config/shell/ssh.nix
+    ${config.shell.ssh.shellHook}
 
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
@@ -80,7 +84,7 @@ baseShell.overrideAttrs (old: {
     echo ""
     echo "Build Tools:"
     echo "  docker, docker-compose, buildkit, skopeo, crane"
-    echo "  qemu, libvirt, virt-manager, cdrkit"
+    echo "  qemu, libvirt, virt-manager, virt-sparsify, OVMF"
     echo ""
     echo "Commands:  mise run help"
     echo ""
@@ -97,5 +101,5 @@ baseShell.overrideAttrs (old: {
     NODE_ENV = "development";
     # Rust
     RUST_BACKTRACE = "1";
-  } // konductor.env;
+  } // (konductor.env pkgs) // config.shell.ssh.env;
 })

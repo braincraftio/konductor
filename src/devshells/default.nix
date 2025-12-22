@@ -42,16 +42,16 @@ in
   rust = import ./rust.nix { inherit baseShell pkgs packages versions; };
 
   # Dev: Human workflow with IDE tools
-  dev = import ./dev.nix { inherit baseShell pkgs packages programs; };
+  dev = import ./dev.nix { inherit baseShell pkgs packages programs config; };
 
   # Full: Everything - all languages + dev tools
-  full = import ./full.nix { inherit baseShell pkgs packages versions programs; };
+  full = import ./full.nix { inherit baseShell pkgs packages versions programs config; };
 
   # Konductor: Self-hosting - full + container/VM build tools
   # Use inside QCOW2 VM to get docker, qemu, libvirt, etc.
-  konductor = import ./konductor.nix { inherit baseShell pkgs packages versions programs; };
+  konductor = import ./konductor.nix { inherit baseShell pkgs packages versions programs config; };
 
   # CI: Forgejo Actions runner environment
   # All languages + forgejo runner/cli + container/VM build tools
-  ci = import ./ci.nix { inherit baseShell pkgs packages versions programs; };
+  ci = import ./ci.nix { inherit baseShell pkgs packages versions programs config; };
 }

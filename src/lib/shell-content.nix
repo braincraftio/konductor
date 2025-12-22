@@ -111,35 +111,14 @@ in
         br = branch
         ci = commit
         lg = log --oneline --graph --decorate
+    [safe]
+        directory = /opt/konductor
+        directory = /workspace
+        directory = *
   '';
 
-  # Starship config content
-  starshipConfigContent = ''
-    format = """
-    $username\
-    $hostname\
-    $directory\
-    $git_branch\
-    $git_status\
-    $python\
-    $golang\
-    $nodejs\
-    $rust\
-    $cmd_duration\
-    $line_break\
-    $character"""
-
-    [character]
-    success_symbol = "[>](bold green)"
-    error_symbol = "[>](bold red)"
-
-    [directory]
-    truncation_length = 3
-    truncate_to_repo = true
-
-    [git_branch]
-    symbol = "git:"
-  '';
+  # NOTE: Starship config is SSOT in src/config/shell/starship.toml
+  # Access via: config.shell.starship.configContent
 
   # Welcome message content
   welcomeMessageContent = ''

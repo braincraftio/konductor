@@ -3,8 +3,9 @@
 # Adds neovim + tmux + forgejo-cli for interactive development
 #
 # Package composition defined in: ../packages/
+# SSH config from: ../config/shell/ssh.nix
 
-{ baseShell, packages, programs, ... }:
+{ baseShell, packages, programs, config, ... }:
 
 baseShell.overrideAttrs (old: {
   name = "dev";
@@ -21,9 +22,14 @@ baseShell.overrideAttrs (old: {
     export KONDUCTOR_SHELL="dev"
     export name="dev"
 
+    # SSH config generation from centralized src/config/shell/ssh.nix
+    ${config.shell.ssh.shellHook}
+
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
     echo "IDE ready: nvim, tmux, forgejo-cli"
   '';
+
+  env = old.env // config.shell.ssh.env;
 })

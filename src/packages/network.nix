@@ -4,10 +4,10 @@
 { pkgs }:
 
 {
+  # Note: openssh is in cli.nix (wrapped with hermetic config)
   packages = with pkgs; [
     curl # HTTP client
     wget # HTTP/FTP retrieval
-    openssh # SSH client
     gnupg # GPG for signing
     cacert # CA certificates
   ];

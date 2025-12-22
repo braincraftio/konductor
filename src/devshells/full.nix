@@ -3,8 +3,9 @@
 # All languages + IDE tools
 #
 # Package composition defined in: ../packages/
+# SSH config from: ../config/shell/ssh.nix
 
-{ baseShell, packages, versions, programs, pkgs, ... }:
+{ baseShell, packages, versions, programs, config, pkgs, ... }:
 
 let
   langs = versions.languages;
@@ -28,6 +29,9 @@ baseShell.overrideAttrs (old: {
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="full"
     export name="full"
+
+    # SSH config generation from centralized src/config/shell/ssh.nix
+    ${config.shell.ssh.shellHook}
 
     # Native library support for pip-installed packages (grpc, etc.)
     export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
@@ -74,5 +78,5 @@ baseShell.overrideAttrs (old: {
     NODE_ENV = "development";
     # Rust
     RUST_BACKTRACE = "1";
-  };
+  } // config.shell.ssh.env;
 })

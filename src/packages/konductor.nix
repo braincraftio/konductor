@@ -28,6 +28,8 @@
     qemu-utils
     libvirt
     virt-manager
+    guestfs-tools  # guestmount, virt-sparsify
+    OVMF           # EFI firmware for QEMU
 
     # Cloud-init ISO creation
     cdrkit
@@ -37,12 +39,16 @@
     cachix
   ];
 
+  # Note: SSH config is handled by config.shell.ssh.shellHook in devshells
   shellHook = ''
     # Konductor self-hosting environment
     export DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
   '';
 
-  env = {
+  env = pkgs: {
     DOCKER_BUILDKIT = "1";
+    # OVMF EFI firmware paths for QEMU
+    OVMF_CODE = "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd";
+    OVMF_VARS = "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd";
   };
 }

@@ -16,8 +16,9 @@
 #   nix develop github:containercraft/konductor#ci
 #
 # Package composition defined in: ../packages/
+# SSH config from: ../config/shell/ssh.nix
 
-{ baseShell, pkgs, packages, versions, programs, ... }:
+{ baseShell, pkgs, packages, versions, programs, config, ... }:
 
 let
   langs = versions.languages;
@@ -51,6 +52,9 @@ baseShell.overrideAttrs (old: {
     export KONDUCTOR_SHELL="ci"
     export name="ci"
     export CI="true"
+
+    # SSH config generation from centralized src/config/shell/ssh.nix
+    ${config.shell.ssh.shellHook}
 
     # Python
     export UV_SYSTEM_PYTHON="1"
@@ -97,7 +101,7 @@ baseShell.overrideAttrs (old: {
     echo "CI Tools:"
     echo "  forgejo-runner, forgejo-cli"
     echo "  docker, docker-compose, buildkit, skopeo, crane"
-    echo "  qemu, libvirt, cdrkit"
+    echo "  qemu, libvirt, virt-sparsify, OVMF"
     echo ""
     echo "Build Commands:"
     echo "  nix build .#qcow2         # Build QCOW2 image"
@@ -119,5 +123,5 @@ baseShell.overrideAttrs (old: {
     RUST_BACKTRACE = "1";
     # CI
     CI = "true";
-  } // konductor.env;
+  } // (konductor.env pkgs) // config.shell.ssh.env;
 })
