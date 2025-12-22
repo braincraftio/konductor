@@ -108,7 +108,7 @@
 
           # QCOW2 VM (Linux-only)
           qcow2 = import ./src/qcow2 {
-            inherit pkgs inputs system;
+            inherit pkgs inputs system versions programs;
             inherit (nixpkgs) lib;
             inherit (inputs) nixos-generators;
           };
