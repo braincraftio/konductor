@@ -2,7 +2,12 @@
 # Git configuration wrapper
 #
 # Config is generated from centralized shell-content.nix SSOT.
-# The wrapper forces config via GIT_CONFIG_GLOBAL env var with no escape hatch.
+# Uses GIT_CONFIG_SYSTEM for defaults, allowing user overrides in ~/.gitconfig.
+#
+# Git config precedence (highest to lowest):
+#   1. Repository config (.git/config)
+#   2. Global config (~/.gitconfig) - user can write/override here
+#   3. System config (GIT_CONFIG_SYSTEM) - our Konductor defaults
 
 { pkgs, lib }:
 
@@ -10,7 +15,7 @@ let
   # Import centralized shell content
   shellContent = import ../../lib/shell-content.nix { inherit lib; };
 
-  # Config file - written to nix store
+  # Config file - written to nix store (read-only defaults)
   configFile = pkgs.writeTextFile {
     name = "konductor-gitconfig";
     destination = "/.gitconfig";
@@ -19,12 +24,13 @@ let
 
 in
 {
-  # Wrapped git that forces hermetic config
+  # Wrapped git with Konductor defaults as system config
+  # User's ~/.gitconfig can override any setting
   package = pkgs.writeShellApplication {
     name = "git";
     runtimeInputs = [ pkgs.git ];
     text = ''
-      export GIT_CONFIG_GLOBAL="${configFile}/.gitconfig"
+      export GIT_CONFIG_SYSTEM="${configFile}/.gitconfig"
       exec git "$@"
     '';
   };
