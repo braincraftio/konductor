@@ -26,7 +26,10 @@ project:
     - .claude
     - "docs/TASKS.*"
     - "docs/*.md"
-    - "!docs/developer_guide/**"
+    # Reference docs contain example code blocks, not executable tasks
+    - "docs/developer_guide/runme/*.md"
+    - "docs/developer_guide/runme/RUNME.md"
+    - "docs/developer_guide/runme/TASKS.md"
 
   # Respect .gitignore files (default: true)
   disable_gitignore: false

@@ -1,10 +1,19 @@
+---
+# This file is REFERENCE DOCUMENTATION about runme, not executable tasks.
+# All code blocks are examples showing runme syntax, not meant for execution.
+skipPrompts: true
+shell: bash
+runme:
+  version: v3
+---
+
 # Runme: Executable Markdown Documentation
 
 Runme transforms Markdown files into interactive, executable documents. Instead of copy-pasting commands from documentation, developers can run code blocks directly from their editor or CLI.
 
 ## Installation
 
-```sh {"name":"install-runme","excludeFromRunAll":"true"}
+```sh {"name":"_example:install-runme","excludeFromRunAll":"true"}
 # macOS
 brew install runme
 
@@ -20,13 +29,13 @@ go install github.com/stateful/runme/v3@latest
 
 ## Quick Start
 
-```sh {"name":"runme-help","interactive":"false"}
+```sh {"name":"_example:runme-help","excludeFromRunAll":"true","interactive":"false"}
 runme --help
 ```
 
 ### Run a Named Block
 
-```sh {"name":"runme-example","excludeFromRunAll":"true"}
+```sh {"name":"_example:runme-run","excludeFromRunAll":"true"}
 # Run a specific named code block
 runme run block-name
 
@@ -36,7 +45,7 @@ runme run --filename docs/BUILD.md block-name
 
 ### Run All Blocks
 
-```sh {"name":"runme-all","excludeFromRunAll":"true"}
+```sh {"name":"_example:runme-all","excludeFromRunAll":"true"}
 # Run all executable blocks in sequence
 runme run --all
 
@@ -570,7 +579,7 @@ Runme has two command modes with different capabilities:
 
 ### Run Commands
 
-```sh {"name":"cli-run-examples","excludeFromRunAll":"true","interactive":"false"}
+```sh {"name":"_example:cli-run","excludeFromRunAll":"true","interactive":"false"}
 # Run specific block
 runme run block-name
 
@@ -598,7 +607,7 @@ runme run --env-order=".env.prod,.env" block-name
 
 ### Beta Run Commands
 
-```sh {"name":"cli-beta-run","excludeFromRunAll":"true","interactive":"false"}
+```sh {"name":"_example:cli-beta-run","excludeFromRunAll":"true","interactive":"false"}
 # Run blocks with glob pattern (session persistence)
 runme beta run "setup-*"
 
@@ -617,7 +626,7 @@ runme beta run --filename=docs/BUILD.md "build-*"
 
 ### Beta Session
 
-```sh {"name":"cli-beta-session","excludeFromRunAll":"true"}
+```sh {"name":"_example:cli-beta-session","excludeFromRunAll":"true"}
 # Start interactive session shell
 # All exports persist until exit
 runme beta session
@@ -625,7 +634,7 @@ runme beta session
 
 ### List Commands
 
-```sh {"name":"cli-list-examples","excludeFromRunAll":"true","interactive":"false"}
+```sh {"name":"_example:cli-list","excludeFromRunAll":"true","interactive":"false"}
 # List all runnable blocks
 runme list
 
@@ -638,7 +647,7 @@ runme list --json
 
 ### TUI Mode
 
-```sh {"name":"cli-tui","excludeFromRunAll":"true"}
+```sh {"name":"_example:cli-tui","excludeFromRunAll":"true"}
 # Interactive terminal UI
 runme tui
 
@@ -648,7 +657,7 @@ runme tui --filename=docs/BUILD.md
 
 ### Environment Commands
 
-```sh {"name":"cli-env","excludeFromRunAll":"true","interactive":"false"}
+```sh {"name":"_example:cli-env","excludeFromRunAll":"true","interactive":"false"}
 # Show environment from session
 runme env
 
@@ -691,19 +700,19 @@ docker build -t myapp .
 ### 2. Use Tags for Workflows
 
 ````markdown
-```sh {"name":"install","tag":"setup"}
+```sh {"name":"_example:install","tag":"setup"}
 npm install
 ```
 
-```sh {"name":"build","tag":"build"}
+```sh {"name":"_example:build","tag":"build"}
 npm run build
 ```
 
-```sh {"name":"test","tag":"test,ci"}
+```sh {"name":"_example:test","tag":"test,ci"}
 npm test
 ```
 
-```sh {"name":"deploy","tag":"deploy"}
+```sh {"name":"_example:deploy","tag":"deploy"}
 kubectl apply -f k8s/
 ```
 ````
