@@ -19,7 +19,8 @@ in
     name = "taplo";
     runtimeInputs = [ pkgs.taplo ];
     text = ''
-      exec taplo --config "${configFile}/taplo.toml" "$@"
+      export TAPLO_CONFIG="${configFile}/taplo.toml"
+      exec taplo "$@"
     '';
   };
 
