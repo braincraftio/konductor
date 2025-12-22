@@ -17,6 +17,7 @@ in
   packages = with pkgs; [
     lazygit # Git TUI
     htop # Process monitor
+    btop
     bottom # System monitor (btm)
     bat # cat with syntax highlighting
     eza # Modern ls

@@ -13,7 +13,8 @@ result-*
 docker-bake.override.json
 *.qcow2
 !Dockerfile.qcow2
-core
+*.core
+core.[0-9]*
 
 # =============================================================================
 # Language Runtimes & Dependencies

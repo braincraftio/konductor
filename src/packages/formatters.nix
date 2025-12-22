@@ -19,6 +19,7 @@ in
       # Formatters without wrappers
       pkgs.gofumpt
       pkgs.nixpkgs-fmt
+      pkgs.stylua
       pkgs.black
       pkgs.isort
     ] else

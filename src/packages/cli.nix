@@ -28,6 +28,7 @@ in
   packages = shellTools ++ (with pkgs; [
     jq # JSON processor
     yq-go # YAML processor
+    sqlite # SQLite for snacks.picker frecency
     gh # GitHub CLI
     ripgrep # Fast grep (rg)
     fd # Fast find
