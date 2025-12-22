@@ -1,0 +1,196 @@
+# Konductor Starship Prompt
+#
+# Polyglot prompt for Python, Go, Node.js, Rust, Nix development.
+# Optimized for: containers, VMs, 9p mounts, kubernetes, pulumi workflows.
+#
+# Design principles:
+#   - Progressive disclosure: only show what's relevant
+#   - Performance: increased timeouts for network mounts
+#   - Actionable info: context/namespace, branch, status
+#   - Minimal noise: no redundant symbols or decorations
+
+"$schema" = "https://starship.rs/config-schema.json"
+
+scan_timeout = 1000
+command_timeout = 1000
+add_newline = true
+
+format = """
+$username$hostname$container$kubernetes$directory$git_branch$git_status$git_state\
+$python$golang$nodejs$rust$nix_shell$pulumi$docker_context\
+$cmd_duration$fill$jobs
+$character"""
+
+# Palette for consistent theming
+palette = "konductor"
+
+[palettes.konductor]
+kc_green = "#a6e3a1"
+kc_red = "#f38ba8"
+kc_blue = "#89b4fa"
+kc_yellow = "#f9e2af"
+kc_purple = "#cba6f7"
+kc_cyan = "#94e2d5"
+kc_orange = "#fab387"
+kc_gray = "#6c7086"
+
+# Input character
+[character]
+success_symbol = "[❯](bold kc_green)"
+error_symbol = "[❯](bold kc_red)"
+
+# Fill
+[fill]
+symbol = " "
+
+# Username
+[username]
+style_user = "kc_cyan"
+style_root = "bold kc_red"
+format = "[$user]($style)"
+show_always = false
+
+# Hostname
+[hostname]
+ssh_only = true
+format = "[@$hostname]($style) "
+style = "kc_cyan"
+
+# Container
+[container]
+format = "[$symbol]($style) "
+symbol = "⬢"
+style = "bold kc_blue"
+
+# Kubernetes
+[kubernetes]
+disabled = false
+format = "[$symbol$context(:$namespace)]($style) "
+symbol = "☸ "
+style = "kc_blue"
+detect_files = ["skaffold.yaml", "kustomization.yaml", "kustomization.yml", "helmfile.yaml"]
+detect_folders = ["charts", "helm", "k8s", "kubernetes", "kustomize"]
+detect_extensions = []
+
+# Directory
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+format = "[$path]($style)[$read_only]($read_only_style) "
+style = "bold kc_purple"
+read_only = " ro"
+read_only_style = "kc_red"
+
+# Git branch
+[git_branch]
+format = "[$symbol$branch(:$remote_branch)]($style) "
+symbol = " "
+style = "kc_green"
+truncation_length = 20
+truncation_symbol = "…"
+
+# Git status
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+style = "kc_yellow"
+conflicted = "="
+ahead = "⇡$count"
+behind = "⇣$count"
+diverged = "⇕"
+untracked = "?$count"
+stashed = "*$count"
+modified = "!$count"
+staged = "+$count"
+renamed = "»$count"
+deleted = "✘$count"
+ignore_submodules = true
+
+# Git state
+[git_state]
+format = "[$state( $progress_current/$progress_total)]($style) "
+style = "bold kc_orange"
+
+# Python
+[python]
+format = "[py$version( $virtualenv)]($style) "
+style = "kc_yellow"
+detect_extensions = ["py", "pyi"]
+detect_files = ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile", ".python-version"]
+
+# Go
+[golang]
+format = "[go$version]($style) "
+style = "kc_cyan"
+detect_extensions = ["go"]
+detect_files = ["go.mod", "go.sum", "go.work"]
+
+# Node.js
+[nodejs]
+format = "[node$version]($style) "
+style = "kc_green"
+detect_extensions = ["js", "mjs", "cjs", "ts", "mts", "cts"]
+detect_files = ["package.json", ".nvmrc", ".node-version"]
+not_capable_style = "kc_gray"
+
+# Rust
+[rust]
+format = "[rs$version]($style) "
+style = "kc_orange"
+detect_extensions = ["rs"]
+detect_files = ["Cargo.toml"]
+
+# Nix shell
+[nix_shell]
+format = "[$state( $name)]($style) "
+symbol = "❄"
+style = "kc_blue"
+impure_msg = "❄"
+pure_msg = "❄"
+unknown_msg = "❄"
+heuristic = true
+
+# Pulumi
+[pulumi]
+format = "[pulumi$stack]($style) "
+style = "kc_purple"
+search_upwards = true
+
+# Docker context
+[docker_context]
+format = "[docker:$context]($style) "
+style = "kc_blue"
+only_with_files = true
+detect_files = ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]
+
+# Command duration
+[cmd_duration]
+min_time = 2000
+format = "[$duration]($style) "
+style = "kc_gray"
+show_milliseconds = false
+
+# Background jobs
+[jobs]
+format = "[$symbol$number]($style) "
+symbol = "✦"
+style = "bold kc_yellow"
+number_threshold = 1
+
+# Disabled modules
+[aws]
+disabled = true
+
+[gcloud]
+disabled = true
+
+[azure]
+disabled = true
+
+[package]
+disabled = true
+
+[git_commit]
+disabled = true
+
+[git_metrics]
+disabled = true
