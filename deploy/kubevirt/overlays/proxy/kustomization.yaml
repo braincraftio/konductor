@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: konductor-vm-proxy
+
+# Inherit from base
+resources:
+  - ../../base
+
+# Override namespace
+namespace: konductor
+
+# Patches for proxy configuration
+patches:
+  - target:
+      kind: Secret
+      name: konductor-userdata
+    path: userdata.yaml
+
+# Common labels
+labels:
+  - pairs:
+      app.kubernetes.io/name: konductor
+      app.kubernetes.io/component: virtual-machine
+      app.kubernetes.io/part-of: konductor
+      app.kubernetes.io/variant: proxy
+    includeSelectors: false

@@ -57,6 +57,11 @@ spec:
         resources:
           requests:
             memory: 16Gi
+        # EFI boot with OVMF firmware (qcow-efi image uses proper GPT alignment)
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
         devices:
           autoattachPodInterface: false
           autoattachSerialConsole: true

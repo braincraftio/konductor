@@ -15,16 +15,23 @@ stringData:
     #cloud-config
     users:
       - name: kc2
-        uid: 1000
-        gecos: Konductor Unprivileged User
+        uid: 1001
+        gecos: Konductor User
         groups: users, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
         lock_passwd: true
       - name: kc2admin
-        gecos: Konductor Admin User
+        uid: 1002
+        gecos: Konductor Admin
         groups: users, wheel, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
         sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+      - name: runner
+        uid: 1003
+        gecos: CI/CD Runner
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
         lock_passwd: true
 
     write_files:

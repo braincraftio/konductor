@@ -25,8 +25,15 @@
 #   VNC:     virtctl vnc konductor -n konductor
 #
 # Users:
-#   kc2      - Unprivileged user (uid 1000)
-#   kc2admin - Privileged user with sudo access
+#   kc2      - Unprivileged user (uid 1001)
+#   kc2admin - Privileged user with sudo access (uid 1002)
+#   runner   - CI/CD runner user (uid 1003)
+#
+# Environment:
+#   Full Konductor toolchain pre-installed - no setup required.
+#   Languages: Python, Go, Node.js, Rust
+#   IDE: Neovim, tmux
+#   Tools: Docker, QEMU, libvirt, linters, formatters
 # =============================================================================
 ---
 apiVersion: v1
@@ -48,16 +55,23 @@ stringData:
     # -------------------------------------------------------------------------
     users:
       - name: kc2
-        uid: 1000
-        gecos: Konductor Unprivileged User
+        uid: 1001
+        gecos: Konductor User
         groups: users, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
         lock_passwd: true
       - name: kc2admin
-        gecos: Konductor Admin User
+        uid: 1002
+        gecos: Konductor Admin
         groups: users, wheel, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
         sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+      - name: runner
+        uid: 1003
+        gecos: CI/CD Runner
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
         lock_passwd: true
 
     # -------------------------------------------------------------------------
@@ -66,14 +80,12 @@ stringData:
     runcmd:
       - [systemctl, start, docker]
       - [systemctl, start, libvirtd]
-      # Pre-build the konductor devshell for faster first use
-      - [/run/current-system/sw/bin/nix, build, "github:containercraft/konductor#konductor", --no-link, --refresh]
 
     final_message: |
       ## template: jinja
       Cloud-Init: v{{version}} | Datasource: {{datasource}} | Boot: {{uptime}}s
       Access: ssh kc2@<IP> or ssh kc2admin@<IP>
-      Shell: nix develop github:containercraft/konductor#konductor
+      Ready: Full Konductor environment pre-installed
 ---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -109,6 +121,7 @@ spec:
                 users:
                   - kc2
                   - kc2admin
+                  - runner
       domain:
         cpu:
           cores: 2
@@ -123,6 +136,12 @@ spec:
           #   memory: 8Gi
         machine:
           type: q35
+        # EFI boot with OVMF firmware (qcow-efi image uses proper GPT alignment)
+        # secureBoot disabled - NixOS uses its own integrity mechanisms
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
         devices:
           autoattachSerialConsole: true
           autoattachGraphicsDevice: true

@@ -1,0 +1,65 @@
+# =============================================================================
+# User Data Patch - Corporate Proxy Configuration
+# =============================================================================
+# Configures HTTP/HTTPS proxy for environments behind corporate firewalls.
+# The proxy.env file is automatically sourced by:
+#   - nix-daemon (via konductor-proxy-setup.service)
+#   - Shell sessions (via /etc/profile.d/konductor-proxy.sh)
+#
+# Customize the proxy URLs and no_proxy list for your environment.
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: konductor-userdata
+stringData:
+  userdata: |
+    #cloud-config
+    users:
+      - name: kc2
+        uid: 1001
+        gecos: Konductor User
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        lock_passwd: true
+      - name: kc2admin
+        uid: 1002
+        gecos: Konductor Admin
+        groups: users, wheel, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+      - name: runner
+        uid: 1003
+        gecos: CI/CD Runner
+        groups: users, docker, libvirtd, kvm
+        shell: /run/current-system/sw/bin/bash
+        lock_passwd: true
+
+    write_files:
+      # Proxy configuration for nix-daemon and shell sessions
+      # Customize these values for your corporate proxy
+      - path: /etc/konductor/proxy.env
+        content: |
+          # Corporate proxy configuration
+          # Customize these values for your environment
+          http_proxy=http://proxy.example.com:8080
+          https_proxy=http://proxy.example.com:8080
+          HTTP_PROXY=http://proxy.example.com:8080
+          HTTPS_PROXY=http://proxy.example.com:8080
+          # Bypass proxy for internal networks
+          no_proxy=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.example.com
+          NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.example.com
+        permissions: '0644'
+
+    runcmd:
+      # Restart nix-daemon to pick up proxy configuration
+      - [systemctl, restart, nix-daemon]
+      - [systemctl, start, docker]
+
+    final_message: |
+      ## template: jinja
+      Cloud-Init: v{{version}} | Datasource: {{datasource}} | Boot: {{uptime}}s
+      Proxy: Configured via /etc/konductor/proxy.env
+      Access: ssh kc2@<IP> or ssh kc2admin@<IP>
+      Shell: nix develop /opt/konductor#konductor --offline
