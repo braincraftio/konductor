@@ -28,8 +28,8 @@
     qemu-utils
     libvirt
     virt-manager
-    guestfs-tools  # guestmount, virt-sparsify
-    OVMF           # EFI firmware for QEMU
+    guestfs-tools # guestmount, virt-sparsify
+    OVMF # EFI firmware for QEMU
 
     # Cloud-init ISO creation
     cdrkit

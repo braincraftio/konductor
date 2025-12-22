@@ -11,8 +11,8 @@
   #   - flake.nix: nixpkgs.url and nixvim.url branches
   #   - src/qcow2/default.nix: system.stateVersion
   nixos = {
-    channel = "25.11";       # NixOS release channel (e.g., "25.11", "24.11")
-    stateVersion = "25.11";  # NixOS stateVersion for VMs
+    channel = "25.11"; # NixOS release channel (e.g., "25.11", "24.11")
+    stateVersion = "25.11"; # NixOS stateVersion for VMs
   };
 
   # ===========================================================================

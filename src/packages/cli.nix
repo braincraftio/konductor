@@ -11,16 +11,17 @@ let
 
   # Shell tools: wrapped when config available, unwrapped otherwise
   # All wrappers from src/config/shell/
-  shellTools = if hasConfig then [
-    config.shell.git.package      # Git with forced Konductor gitconfig
-    config.shell.ssh.package      # SSH with KONDUCTOR_SSH_CONFIG support
-    config.shell.starship.package # Starship with Konductor theme
-    # Note: bash.package is not included here - it's used via shellHook/bashrcContent
-  ] else [
-    pkgs.git
-    pkgs.openssh
-    pkgs.starship
-  ];
+  shellTools =
+    if hasConfig then [
+      config.shell.git.package # Git with forced Konductor gitconfig
+      config.shell.ssh.package # SSH with KONDUCTOR_SSH_CONFIG support
+      config.shell.starship.package # Starship with Konductor theme
+      # Note: bash.package is not included here - it's used via shellHook/bashrcContent
+    ] else [
+      pkgs.git
+      pkgs.openssh
+      pkgs.starship
+    ];
 in
 
 {

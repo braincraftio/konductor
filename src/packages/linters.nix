@@ -27,8 +27,8 @@ in
       pkgs.statix
       pkgs.deadnix
     ] else
-      # ERROR: config must be provided for wrapped linters
-      # Unwrapped linters violate hermetic configuration standards
+    # ERROR: config must be provided for wrapped linters
+    # Unwrapped linters violate hermetic configuration standards
       throw "linters.nix requires config parameter - unwrapped linters are not permitted";
 
   shellHook = "";

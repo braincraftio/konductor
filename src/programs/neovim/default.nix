@@ -75,9 +75,9 @@ let
       # Treesitter-based folding
       foldmethod = "expr";
       foldexpr = "v:lua.vim.treesitter.foldexpr()";
-      foldcolumn = "0";      # Hide fold column
-      foldlevel = 99;        # Start with all folds open
-      foldlevelstart = 99;   # Start with all folds open
+      foldcolumn = "0"; # Hide fold column
+      foldlevel = 99; # Start with all folds open
+      foldlevelstart = 99; # Start with all folds open
       foldenable = true;
     };
 
@@ -394,8 +394,8 @@ let
             # === Preview configuration ===
             preview = {
               treesitter = true;
-              filesize_limit = 1;      # MB - disable preview for large files
-              timeout = 250;           # ms
+              filesize_limit = 1; # MB - disable preview for large files
+              timeout = 250; # ms
             };
 
             # === Keymaps within telescope ===
@@ -577,7 +577,7 @@ let
           "<leader>f'" = "resume";
           "<leader>fp" = "pickers";
           "<leader>fB" = "builtin";
-          "<leader>fZ" = "treesitter";  # Syntax tree (fz = fuzzy treesitter)
+          "<leader>fZ" = "treesitter"; # Syntax tree (fz = fuzzy treesitter)
           "<leader>fS" = "spell_suggest";
         };
 
@@ -602,10 +602,36 @@ let
         nixGrammars = true;
         # Specify grammars via nix - these are installed at build time
         grammarPackages = with pkgs.vimPlugins.nvim-treesitter.builtGrammars; [
-          bash c cpp css dockerfile go gomod gosum
-          html http javascript json jsonc lua luadoc
-          make markdown markdown_inline nix python query regex rust
-          toml tsx typescript vim vimdoc xml yaml
+          bash
+          c
+          cpp
+          css
+          dockerfile
+          go
+          gomod
+          gosum
+          html
+          http
+          javascript
+          json
+          jsonc
+          lua
+          luadoc
+          make
+          markdown
+          markdown_inline
+          nix
+          python
+          query
+          regex
+          rust
+          toml
+          tsx
+          typescript
+          vim
+          vimdoc
+          xml
+          yaml
           # norg - not in builtGrammars, only needed for neorg users
         ];
         settings = {
@@ -621,9 +647,9 @@ let
           incremental_selection = {
             enable = true;
             keymaps = {
-              init_selection = "<C-space>";    # Start selection
-              node_incremental = "<C-space>";  # Expand to larger node
-              scope_incremental = "<C-s>";     # Expand to scope
+              init_selection = "<C-space>"; # Start selection
+              node_incremental = "<C-space>"; # Expand to larger node
+              scope_incremental = "<C-s>"; # Expand to scope
               node_decremental = "<C-backspace>"; # Shrink selection
             };
           };
@@ -1120,7 +1146,7 @@ let
           # Format on save configuration
           format_on_save = {
             timeout_ms = 1000;
-            lsp_format = "fallback";  # Use LSP if no formatter available
+            lsp_format = "fallback"; # Use LSP if no formatter available
             quiet = false;
           };
 
@@ -1132,12 +1158,12 @@ let
 
           # Notifications
           notify_on_error = true;
-          notify_no_formatters = false;  # Don't spam when no formatters
+          notify_no_formatters = false; # Don't spam when no formatters
 
           # Formatter-specific customizations
           formatters = {
             shfmt = {
-              prepend_args = [ "-i" "2" "-ci" "-bn" ];  # 2-space indent, case indent, binary newline
+              prepend_args = [ "-i" "2" "-ci" "-bn" ]; # 2-space indent, case indent, binary newline
             };
             prettier = {
               prepend_args = [ "--prose-wrap" "always" ];
@@ -1284,7 +1310,7 @@ let
         enable = true;
         settings = {
           # Timing
-          delay = 300;  # Show popup after 300ms
+          delay = 300; # Show popup after 300ms
 
           # Icons
           icons = {
@@ -1292,8 +1318,8 @@ let
             separator = "➜";
             group = "+";
             ellipsis = "…";
-            mappings = true;  # Enable icons for mappings
-            colors = true;    # Use highlight colors
+            mappings = true; # Enable icons for mappings
+            colors = true; # Use highlight colors
             keys = {
               Up = " ";
               Down = " ";
@@ -1343,20 +1369,20 @@ let
 
           # Built-in plugins
           plugins = {
-            marks = true;      # Shows marks on ' and `
-            registers = true;  # Shows registers on " and <C-r>
+            marks = true; # Shows marks on ' and `
+            registers = true; # Shows registers on " and <C-r>
             spelling = {
               enabled = true;
               suggestions = 20;
             };
             presets = {
-              operators = true;     # Help for operators like d, y, c
-              motions = true;       # Help for motions
-              text_objects = true;  # Help for text objects (a, i)
-              windows = true;       # Help for window commands <C-w>
-              nav = true;           # Help for navigation
-              z = true;             # Help for z commands (folds, spelling)
-              g = true;             # Help for g commands
+              operators = true; # Help for operators like d, y, c
+              motions = true; # Help for motions
+              text_objects = true; # Help for text objects (a, i)
+              windows = true; # Help for window commands <C-w>
+              nav = true; # Help for navigation
+              z = true; # Help for z commands (folds, spelling)
+              g = true; # Help for g commands
             };
           };
 
