@@ -39,6 +39,30 @@ convenience and architecture over ad-hoc scripting.
 
 ## Quick Start
 
+### Local VM Development (Recommended)
+
+The canonical path for Konductor development uses a local NixOS VM with your repo mounted at `/workspace`:
+
+```bash
+# Clone and symlink
+gh repo clone braincraftio/konductor ~/Git/github.com/braincraftio/konductor
+ln -s ~/Git/github.com/braincraftio/konductor ~/.konductor
+cd ~/.konductor
+
+# Enter devshell and deploy VM
+nix develop .#konductor
+runme run nix-build-qcow2-deploy
+
+# SSH to VM (repo mounted at /workspace)
+ssh localhost
+cd /workspace && nix develop .#konductor
+```
+
+Inside the VM:
+- `/workspace` = your host repo (9p mount, live sync)
+- Full docker/qemu/libvirt available for nested builds
+- Changes persist to host immediately
+
 ### Prerequisites
 
 Konductor requires [Lix](https://lix.systems/) (a Nix variant) with flakes enabled.
@@ -241,12 +265,22 @@ Excludes: Language runtimes (use `nix develop konductor#{python,go}` inside)
 NixOS 25.11 virtual machine images for cloud deployment with cloud-init support for AWS, GCP, Azure,
 and OpenStack provisioning.
 
-**Build image and create cloud-init ISO:**
+**Quick deploy (recommended):**
 
 ```bash
 # Ensure KVM access (one-time setup)
 sudo usermod -aG kvm $USER && newgrp kvm
+
+# Deploy VM and SSH (from konductor devshell)
+runme run nix-build-qcow2-deploy
+ssh localhost
 ```
+
+The devshell configures SSH automatically - no manual config needed. Your SSH key is detected
+and injected via cloud-init, and `ssh localhost` just works.
+
+<details>
+<summary><b>Manual build steps</b></summary>
 
 ```bash
 # Build image and create cloud-init ISO
@@ -288,7 +322,13 @@ qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
 
 **SSH Configuration:**
 
-Add to `~/.ssh/config` for easy access:
+When using the devshell, SSH is configured automatically via hermetic config at `/tmp/konductor-ssh/config`.
+Just run `ssh localhost` - no manual configuration needed.
+
+<details>
+<summary><b>Manual SSH config (for use outside devshell)</b></summary>
+
+Add to `~/.ssh/config` for access without devshell:
 
 ```bash
 cat >> ~/.ssh/config << EOF
@@ -319,6 +359,8 @@ ssh -p 2222 kc2@localhost
 # SSH with sudo access
 ssh -p 2222 kc2admin@localhost
 ```
+
+</details>
 
 SSH sessions automatically enter the default devshell (uses `/workspace` if mounted, otherwise
 `nix develop konductor`).
@@ -366,6 +408,8 @@ cd /workspace && nix develop konductor#konductor
 - Virtio drivers for disk, network, balloon, RNG, and 9p
 
 **Use cases:** KVM, libvirt, Proxmox, cloud orchestration platforms
+
+</details>
 
 #### System Modules
 

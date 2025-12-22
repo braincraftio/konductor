@@ -24,6 +24,9 @@ project:
     - "*.qcow2.tmp"
     - .git
     - .claude
+    - "docs/TASKS.*"
+    - "docs/*.md"
+    - "!docs/developer_guide/**"
 
   # Respect .gitignore files (default: true)
   disable_gitignore: false
