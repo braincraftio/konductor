@@ -4,7 +4,7 @@
 # Config is maintained in native format (.bashrc) for easy contribution.
 # This follows the same pattern as markdownlint-cli2 wrapper.
 
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 let
   # Config file - native bashrc, copied directly to nix store

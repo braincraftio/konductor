@@ -22,7 +22,7 @@
 
 let
   langs = versions.languages;
-  konductor = packages.konductor;
+  inherit (packages) konductor;
 in
 
 baseShell.overrideAttrs (old: {

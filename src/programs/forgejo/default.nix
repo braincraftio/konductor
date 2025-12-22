@@ -10,13 +10,13 @@
 #   CI runners: Include in ci devshell for self-hosted CI/CD
 #   Development: forgejo-cli for API interactions
 
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 let
   # Forgejo packages from nixpkgs
-  forgejoServer = pkgs.forgejo;       # v13.x - current stable
+  forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoRunner = pkgs.forgejo-runner; # v11.x - act-based runner
-  forgejoCli = pkgs.forgejo-cli;       # v0.3.x - API CLI
+  forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
 in
 {

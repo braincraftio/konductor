@@ -273,20 +273,17 @@ let
     {
       path = homeDirectories;
       regex = ".*/home/kc2(/.*)?$";
-      uid = users.kc2.uid;
-      gid = users.kc2.gid;
+      inherit (users.kc2) uid gid;
     }
     {
       path = homeDirectories;
       regex = ".*/home/kc2admin(/.*)?$";
-      uid = users.kc2admin.uid;
-      gid = users.kc2admin.gid;
+      inherit (users.kc2admin) uid gid;
     }
     {
       path = homeDirectories;
       regex = ".*/home/runner(/.*)?$";
-      uid = users.runner.uid;
-      gid = users.runner.gid;
+      inherit (users.runner) uid gid;
     }
     {
       path = homeDirectories;

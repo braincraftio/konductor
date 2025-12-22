@@ -9,7 +9,7 @@
 #   - Actionable info: context/namespace, branch, status
 #   - Minimal noise: no redundant symbols or decorations
 
-"$schema" = "https://starship.rs/config-schema.json"
+"$schema" = "https://raw.githubusercontent.com/starship/starship/master/.github/config-schema.json"
 
 scan_timeout = 1000
 command_timeout = 1000
@@ -68,7 +68,12 @@ disabled = false
 format = "[$symbol$context(:$namespace)]($style) "
 symbol = "☸ "
 style = "kc_blue"
-detect_files = ["skaffold.yaml", "kustomization.yaml", "kustomization.yml", "helmfile.yaml"]
+detect_files = [
+  "skaffold.yaml",
+  "kustomization.yaml",
+  "kustomization.yml",
+  "helmfile.yaml",
+]
 detect_folders = ["charts", "helm", "k8s", "kubernetes", "kustomize"]
 detect_extensions = []
 
@@ -115,7 +120,13 @@ style = "bold kc_orange"
 format = "[py$version( $virtualenv)]($style) "
 style = "kc_yellow"
 detect_extensions = ["py", "pyi"]
-detect_files = ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile", ".python-version"]
+detect_files = [
+  "pyproject.toml",
+  "requirements.txt",
+  "setup.py",
+  "Pipfile",
+  ".python-version",
+]
 
 # Go
 [golang]
@@ -160,7 +171,13 @@ search_upwards = true
 format = "[docker:$context]($style) "
 style = "kc_blue"
 only_with_files = true
-detect_files = ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]
+detect_files = [
+  "Dockerfile",
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yml",
+  "compose.yaml",
+]
 
 # Command duration
 [cmd_duration]

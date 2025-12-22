@@ -284,7 +284,8 @@ execute_git_across_repos() {
     local git_cmd="${1:-status}"
     shift
 
-    # Define the execution function
+    # Define the execution function (invoked indirectly via execute_across_repos)
+    # shellcheck disable=SC2329
     _git_executor() {
         local repo_name="${1:-}"
         local repo_path="${2:-}"
