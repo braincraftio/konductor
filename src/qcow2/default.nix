@@ -1,19 +1,25 @@
 # src/qcow2/default.nix
 # QCOW2 VM build using nixos-generators
 #
-# Services installed but not auto-started (lean boot).
-# Self-hosting tools fetched on-demand via: nix develop konductor#konductor
+# Full konductor environment pre-installed for immediate productivity.
+# SSH in and start working - no additional setup required.
 #
-# Cloud-init workflow:
-#   1. Start services: systemctl start docker libvirtd
-#   2. Enter devshell: nix develop konductor#konductor
+# Includes:
+#   - All languages (Python, Go, Node, Rust)
+#   - IDE tools (Neovim, tmux)
+#   - Self-hosting tools (Docker, QEMU, libvirt)
+#   - Linters, formatters, AI tools
+#
+# Services installed but not auto-started (lean boot).
+# Start via cloud-init or: systemctl start docker libvirtd
 
-{ pkgs, lib, nixos-generators, system, ... }:
+{ pkgs, lib, nixos-generators, system, versions, programs, ... }:
 
 let
-  versions = import ../lib/versions.nix;
   users = import ../lib/users.nix;
   env = import ../lib/env.nix;
+  shellContent = import ../lib/shell-content.nix { inherit lib; };
+  langs = versions.languages;
 
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
@@ -24,12 +30,18 @@ let
     inherit pkgs lib versions config;
   };
 
+  # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
+  konductor = devshellPackages.konductor;
+
 in
 {
   # QCOW2 VM image
+  # Use qcow-efi for proper 4K partition alignment (ESP starts at 8MiB)
+  # The "qcow" format uses hybrid partition table with BIOS partition at sector 0,
+  # which causes alignment warnings and suboptimal I/O on Ceph RBD.
   image = nixos-generators.nixosGenerate {
     inherit system;
-    format = "qcow";
+    format = "qcow-efi";
     # Note: copyChannel is not exposed by nixos-generators wrapper
     # Channel copy prevented via installer.cloneConfig = false below
     modules = [
@@ -74,7 +86,7 @@ in
           isNormalUser = true;
           inherit (users.kc2) uid home;
           description = users.kc2.gecos;
-          extraGroups = [ "wheel" "docker" "libvirtd" "kvm" ];
+          extraGroups = [ "docker" "libvirtd" "kvm" ];
         };
 
         users.users.kc2admin = {
@@ -84,26 +96,63 @@ in
           extraGroups = [ "wheel" "docker" "libvirtd" "kvm" ];
         };
 
-        # Sudo without password
+        users.users.runner = {
+          isNormalUser = true;
+          inherit (users.runner) uid home;
+          description = users.runner.gecos;
+          extraGroups = [ "docker" "libvirtd" "kvm" ];
+        };
+
+        # Sudo without password for wheel group
         security.sudo.wheelNeedsPassword = false;
 
-        # Direnv for automatic flake loading
+        # Runner sudoers for docker and nix commands (CI/CD builds)
+        security.sudo.extraRules = [
+          {
+            users = [ "runner" ];
+            commands = [
+              { command = "/run/current-system/sw/bin/docker"; options = [ "NOPASSWD" ]; }
+              { command = "/run/current-system/sw/bin/nix"; options = [ "NOPASSWD" ]; }
+              { command = "/run/current-system/sw/bin/nix-build"; options = [ "NOPASSWD" ]; }
+              { command = "/run/current-system/sw/bin/nix-shell"; options = [ "NOPASSWD" ]; }
+              { command = "/run/current-system/sw/bin/nix-env"; options = [ "NOPASSWD" ]; }
+              { command = "/run/current-system/sw/bin/nixos-rebuild"; options = [ "NOPASSWD" ]; }
+            ];
+          }
+        ];
+
+        # Direnv for automatic flake loading with trusted paths
         programs.direnv = {
           enable = true;
           nix-direnv.enable = true;
+          # Auto-trust .envrc in these locations (writes to /etc/direnv/direnv.toml)
+          settings = {
+            whitelist = {
+              prefix = [ "~" "/opt/konductor" "/workspace" "/home" ];
+            };
+          };
         };
 
-        # /etc/skel/.envrc - copied to new user home directories
-        # Auto-loads flake offline and picks up .env for secrets (KubeVirt secret mounts)
-        environment.etc."skel/.envrc".text = ''
-          # Konductor airgap configuration
-          # Loads pre-cached flake from /opt/konductor (offline mode)
-          use flake /opt/konductor --offline
+        # =====================================================================
+        # /etc/skel - Shell Configuration (copied to new user home dirs)
+        # =====================================================================
+        # Same shell experience as devshell and OCI container
+        environment.etc."skel/.bashrc".text = shellContent.bashrcContentStandalone;
+        environment.etc."skel/.bash_profile".text = shellContent.bashProfileContent;
+        environment.etc."skel/.inputrc".text = shellContent.inputrcContent;
+        environment.etc."skel/.gitconfig".text = shellContent.gitconfigContent;
+        environment.etc."skel/.config/starship.toml".text = config.shell.starship.configContent;
 
-          # Load secrets from .env (supports KubeVirt secret mounts)
+        # /etc/skel/.envrc - for project .env files only (packages pre-installed)
+        environment.etc."skel/.envrc".text = ''
+          # Konductor VM - all packages pre-installed system-wide
+          # This .envrc is for project-specific env vars only
           dotenv_if_exists .env
           dotenv_if_exists "$HOME/.env"
         '';
+
+        # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
+        # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
 
         # /etc/profile.d/konductor-proxy.sh - sources proxy env for shell sessions
         # Cloud-init writes /etc/konductor/proxy.env, this script sources it
@@ -116,9 +165,68 @@ in
           fi
         '';
 
-        # Packages: devshell defaults + essentials
-        # Self-hosting tools (docker, qemu, libvirt) via: nix develop konductor#konductor
+        # /etc/profile.d/konductor-env.sh - sets up language paths and tools
+        # This ensures all users get the full konductor experience on login
+        environment.etc."profile.d/konductor-env.sh".text = ''
+          # =====================================================================
+          # Konductor Environment Setup
+          # =====================================================================
+          # Copy shell configs from /etc/skel if missing (first login setup)
+          # Use -L to dereference symlinks (nix store files are read-only)
+          if [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ]; then
+            cp -L /etc/skel/.bashrc "$HOME/"
+            cp -L /etc/skel/.bash_profile "$HOME/" 2>/dev/null || true
+            cp -L /etc/skel/.inputrc "$HOME/" 2>/dev/null || true
+            cp -L /etc/skel/.gitconfig "$HOME/" 2>/dev/null || true
+            mkdir -p "$HOME/.config"
+            cp -L /etc/skel/.config/starship.toml "$HOME/.config/" 2>/dev/null || true
+          fi
+          # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
+
+          # Language paths
+          export GOPATH="''${GOPATH:-$HOME/go}"
+          export GOBIN="$GOPATH/bin"
+          export PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
+          export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
+
+          # Create directories if they don't exist
+          mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg" 2>/dev/null || true
+          mkdir -p "$PNPM_HOME" 2>/dev/null || true
+          mkdir -p "$CARGO_HOME" 2>/dev/null || true
+
+          # Update PATH with language bin directories
+          export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
+
+          # Python venv activation (if exists in current directory)
+          if [ -d .venv ]; then
+            source .venv/bin/activate 2>/dev/null || true
+          fi
+
+          # Neovim configuration
+          ${programs.neovim.shellHook}
+
+          # Tmux configuration
+          ${programs.tmux.shellHook}
+        '';
+
+        # =====================================================================
+        # Full Konductor Package Set
+        # =====================================================================
+        # Complete konductor devshell packages pre-installed for immediate use.
+        # SSH in and start working - no `nix develop` required.
         environment.systemPackages = devshellPackages.default
+          # All languages
+          ++ devshellPackages.pythonPackages
+          ++ devshellPackages.goPackages
+          ++ devshellPackages.nodejsPackages
+          ++ devshellPackages.rustPackages
+          # IDE tools (neovim + tmux from programs)
+          ++ programs.neovim.packages
+          ++ programs.tmux.packages
+          ++ devshellPackages.idePackages
+          # Self-hosting tools (docker, qemu, libvirt, etc.)
+          ++ konductor.packages
+          # Essentials
           ++ (with pkgs; [
             git
             gh
@@ -126,8 +234,26 @@ in
             cachix
           ]);
 
-        # Environment variables from centralized configuration
-        environment.variables = lib.mapAttrs (_name: value: lib.mkForce value) env;
+        # =====================================================================
+        # Environment Variables
+        # =====================================================================
+        # Includes base env + language-specific + konductor settings
+        environment.variables = lib.mapAttrs (_name: value: lib.mkForce value) (env // {
+          # Python
+          UV_SYSTEM_PYTHON = "1";
+          PYTHONDONTWRITEBYTECODE = "1";
+          # Go
+          GO111MODULE = "on";
+          CGO_ENABLED = "1";
+          # Node
+          NODE_ENV = "development";
+          # Rust
+          RUST_BACKTRACE = "1";
+          # Docker
+          DOCKER_BUILDKIT = "1";
+          # Konductor
+          KONDUCTOR_SHELL = "konductor";
+        });
 
         # Services configuration
         services = {
@@ -266,6 +392,46 @@ in
         # Disk size for VM
         virtualisation.diskSize = lib.mkDefault (20 * 1024); # 20GB (lean image)
 
+        # Use latest kernel for best hardware support and security
+        boot.kernelPackages = pkgs.linuxPackages_latest;
+
+        # =====================================================================
+        # Storage Optimization for Ceph RBD Block Devices
+        # =====================================================================
+        # Aligned for 4KB Ceph BlueStore allocation (bluestore_min_alloc_size_ssd)
+        # See: Pulumi.optiplex-rook-ceph.yaml ceph_config_override
+
+        # I/O scheduler: none for virtio-blk (Ceph handles its own scheduling)
+        boot.kernelParams = [
+          "elevator=none"
+          "scsi_mod.use_blk_mq=1"
+        ];
+
+        # Filesystem mount options optimized for Ceph RBD
+        fileSystems."/" = {
+          options = [
+            "noatime"         # Reduce metadata writes
+            "nodiratime"      # Reduce directory access time updates
+            "discard"         # TRIM/unmap for thin provisioning
+            "commit=60"       # Increase journal commit interval (seconds)
+          ];
+        };
+
+        # Kernel tuning for block I/O on Ceph
+        boot.kernel.sysctl = {
+          # Writeback tuning - larger dirty buffers for batch writes
+          "vm.dirty_ratio" = 40;
+          "vm.dirty_background_ratio" = 10;
+          "vm.dirty_expire_centisecs" = 3000;
+          "vm.dirty_writeback_centisecs" = 500;
+
+          # Reduce swappiness (prefer keeping pages in memory)
+          "vm.swappiness" = 10;
+
+          # Increase readahead for sequential I/O (matches rbd_readahead_max_bytes)
+          "vm.vfs_cache_pressure" = 50;
+        };
+
         # Virtio drivers for performance
         boot.initrd.availableKernelModules = [
           "virtio_net"
@@ -296,8 +462,8 @@ in
               "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
             ];
           };
-          # Pre-configured flake registry
-          # Usage: nix develop konductor#konductor
+          # Pre-configured flake registry for updates/customization
+          # All tools pre-installed - this registry is for advanced use
           registry.konductor = {
             from = { type = "indirect"; id = "konductor"; };
             to = { type = "github"; owner = "braincraftio"; repo = "konductor"; };

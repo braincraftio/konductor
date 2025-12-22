@@ -48,6 +48,7 @@ let
     nobody:x:65534:65534:Nobody:/nonexistent:/sbin/nologin
     kc2:x:${toString users.kc2.uid}:${toString users.kc2.gid}:${users.kc2.gecos}:${users.kc2.home}:${users.kc2.shell}
     kc2admin:x:${toString users.kc2admin.uid}:${toString users.kc2admin.gid}:${users.kc2admin.gecos}:${users.kc2admin.home}:${users.kc2admin.shell}
+    runner:x:${toString users.runner.uid}:${toString users.runner.gid}:${users.runner.gecos}:${users.runner.home}:${users.runner.shell}
     ${nixbldPasswdEntries}'';
 
   # Generate nixbld group members list
@@ -56,9 +57,13 @@ let
   groupFile = pkgs.writeTextDir "etc/group" ''
     root:x:0:
     wheel:x:10:kc2admin
+    docker:x:999:kc2,kc2admin,runner
+    libvirtd:x:998:kc2,kc2admin,runner
+    kvm:x:997:kc2,kc2admin,runner
     nobody:x:65534:
-    kc2:x:${toString users.kc2.gid}:kc2admin
-    kc2admin:x:${toString users.kc2admin.gid}:
+    kc2:x:${toString users.kc2.gid}:
+    kc2admin:x:${toString users.kc2admin.gid}:kc2
+    runner:x:${toString users.runner.gid}:
     nixbld:x:${toString nixbld.gid}:${nixbldMembers}
   '';
 
@@ -67,14 +72,19 @@ let
     nobody:!:1::::::
     kc2:!:1::::::
     kc2admin:!:1::::::
+    runner:!:1::::::
     ${nixbldShadowEntries}'';
 
   gshadowFile = pkgs.writeTextDir "etc/gshadow" ''
     root:x::
     wheel:x::kc2admin
+    docker:x::kc2,kc2admin,runner
+    libvirtd:x::kc2,kc2admin,runner
+    kvm:x::kc2,kc2admin,runner
     nobody:x::
     kc2:x::
     kc2admin:x::
+    runner:x::
     nixbld:x::${nixbldMembers}
   '';
 
@@ -82,6 +92,8 @@ let
     # Konductor sudoers configuration
     kc2admin ALL=(ALL:ALL) NOPASSWD: ALL
     %wheel ALL=(ALL:ALL) NOPASSWD: ALL
+    # Runner CI/CD permissions for docker and nix
+    runner ALL=(ALL) NOPASSWD: /bin/docker, /bin/nix, /bin/nix-build, /bin/nix-shell, /bin/nix-env
   '';
 
   nsswitchFile = pkgs.writeTextDir "etc/nsswitch.conf" ''
@@ -139,7 +151,7 @@ let
     EOF
 
         cat > $out/etc/skel/.config/starship.toml <<'EOF'
-    ${shellContent.starshipConfigContent}
+    ${config.shell.starship.configContent}
     EOF
 
         chmod 644 $out/etc/skel/.bashrc $out/etc/skel/.bash_profile $out/etc/skel/.inputrc $out/etc/skel/.gitconfig
@@ -153,9 +165,10 @@ let
   homeDirectories = pkgs.runCommand "home-directories" { } ''
     mkdir -p $out/home/kc2/.config $out/home/kc2/.cache/starship $out/home/kc2/.local/share $out/home/kc2/.local/state $out/home/kc2/.local/bin
     mkdir -p $out/home/kc2admin/.config $out/home/kc2admin/.cache/starship $out/home/kc2admin/.local/share $out/home/kc2admin/.local/state $out/home/kc2admin/.local/bin
+    mkdir -p $out/home/runner/.config $out/home/runner/.cache/starship $out/home/runner/.local/share $out/home/runner/.local/state $out/home/runner/.local/bin
     mkdir -p $out/root/.cache/starship
 
-    for user in kc2 kc2admin; do
+    for user in kc2 kc2admin runner; do
       cp ${skelFiles}/etc/skel/.bashrc $out/home/$user/
       cp ${skelFiles}/etc/skel/.bash_profile $out/home/$user/
       cp ${skelFiles}/etc/skel/.inputrc $out/home/$user/
@@ -166,7 +179,7 @@ let
     cp ${skelFiles}/etc/skel/.bashrc $out/root/
     cp ${skelFiles}/etc/skel/.bash_profile $out/root/
 
-    chmod -R u+rwX,go+rX $out/home/kc2 $out/home/kc2admin $out/root
+    chmod -R u+rwX,go+rX $out/home/kc2 $out/home/kc2admin $out/home/runner $out/root
   '';
 
   # Standard directories
@@ -260,14 +273,20 @@ let
     {
       path = homeDirectories;
       regex = ".*/home/kc2(/.*)?$";
-      uid = 1000;
-      gid = 1000;
+      uid = users.kc2.uid;
+      gid = users.kc2.gid;
     }
     {
       path = homeDirectories;
       regex = ".*/home/kc2admin(/.*)?$";
-      uid = 1001;
-      gid = 1001;
+      uid = users.kc2admin.uid;
+      gid = users.kc2admin.gid;
+    }
+    {
+      path = homeDirectories;
+      regex = ".*/home/runner(/.*)?$";
+      uid = users.runner.uid;
+      gid = users.runner.gid;
     }
     {
       path = homeDirectories;
