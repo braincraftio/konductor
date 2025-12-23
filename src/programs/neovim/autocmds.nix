@@ -220,15 +220,16 @@
           vim.opt_local.number = false
           vim.opt_local.relativenumber = false
           vim.opt_local.signcolumn = "no"
-          -- Clean up terminal buffer name for bufferline
-          vim.schedule(function()
-            if vim.api.nvim_buf_is_valid(event.buf) then
-              local name = vim.api.nvim_buf_get_name(event.buf)
-              if name:match("^term://") then
-                pcall(vim.api.nvim_buf_set_name, event.buf, "Terminal")
-              end
-            end
-          end)
+          -- NOTE: Buffer rename disabled - conflicts with bufferline name_formatter
+          -- that shows cwd. Re-enable if needed for specific use case.
+          -- vim.schedule(function()
+          --   if vim.api.nvim_buf_is_valid(event.buf) then
+          --     local name = vim.api.nvim_buf_get_name(event.buf)
+          --     if name:match("^term://") then
+          --       pcall(vim.api.nvim_buf_set_name, event.buf, "Terminal")
+          --     end
+          --   end
+          -- end)
         end
       '';
     }

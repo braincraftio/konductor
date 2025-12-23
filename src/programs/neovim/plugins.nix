@@ -42,14 +42,44 @@ in
           enabled = true;
           width = 62;
 
-          # Formatters for file/project sections (keys use custom text)
+          # Formatters - consistent widths for vertical alignment
+          # Layout: icon(2) + file/desc(57) + key(3) = 62 (full dashboard width)
           formats = {
+            # Icons: Always width=2 for alignment (don't use Snacks.dashboard.icon)
             icon.__raw = ''
               function(item)
-                if item.file and (item.icon == "file" or item.icon == "directory") then
-                  return Snacks.dashboard.icon(item.file, item.icon)
+                local icon_char = item.icon or ""
+                -- Get icon for files/directories
+                if item.file then
+                  local mini_icons_ok, mini_icons = pcall(require, "mini.icons")
+                  if mini_icons_ok then
+                    icon_char = mini_icons.get("file", item.file) or ""
+                  end
                 end
-                return { item.icon or "", width = 2, hl = "SnacksDashboardIcon" }
+                return { icon_char .. " ", width = 2, hl = "SnacksDashboardIcon" }
+              end
+            '';
+            # File paths: fixed width=57 to align with desc column
+            file.__raw = ''
+              function(item, ctx)
+                local fname = item.file and vim.fn.fnamemodify(item.file, ":~") or ""
+                if #fname > 57 then
+                  fname = "…" .. fname:sub(-56)
+                end
+                return { fname, width = 57, hl = "SnacksDashboardFile" }
+              end
+            '';
+            # Keys: bracket style [k] - clean, no box
+            key.__raw = ''
+              function(item)
+                if item.key then
+                  return {
+                    { "[", hl = "SnacksDashboardSpecial" },
+                    { item.key, hl = "SnacksDashboardKey" },
+                    { "]", hl = "SnacksDashboardSpecial" },
+                  }
+                end
+                return { { "", width = 3 } }
               end
             '';
           };
@@ -58,7 +88,7 @@ in
             header = "${banner.full}";
 
             # Dashboard keys - columnar layout matching Projects/Recent sections
-            # Layout: | icon (3) | description centered (50) | key (3) | = 56 chars
+            # Layout: | icon (2) | description centered (57) | [k] (3) | = 62 chars (full width)
             keys = [
               # AI-first workflow (v for vibe coding) - opens AI menu
               {
@@ -70,29 +100,29 @@ in
                     require('which-key').show({ keys = '<leader>v', loop = true })
                   end
                 '';
-                text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 3 }, { "Vibe", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " v ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 2 }, { "Vibe", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "v", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               # Core file operations
               {
                 key = "f";
                 action.__raw = "function() Snacks.picker.files() end";
-                text.__raw = ''{ { "󰈞 ", hl = "SnacksDashboardIcon", width = 3 }, { "Find File", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " f ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰈞 ", hl = "SnacksDashboardIcon", width = 2 }, { "Find File", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "f", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "/";
                 action.__raw = "function() Snacks.picker.grep() end";
-                text.__raw = ''{ { "󰊄 ", hl = "SnacksDashboardIcon", width = 3 }, { "Find Text", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " / ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰊄 ", hl = "SnacksDashboardIcon", width = 2 }, { "Find Text", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "/", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "r";
                 action.__raw = "function() Snacks.picker.recent() end";
-                text.__raw = ''{ { "󰋚 ", hl = "SnacksDashboardIcon", width = 3 }, { "Recent", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " r ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰋚 ", hl = "SnacksDashboardIcon", width = 2 }, { "Recent", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "r", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               # Workspace tools
               {
                 key = "e";
                 action.__raw = "function() Snacks.explorer() end";
-                text.__raw = ''{ { "󰙅 ", hl = "SnacksDashboardIcon", width = 3 }, { "Explorer", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " e ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰙅 ", hl = "SnacksDashboardIcon", width = 2 }, { "Explorer", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "e", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "g";
@@ -102,7 +132,7 @@ in
                     require('which-key').show({ keys = '<leader>g', loop = true })
                   end
                 '';
-                text.__raw = ''{ { "󰊢 ", hl = "SnacksDashboardIcon", width = 3 }, { "Git", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " g ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰊢 ", hl = "SnacksDashboardIcon", width = 2 }, { "Git", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "g", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "t";
@@ -112,7 +142,7 @@ in
                     require('which-key').show({ keys = '<leader>t', loop = true })
                   end
                 '';
-                text.__raw = ''{ { "󰆍 ", hl = "SnacksDashboardIcon", width = 3 }, { "Terminal", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " t ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰆍 ", hl = "SnacksDashboardIcon", width = 2 }, { "Terminal", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "t", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               # Search menu (more useful than session)
               {
@@ -123,12 +153,12 @@ in
                     require('which-key').show({ keys = '<leader>s', loop = true })
                   end
                 '';
-                text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 3 }, { "Search", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " s ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 2 }, { "Search", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "s", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "q";
                 action = ":qa";
-                text.__raw = ''{ { "󰈆 ", hl = "SnacksDashboardIcon", width = 3 }, { "Quit", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " q ", hl = "SnacksDashboardKey", width = 3 } }'';
+                text.__raw = ''{ { "󰈆 ", hl = "SnacksDashboardIcon", width = 2 }, { "Quit", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "q", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
             ];
           };
@@ -137,7 +167,7 @@ in
             # Header with breathing room
             { section = "header"; padding = 3; }
 
-            # Action keys - full width columnar layout (56 chars = icon 3 + desc 50 + key 3)
+            # Action keys - full width columnar layout (62 chars = icon 2 + desc 57 + key 3)
             { section = "keys"; gap = 1; padding = 2; }
 
             # Visual separator
@@ -516,6 +546,7 @@ in
       autoEnableSources = true;
       settings = {
         sources = [
+          { name = "copilot"; priority = 1100; }
           { name = "nvim_lsp"; priority = 1000; }
           { name = "luasnip"; priority = 750; }
           { name = "buffer"; priority = 500; }

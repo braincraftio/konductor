@@ -136,7 +136,7 @@ let
     # CATPPUCCIN THEME - Rounded style (pill-shaped separators)
     # =========================================================================
     # IMPORTANT: All @catppuccin options must be set BEFORE run-shell
-    set -g @catppuccin_flavor 'macchiato'
+    set -g @catppuccin_flavor 'frappe'
 
     # -------------------------------------------------------------------------
     # Window Tabs - Slanted style

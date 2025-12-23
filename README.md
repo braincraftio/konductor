@@ -10,6 +10,11 @@ complete configuration isolation and reproducible builds.
 
 ---
 
+![Konductor development environment](docs/images/konductor-neovim-dashboard.png)
+<sup>Neovim with snacks.nvim dashboard, file explorer, and integrated tooling running in a devcontainer</sup>
+
+---
+
 ## Overview
 
 Konductor is a Nix flake providing reproducible, multi-target development environments for polyglot

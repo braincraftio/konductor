@@ -79,15 +79,14 @@
     { mode = "n"; key = "<leader>vc"; action.__raw = "function() require('claude-code').toggle('continue') end"; options.desc = "Continue Claude"; }
     { mode = "n"; key = "<leader>vV"; action.__raw = "function() require('claude-code').toggle('verbose') end"; options.desc = "Verbose Claude"; }
 
-    # Copilot controls
-    { mode = "n"; key = "<leader>vp"; action = "<cmd>Copilot panel<CR>"; options.desc = "Copilot panel"; }
-    { mode = "n"; key = "<leader>vP"; action = "<cmd>Copilot toggle<CR>"; options.desc = "Copilot toggle"; }
+    # Copilot controls (using copilot-cmp, panel disabled)
+    { mode = "n"; key = "<leader>vp"; action = "<cmd>Copilot toggle<CR>"; options.desc = "Copilot toggle"; }
     { mode = "n"; key = "<leader>ve"; action = "<cmd>Copilot enable<CR>"; options.desc = "Copilot enable"; }
     { mode = "n"; key = "<leader>vx"; action = "<cmd>Copilot disable<CR>"; options.desc = "Copilot disable"; }
     { mode = "n"; key = "<leader>vs"; action = "<cmd>Copilot status<CR>"; options.desc = "Copilot status"; }
     # CLI AI tools (terminal-based)
-    { mode = "n"; key = "<leader>vC"; action = "<cmd>lua _copilot_cli_toggle()<CR>"; options.desc = "Copilot CLI"; }
-    { mode = "n"; key = "<leader>vX"; action = "<cmd>lua _codex_cli_toggle()<CR>"; options.desc = "Codex CLI"; }
+    { mode = "n"; key = "<leader>vC"; action = "<cmd>lua Konductor.copilot_cli_toggle()<CR>"; options.desc = "Copilot CLI"; }
+    { mode = "n"; key = "<leader>vX"; action = "<cmd>lua Konductor.codex_cli_toggle()<CR>"; options.desc = "Codex CLI"; }
 
     # =========================================================================
     # REST (<leader>r) - HTTP client for .http files
@@ -103,7 +102,6 @@
     { mode = "n"; key = "<leader>lr"; action.__raw = "vim.lsp.buf.rename"; options.desc = "Rename symbol"; }
     { mode = "n"; key = "<leader>lf"; action.__raw = "function() require('conform').format() end"; options.desc = "Format"; }
     { mode = "n"; key = "<leader>li"; action = "<cmd>LspInfo<CR>"; options.desc = "LSP info"; }
-    { mode = "n"; key = "<leader>lI"; action = "<cmd>LspInstall<CR>"; options.desc = "LSP install"; }
     { mode = "n"; key = "<leader>lR"; action = "<cmd>LspRestart<CR>"; options.desc = "LSP restart"; }
     { mode = "n"; key = "<leader>ls"; action.__raw = "function() Snacks.picker.lsp_symbols() end"; options.desc = "Document symbols"; }
     { mode = "n"; key = "<leader>lS"; action.__raw = "function() Snacks.picker.lsp_workspace_symbols() end"; options.desc = "Workspace symbols"; }
@@ -203,11 +201,11 @@
     { mode = "n"; key = "<leader>tv"; action.__raw = "function() Snacks.terminal(nil, {win = {position = 'right', width = 0.4}}) end"; options.desc = "Side terminal"; }
     { mode = "n"; key = "<C-/>"; action.__raw = "function() Snacks.terminal() end"; options.desc = "Terminal"; }
     { mode = "t"; key = "<C-/>"; action = "<cmd>close<CR>"; options.desc = "Hide terminal"; }
-    # Custom terminals (via extraConfigLua toggle functions)
+    # Custom terminals (via Konductor namespace in extraConfig.nix)
     { mode = "n"; key = "<leader>tg"; action.__raw = "function() Snacks.lazygit() end"; options.desc = "LazyGit"; }
-    { mode = "n"; key = "<leader>tb"; action = "<cmd>lua _btop_toggle()<CR>"; options.desc = "Btop monitor"; }
-    { mode = "n"; key = "<leader>tp"; action = "<cmd>lua _python_toggle()<CR>"; options.desc = "Python REPL"; }
-    { mode = "n"; key = "<leader>tn"; action = "<cmd>lua _node_toggle()<CR>"; options.desc = "Node REPL"; }
+    { mode = "n"; key = "<leader>tb"; action = "<cmd>lua Konductor.btop_toggle()<CR>"; options.desc = "Btop monitor"; }
+    { mode = "n"; key = "<leader>tp"; action = "<cmd>lua Konductor.python_toggle()<CR>"; options.desc = "Python REPL"; }
+    { mode = "n"; key = "<leader>tn"; action = "<cmd>lua Konductor.node_toggle()<CR>"; options.desc = "Node REPL"; }
 
     # =========================================================================
     # WINDOW (<leader>w) - Window/split management

@@ -35,7 +35,7 @@ let
     colorschemes.catppuccin = {
       enable = true;
       settings = {
-        flavour = "macchiato";
+        flavour = "frappe";
         integrations = {
           cmp = true;
           gitsigns = true;
@@ -44,6 +44,38 @@ let
           mini = { enabled = true; };
           snacks = true;
         };
+        # Theme-aware dashboard customizations (adapts to any flavor)
+        # Palette strategy: warm descriptions, cool structure, green actions
+        custom_highlights.__raw = ''
+          function(colors)
+            return {
+              -- BRAND - Mauve header (matches tmux accent)
+              SnacksDashboardHeader = { fg = colors.mauve },
+
+              -- ICONS - Sapphire (blue, distinct from titles)
+              SnacksDashboardIcon = { fg = colors.sapphire },
+
+              -- KEYS - Green text (no background box)
+              SnacksDashboardKey = { fg = colors.green, bold = true },
+              SnacksDashboardSpecial = { fg = colors.overlay2 },
+
+              -- DESCRIPTIONS - Yellow (warm, stands out from cool tones)
+              SnacksDashboardDesc = { fg = colors.yellow },
+
+              -- SECTION TITLES - Peach (warm, visible, distinct)
+              SnacksDashboardTitle = { fg = colors.peach, bold = true },
+
+              -- FILE PATHS - Overlay2 (muted gray, not white)
+              SnacksDashboardFile = { fg = colors.overlay2 },
+
+              -- DIRECTORIES - Dimmed
+              SnacksDashboardDir = { fg = colors.overlay0 },
+
+              -- FOOTER/SEPARATOR - Subtle
+              SnacksDashboardFooter = { fg = colors.surface1 },
+            }
+          end
+        '';
       };
     };
 
