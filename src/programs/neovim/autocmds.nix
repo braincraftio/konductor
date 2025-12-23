@@ -210,18 +210,49 @@
     # TERMINAL
     # =========================================================================
 
-    # Terminal window options only - NO auto-startinsert
+    # Terminal window options - clean buffer name, no line numbers
     # Snacks.terminal handles its own insert mode via start_insert/auto_insert options
-    # Dashboard terminal sections are non-interactive and should never be in insert mode
     {
       event = "TermOpen";
       pattern = [ "*" ];
       callback.__raw = ''
-        function()
+        function(event)
           vim.opt_local.number = false
           vim.opt_local.relativenumber = false
           vim.opt_local.signcolumn = "no"
-          -- Don't auto-startinsert - let snacks handle it for interactive terminals
+          -- Clean up terminal buffer name for bufferline
+          vim.schedule(function()
+            if vim.api.nvim_buf_is_valid(event.buf) then
+              local name = vim.api.nvim_buf_get_name(event.buf)
+              if name:match("^term://") then
+                pcall(vim.api.nvim_buf_set_name, event.buf, "Terminal")
+              end
+            end
+          end)
+        end
+      '';
+    }
+
+    # Explorer gets fixed width (left panel)
+    {
+      event = "FileType";
+      pattern = [ "snacks_layout_box" "snacks_explorer" ];
+      callback.__raw = ''
+        function()
+          vim.opt_local.winfixwidth = true
+        end
+      '';
+    }
+
+    # Claude Code gets full right side (fixed width, full height)
+    {
+      event = "FileType";
+      pattern = [ "claude-code" ];
+      callback.__raw = ''
+        function()
+          vim.opt_local.winfixwidth = true
+          -- Ensure Claude stays full height when terminal opens
+          vim.opt_local.winfixheight = false
         end
       '';
     }
@@ -275,6 +306,21 @@
             vim.opt_local.list = false
             vim.b[event.buf].large_file = true
           end
+        end
+      '';
+    }
+
+    # =========================================================================
+    # DASHBOARD BUFFER NAME - Show "Konductor" in statusline
+    # =========================================================================
+
+    {
+      event = "FileType";
+      pattern = [ "snacks_dashboard" ];
+      callback.__raw = ''
+        function(event)
+          -- Set buffer name to "Konductor" for statusline display
+          pcall(vim.api.nvim_buf_set_name, event.buf, "Konductor")
         end
       '';
     }

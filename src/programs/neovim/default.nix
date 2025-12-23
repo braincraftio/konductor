@@ -16,6 +16,7 @@
 { pkgs, lib, inputs }:
 
 let
+  nixvimLib = inputs.nixvim.lib.${pkgs.stdenv.hostPlatform.system};
   nixvimPkgs = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 
   # Import configuration modules
@@ -27,6 +28,9 @@ let
 
   # Build nixvim configuration
   nixvimConfig = nixvimPkgs.makeNixvim {
+    # Allow unfree packages (claude-code)
+    nixpkgs.config.allowUnfree = true;
+
     # Colorscheme
     colorschemes.catppuccin = {
       enable = true;
@@ -53,6 +57,9 @@ let
 
     # Extra plugins only for what nixvim doesn't support
     inherit (pluginsCfg) extraPlugins;
+
+    # Treesitter injection queries for mise
+    inherit (pluginsCfg) extraFiles;
 
     # Extra Lua packages for plugin dependencies
     # luasql-sqlite3: Required for snacks.picker frecency feature

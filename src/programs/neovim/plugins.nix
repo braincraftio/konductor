@@ -36,75 +36,145 @@ in
         statuscolumn = { enabled = true; };
         words = { enabled = true; };
 
-        # Dashboard - Clean, professional UI
-        # Single header, organized sections, no redundancy
+        # Dashboard - Professional UI with refined typography
+        # Design: Clean vertical flow, elegant key styling, visual hierarchy
         dashboard = {
           enabled = true;
-          width = 60;
+          width = 62;
+
+          # Formatters for file/project sections (keys use custom text)
+          formats = {
+            icon.__raw = ''
+              function(item)
+                if item.file and (item.icon == "file" or item.icon == "directory") then
+                  return Snacks.dashboard.icon(item.file, item.icon)
+                end
+                return { item.icon or "", width = 2, hl = "SnacksDashboardIcon" }
+              end
+            '';
+          };
 
           preset = {
-            # Responsive header - adapts to terminal width
-            header.__raw = ''
-              (function()
-                local cols = vim.o.columns
-                if cols >= 80 then
-                  return [[
-██╗  ██╗ ██████╗ ███╗   ██╗██████╗ ██╗   ██╗ ██████╗████████╗ ██████╗ ██████╗
-██║ ██╔╝██╔═══██╗████╗  ██║██╔══██╗██║   ██║██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗
-█████╔╝ ██║   ██║██╔██╗ ██║██║  ██║██║   ██║██║        ██║   ██║   ██║██████╔╝
-██╔═██╗ ██║   ██║██║╚██╗██║██║  ██║██║   ██║██║        ██║   ██║   ██║██╔══██╗
-██║  ██╗╚██████╔╝██║ ╚████║██████╔╝╚██████╔╝╚██████╗   ██║   ╚██████╔╝██║  ██║
-╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝  ╚═════╝  ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝]]
-                elseif cols >= 50 then
-                  return [[
- █▄▀ █▀█ █▄ █ █▀▄ █ █ █▀▀ ▀█▀ █▀█ █▀█
- █ █ █▄█ █ ▀█ █▄▀ █▄█ █▄▄  █  █▄█ █▀▄]]
-                else
-                  return "KONDUCTOR"
-                end
-              end)()
-            '';
+            header = "${banner.full}";
 
+            # Dashboard keys - columnar layout matching Projects/Recent sections
+            # Layout: | icon (3) | description centered (50) | key (3) | = 56 chars
             keys = [
-              { icon = " "; key = "f"; desc = "Find File"; action.__raw = "function() Snacks.picker.files() end"; }
-              { icon = " "; key = "n"; desc = "New File"; action = ":ene | startinsert"; }
-              { icon = " "; key = "/"; desc = "Find Text"; action.__raw = "function() Snacks.picker.grep() end"; }
-              { icon = " "; key = "r"; desc = "Recent Files"; action.__raw = "function() Snacks.picker.recent() end"; }
-              { icon = " "; key = "c"; desc = "Config"; action.__raw = "function() Snacks.picker.files({cwd = vim.fn.stdpath('config')}) end"; }
-              { icon = " "; key = "s"; desc = "Restore Session"; section = "session"; }
-              { icon = " "; key = "e"; desc = "Explorer"; action.__raw = "function() Snacks.explorer() end"; }
-              { icon = " "; key = "q"; desc = "Quit"; action = ":qa"; }
+              # AI-first workflow (v for vibe coding) - opens AI menu
+              {
+                key = "v";
+                # Open the Vibe/AI which-key menu for discoverability
+                action.__raw = ''
+                  function()
+                    -- Trigger which-key for the Vibe group
+                    require('which-key').show({ keys = '<leader>v', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 3 }, { "Vibe", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " v ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              # Core file operations
+              {
+                key = "f";
+                action.__raw = "function() Snacks.picker.files() end";
+                text.__raw = ''{ { "󰈞 ", hl = "SnacksDashboardIcon", width = 3 }, { "Find File", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " f ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              {
+                key = "/";
+                action.__raw = "function() Snacks.picker.grep() end";
+                text.__raw = ''{ { "󰊄 ", hl = "SnacksDashboardIcon", width = 3 }, { "Find Text", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " / ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              {
+                key = "r";
+                action.__raw = "function() Snacks.picker.recent() end";
+                text.__raw = ''{ { "󰋚 ", hl = "SnacksDashboardIcon", width = 3 }, { "Recent", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " r ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              # Workspace tools
+              {
+                key = "e";
+                action.__raw = "function() Snacks.explorer() end";
+                text.__raw = ''{ { "󰙅 ", hl = "SnacksDashboardIcon", width = 3 }, { "Explorer", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " e ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              {
+                key = "g";
+                # Open Git which-key menu for discoverability
+                action.__raw = ''
+                  function()
+                    require('which-key').show({ keys = '<leader>g', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { "󰊢 ", hl = "SnacksDashboardIcon", width = 3 }, { "Git", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " g ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              {
+                key = "t";
+                # Open Terminal which-key menu for discoverability
+                action.__raw = ''
+                  function()
+                    require('which-key').show({ keys = '<leader>t', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { "󰆍 ", hl = "SnacksDashboardIcon", width = 3 }, { "Terminal", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " t ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              # Search menu (more useful than session)
+              {
+                key = "s";
+                # Open Search which-key menu for discoverability
+                action.__raw = ''
+                  function()
+                    require('which-key').show({ keys = '<leader>s', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 3 }, { "Search", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " s ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
+              {
+                key = "q";
+                action = ":qa";
+                text.__raw = ''{ { "󰈆 ", hl = "SnacksDashboardIcon", width = 3 }, { "Quit", hl = "SnacksDashboardDesc", width = 50, align = "center" }, { " q ", hl = "SnacksDashboardKey", width = 3 } }'';
+              }
             ];
           };
 
           sections = [
-            # Clean single-column layout - professional vertical flow
-            { section = "header"; padding = 2; }
-            { section = "keys"; gap = 1; padding = 1; }
+            # Header with breathing room
+            { section = "header"; padding = 3; }
+
+            # Action keys - full width columnar layout (56 chars = icon 3 + desc 50 + key 3)
+            { section = "keys"; gap = 1; padding = 2; }
+
+            # Visual separator
             {
-              icon = " ";
+              text.__raw = ''
+                { { "────────────────────────────────────────────────────────", hl = "SnacksDashboardFooter" } }
+              '';
+              padding = 1;
+            }
+
+            # Git Status - compact with just filenames
+            {
+              icon = "󰊢 ";
               title = "Git Status";
               section = "terminal";
-              cmd = "git -c color.status=always status --short --branch --renames 2>/dev/null || echo 'Not a git repo'";
-              height = 5;
-              ttl = 300;
-              indent = 2;
+              # Compact git status: branch + short filenames only
+              cmd = "git status -sb 2>/dev/null | head -1; git status --porcelain 2>/dev/null | cut -c4- | xargs -I{} basename {} | head -5 | sed 's/^/  /'";
+              height = 6;
+              ttl = 60;
               padding = 1;
               enabled.__raw = "function() return Snacks.git.get_root() ~= nil end";
             }
+
+            # Projects - quick workspace switching
             {
               icon = " ";
               title = "Projects";
               section = "projects";
-              indent = 2;
               padding = 1;
             }
+
+            # Recent Files - lowest priority, still useful
             {
               icon = " ";
               title = "Recent Files";
               section = "recent_files";
-              indent = 2;
-              padding = 1;
+              padding = 2;
             }
           ];
         };
@@ -128,8 +198,16 @@ in
         # Scope detection for indent/dim
         scope = { enabled = true; };
 
-        # Terminal (replaces Toggleterm)
-        terminal = { enabled = true; };
+        # Terminal (replaces Toggleterm) - bottom by default
+        terminal = {
+          enabled = true;
+          win = {
+            position = "bottom";
+            height = 0.3;
+            # Clean winbar showing cwd (not ugly term://nix/store path)
+            wo.winbar = " %{b:snacks_terminal.cwd}";
+          };
+        };
 
         # Git
         lazygit = { enabled = true; configure = true; };
@@ -161,11 +239,36 @@ in
           diagnostics = "nvim_lsp";
           always_show_bufferline = true;
           separator_style = "slant";
+          # Offset for explorer without duplicate text (explorer has its own title)
           offsets = [{
             filetype = "snacks_layout_box";
-            text = "Explorer";
-            text_align = "center";
+            text = "";
+            separator = true;
           }];
+          # Show working directory for terminals, clean names for others
+          name_formatter.__raw = ''
+            function(buf)
+              -- Use buftype to properly detect terminal buffers (per bufferline API)
+              if vim.bo[buf.bufnr].buftype == "terminal" then
+                -- Prefer snacks terminal cwd if available (has rich metadata)
+                local snacks_info = vim.b[buf.bufnr].snacks_terminal
+                if snacks_info and snacks_info.cwd then
+                  local cwd = snacks_info.cwd:gsub(vim.env.HOME, "~")
+                  return " " .. cwd
+                end
+                -- Fallback: extract cwd from term://path//pid:shell format
+                -- Pattern: anchor on //digits (PID) to find the path portion
+                local term_path = vim.api.nvim_buf_get_name(buf.bufnr)
+                local dir = term_path:match("^term://(.+)//%d")
+                if dir then
+                  return " " .. dir:gsub(vim.env.HOME, "~")
+                end
+                return " term"
+              end
+              -- Regular files: use default basename
+              return buf.name
+            end
+          '';
         };
       };
     };
@@ -181,8 +284,36 @@ in
         sections = {
           lualine_a = [ "mode" ];
           lualine_b = [ "branch" "diff" "diagnostics" ];
-          lualine_c = [{ __unkeyed-1 = "filename"; path = 1; }];
-          lualine_x = [ "encoding" "fileformat" "filetype" ];
+          # Custom filename with location-aware context
+          lualine_c = [{
+            __unkeyed-1.__raw = ''
+              function()
+                local ft = vim.bo.filetype
+                -- Dashboard: brand name
+                if ft == "snacks_dashboard" then
+                  return "󰣇 Konductor"
+                -- Explorer/layout: hide (has own title)
+                elseif ft == "snacks_layout_box" or ft == "snacks_explorer" then
+                  return ""
+                -- Terminal: show cwd for "where am I" context
+                elseif ft == "snacks_terminal" or vim.bo.buftype == "terminal" then
+                  local snacks_info = vim.b.snacks_terminal
+                  if snacks_info and snacks_info.cwd then
+                    local cwd = snacks_info.cwd:gsub(vim.env.HOME, "~")
+                    return " " .. cwd
+                  end
+                  return " Terminal"
+                -- Claude Code: show context
+                elseif ft == "claude-code" then
+                  return "󰚩 Claude"
+                else
+                  -- Files: relative path for location context
+                  return vim.fn.expand("%:~:.")
+                end
+              end
+            '';
+          }];
+          lualine_x = [ "filetype" ];
           lualine_y = [ "progress" ];
           lualine_z = [ "location" ];
         };
@@ -195,15 +326,28 @@ in
         preset = "modern";
         delay = 300;
         spec = [
-          { __unkeyed-1 = "<leader>b"; group = "Buffer"; }
-          { __unkeyed-1 = "<leader>c"; group = "Code"; }
-          { __unkeyed-1 = "<leader>f"; group = "Find"; }
-          { __unkeyed-1 = "<leader>g"; group = "Git"; }
-          { __unkeyed-1 = "<leader>gh"; group = "Hunks"; }
-          { __unkeyed-1 = "<leader>q"; group = "Session"; }
-          { __unkeyed-1 = "<leader>s"; group = "Search"; }
-          { __unkeyed-1 = "<leader>u"; group = "UI/Toggle"; }
-          { __unkeyed-1 = "<leader>x"; group = "Diagnostics"; }
+          # Primary workflow groups
+          { __unkeyed-1 = "<leader>v"; group = "Vibe"; icon = "󰚩"; }
+          { __unkeyed-1 = "<leader>l"; group = "LSP"; icon = ""; }
+          { __unkeyed-1 = "<leader>f"; group = "Find"; icon = ""; }
+          { __unkeyed-1 = "<leader>s"; group = "Search"; icon = ""; }
+          { __unkeyed-1 = "<leader>b"; group = "Buffer"; icon = "󰓩"; }
+          { __unkeyed-1 = "<leader>g"; group = "Git"; icon = ""; }
+          { __unkeyed-1 = "<leader>gh"; group = "Hunks"; icon = ""; }
+          { __unkeyed-1 = "<leader>t"; group = "Terminal"; icon = ""; }
+          { __unkeyed-1 = "<leader>w"; group = "Window"; icon = ""; }
+          { __unkeyed-1 = "<leader>x"; group = "Diagnostics"; icon = ""; }
+          { __unkeyed-1 = "<leader>m"; group = "Markdown"; icon = ""; }
+          { __unkeyed-1 = "<leader>r"; group = "REST"; icon = ""; }
+          { __unkeyed-1 = "<leader>q"; group = "Session/Quit"; icon = "󰈆"; }
+          { __unkeyed-1 = "<leader>u"; group = "UI Toggle"; icon = ""; }
+
+          # Bracket motions
+          { __unkeyed-1 = "]"; group = "Next"; }
+          { __unkeyed-1 = "["; group = "Previous"; }
+
+          # g prefix
+          { __unkeyed-1 = "g"; group = "Goto/Actions"; }
         ];
       };
     };
@@ -223,8 +367,42 @@ in
 
     treesitter = {
       enable = true;
+      nixGrammars = true;
+      grammarPackages = with pkgs.vimPlugins.nvim-treesitter.builtGrammars; [
+        bash
+        c
+        cpp
+        css
+        dockerfile
+        go
+        gomod
+        gosum
+        html
+        http # Required for rest.nvim
+        javascript
+        json
+        jsonc
+        lua
+        luadoc
+        make
+        markdown
+        markdown_inline
+        nix
+        python
+        query
+        regex
+        rust
+        toml
+        tsx
+        typescript
+        vim
+        vimdoc
+        xml
+        yaml
+      ];
       settings = {
         auto_install = false; # nixvim manages parsers
+        sync_install = false;
         highlight = {
           enable = true;
           additional_vim_regex_highlighting = false;
@@ -235,8 +413,8 @@ in
           keymaps = {
             init_selection = "<C-space>";
             node_incremental = "<C-space>";
-            scope_incremental = false;
-            node_decremental = "<bs>";
+            scope_incremental = "<C-s>";
+            node_decremental = "<C-backspace>";
           };
         };
       };
@@ -429,20 +607,53 @@ in
     # AI LAYER
     # =========================================================================
 
+    # Claude Code - Official Anthropic Claude integration
+    claude-code = {
+      enable = true;
+      settings = {
+        # Window settings - vertical split on right side
+        window = {
+          split_ratio = 0.4;
+          position = "vertical";  # Creates vsplit (respects splitright)
+          enter_insert = true;
+          hide_numbers = true;
+          hide_signcolumn = true;
+        };
+        # Auto-refresh for file changes
+        refresh = {
+          enable = true;
+          updatetime = 100;
+          timer_interval = 1000;
+          show_notifications = true;
+        };
+        # Use git root as working directory
+        git.use_git_root = true;
+        # Command configuration
+        command = "claude";
+        command_variants = {
+          continue = "--continue";
+          resume = "--resume";
+          verbose = "--verbose";
+        };
+        # Keymaps handled in keymaps.nix, disable defaults
+        keymaps = {
+          toggle = {
+            normal = false;
+            terminal = false;
+          };
+          window_navigation = true;
+          scrolling = true;
+        };
+      };
+    };
+
     copilot-lua = {
       enable = true;
       settings = {
-        suggestion = {
-          enabled = true;
-          auto_trigger = true;
-          keymap = {
-            accept = "<M-l>";
-            next = "<M-]>";
-            prev = "<M-[>";
-            dismiss = "<C-]>";
-          };
-        };
-        panel.enabled = true;
+        # Disable suggestion/panel - using copilot-cmp for nvim-cmp integration instead
+        # This provides unified completion UX through the cmp popup
+        suggestion.enabled = false;
+        panel.enabled = false;
         filetypes = {
           yaml = true;
           markdown = true;
@@ -462,13 +673,135 @@ in
         auto_close = 1;
       };
     };
+
+    # HTTP client for .http files
+    rest = {
+      enable = true;
+      settings = {
+        client = "curl";
+        custom_dynamic_variables = { };
+        request = {
+          skip_ssl_verification = false;
+          hooks = {
+            encode_url = true;
+          };
+        };
+        response = {
+          hooks = {
+            decode_url = true;
+            format = true;
+          };
+        };
+      };
+    };
+
+    # Copilot completion source
+    copilot-cmp.enable = true;
   };
 
   # =========================================================================
   # EXTRA PLUGINS - Only for what nixvim doesn't support natively
   # =========================================================================
-  extraPlugins = with pkgs.vimPlugins; [
-    # claudecode.nvim - not yet in nixvim (check regularly for addition)
-    # Add only after confirming nixvim doesn't have plugins.claudecode
-  ];
+  extraPlugins =
+    let
+      buildVimPlugin = pkgs.vimUtils.buildVimPlugin;
+    in
+    [
+      # render-markdown.nvim - live in-editor markdown rendering (normal mode)
+      ((buildVimPlugin {
+        name = "render-markdown.nvim";
+        src = pkgs.fetchFromGitHub {
+          owner = "MeanderingProgrammer";
+          repo = "render-markdown.nvim";
+          rev = "6e0e8902dac70fecbdd8ce557d142062a621ec38";
+          sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
+        };
+      }).overrideAttrs (old: {
+        doCheck = false;
+        postInstall = (old.postInstall or "") + ''
+          mkdir -p $out/plugin
+          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+          -- Auto-initialize render-markdown on plugin load
+          local ok, render_markdown = pcall(require, "render-markdown")
+          if ok then
+            render_markdown.setup({
+              enabled = true,
+              preset = 'obsidian',
+              render_modes = { 'n', 'c', 't' },
+              anti_conceal = { enabled = true },
+              heading = { enabled = true },
+              code = { enabled = true, style = 'full' },
+            })
+          end
+          EOF
+        '';
+      }))
+    ];
+
+  # =========================================================================
+  # TREESITTER INJECTION QUERIES - mise/usage syntax highlighting
+  # =========================================================================
+  extraFiles = {
+    # TOML injections for mise run commands
+    "after/queries/toml/injections.scm".text = ''
+      ; extends
+
+      (pair
+        (bare_key) @key (#eq? @key "run")
+        (string) @injection.content @injection.language
+
+        (#is-mise?)
+        (#match? @injection.language "^['\"]{3}\n*#!(/\\w+)+/env\\s+\\w+")
+        (#gsub! @injection.language "^.*#!/.*/env%s+([^%s]+).*" "%1")
+        (#offset! @injection.content 0 3 0 -3)
+      )
+
+      (pair
+        (bare_key) @key (#eq? @key "run")
+        (string) @injection.content @injection.language
+
+        (#is-mise?)
+        (#match? @injection.language "^['\"]{3}\n*#!(/\\w+)+\s*\n")
+        (#gsub! @injection.language "^.*#!/.*/([^/%s]+).*" "%1")
+        (#offset! @injection.content 0 3 0 -3)
+      )
+
+      (pair
+        (bare_key) @key (#eq? @key "run")
+        (string) @injection.content
+
+        (#is-mise?)
+        (#match? @injection.content "^['\"]{3}\n*.*")
+        (#not-match? @injection.content "^['\"]{3}\n*#!")
+        (#offset! @injection.content 0 3 0 -3)
+        (#set! injection.language "bash")
+      )
+
+      (pair
+        (bare_key) @key (#eq? @key "run")
+        (string) @injection.content
+
+        (#is-mise?)
+        (#not-match? @injection.content "^['\"]{3}")
+        (#offset! @injection.content 0 1 0 -1)
+        (#set! injection.language "bash")
+      )
+    '';
+
+    # Bash injections for mise and usage comments
+    "after/queries/bash/injections.scm".text = ''
+      ; extends
+
+      ((comment) @injection.content
+        (#lua-match? @injection.content "^#MISE ")
+        (#offset! @injection.content 0 6 0 1)
+        (#set! injection.language "toml"))
+
+      ((comment) @injection.content
+        (#lua-match? @injection.content "^#USAGE ")
+        (#offset! @injection.content 0 7 0 1)
+        (#set! injection.combined)
+        (#set! injection.language "kdl"))
+    '';
+  };
 }
