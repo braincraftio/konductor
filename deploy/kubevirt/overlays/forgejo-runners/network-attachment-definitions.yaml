@@ -1,0 +1,29 @@
+# =============================================================================
+# NetworkAttachmentDefinition for Forgejo Runners
+# =============================================================================
+# OVS bridge for external connectivity - avoids macvtap hairpin limitations.
+#
+# Note: The cluster-wide NAD 'ovs-br0' exists in default namespace.
+# This creates a namespace-local reference for the forgejo-runners namespace.
+#
+# Prerequisites:
+#   - Multus CNI installed
+#   - Open vSwitch + ovs-cni on nodes
+#   - OVS bridge 'br0' configured on nodes
+# =============================================================================
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: ovs-br0
+  labels:
+    app: forgejo-runner
+spec:
+  config: |
+    {
+      "cniVersion": "0.4.0",
+      "name": "ovs-br0",
+      "type": "ovs",
+      "bridge": "br0",
+      "mtu": 1500
+    }

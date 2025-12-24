@@ -1,0 +1,31 @@
+# =============================================================================
+# Network Data Secret - Forgejo Runners Configuration
+# =============================================================================
+# Cloud-init v2 network configuration for dual-NIC setup:
+#   - enp1s0: Primary interface with DHCP (OVS bridge to physical network)
+#   - enp2s0: Secondary interface (pod network for cluster-internal access)
+#
+# OVS bridge provides external connectivity without macvtap hairpin issues.
+# Pod interface enables access to cluster services (Forgejo, DNS, etc).
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: forgejo-runner-networkdata
+  labels:
+    app: forgejo-runner
+type: Opaque
+stringData:
+  networkdata: |
+    version: 2
+    renderer: networkd
+    ethernets:
+      enp1s0:
+        dhcp4: true
+        dhcp6: false
+        dhcp-identifier: mac
+      enp2s0:
+        dhcp4: true
+        dhcp6: false
+        dhcp-identifier: mac
+        optional: true

@@ -1,0 +1,19 @@
+name: Hello World
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: konductor
+    steps:
+      - name: Hello World
+        run: |
+          echo "Hello from Forgejo Runner!"
+          echo "Runner: $(hostname)"
+          echo "Date: $(date)"
+          uname -a

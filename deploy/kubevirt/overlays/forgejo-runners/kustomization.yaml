@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: forgejo-runners
+
+# =============================================================================
+# Forgejo Runner Overlay
+# =============================================================================
+# Deploy: ./deploy.sh && kubectl apply -k .
+#
+# deploy.sh creates secrets with real values:
+#   - forgejo-runner-userdata (cloud-init with CA, secret, URL)
+#   - forgejo-runner-ssh-key (SSH public key for access)
+#   - forgejo-runner-credentials (shared secret backup)
+#
+# VM waits for secrets before starting.
+# =============================================================================
+
+resources:
+  - namespace.yaml
+  - network-attachment-definitions.yaml
+  - networkdata.yaml
+  - virtualmachine.yaml
+
+namespace: forgejo-runners
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: forgejo-runner
+      app.kubernetes.io/component: ci-runner
+      app.kubernetes.io/part-of: forgejo
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false

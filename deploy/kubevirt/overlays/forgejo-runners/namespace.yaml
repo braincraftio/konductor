@@ -1,0 +1,17 @@
+# =============================================================================
+# Forgejo Runners Namespace
+# =============================================================================
+# Namespace for Forgejo CI/CD runner VMs.
+# PSA labels allow privileged workloads (required for KubeVirt VMs).
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forgejo-runners
+  labels:
+    app.kubernetes.io/name: forgejo-runners
+    app.kubernetes.io/component: namespace
+    # Pod Security Admission - allow privileged for VM workloads
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

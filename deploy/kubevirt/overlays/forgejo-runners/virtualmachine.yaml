@@ -1,0 +1,124 @@
+# =============================================================================
+# Forgejo Runner VirtualMachine
+# =============================================================================
+# KubeVirt VM for Forgejo CI/CD workloads with shared secret registration.
+#
+# Features:
+#   - DataVolumeTemplate with persistent storage (imported from registry)
+#   - 16Gi RAM, 4 cores + hyperthreading for CI workloads
+#   - host-passthrough CPU for nested virtualization (docker-in-VM)
+#   - OVS bridge primary interface (external network, no hairpin issues)
+#   - Pod secondary interface (cluster-internal: Forgejo, DNS, services)
+#
+# Credential Injection:
+#   - SSH keys: QEMU Guest Agent (runtime injection from forgejo-runner-ssh-key secret)
+#   - Runner credentials: cloud-init userdata (cluster CA, shared secret, server URL)
+#
+# Prerequisites:
+#   - KubeVirt with CDI installed
+#   - StorageClass: ceph-nvme-vm-block
+#   - NetworkAttachmentDefinition: ovs-br0
+#   - SSH key secret: forgejo-runner-ssh-key (created separately)
+#   - Userdata secret: forgejo-runner-userdata (with placeholders populated)
+# =============================================================================
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: forgejo-runner
+  labels:
+    app: forgejo-runner
+spec:
+  runStrategy: Always
+  dataVolumeTemplates:
+    - metadata:
+        name: forgejo-runner-root
+        labels:
+          app: forgejo-runner
+      spec:
+        pvc:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 64Gi
+          storageClassName: ceph-nvme-vm-block
+        source:
+          registry:
+            url: docker://docker.io/containercraft/konductor@sha256:5ea9959f7b84ca5b981a2dd5c32fff64e34cbc40bfc28cb7ad8fdba05c3ad85c
+  template:
+    metadata:
+      labels:
+        app: forgejo-runner
+        kubevirt.io/domain: forgejo-runner
+    spec:
+      hostname: forgejo-runner
+      terminationGracePeriodSeconds: 30
+      # -----------------------------------------------------------------------
+      # SSH Key Injection via QEMU Guest Agent
+      # -----------------------------------------------------------------------
+      accessCredentials:
+        - sshPublicKey:
+            source:
+              secret:
+                secretName: forgejo-runner-ssh-key
+            propagationMethod:
+              qemuGuestAgent:
+                users:
+                  - runner
+                  - kc2admin
+      domain:
+        cpu:
+          cores: 4
+          sockets: 1
+          threads: 2
+          model: host-passthrough
+        resources:
+          requests:
+            memory: 16Gi
+        machine:
+          type: q35
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+        devices:
+          autoattachSerialConsole: true
+          autoattachGraphicsDevice: true
+          networkInterfaceMultiqueue: true
+          rng: {}
+          disks:
+            - name: root-disk
+              bootOrder: 1
+              cache: writeback
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              bootOrder: 2
+              disk:
+                bus: virtio
+          interfaces:
+            # OVS bridge: External network via br0 (avoids macvtap hairpin)
+            - name: ovs-external
+              model: virtio
+              bridge: {}
+            # Pod network: Cluster-internal access (Forgejo, DNS, services)
+            - name: pod-internal
+              model: virtio
+              masquerade: {}
+      networks:
+        - name: ovs-external
+          multus:
+            networkName: ovs-br0
+        - name: pod-internal
+          pod: {}
+      volumes:
+        - name: root-disk
+          dataVolume:
+            name: forgejo-runner-root
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            secretRef:
+              name: forgejo-runner-userdata
+            networkDataSecretRef:
+              name: forgejo-runner-networkdata

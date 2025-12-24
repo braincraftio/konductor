@@ -27,7 +27,7 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 | Artifact | Size | Description |
 |----------|------|-------------|
 | `konductor-YYYYMMDD.qcow2` | ~4GB | ZSTD-compressed QCOW2, boots offline with full toolchain |
-| `ghcr.io/braincraftio/konductor:latest-qcow2` | ~4GB | KubeVirt containerDisk for Kubernetes deployment |
+| `docker.io/containercraft/konductor:latest-qcow2` | ~4GB | KubeVirt containerDisk (also on ghcr.io/braincraftio/konductor) |
 
 The image includes:
 
@@ -63,15 +63,15 @@ All prerequisites are provided by `nix develop` (devshell).
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  build:qcow2                    Show this help                              │
-│    ├── :image                   Full build pipeline (nix → package)         │
-│    ├── :start                   Boot existing image for development         │
-│    ├── :stop                    Graceful VM shutdown                        │
-│    ├── :ssh                     SSH into running VM                         │
-│    ├── :publish                 Build + containerize + push to GHCR         │
-│    ├── :container               Build containerDisk from QCOW2              │
+│    ├── :clean                   Reset build state                           │
+│    ├── :image                   Build QCOW2 (nix → VM configure → package)  │
+│    ├── :container               Package QCOW2 as containerDisk              │
+│    ├── :login                   Authenticate to registry                    │
 │    ├── :push                    Push container to registry                  │
-│    ├── :login                   Authenticate to GHCR                        │
-│    └── :clean                   Force cleanup build state                   │
+│    ├── :start                   Boot image for local development            │
+│    ├── :ssh                     SSH into running VM                         │
+│    ├── :stop                    Graceful VM shutdown                        │
+│    └── :publish                 Full automation: image → container → push   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -86,24 +86,24 @@ build:qcow2 - Konductor QCOW2 Build Tasks
 Usage: runme run build:qcow2:<task>
 
 Tasks:
-  :image      Full build pipeline (nix → VM configure → compress → verify)
-  :start      Boot existing image for development (auto-builds if missing)
-  :stop       Graceful VM shutdown
-  :ssh        SSH into running VM
-  :clean      Force cleanup all build state
-  :publish    Full publish: build → containerize → push to GHCR
-  :container  Build containerDisk from QCOW2
-  :login      Authenticate to container registry
+  :clean      Reset build state
+  :image      Build QCOW2 (nix → VM configure → compress → verify)
+  :container  Package QCOW2 as containerDisk
+  :login      Authenticate to registry
   :push       Push container to registry
+  :start      Boot image for local development
+  :ssh        SSH into running VM
+  :stop       Graceful VM shutdown
+  :publish    Full automation: image → container → login → push
 
 Examples:
-  runme run build:qcow2:image                    # Build QCOW2 image
-  runme run build:qcow2:start && ssh localhost   # Start VM and connect
-  runme run build:qcow2:publish                  # Build and publish to GHCR
+  runme run build:qcow2:publish                  # From zero to published
+  runme run build:qcow2:image                    # Build QCOW2 only
+  runme run build:qcow2:start && ssh localhost   # Local development
 
 Output:
-  konductor-YYYYMMDD.qcow2                       # ZSTD-compressed QCOW2
-  ghcr.io/braincraftio/konductor:latest-qcow2    # KubeVirt containerDisk
+  konductor-YYYYMMDD.qcow2                         # ZSTD-compressed QCOW2
+  docker.io/containercraft/konductor:latest-qcow2  # KubeVirt containerDisk
 EOF
 ```
 
@@ -111,9 +111,24 @@ EOF
 
 ---
 
+### build:qcow2:clean
+
+Reset build state. Kills running VM, removes temp files.
+
+```sh {"name":"build:qcow2:clean","excludeFromRunAll":"true","tag":"type:entry,type:destructive"}
+pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
+rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
+sudo guestunmount /tmp/nixmount 2>/dev/null || true
+sudo rm -rf /tmp/nixmount /tmp/konductor-build-cloud-init
+```
+
+`runme run build:qcow2:clean`
+
+---
+
 ### build:qcow2:image
 
-Full pipeline: nix build → VM configure → compress → sparsify → verify.
+Build QCOW2: nix build → VM configure → compress → sparsify → verify.
 
 ```text
 build:qcow2:image
@@ -142,9 +157,134 @@ runme run --filename docs/developer_guide/qcow2/BUILD.md --all
 
 ---
 
+### build:qcow2:container
+
+Package QCOW2 as containerDisk for KubeVirt.
+
+```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
+set -e
+: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${CONTAINER_REGISTRY:=docker.io}
+: ${CONTAINER_IMAGE:=containercraft/konductor}
+: ${CONTAINER_TAG:=latest-qcow2}
+FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+
+[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2:image first."; exit 1; }
+[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
+
+echo "Building containerDisk from: $QCOW2_OUTPUT"
+echo "Target image: $FULL_IMAGE"
+docker build --no-cache -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" -t "$FULL_IMAGE" .
+echo ""
+echo "Built: $FULL_IMAGE"
+docker images "$FULL_IMAGE" --format "Size: {{.Size}}"
+```
+
+`runme run build:qcow2:container`
+
+---
+
+### build:qcow2:login
+
+Authenticate to container registry. Supports Docker Hub and GHCR.
+
+Logic:
+1. If token provided (DOCKER_TOKEN or GITHUB_TOKEN) → login with token
+2. If already authenticated (docker config) → skip
+3. Otherwise → error with instructions
+
+```sh {"name":"build:qcow2:login","excludeFromRunAll":"true","tag":"requires:docker"}
+set -e
+: ${CONTAINER_REGISTRY:=docker.io}
+
+# Normalize registry name for config lookup
+if [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
+  CONFIG_REGISTRY="https://index.docker.io/v1/"
+else
+  CONFIG_REGISTRY="$CONTAINER_REGISTRY"
+fi
+
+# Docker Hub authentication
+if [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
+  # If token provided, always login (CI path - token injected as secret)
+  if [[ -n "$DOCKER_TOKEN" ]]; then
+    echo "$DOCKER_TOKEN" | docker login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
+    echo "Logged in to Docker Hub as ${DOCKER_USERNAME:-containercraft}"
+    exit 0
+  fi
+  # Check if already logged in via docker config
+  if grep -q "$CONFIG_REGISTRY" ~/.docker/config.json 2>/dev/null; then
+    echo "Already authenticated to Docker Hub (found in docker config)"
+    exit 0
+  fi
+  # Not authenticated
+  echo "Not authenticated to Docker Hub."
+  echo ""
+  echo "Options:"
+  echo "  1. Run: docker login"
+  echo "  2. Set DOCKER_TOKEN in .env (DOCKER_USERNAME defaults to containercraft)"
+  echo "  3. Export DOCKER_TOKEN in environment"
+  exit 1
+
+# GHCR authentication
+elif [[ "$CONTAINER_REGISTRY" == "ghcr.io" ]]; then
+  # If token provided, always login (CI path)
+  if [[ -n "$GITHUB_TOKEN" ]]; then
+    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin
+    echo "Logged in to GHCR as ${GITHUB_ACTOR:-github}"
+    exit 0
+  fi
+  # Check if already logged in via docker config
+  if grep -q "$CONFIG_REGISTRY" ~/.docker/config.json 2>/dev/null; then
+    echo "Already authenticated to GHCR (found in docker config)"
+    exit 0
+  fi
+  # Not authenticated
+  echo "Not authenticated to GHCR."
+  echo ""
+  echo "Options:"
+  echo "  1. Run: docker login ghcr.io"
+  echo "  2. Set GITHUB_TOKEN in .env (GITHUB_ACTOR defaults to github)"
+  echo "  3. Export GITHUB_TOKEN in environment"
+  exit 1
+
+else
+  echo "Unknown registry: $CONTAINER_REGISTRY"
+  echo "Run: docker login $CONTAINER_REGISTRY"
+  exit 1
+fi
+```
+
+`runme run build:qcow2:login`
+
+---
+
+### build:qcow2:push
+
+Push container to registry.
+
+```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
+set -e
+: ${CONTAINER_REGISTRY:=docker.io}
+: ${CONTAINER_IMAGE:=containercraft/konductor}
+: ${CONTAINER_TAG:=latest-qcow2}
+FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+
+echo "Pushing: $FULL_IMAGE"
+docker push "$FULL_IMAGE"
+echo ""
+echo "=== Push Complete ==="
+echo "Image: $FULL_IMAGE"
+docker inspect "$FULL_IMAGE" --format 'Digest: {{index .RepoDigests 0}}' 2>/dev/null || true
+```
+
+`runme run build:qcow2:push`
+
+---
+
 ### build:qcow2:start
 
-Boot existing `result/nixos.qcow2` for development. Auto-builds if missing.
+Boot image for local development. Auto-builds if missing.
 
 ```text
 build:qcow2:start
@@ -178,6 +318,18 @@ echo "VM ready! Run: ssh localhost"
 
 ---
 
+### build:qcow2:ssh
+
+SSH into running VM.
+
+```sh {"name":"build:qcow2:ssh","excludeFromRunAll":"true","tag":"type:entry"}
+ssh localhost
+```
+
+`runme run build:qcow2:ssh`
+
+---
+
 ### build:qcow2:stop
 
 Graceful VM shutdown.
@@ -192,110 +344,39 @@ echo "VM stopped"
 
 ---
 
-### build:qcow2:ssh
-
-SSH into running VM.
-
-```sh {"name":"build:qcow2:ssh","excludeFromRunAll":"true","tag":"type:entry"}
-ssh localhost
-```
-
-`runme run build:qcow2:ssh`
-
----
-
-### build:qcow2:clean
-
-Force cleanup all build state.
-
-```sh {"name":"build:qcow2:clean","excludeFromRunAll":"true","tag":"type:entry,type:destructive"}
-pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
-rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
-sudo guestunmount /tmp/nixmount 2>/dev/null || true
-sudo rm -rf /tmp/nixmount /tmp/konductor-build-cloud-init
-```
-
-`runme run build:qcow2:clean`
-
----
-
 ### build:qcow2:publish
 
-Full publish: build → containerize → login → push.
+Full automation: image → container → login → push.
 
 ```text
 build:qcow2:publish
 
-  build:qcow2 → :container → :login → :push
-       │            │           │        │
-       ▼            ▼           ▼        ▼
-     full       docker       GHCR     docker
-     pipeline   build        auth     push
+  :image → :container → :login → :push
+     │          │          │        │
+     ▼          ▼          ▼        ▼
+   build     package    registry  docker
+   QCOW2     container   auth     push
 ```
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
+: ${CONTAINER_REGISTRY:=docker.io}
+: ${CONTAINER_IMAGE:=containercraft/konductor}
+: ${CONTAINER_TAG:=latest-qcow2}
+FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+
+echo "=== Publishing: $FULL_IMAGE ==="
+echo ""
 runme run build:qcow2:image
 runme run build:qcow2:container
 runme run build:qcow2:login
 runme run build:qcow2:push
 echo ""
 echo "=== Publish Complete ==="
-echo "Image: ghcr.io/braincraftio/konductor:latest-qcow2"
+echo "Image: $FULL_IMAGE"
 ```
 
-`GITHUB_TOKEN=ghp_xxx GITHUB_ACTOR=username runme run build:qcow2:publish`
-
----
-
-### build:qcow2:container
-
-Build containerDisk from QCOW2.
-
-```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
-set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
-: ${CONTAINER_REGISTRY:=ghcr.io}
-: ${CONTAINER_IMAGE:=${CONTAINER_REGISTRY}/braincraftio/konductor:latest-qcow2}
-[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2 first."; exit 1; }
-[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
-docker build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" -t "$CONTAINER_IMAGE" .
-echo "Built: $CONTAINER_IMAGE"
-```
-
-`runme run build:qcow2:container`
-
----
-
-### build:qcow2:login
-
-Authenticate to container registry.
-
-```sh {"name":"build:qcow2:login","excludeFromRunAll":"true","tag":"requires:docker"}
-set -e
-: ${CONTAINER_REGISTRY:=ghcr.io}
-[ -n "$GITHUB_TOKEN" ] || { echo "Error: GITHUB_TOKEN not set"; exit 1; }
-echo "$GITHUB_TOKEN" | docker login "$CONTAINER_REGISTRY" -u "$GITHUB_ACTOR" --password-stdin
-echo "Logged in: $CONTAINER_REGISTRY"
-```
-
-`runme run build:qcow2:login`
-
----
-
-### build:qcow2:push
-
-Push container to registry.
-
-```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
-set -e
-: ${CONTAINER_REGISTRY:=ghcr.io}
-: ${CONTAINER_IMAGE:=${CONTAINER_REGISTRY}/braincraftio/konductor:latest-qcow2}
-docker push "$CONTAINER_IMAGE"
-echo "Pushed: $CONTAINER_IMAGE"
-```
-
-`runme run build:qcow2:push`
+`runme run build:qcow2:publish`
 
 ---
 
@@ -304,15 +385,15 @@ echo "Pushed: $CONTAINER_IMAGE"
 ```text
 Entry Points (user-facing):
   build:qcow2              Show help / available tasks
-  build:qcow2:image        Full build pipeline
-  build:qcow2:start        Boot existing image (auto-builds if missing)
-  build:qcow2:stop         Graceful shutdown
+  build:qcow2:clean        Reset build state
+  build:qcow2:image        Build QCOW2 (nix → VM configure → package)
+  build:qcow2:container    Package QCOW2 as containerDisk
+  build:qcow2:login        Authenticate to registry (Docker Hub / GHCR)
+  build:qcow2:push         Push container to registry
+  build:qcow2:start        Boot image for local development
   build:qcow2:ssh          SSH into VM
-  build:qcow2:clean        Force cleanup
-  build:qcow2:publish      Build + push to GHCR
-  build:qcow2:container    Build containerDisk
-  build:qcow2:login        GHCR authentication
-  build:qcow2:push         Push container
+  build:qcow2:stop         Graceful shutdown
+  build:qcow2:publish      Full automation: image → container → login → push
 
 Pipeline Tasks (internal, run via --all):
   _build:qcow2:nix             Nix build QCOW2
@@ -334,8 +415,9 @@ Debug Tasks:
   _build:qcow2:debug:log       View boot log
   _build:qcow2:vm:kill         Force kill VM
 
+Configuration: example.env (defaults) → .env (overrides)
 SSH: ssh localhost (devshell configures port 2222)
-Registry: ghcr.io/braincraftio/konductor:latest-qcow2
+Registry: docker.io/containercraft/konductor:latest-qcow2
 ```
 
 ---

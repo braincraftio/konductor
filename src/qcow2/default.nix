@@ -229,6 +229,9 @@ in
             ++ devshellPackages.idePackages
             # Self-hosting tools (docker, qemu, libvirt, etc.)
             ++ konductor.packages
+            # Forgejo CI/CD tools (runner + cli)
+            ++ programs.forgejo.runnerPackages
+            ++ programs.forgejo.cliPackages
             # Essentials
             ++ (with pkgs; [
             git
@@ -362,6 +365,117 @@ in
 
                   echo "Proxy configuration applied to nix-daemon"
                 '';
+              };
+            };
+
+            # =====================================================================
+            # CA Trust Configuration (Cloud-init Runtime)
+            # =====================================================================
+            # Creates CA bundle from cloud-init injected cluster CA certificate.
+            # Cloud-init writes /etc/konductor/cluster-ca.crt, this service:
+            #   1. Concatenates system CAs + cluster CA into ca-bundle.crt
+            #   2. Creates drop-in for forgejo-runner with CA environment vars
+            #
+            # Usage: Cloud-init user-data writes cluster CA:
+            #   write_files:
+            #     - path: /etc/konductor/cluster-ca.crt
+            #       content: |
+            #         -----BEGIN CERTIFICATE-----
+            #         <cluster-ca-certificate>
+            #         -----END CERTIFICATE-----
+            konductor-ca-setup = {
+              description = "Configure CA trust from cloud-init cluster CA";
+              before = [ "forgejo-runner.service" ];
+              after = [ "cloud-init.service" ];
+              wantedBy = [ "multi-user.target" ];
+              unitConfig = {
+                ConditionPathExists = "/etc/konductor/cluster-ca.crt";
+              };
+              serviceConfig = {
+                Type = "oneshot";
+                RemainAfterExit = true;
+                ExecStart = pkgs.writeShellScript "setup-ca-trust" ''
+                  set -euo pipefail
+                  CLUSTER_CA="/etc/konductor/cluster-ca.crt"
+                  CA_BUNDLE="/etc/konductor/ca-bundle.crt"
+                  SYSTEM_CA="/etc/ssl/certs/ca-certificates.crt"
+                  DROPIN_DIR="/run/systemd/system/forgejo-runner.service.d"
+
+                  echo "Creating CA bundle from cluster CA"
+
+                  # Create konductor config directory
+                  mkdir -p /etc/konductor
+
+                  # Create CA bundle: system CAs + cluster CA
+                  if [ -f "$SYSTEM_CA" ]; then
+                    cat "$SYSTEM_CA" "$CLUSTER_CA" > "$CA_BUNDLE"
+                  else
+                    # Fallback if system CA bundle doesn't exist
+                    cp "$CLUSTER_CA" "$CA_BUNDLE"
+                  fi
+                  chmod 644 "$CA_BUNDLE"
+
+                  echo "Creating forgejo-runner CA environment drop-in"
+
+                  # Create drop-in directory for forgejo-runner
+                  mkdir -p "$DROPIN_DIR"
+
+                  # Create drop-in with CA environment variables
+                  cat > "$DROPIN_DIR/ca-bundle.conf" << EOF
+                  [Service]
+                  Environment="SSL_CERT_FILE=$CA_BUNDLE"
+                  Environment="REQUESTS_CA_BUNDLE=$CA_BUNDLE"
+                  Environment="GIT_SSL_CAINFO=$CA_BUNDLE"
+                  Environment="NIX_SSL_CERT_FILE=$CA_BUNDLE"
+                  Environment="CURL_CA_BUNDLE=$CA_BUNDLE"
+                  EOF
+
+                  # Reload systemd to pick up the drop-in
+                  systemctl daemon-reload
+
+                  echo "CA trust configured: $CA_BUNDLE"
+                '';
+              };
+            };
+
+            # =====================================================================
+            # Forgejo Runner Service
+            # =====================================================================
+            # Runs Forgejo Actions runner daemon when registration is complete.
+            # Registration creates .runner file; service only starts if it exists.
+            #
+            # Registration (shared secret pattern - idempotent):
+            #   forgejo-runner create-runner-file \
+            #     --secret <40-char-hex> \
+            #     --instance <forgejo-url> \
+            #     --name <hostname> \
+            #     --connect
+            #
+            # The .runner file is created in /home/runner/.config/forgejo-runner/
+            # CA trust is configured by konductor-ca-setup service (drop-in).
+            forgejo-runner = {
+              description = "Forgejo Actions Runner";
+              after = [ "network-online.target" "docker.service" "konductor-ca-setup.service" ];
+              wants = [ "network-online.target" "docker.service" ];
+              requires = [ "konductor-ca-setup.service" ];
+              wantedBy = [ "multi-user.target" ];
+              unitConfig = {
+                # Only start if runner is registered (.runner file exists)
+                ConditionPathExists = "/home/runner/.config/forgejo-runner/.runner";
+              };
+              serviceConfig = {
+                Type = "simple";
+                User = "runner";
+                Group = "users";
+                WorkingDirectory = "/home/runner";
+                Environment = [
+                  "HOME=/home/runner"
+                  "PATH=/run/current-system/sw/bin"
+                  "DOCKER_HOST=unix:///var/run/docker.sock"
+                ];
+                ExecStart = "${pkgs.forgejo-runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
+                Restart = "always";
+                RestartSec = 10;
               };
             };
           };
