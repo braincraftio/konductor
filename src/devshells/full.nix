@@ -4,6 +4,7 @@
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
+# OpenCode theme from: ../config/opencode/
 
 { baseShell, packages, versions, programs, config, pkgs, ... }:
 
@@ -32,6 +33,9 @@ baseShell.overrideAttrs (old: {
 
     # SSH config generation from centralized src/config/shell/ssh.nix
     ${config.shell.ssh.shellHook}
+
+    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    ${config.opencode.shellHook}
 
     # Native library support for pip-installed packages (grpc, etc.)
     export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
@@ -78,5 +82,5 @@ baseShell.overrideAttrs (old: {
     NODE_ENV = "development";
     # Rust
     RUST_BACKTRACE = "1";
-  } // config.shell.ssh.env;
+  } // config.shell.ssh.env // config.opencode.env;
 })

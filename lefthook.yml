@@ -141,6 +141,11 @@ pre-commit:
     # Documentation checks
     markdown-style:
       glob: "*.{md,markdown}"
+      exclude:
+        - "**/venv/**"
+        - "**/.venv/**"
+        - "**/site-packages/**"
+        - "**/node_modules/**"
       run: markdownlint-cli2 {staged_files}
       tags: [docs, markdown]
       fail_text: |

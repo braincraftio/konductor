@@ -4,8 +4,13 @@
 # Layout Philosophy (Apple-simple, Material-elegant):
 #   LEFT   - Explorer (<leader>e)     - File navigation
 #   CENTER - Editor                   - Your code
-#   RIGHT  - Vibe AI (<leader>vv)     - Claude/Copilot assistance
+#   RIGHT  - AI Panel                 - Claude (<leader>vv) / OpenCode (<leader>oo)
 #   BOTTOM - Terminal (<leader>tt)    - Shell access
+#
+# AI Integration:
+#   <leader>v* - Vibe group (Claude Code, Copilot)
+#   <leader>o* - OpenCode (multi-provider AI agent with deep integration)
+#   go{motion} - OpenCode operator (review with motion, e.g., goap = review paragraph)
 #
 # Navigation:
 #   Ctrl+hjkl  - Move between splits (works in terminal too)
@@ -14,7 +19,7 @@
 #
 # Design principles:
 #   - Progressive disclosure: common actions first, power features in subgroups
-#   - Mnemonic consistency: v=Vibe/AI, f=Find, g=Git, t=Terminal, etc.
+#   - Mnemonic consistency: v=Vibe, o=OpenCode, f=Find, g=Git, t=Terminal
 #   - Discoverable: which-key shows groups with icons and descriptions
 #   - Efficient: experts can chain keys quickly, novices can explore
 #
@@ -55,7 +60,24 @@
     { mode = "t"; key = "<C-j>"; action = "<cmd>wincmd j<CR>"; options.desc = "Go to lower window"; }
     { mode = "t"; key = "<C-k>"; action = "<cmd>wincmd k<CR>"; options.desc = "Go to upper window"; }
     { mode = "t"; key = "<C-l>"; action = "<cmd>wincmd l<CR>"; options.desc = "Go to right window"; }
-    { mode = "t"; key = "<Esc><Esc>"; action = "<C-\\><C-n>"; options.desc = "Exit terminal mode"; }
+    # <Esc><Esc>: In AI buffers, toggle off; otherwise exit terminal mode
+    {
+      mode = "t";
+      key = "<Esc><Esc>";
+      action.__raw = ''
+        function()
+          local ft = vim.bo.filetype
+          if ft == "claude-code" then
+            require("claude-code").toggle()
+          elseif ft == "opencode" then
+            require("opencode").toggle()
+          else
+            vim.cmd("stopinsert")
+          end
+        end
+      '';
+      options.desc = "Exit terminal / Toggle AI";
+    }
     { mode = "t"; key = "jk"; action = "<C-\\><C-n>"; options.desc = "Exit terminal mode"; }
 
     # =========================================================================
@@ -87,6 +109,54 @@
     # CLI AI tools (terminal-based)
     { mode = "n"; key = "<leader>vC"; action = "<cmd>lua Konductor.copilot_cli_toggle()<CR>"; options.desc = "Copilot CLI"; }
     { mode = "n"; key = "<leader>vX"; action = "<cmd>lua Konductor.codex_cli_toggle()<CR>"; options.desc = "Codex CLI"; }
+    # OpenCode quick toggle (also in <leader>o menu)
+    { mode = "n"; key = "<leader>vo"; action.__raw = "function() require('opencode').toggle() end"; options.desc = "OpenCode"; }
+
+    # =========================================================================
+    # OPENCODE (<leader>o) - Multi-provider AI agent
+    # =========================================================================
+    # Core actions
+    { mode = "n"; key = "<leader>oo"; action.__raw = "function() require('opencode').toggle() end"; options.desc = "Toggle OpenCode"; }
+    { mode = "n"; key = "<leader>oa"; action.__raw = "function() require('opencode').ask() end"; options.desc = "Ask (interactive)"; }
+    { mode = "n"; key = "<leader>oS"; action.__raw = "function() require('opencode').select() end"; options.desc = "Select prompt"; }
+
+    # Prompts - code intelligence with context injection
+    { mode = "n"; key = "<leader>opr"; action.__raw = "function() require('opencode').prompt('review') end"; options.desc = "Review @this"; }
+    { mode = "v"; key = "<leader>opr"; action.__raw = "function() require('opencode').prompt('review') end"; options.desc = "Review selection"; }
+    { mode = "n"; key = "<leader>ope"; action.__raw = "function() require('opencode').prompt('explain') end"; options.desc = "Explain @this"; }
+    { mode = "v"; key = "<leader>ope"; action.__raw = "function() require('opencode').prompt('explain') end"; options.desc = "Explain selection"; }
+    { mode = "n"; key = "<leader>opd"; action.__raw = "function() require('opencode').prompt('document') end"; options.desc = "Document @this"; }
+    { mode = "v"; key = "<leader>opd"; action.__raw = "function() require('opencode').prompt('document') end"; options.desc = "Document selection"; }
+    { mode = "n"; key = "<leader>opf"; action.__raw = "function() require('opencode').prompt('fix') end"; options.desc = "Fix diagnostics"; }
+    { mode = "n"; key = "<leader>opt"; action.__raw = "function() require('opencode').prompt('test') end"; options.desc = "Write tests"; }
+    { mode = "v"; key = "<leader>opt"; action.__raw = "function() require('opencode').prompt('test') end"; options.desc = "Test selection"; }
+    { mode = "n"; key = "<leader>opo"; action.__raw = "function() require('opencode').prompt('optimize') end"; options.desc = "Optimize @this"; }
+    { mode = "v"; key = "<leader>opo"; action.__raw = "function() require('opencode').prompt('optimize') end"; options.desc = "Optimize selection"; }
+    { mode = "n"; key = "<leader>opi"; action.__raw = "function() require('opencode').prompt('implement') end"; options.desc = "Implement"; }
+    { mode = "v"; key = "<leader>opi"; action.__raw = "function() require('opencode').prompt('implement') end"; options.desc = "Implement selection"; }
+    { mode = "n"; key = "<leader>opR"; action.__raw = "function() require('opencode').prompt('refactor') end"; options.desc = "Refactor @this"; }
+    { mode = "v"; key = "<leader>opR"; action.__raw = "function() require('opencode').prompt('refactor') end"; options.desc = "Refactor selection"; }
+
+    # Session management
+    { mode = "n"; key = "<leader>osn"; action.__raw = "function() require('opencode').command('session.new') end"; options.desc = "New session"; }
+    { mode = "n"; key = "<leader>osl"; action.__raw = "function() require('opencode').command('session.list') end"; options.desc = "List sessions"; }
+    { mode = "n"; key = "<leader>oss"; action.__raw = "function() require('opencode').command('session.share') end"; options.desc = "Share session"; }
+    { mode = "n"; key = "<leader>osu"; action.__raw = "function() require('opencode').command('session.undo') end"; options.desc = "Undo"; }
+    { mode = "n"; key = "<leader>osr"; action.__raw = "function() require('opencode').command('session.redo') end"; options.desc = "Redo"; }
+
+    # Navigation within OpenCode
+    { mode = "n"; key = "<leader>o["; action.__raw = "function() require('opencode').command('session.page.up') end"; options.desc = "Page up"; }
+    { mode = "n"; key = "<leader>o]"; action.__raw = "function() require('opencode').command('session.page.down') end"; options.desc = "Page down"; }
+    { mode = "n"; key = "<leader>o{"; action.__raw = "function() require('opencode').command('session.first') end"; options.desc = "First message"; }
+    { mode = "n"; key = "<leader>o}"; action.__raw = "function() require('opencode').command('session.last') end"; options.desc = "Last message"; }
+
+    # Agent control
+    { mode = "n"; key = "<leader>oc"; action.__raw = "function() require('opencode').command('agent.cycle') end"; options.desc = "Cycle agent"; }
+
+    # Operator motion - use 'go' prefix for opencode operator (vim-native)
+    # Example: gor (review inner word), goap (review paragraph), etc.
+    { mode = "n"; key = "go"; action.__raw = "function() return require('opencode').operator() end"; options.desc = "OpenCode operator"; options.expr = true; }
+    { mode = "v"; key = "go"; action.__raw = "function() require('opencode').prompt('review') end"; options.desc = "OpenCode review"; }
 
     # =========================================================================
     # REST (<leader>r) - HTTP client for .http files

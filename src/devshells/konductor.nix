@@ -9,6 +9,7 @@
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
+# OpenCode theme from: ../config/opencode/
 
 { baseShell, pkgs, packages, versions, programs, config, ... }:
 
@@ -20,7 +21,7 @@ in
 baseShell.overrideAttrs (old: {
   name = "konductor";
 
-  # Everything from full + konductor self-hosting packages
+  # Everything from full + konductor self-hosting packages + CI tools
   buildInputs = old.buildInputs
     # IDE tools (neovim + tmux from programs, rest from packages.nix)
     ++ programs.neovim.packages
@@ -31,6 +32,9 @@ baseShell.overrideAttrs (old: {
     ++ packages.goPackages
     ++ packages.nodejsPackages
     ++ packages.rustPackages
+    # Forgejo runner + CLI (CI/CD tools)
+    ++ programs.forgejo.runnerPackages
+    ++ programs.forgejo.cliPackages
     # Self-hosting: container + VM build tools
     ++ konductor.packages;
 
@@ -43,6 +47,9 @@ baseShell.overrideAttrs (old: {
 
     # SSH config generation from centralized src/config/shell/ssh.nix
     ${config.shell.ssh.shellHook}
+
+    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    ${config.opencode.shellHook}
 
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
@@ -67,8 +74,15 @@ baseShell.overrideAttrs (old: {
     export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
 
+    # Docker
+    export DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
+    export DOCKER_BUILDKIT=1
+
     # Konductor self-hosting
     ${konductor.shellHook}
+
+    # Forgejo CI/CD
+    ${programs.forgejo.shellHook}
 
     # Update PATH
     export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
@@ -86,6 +100,9 @@ baseShell.overrideAttrs (old: {
     echo "  docker, docker-compose, buildkit, skopeo, crane"
     echo "  qemu, libvirt, virt-manager, virt-sparsify, OVMF"
     echo ""
+    echo "CI/CD Tools:"
+    echo "  forgejo-runner, forgejo-cli"
+    echo ""
     echo "Commands:  mise run help"
     echo ""
   '';
@@ -101,5 +118,5 @@ baseShell.overrideAttrs (old: {
     NODE_ENV = "development";
     # Rust
     RUST_BACKTRACE = "1";
-  } // (konductor.env pkgs) // config.shell.ssh.env;
+  } // (konductor.env pkgs) // config.shell.ssh.env // config.opencode.env;
 })

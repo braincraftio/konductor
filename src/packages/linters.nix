@@ -21,6 +21,7 @@ in
       config.linters.mypy.package
       config.linters.bandit.package
       config.linters.markdownlint.package
+      config.linters.commitlint.package
 
       # Linters without config files
       pkgs.actionlint

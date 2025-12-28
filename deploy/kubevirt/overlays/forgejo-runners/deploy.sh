@@ -70,8 +70,8 @@ teardown() {
         kubectl delete dv "${RUNNER_NAME}-root" -n "$NAMESPACE" --wait=true --timeout=120s || true
     fi
 
-    # Delete secrets
-    for secret in forgejo-runner-userdata forgejo-runner-networkdata forgejo-runner-ssh-key; do
+    # Delete secrets (including credentials to allow re-registration with new URL)
+    for secret in forgejo-runner-userdata forgejo-runner-networkdata forgejo-runner-ssh-key forgejo-runner-credentials; do
         if kubectl get secret "$secret" -n "$NAMESPACE" &>/dev/null; then
             log_info "Deleting secret $secret..."
             kubectl delete secret "$secret" -n "$NAMESPACE" || true
@@ -106,11 +106,11 @@ get_or_generate_secret() {
         kubectl exec -n "$FORGEJO_NAMESPACE" "deployment/$FORGEJO_DEPLOYMENT" -- \
             forgejo forgejo-cli actions generate-secret --config /etc/gitea/app.ini 2>/dev/null > "$secret_file"
 
-        # Store the secret for future use
+        # Store the secret for future use (redirect apply output to stderr)
         kubectl create secret generic forgejo-runner-credentials \
             -n "$NAMESPACE" \
             --from-file=secret="$secret_file" \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml | kubectl apply -f - >&2
     fi
 
     cat "$secret_file"
@@ -152,8 +152,22 @@ get_cluster_ca() {
 # =============================================================================
 get_forgejo_url() {
     local hostname
+    local ip
 
-    # Try HTTPRoute first (Gateway API)
+    # Try HAProxy multiplexer LoadBalancer first (SSH+HTTPS on 443)
+    ip=$(kubectl get svc forgejo-multiplexer-lb -n "$FORGEJO_NAMESPACE" \
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+    if [[ -n "$ip" ]]; then
+        # Convert IP to hex for sslip.io hostname
+        # 192.168.1.200 -> c0a801c8
+        local hex
+        hex=$(printf '%02x%02x%02x%02x' $(echo "$ip" | tr '.' ' '))
+        hostname="git.${hex}.sslip.io"
+        echo "https://$hostname"
+        return
+    fi
+
+    # Fall back to HTTPRoute (Gateway API)
     hostname=$(kubectl get httproute -n "$FORGEJO_NAMESPACE" \
         -o jsonpath='{.items[0].spec.hostnames[0]}' 2>/dev/null || true)
 
@@ -329,11 +343,11 @@ final_message: |
 EOF
 )
 
-    # Create the secret
+    # Create the secret (redirect apply output to stderr)
     kubectl create secret generic forgejo-runner-userdata \
         -n "$NAMESPACE" \
         --from-literal=userdata="$userdata" \
-        --dry-run=client -o yaml | kubectl apply -f -
+        --dry-run=client -o yaml | kubectl apply -f - >&2
 }
 
 # =============================================================================

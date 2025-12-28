@@ -259,6 +259,65 @@
     }
 
     # =========================================================================
+    # OPENCODE - AI Agent Integration
+    # =========================================================================
+
+    # OpenCode terminal gets same treatment as Claude Code
+    {
+      event = "FileType";
+      pattern = [ "opencode" ];
+      callback.__raw = ''
+        function()
+          vim.opt_local.winfixwidth = true
+          vim.opt_local.winfixheight = false
+          vim.opt_local.number = false
+          vim.opt_local.relativenumber = false
+          vim.opt_local.signcolumn = "no"
+        end
+      '';
+    }
+
+    # OpenCode SSE events - react to agent state changes
+    # Events: session.idle, session.update, message.created, etc.
+    {
+      event = "User";
+      pattern = [ "OpencodeEvent" ];
+      callback.__raw = ''
+        function(event)
+          local data = event.data
+          if not data then return end
+
+          -- Auto-reload buffers when OpenCode edits files
+          if data.type == "file.edited" or data.type == "session.idle" then
+            -- Refresh all buffers that might have been modified
+            vim.schedule(function()
+              for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "" then
+                  local name = vim.api.nvim_buf_get_name(buf)
+                  if name ~= "" and vim.fn.filereadable(name) == 1 then
+                    vim.api.nvim_buf_call(buf, function()
+                      vim.cmd("checktime")
+                    end)
+                  end
+                end
+              end
+            end)
+          end
+
+          -- Notify on session idle (agent finished responding)
+          if data.type == "session.idle" then
+            vim.schedule(function()
+              Snacks.notifier.notify("OpenCode ready", "info", {
+                title = "OpenCode",
+                timeout = 2000,
+              })
+            end)
+          end
+        end
+      '';
+    }
+
+    # =========================================================================
     # LSP
     # =========================================================================
 

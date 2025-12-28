@@ -4,6 +4,7 @@
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
+# OpenCode theme from: ../config/opencode/
 
 { baseShell, packages, programs, config, ... }:
 
@@ -25,11 +26,14 @@ baseShell.overrideAttrs (old: {
     # SSH config generation from centralized src/config/shell/ssh.nix
     ${config.shell.ssh.shellHook}
 
+    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    ${config.opencode.shellHook}
+
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
     echo "IDE ready: nvim, tmux, forgejo-cli"
   '';
 
-  env = old.env // config.shell.ssh.env;
+  env = old.env // config.shell.ssh.env // config.opencode.env;
 })

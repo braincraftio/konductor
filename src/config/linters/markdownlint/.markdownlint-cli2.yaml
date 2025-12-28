@@ -8,18 +8,24 @@
 
 # Ignores - files/directories to skip
 ignores:
-  - "node_modules/**"
-  - ".npm-global/**"
-  - "vendor/**"
-  - ".reports/**"
-  - "coverage/**"
-  - "docs/generated/**"
-  - ".cache/**"
-  - "tmp/**"
-  - ".tmp/**"
-  - "CHANGELOG.md"
-  - "LICENSE.md"
-  - ".git/**"
+  - "**/node_modules/**"
+  - "**/.npm-global/**"
+  - "**/vendor/**"
+  - "**/.reports/**"
+  - "**/coverage/**"
+  - "**/docs/generated/**"
+  - "**/.cache/**"
+  - "**/tmp/**"
+  - "**/.tmp/**"
+  - "**/CHANGELOG.md"
+  - "**/LICENSE.md"
+  - "**/.git/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/site-packages/**"
+  - "**/__pycache__/**"
+  - "**/dist/**"
+  - "**/build/**"
 
 # Disable auto-fix (pre-commit hooks must be read-only)
 fix: false

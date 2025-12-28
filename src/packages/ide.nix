@@ -1,5 +1,11 @@
 # src/packages/ide.nix
 # IDE and developer experience tools
+#
+# Includes:
+#   - TUI tools (lazygit, htop, btop, etc.)
+#   - AI coding agents (opencode)
+#   - Neovim plugin dependencies
+#   - Cloudflare developer platform CLI tools
 
 { pkgs }:
 
@@ -24,6 +30,10 @@ in
     dust # Disk usage analyzer
     tree # Directory tree
 
+    # AI coding agents (from unstable - fast-moving packages)
+    # opencode: 1.0.184 (unstable) vs 1.0.105 (25.11)
+    unstable.opencode
+
     # Neovim dependencies (required for plugins)
     tree-sitter # Parser generator for nvim-treesitter (:TSInstallFromGrammar)
     luaEnv # Lua 5.1 with luarocks and rest.nvim dependencies
@@ -36,6 +46,11 @@ in
 
     # Render-markdown latex support
     python312Packages.pylatexenc # utftex for latex-to-unicode conversion
+
+    # Cloudflare developer platform CLI tools
+    wrangler # CLI for Cloudflare Workers, Pages, KV, R2, D1, Workflows
+    cloudflared # Cloudflare Tunnel, Access, DNS over HTTPS
+    flarectl # CLI for interacting with Cloudflare account
   ];
 
   shellHook = "";

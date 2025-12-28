@@ -102,6 +102,16 @@ in
                 '';
                 text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 2 }, { "Vibe", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "v", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
+              # OpenCode - multi-provider AI agent with deep integration
+              {
+                key = "o";
+                action.__raw = ''
+                  function()
+                    require('which-key').show({ keys = '<leader>o', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 2 }, { "OpenCode", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "o", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
+              }
               # Core file operations
               {
                 key = "f";
@@ -270,11 +280,19 @@ in
           always_show_bufferline = true;
           separator_style = "slant";
           # Offset for explorer without duplicate text (explorer has its own title)
-          offsets = [{
-            filetype = "snacks_layout_box";
-            text = "";
-            separator = true;
-          }];
+          offsets = [
+            {
+              filetype = "snacks_layout_box";
+              text = "";
+              separator = true;
+            }
+            {
+              filetype = "opencode";
+              text = " OpenCode";
+              highlight = "Directory";
+              separator = true;
+            }
+          ];
           # Show working directory for terminals, clean names for others
           name_formatter.__raw = ''
             function(buf)
@@ -336,6 +354,9 @@ in
                 -- Claude Code: show context
                 elseif ft == "claude-code" then
                   return "󰚩 Claude"
+                -- OpenCode: show context
+                elseif ft == "opencode" then
+                  return " OpenCode"
                 else
                   -- Files: relative path for location context
                   return vim.fn.expand("%:~:.")
@@ -358,6 +379,9 @@ in
         spec = [
           # Primary workflow groups
           { __unkeyed-1 = "<leader>v"; group = "Vibe"; icon = "󰚩"; }
+          { __unkeyed-1 = "<leader>o"; group = "OpenCode"; icon = ""; }
+          { __unkeyed-1 = "<leader>op"; group = "Prompts"; icon = ""; }
+          { __unkeyed-1 = "<leader>os"; group = "Session"; icon = ""; }
           { __unkeyed-1 = "<leader>l"; group = "LSP"; icon = ""; }
           { __unkeyed-1 = "<leader>f"; group = "Find"; icon = ""; }
           { __unkeyed-1 = "<leader>s"; group = "Search"; icon = ""; }
@@ -638,6 +662,10 @@ in
     # AI LAYER
     # =========================================================================
 
+    # OpenCode - Multi-provider AI agent with deep Neovim integration
+    # Configured via extraPlugins below (not native nixvim plugin)
+    # Keymaps: <leader>o* group, toggle with <leader>vo
+
     # Claude Code - Official Anthropic Claude integration
     claude-code = {
       enable = true;
@@ -666,11 +694,13 @@ in
           resume = "--resume";
           verbose = "--verbose";
         };
-        # Keymaps handled in keymaps.nix, disable defaults
+        # Keymaps: normal mode toggle in keymaps.nix, terminal toggle enabled
+        # <C-o> in terminal mode closes/interrupts Claude without killing process
+        # <Esc><Esc> exits terminal mode, <C-o> interrupts the operation
         keymaps = {
           toggle = {
-            normal = false;
-            terminal = false;
+            normal = false;  # Using <leader>vv from keymaps.nix
+            terminal = "<C-o>";  # Interrupt/close Claude from terminal mode
           };
           window_navigation = true;
           scrolling = true;
@@ -738,7 +768,25 @@ in
       buildVimPlugin = pkgs.vimUtils.buildVimPlugin;
     in
     [
+      # -----------------------------------------------------------------------
+      # OpenCode.nvim - Deep integration with OpenCode AI agent
+      # -----------------------------------------------------------------------
+      # Features:
+      #   - Direct HTTP connection to OpenCode server (port 3232)
+      #   - SSE real-time events -> OpencodeEvent autocmds
+      #   - Context injection: @buffer, @this, @diagnostics, @diff, @visible
+      #   - Built-in prompts: review, explain, document, fix, test, optimize
+      #   - Session control: new, list, share, undo, redo, page navigation
+      #   - Vim-native operators with dot-repeat support
+      # -----------------------------------------------------------------------
+      # OpenCode.nvim - configured via vim.g.opencode_opts (no setup() function)
+      # Configuration is set in extraConfigLuaPre in extraConfig.nix
+      # Using unstable: 2025-12-18 vs stable 2025-11-20 (about 1 month newer)
+      pkgs.unstable.vimPlugins.opencode-nvim
+
+      # -----------------------------------------------------------------------
       # render-markdown.nvim - live in-editor markdown rendering (normal mode)
+      # -----------------------------------------------------------------------
       ((buildVimPlugin {
         name = "render-markdown.nvim";
         src = pkgs.fetchFromGitHub {
