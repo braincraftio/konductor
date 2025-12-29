@@ -51,6 +51,9 @@ in
     wrangler # CLI for Cloudflare Workers, Pages, KV, R2, D1, Workflows
     cloudflared # Cloudflare Tunnel, Access, DNS over HTTPS
     flarectl # CLI for interacting with Cloudflare account
+
+    # Documentation site generation
+    hugo # Static site generator for docs (Go-based, works with Docsy theme)
   ];
 
   shellHook = "";

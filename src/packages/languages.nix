@@ -32,12 +32,25 @@ rec {
   # Go
   # ===========================================================================
   goPackages = with pkgs; [
+    # Runtime
     pkgs."go_${langs.go.version}"
+
+    # LSP and debugging
     gopls
     delve
+
+    # Linting (wrapped in src/config/linters/golangci-lint/)
     golangci-lint
+
+    # Formatting
     gofumpt
+
+    # Go tools (stringer, guru, etc.)
     gotools
+
+    # Release automation
+    goreleaser           # Build, release, and publish Go binaries
+    git-cliff            # Changelog generation from conventional commits
   ];
 
   # ===========================================================================

@@ -1,8 +1,25 @@
 ---
-# BrainCraft.io golangci-lint Configuration
+# BrainCraft.io golangci-lint Configuration v2
+# Documentation-focused linting for Go projects
+
+version: "2"
+
+run:
+  go: "1.24"
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
 
 linters:
+  default: standard
   enable:
+    # Documentation quality
+    - godot        # Sentence format for doc comments
+    - revive       # Exported function documentation
+    - misspell     # Spelling in docs and code
+
+    # Code quality (kept from v1)
     - gofmt
     - goimports
     - govet
@@ -12,15 +29,84 @@ linters:
     - ineffassign
     - unused
 
-linters-settings:
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: github.com/braincraftio
+  settings:
+    godot:
+      scope: declarations
+      period: true
+      capital: false
+      exclude:
+        - "^fixme:"
+        - "^todo:"
+        - "^TODO:"
+        - "^FIXME:"
+        - "^nolint"
+        - "^//go:"
 
-run:
-  timeout: 5m
-  tests: true
+    misspell:
+      locale: US
+      mode: restricted
+      ignore-rules:
+        - cancelled
+
+    revive:
+      severity: warning
+      confidence: 0.8
+      rules:
+        - name: exported
+          severity: warning
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+        - name: package-comments
+          severity: warning
+        - name: comment-spacings
+          severity: warning
+          arguments:
+            - nolint
+            - TODO
+            - FIXME
+        - name: blank-imports
+          severity: warning
+
+    goimports:
+      local-prefixes: github.com/braincraftio
+
+  exclusions:
+    generated: strict
+    presets:
+      - comments
+      - common-false-positives
+    rules:
+      - path: '_test\.go'
+        linters:
+          - godot
+          - revive
+      - path: '\.pb\.go'
+        linters:
+          - godot
+          - revive
+      - path: '_gen\.go'
+        linters:
+          - godot
+          - revive
+
+output:
+  formats:
+    colored-line-number:
+      path: stdout
+      colors: true
+      print-linter-name: true
+  sort-order:
+    - linter
+    - severity
+    - file
+
+severity:
+  default: warning
+  rules:
+    - linters:
+        - revive
+      severity: error
 
 issues:
   exclude-use-default: false

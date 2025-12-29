@@ -1,0 +1,327 @@
+# go.toml - Go development tasks for BrainCraft.io
+#
+# Provides:
+# - Go linting (via golangci-lint)
+# - Go formatting (gofumpt)
+# - Go testing
+# - Go code generation
+# - Release automation
+#
+# Task naming convention: go:action:detail
+
+# =============================================================================
+# TOP-LEVEL GO ORCHESTRATION
+# =============================================================================
+
+["go"]
+description = "Go help and available commands"
+alias = ["g"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Go Development Commands"
+
+printf '%bLinting:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run go:lint          Run golangci-lint\n'
+printf '  mise run go:lint:fix      Auto-fix linting issues\n'
+printf '\n'
+
+printf '%bFormatting:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run go:fmt           Format with gofumpt\n'
+printf '  mise run go:fmt:check     Check formatting\n'
+printf '\n'
+
+printf '%bTesting:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run go:test          Run all tests\n'
+printf '  mise run go:test:cover    Run tests with coverage\n'
+printf '  mise run go:test:race     Run tests with race detector\n'
+printf '\n'
+
+printf '%bCode Generation:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run go:generate      Run go generate\n'
+printf '  mise run go:mod:tidy      Tidy go.mod\n'
+printf '\n'
+
+printf '%bRelease:%b\n' "${CYAN:-}" "${NC:-}"
+printf '  mise run go:release:check Check goreleaser config\n'
+printf '  mise run go:changelog     Generate changelog\n'
+printf '\n'
+'''
+
+# =============================================================================
+# GO LINTING
+# =============================================================================
+
+["go:lint"]
+description = "Lint Go code with golangci-lint"
+alias = ["gl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running golangci-lint..."
+
+# golangci-lint is wrapped with hermetic config in src/config/linters/golangci-lint/
+if golangci-lint run ./...; then
+    print_status success "Go linting passed"
+else
+    print_status error "Go linting failed"
+    exit 1
+fi
+'''
+
+["go:lint:fix"]
+description = "Auto-fix Go linting issues"
+alias = ["glf"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running golangci-lint with auto-fix..."
+
+if golangci-lint run --fix ./...; then
+    print_status success "Go linting fixes applied"
+else
+    print_status error "Some issues could not be auto-fixed"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# GO FORMATTING
+# =============================================================================
+
+["go:fmt"]
+description = "Format Go code with gofumpt"
+alias = ["gf"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Formatting Go code with gofumpt..."
+
+if gofumpt -w .; then
+    print_status success "Go code formatted"
+else
+    print_status error "Go formatting failed"
+    exit 1
+fi
+'''
+
+["go:fmt:check"]
+description = "Check Go code formatting without changes"
+alias = ["gfc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Checking Go code formatting..."
+
+# gofumpt -d shows diff, returns 0 if no changes needed
+if [ -z "$(gofumpt -d . 2>&1)" ]; then
+    print_status success "Go code is properly formatted"
+else
+    print_status error "Go code needs formatting"
+    gofumpt -d .
+    print_status info "Run: mise run go:fmt"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# GO TESTING
+# =============================================================================
+
+["go:test"]
+description = "Run Go tests"
+alias = ["gt"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running Go tests..."
+
+if go test ./...; then
+    print_status success "Go tests passed"
+else
+    print_status error "Go tests failed"
+    exit 1
+fi
+'''
+
+["go:test:cover"]
+description = "Run Go tests with coverage"
+alias = ["gtc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running Go tests with coverage..."
+
+if go test -coverprofile=coverage.out ./...; then
+    print_status success "Go tests passed"
+    go tool cover -func=coverage.out
+else
+    print_status error "Go tests failed"
+    exit 1
+fi
+'''
+
+["go:test:race"]
+description = "Run Go tests with race detector"
+alias = ["gtr"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running Go tests with race detector..."
+
+if go test -race ./...; then
+    print_status success "Go tests passed (no races detected)"
+else
+    print_status error "Go tests failed or race detected"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# GO CODE GENERATION
+# =============================================================================
+
+["go:generate"]
+description = "Run go generate"
+alias = ["gg"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Running go generate..."
+
+if go generate ./...; then
+    print_status success "Go generate complete"
+else
+    print_status error "Go generate failed"
+    exit 1
+fi
+'''
+
+["go:mod:tidy"]
+description = "Tidy go.mod dependencies"
+alias = ["gmt"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Tidying go.mod..."
+
+if go mod tidy; then
+    print_status success "go.mod tidied"
+else
+    print_status error "go mod tidy failed"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# GO BUILD
+# =============================================================================
+
+["go:build"]
+description = "Build Go project"
+alias = ["gb"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Building Go project..."
+
+if go build ./...; then
+    print_status success "Go build complete"
+else
+    print_status error "Go build failed"
+    exit 1
+fi
+'''
+
+# =============================================================================
+# RELEASE AUTOMATION
+# =============================================================================
+
+["go:release:check"]
+description = "Check release configuration (dry run)"
+alias = ["grc"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+if [ ! -f ".goreleaser.yaml" ] && [ ! -f ".goreleaser.yml" ]; then
+    print_status error "No .goreleaser.yaml found"
+    exit 1
+fi
+
+print_status info "Checking GoReleaser configuration..."
+
+if goreleaser check; then
+    print_status success "GoReleaser config valid"
+else
+    print_status error "GoReleaser config invalid"
+    exit 1
+fi
+'''
+
+["go:changelog"]
+description = "Generate changelog with git-cliff"
+alias = ["gcl"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_status info "Generating changelog with git-cliff..."
+
+if git-cliff -o CHANGELOG.md; then
+    print_status success "CHANGELOG.md generated"
+else
+    print_status error "Changelog generation failed"
+    exit 1
+fi
+'''
