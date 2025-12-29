@@ -51,6 +51,12 @@ rec {
     # Release automation
     goreleaser           # Build, release, and publish Go binaries
     git-cliff            # Changelog generation from conventional commits
+
+    # Code generation
+    ogen                 # OpenAPI v3 server/client code generator
+    cobra-cli            # CLI scaffolding for Cobra applications
+    go-swag              # Swagger 2.0 RESTful API documentation generator
+    mockgen              # Mock generation for Go interfaces (uber/mock)
   ];
 
   # ===========================================================================
