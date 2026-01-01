@@ -6,6 +6,7 @@
 #   - AI coding agents (opencode)
 #   - Neovim plugin dependencies
 #   - Cloudflare developer platform CLI tools
+#   - LSP servers for Claude Code CLI code intelligence
 
 { pkgs }:
 
@@ -54,6 +55,25 @@ in
 
     # Documentation site generation
     hugo # Static site generator for docs (Go-based, works with Docsy theme)
+
+    # Language Server Protocol (LSP) servers for Claude Code CLI code intelligence
+    # https://docs.anthropic.com/en/docs/claude-code/settings#code-intelligence
+    gopls # Go LSP server
+    lua-language-server # Lua LSP server
+    pyright # Python LSP server
+    rust-analyzer # Rust LSP server
+    typescript-language-server # TypeScript/JavaScript LSP server
+    nil # Nix LSP server
+
+    # Model Context Protocol (MCP) servers for Claude Code
+    github-mcp-server # GitHub issues, PRs, code search
+    gitea-mcp-server # Forgejo/Gitea integration
+    mcp-k8s-go # Kubernetes cluster interaction
+
+    # Nix flake development tools
+    flake-checker # Health checks for Nix flakes
+    nvd # Nix package version diff tool
+    nixfmt # Official Nix code formatter
   ];
 
   shellHook = "";
