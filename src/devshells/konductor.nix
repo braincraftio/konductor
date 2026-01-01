@@ -101,7 +101,7 @@ baseShell.overrideAttrs (old: {
     echo "  qemu, libvirt, virt-manager, virt-sparsify, OVMF"
     echo ""
     echo "CI/CD Tools:"
-    echo "  forgejo-runner, forgejo-cli"
+    echo "  forgejo-runner, fj (forgejo-cli)"
     echo ""
     echo "Commands:  mise run help"
     echo ""

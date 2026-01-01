@@ -65,6 +65,11 @@ in
     typescript-language-server # TypeScript/JavaScript LSP server
     nil # Nix LSP server
 
+    # Git forge CLI tools (used as git credential helpers)
+    gh # GitHub CLI (also used as git credential helper for GitHub)
+    tea # Gitea/Forgejo CLI client (also used as git credential helper)
+    # Note: forgejo-cli is provided by programs.forgejo.cliPackages
+
     # Model Context Protocol (MCP) servers for Claude Code
     github-mcp-server # GitHub issues, PRs, code search
     gitea-mcp-server # Forgejo/Gitea integration

@@ -99,7 +99,7 @@ baseShell.overrideAttrs (old: {
     echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
     echo ""
     echo "CI Tools:"
-    echo "  forgejo-runner, forgejo-cli"
+    echo "  forgejo-runner, fj (forgejo-cli)"
     echo "  docker, docker-compose, buildkit, skopeo, crane"
     echo "  qemu, libvirt, virt-sparsify, OVMF"
     echo ""

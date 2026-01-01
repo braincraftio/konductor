@@ -105,6 +105,15 @@ in
         ui = auto
     [pull]
         rebase = true
+    [credential]
+        helper =
+        helper = cache --timeout=3600
+    [credential "https://github.com"]
+        helper =
+        helper = !gh auth git-credential
+    [credential "https://git.braincraft.io"]
+        helper =
+        helper = cache --timeout=3600
     [alias]
         st = status
         co = checkout
