@@ -28,7 +28,8 @@
     qemu-utils
     libvirt
     virt-manager
-    guestfs-tools # guestmount, virt-sparsify
+    libguestfs-with-appliance # guestmount, guestunmount (includes appliance)
+    guestfs-tools # virt-sparsify
     OVMF # EFI firmware for QEMU
 
     # Cloud-init ISO creation
