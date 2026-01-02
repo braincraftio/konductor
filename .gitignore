@@ -3,6 +3,7 @@
 # =============================================================================
 result
 result-*
+result.writable
 .nix-profile
 .nix-gcroots
 .direnv

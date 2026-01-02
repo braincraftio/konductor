@@ -120,6 +120,7 @@ pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
 sudo guestunmount /tmp/nixmount 2>/dev/null || true
 sudo rm -rf /tmp/nixmount /tmp/konductor-build-cloud-init
+rm -rf result result.writable 2>/dev/null || true
 ```
 
 `runme run build:qcow2:clean`
@@ -253,9 +254,16 @@ elif [[ "$CONTAINER_REGISTRY" == "ghcr.io" ]]; then
   exit 1
 
 else
-  echo "Unknown registry: $CONTAINER_REGISTRY"
-  echo "Run: docker login $CONTAINER_REGISTRY"
-  exit 1
+  # Custom registry - check if already authenticated
+  if grep -q "$CONTAINER_REGISTRY" ~/.docker/config.json 2>/dev/null; then
+    echo "Already authenticated to $CONTAINER_REGISTRY (found in docker config)"
+    exit 0
+  fi
+  # Login with custom creds or default admin:admin
+  : ${REGISTRY_USERNAME:=admin}
+  : ${REGISTRY_PASSWORD:=admin}
+  echo "$REGISTRY_PASSWORD" | docker login "$CONTAINER_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
+  echo "Logged in to $CONTAINER_REGISTRY as $REGISTRY_USERNAME"
 fi
 ```
 
@@ -269,26 +277,28 @@ Push container to registry as OCI image.
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 : ${CONTAINER_REGISTRY:=docker.io}
 : ${CONTAINER_IMAGE:=containercraft/konductor}
 : ${CONTAINER_TAG:=latest-qcow2}
 FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 
-[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found."; exit 1; }
-[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
+# Verify image exists in local docker daemon (built by build:qcow2:container)
+docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found. Run build:qcow2:container first."; exit 1; }
 
-echo "Pushing: $FULL_IMAGE (OCI format)"
-# --provenance=false --sbom=false: disable attestations that cause "manifest invalid" on some registries
-docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" \
-    --provenance=false \
-    --sbom=false \
-    --output type=image,oci-mediatypes=true,push=true \
-    -t "$FULL_IMAGE" .
+echo "Pushing: $FULL_IMAGE"
+# Use skopeo for reliable OCI push (docker buildx has manifest issues with some registries)
+skopeo copy --dest-tls-verify=false \
+    docker-daemon:"$FULL_IMAGE" \
+    docker://"$FULL_IMAGE"
+
 echo ""
 echo "=== Push Complete ==="
 echo "Image: $FULL_IMAGE"
-echo "Format: OCI"
+
+# Validate image in registry
+echo ""
+echo "=== Validating ==="
+skopeo inspect --tls-verify=false docker://"$FULL_IMAGE" | jq '{Digest, Created, Architecture, Os}'
 ```
 
 `runme run build:qcow2:push`
@@ -359,16 +369,16 @@ echo "VM stopped"
 
 ### build:qcow2:publish
 
-Full automation: image → container → login → push.
+Full automation: clean → image → container → login → push.
 
 ```text
 build:qcow2:publish
 
-  :image → :container → :login → :push
-     │          │          │        │
-     ▼          ▼          ▼        ▼
-   build     package    registry  docker
-   QCOW2     container   auth     push
+  :clean → :image → :container → :login → :push
+     │        │          │          │        │
+     ▼        ▼          ▼          ▼        ▼
+   reset    build     package    registry  skopeo
+   state    QCOW2     container   auth     push
 ```
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
@@ -380,6 +390,7 @@ FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 
 echo "=== Publishing: $FULL_IMAGE ==="
 echo ""
+runme run build:qcow2:clean
 runme run build:qcow2:image
 runme run build:qcow2:container
 runme run build:qcow2:login
@@ -444,10 +455,21 @@ Nix builds the NixOS system closure → `result/nixos.qcow2`.
 ```sh {"name":"_build:qcow2:nix","tag":"requires:nix"}
 set -e
 nix build .#qcow2 --no-warn-dirty
-# result/ is ephemeral build artifact - use current user for QEMU write access
-# Final image content uses kc2:kc2 (set in vm:sync and tmpfiles.rules)
-sudo chown -R "$(id -u):$(id -g)" result/
-sudo chmod -R u+rwX result/
+
+# result/ is a symlink to read-only nix store
+# Create CoW overlay (stores only changed blocks, not full copy)
+BACKING_FILE="$(readlink -f result/nixos.qcow2)"
+rm -rf result.writable 2>/dev/null || true
+mkdir -p result.writable
+qemu-img create -f qcow2 -b "$BACKING_FILE" -F qcow2 result.writable/nixos.qcow2
+
+# Symlink result/ to overlay (tasks expect result/nixos.qcow2)
+rm -f result 2>/dev/null || true
+ln -sf result.writable result
+
+# Set ownership for current user (QEMU write access)
+chown -R "$(id -u):$(id -g)" result.writable/
+chmod -R u+rwX result.writable/
 ```
 
 ---
@@ -577,7 +599,7 @@ Rsync source to `/opt/konductor`.
 set -e
 ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 ssh localhost 'sudo rsync -a \
-    --exclude={result,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled"} \
+    --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled"} \
     /workspace/ /opt/konductor/'
 # Use kc2:kc2 (1001:1001) for consistent shared group ownership
 ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
