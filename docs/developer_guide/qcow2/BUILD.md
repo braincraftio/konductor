@@ -542,12 +542,14 @@ Reset image to pristine state before first boot.
 ```sh {"name":"_build:qcow2:img:reset","tag":"requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
+GUESTMOUNT="$(which guestmount)"
+GUESTUNMOUNT="$(which guestunmount)"
 sudo mkdir -p /tmp/nixmount
-sudo guestmount -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
-trap 'sudo guestunmount /tmp/nixmount 2>/dev/null || true' EXIT
+sudo "$GUESTMOUNT" -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
+trap 'sudo "$GUESTUNMOUNT" /tmp/nixmount 2>/dev/null || true' EXIT
 sudo rm -f /tmp/nixmount/etc/ssh/ssh_host_* /tmp/nixmount/etc/machine-id
 sudo rm -rf /tmp/nixmount/var/lib/cloud /tmp/nixmount/var/log/journal/*
-sudo guestunmount /tmp/nixmount
+sudo "$GUESTUNMOUNT" /tmp/nixmount
 trap - EXIT
 sync && sleep 1
 ```
@@ -660,14 +662,16 @@ Clean credentials and build artifacts from final image.
 ```sh {"name":"_build:qcow2:img:clean","tag":"requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
+GUESTMOUNT="$(which guestmount)"
+GUESTUNMOUNT="$(which guestunmount)"
 sudo mkdir -p /tmp/nixmount
-sudo guestmount -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
-trap 'sudo guestunmount /tmp/nixmount 2>/dev/null || true; sudo rmdir /tmp/nixmount 2>/dev/null || true' EXIT
+sudo "$GUESTMOUNT" -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
+trap 'sudo "$GUESTUNMOUNT" /tmp/nixmount 2>/dev/null || true; sudo rmdir /tmp/nixmount 2>/dev/null || true' EXIT
 sudo rm -f /tmp/nixmount/etc/ssh/ssh_host_* /tmp/nixmount/etc/machine-id
 sudo rm -rf /tmp/nixmount/var/lib/cloud /tmp/nixmount/var/log/journal/*
 sudo rm -rf /tmp/nixmount/root/.ssh /tmp/nixmount/home/*/.ssh 2>/dev/null || true
 sudo rm -f /tmp/nixmount/root/.gitconfig /tmp/nixmount/home/*/.gitconfig 2>/dev/null || true
-sudo guestunmount /tmp/nixmount
+sudo "$GUESTUNMOUNT" /tmp/nixmount
 trap - EXIT
 sync && sleep 1
 sudo rmdir /tmp/nixmount 2>/dev/null || true
@@ -695,7 +699,8 @@ Sparsify to reclaim zero-filled space.
 set -e
 : ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 export LIBGUESTFS_BACKEND=direct
-sudo virt-sparsify --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
+VIRT_SPARSIFY="$(which virt-sparsify)"
+sudo "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
 rm -f "${QCOW2_OUTPUT}.tmp"
 ```
 
