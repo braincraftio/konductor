@@ -444,10 +444,10 @@ Nix builds the NixOS system closure → `result/nixos.qcow2`.
 ```sh {"name":"_build:qcow2:nix","tag":"requires:nix"}
 set -e
 nix build .#qcow2 --no-warn-dirty
-# Use kc2:kc2 (1001:1001) - baked-in least-privilege user
-# UID 1000 reserved for dynamic cloud-init user creation
-sudo chown -R 1001:1001 result/
-sudo chmod -R a+rX result/
+# result/ is ephemeral build artifact - use current user for QEMU write access
+# Final image content uses kc2:kc2 (set in vm:sync and tmpfiles.rules)
+sudo chown -R "$(id -u):$(id -g)" result/
+sudo chmod -R u+rwX result/
 ```
 
 ---
