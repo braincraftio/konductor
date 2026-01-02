@@ -32,6 +32,9 @@ let
   # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
   inherit (devshellPackages) konductor;
 
+  # Systemd mount service template for virtio disk mounting
+  mountService = import ./konductor-mount-template.nix { inherit pkgs; };
+
 in
 {
   # QCOW2 VM image
@@ -44,6 +47,9 @@ in
     # Note: copyChannel is not exposed by nixos-generators wrapper
     # Channel copy prevented via installer.cloneConfig = false below
     modules = [
+      # Import the konductor mount service template
+      mountService
+
       {
         # Basic system configuration
         # stateVersion from src/lib/versions.nix nixos.stateVersion
@@ -499,18 +505,52 @@ in
           cloud-init = {
             enable = true;
             network.enable = true;
+            settings = {
+              # Configure logging to suppress warnings
+              log_cfgs = [
+                [
+                  "logger_name"
+                  "level"
+                  "log_cfg"
+                ]
+                [
+                  "cloudinit"
+                  "DEBUG"
+                  "/var/log/cloud-init.log"
+                ]
+                [
+                  "cloudinit.util"
+                  "DEBUG"
+                  "/var/log/cloud-init.log"
+                ]
+              ];
+              # Configure NixOS distro helper paths
+              system_info = {
+                distro = "nixos";
+                paths = {
+                  cloud_dir = "/var/lib/cloud";
+                  run_dir = "/run/cloud-init";
+                };
+              };
+            };
           };
 
           # Spice/QEMU guest tools for clipboard, display, etc.
           spice-vdagentd.enable = true;
         };
 
+        # Fix cloud-init helper tool path for keys-to-console module
+        # Cloud-init expects helper at /usr/libexec/cloud-init/write-ssh-key-fingerprints
+        # but NixOS has it at ${pkgs.cloud-init}/libexec/write-ssh-key-fingerprints
+        environment.etc."libexec/cloud-init/write-ssh-key-fingerprints".source =
+          "${pkgs.cloud-init}/libexec/write-ssh-key-fingerprints";
+
         # =====================================================================
         # Virtualisation Configuration
         # =====================================================================
         virtualisation = {
-          # Disk size for VM
-          diskSize = lib.mkDefault (20 * 1024); # 20GB (lean image)
+          # Disk size for VM - increased to accommodate full package set
+          diskSize = lib.mkDefault (30 * 1024); # 30GB (full konductor environment)
 
           # Docker - installed but not started on boot
           # Start via: systemctl start docker

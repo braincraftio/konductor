@@ -19,10 +19,29 @@ stringData:
     renderer: networkd
     ethernets:
       enp1s0:
+        # Pod network interface - for Kubernetes API access
+        dhcp4: true
+        dhcp6: false
+        routes:
+          # Route Kubernetes service CIDR through pod network
+          - to: 10.96.0.0/12
+            via: 0.0.0.0
+            metric: 100
+          # Route pod CIDR through pod network
+          - to: 10.244.0.0/16
+            via: 0.0.0.0
+            metric: 100
+        dhcp4-overrides:
+          route-metric: 200
+      enp3s0:
+        # macvtap - physical network (default route)
         dhcp4: true
         dhcp6: false
         dhcp-identifier: mac
+        dhcp4-overrides:
+          route-metric: 300
       enp2s0:
+        # OVS bridge slave - no IP
         dhcp4: false
         dhcp6: false
         link-local: []

@@ -45,7 +45,7 @@ spec:
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
-            url: docker://docker.io/containercraft/konductor@sha256:5ea9959f7b84ca5b981a2dd5c32fff64e34cbc40bfc28cb7ad8fdba05c3ad85c
+            url: docker://docker.io/containercraft/konductor:latest-qcow2
   template:
     metadata:
       labels:
@@ -93,32 +93,56 @@ spec:
               cache: writeback
               disk:
                 bus: virtio
+            - name: workspace-disk
+              serial: e4-root-775-workspace
+              disk:
+                bus: virtio
             - name: cloudinitdisk
               bootOrder: 2
               disk:
                 bus: virtio
+            - name: kubeconfig
+              serial: iso-root-755-m.kube
+              disk:
+                bus: virtio
           interfaces:
-            # OVS bridge: External network via br0 (avoids macvtap hairpin)
-            - name: ovs-external
-              model: virtio
-              bridge: {}
-            # Pod network: Cluster-internal access (Forgejo, DNS, services)
-            - name: pod-internal
+            # Pod network: For Kubernetes API access
+            - name: pod
               model: virtio
               masquerade: {}
+            # macvtap: Direct L2 access to physical NIC
+            - name: macvtap
+              model: virtio
+              macAddress: "02:00:00:f0:9e:01"
+              binding:
+                name: macvtap
+            # OVS bridge: For nested virt (no IP)
+            - name: ovs
+              model: virtio
+              bridge: {}
       networks:
-        - name: ovs-external
-          multus:
-            networkName: ovs-br0
-        - name: pod-internal
+        - name: pod
           pod: {}
+        - name: macvtap
+          multus:
+            networkName: macvtap
+        - name: ovs
+          multus:
+            networkName: br0
       volumes:
         - name: root-disk
           dataVolume:
             name: forgejo-runner-root
+        - name: workspace-disk
+          persistentVolumeClaim:
+            claimName: forgejo-runner-workspace
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
               name: forgejo-runner-userdata
             networkDataSecretRef:
               name: forgejo-runner-networkdata
+        - name: kubeconfig
+          secret:
+            secretName: forgejo-runner-kubeconfig
+            optional: true

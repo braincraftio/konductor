@@ -21,6 +21,9 @@ resources:
   - namespace.yaml
   - network-attachment-definitions.yaml
   - networkdata.yaml
+  - serviceaccount.yaml
+  - kubeconfig-generator.yaml
+  - runner-workspace-pvc.yaml
   - virtualmachine.yaml
 
 namespace: forgejo-runners

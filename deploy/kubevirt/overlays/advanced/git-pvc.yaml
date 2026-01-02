@@ -1,0 +1,20 @@
+# =============================================================================
+# Persistent Volume Claim for Git repositories
+# =============================================================================
+# ReadWriteMany CephFS volume for persistent Git storage across VM restarts.
+# Mounted at /home/usrbinkat/Git inside the VM.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konductor-git
+  labels:
+    app: konductor
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: cephfs-nvme-vm
+  resources:
+    requests:
+      storage: 100Gi

@@ -1,0 +1,21 @@
+# =============================================================================
+# Persistent Volume Claim for usrbinkat home directory
+# =============================================================================
+# ReadWriteMany CephFS volume for persistent user home directory.
+# Mounted at /home/usrbinkat inside the VM for user data, configuration,
+# shell history, and application state across VM restarts.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konductor-usrbinkat-home
+  labels:
+    app: konductor
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: cephfs-nvme-vm
+  resources:
+    requests:
+      storage: 50Gi

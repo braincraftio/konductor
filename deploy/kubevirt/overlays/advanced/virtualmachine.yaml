@@ -35,7 +35,7 @@ spec:
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
-            url: docker://docker.io/containercraft/konductor:qcow2
+            url: docker://docker.io/containercraft/konductor:latest-qcow2
   template:
     spec:
       accessCredentials:
@@ -46,8 +46,10 @@ spec:
             propagationMethod:
               qemuGuestAgent:
                 users:
+                  - usrbinkat
                   - kc2
                   - kc2admin
+                  - runner
       domain:
         cpu:
           cores: 4
@@ -63,7 +65,7 @@ spec:
             efi:
               secureBoot: false
         devices:
-          autoattachPodInterface: false
+          autoattachPodInterface: true
           autoattachSerialConsole: true
           autoattachGraphicsDevice: true
           networkInterfaceMultiqueue: true
@@ -74,13 +76,30 @@ spec:
               cache: writeback
               disk:
                 bus: virtio
+            - name: git-disk
+              serial: e4-root-775-h.Git
+              disk:
+                bus: virtio
+            - name: home-disk-usrbinkat
+              serial: e4-usrbinkat-700-h.u
+              disk:
+                bus: virtio
             - name: cloudinitdisk
               disk:
                 bus: virtio
+            - name: kubeconfig
+              serial: iso-root-755-m.kube
+              disk:
+                bus: virtio
           interfaces:
+            # Pod network: For Kubernetes API access
+            - name: default
+              model: virtio
+              masquerade: {}
             # macvtap: Direct L2 access to 10GbE physical NIC
             - name: enp1s0
               model: virtio
+              macAddress: "02:00:00:c0:9d:01"
               binding:
                 name: macvtap
             # OVS bridge: For nested virt (no IP)
@@ -88,6 +107,8 @@ spec:
               model: virtio
               bridge: {}
       networks:
+        - name: default
+          pod: {}
         - name: enp1s0
           multus:
             networkName: macvtap
@@ -98,9 +119,19 @@ spec:
         - name: root-disk
           persistentVolumeClaim:
             claimName: konductor-root
+        - name: git-disk
+          persistentVolumeClaim:
+            claimName: konductor-git
+        - name: home-disk-usrbinkat
+          persistentVolumeClaim:
+            claimName: konductor-usrbinkat-home
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
               name: konductor-userdata
             networkDataSecretRef:
               name: konductor-networkdata
+        - name: kubeconfig
+          secret:
+            secretName: konductor-kubeconfig
+            optional: true

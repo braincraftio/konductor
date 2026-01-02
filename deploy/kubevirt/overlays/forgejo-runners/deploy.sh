@@ -70,6 +70,9 @@ teardown() {
         kubectl delete dv "${RUNNER_NAME}-root" -n "$NAMESPACE" --wait=true --timeout=120s || true
     fi
 
+    # NOTE: Workspace PVC is NOT deleted by default to preserve persistent data
+    # To delete workspace PVC, run: kubectl delete pvc -n forgejo-runners forgejo-runner-workspace
+
     # Delete secrets (including credentials to allow re-registration with new URL)
     for secret in forgejo-runner-userdata forgejo-runner-networkdata forgejo-runner-ssh-key forgejo-runner-credentials; do
         if kubectl get secret "$secret" -n "$NAMESPACE" &>/dev/null; then
@@ -104,7 +107,7 @@ get_or_generate_secret() {
     else
         log_info "Generating new shared secret..."
         kubectl exec -n "$FORGEJO_NAMESPACE" "deployment/$FORGEJO_DEPLOYMENT" -- \
-            forgejo forgejo-cli actions generate-secret --config /etc/gitea/app.ini 2>/dev/null > "$secret_file"
+            forgejo forgejo-cli actions generate-secret --config /var/lib/gitea/custom/conf/app.ini 2>/dev/null > "$secret_file"
 
         # Store the secret for future use (redirect apply output to stderr)
         kubectl create secret generic forgejo-runner-credentials \
@@ -127,7 +130,7 @@ register_runner() {
 
     kubectl exec -n "$FORGEJO_NAMESPACE" "deployment/$FORGEJO_DEPLOYMENT" -- \
         forgejo forgejo-cli actions register \
-            --config /etc/gitea/app.ini \
+            --config /var/lib/gitea/custom/conf/app.ini \
             --secret "$secret" \
             --name "$RUNNER_NAME" \
             --scope "" \
@@ -152,35 +155,21 @@ get_cluster_ca() {
 # =============================================================================
 get_forgejo_url() {
     local hostname
-    local ip
 
-    # Try HAProxy multiplexer LoadBalancer first (SSH+HTTPS on 443)
-    ip=$(kubectl get svc forgejo-multiplexer-lb -n "$FORGEJO_NAMESPACE" \
-        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
-    if [[ -n "$ip" ]]; then
-        # Convert IP to hex for sslip.io hostname
-        # 192.168.1.200 -> c0a801c8
-        local hex
-        hex=$(printf '%02x%02x%02x%02x' $(echo "$ip" | tr '.' ' '))
-        hostname="git.${hex}.sslip.io"
-        echo "https://$hostname"
-        return
+    # Use public git.braincraft.io endpoint (HTTPRoute)
+    hostname=$(kubectl get httproute -n envoy-gateway-system forgejo-https-httproute \
+        -o jsonpath='{.spec.hostnames[0]}' 2>/dev/null || true)
+
+    # Fall back to forgejo namespace HTTPRoute
+    if [[ -z "$hostname" ]]; then
+        hostname=$(kubectl get httproute -n "$FORGEJO_NAMESPACE" \
+            -o jsonpath='{.items[0].spec.hostnames[0]}' 2>/dev/null || true)
     fi
-
-    # Fall back to HTTPRoute (Gateway API)
-    hostname=$(kubectl get httproute -n "$FORGEJO_NAMESPACE" \
-        -o jsonpath='{.items[0].spec.hostnames[0]}' 2>/dev/null || true)
 
     # Fall back to Ingress
     if [[ -z "$hostname" ]]; then
         hostname=$(kubectl get ingress -n "$FORGEJO_NAMESPACE" \
             -o jsonpath='{.items[0].spec.rules[0].host}' 2>/dev/null || true)
-    fi
-
-    # Fall back to Service
-    if [[ -z "$hostname" ]]; then
-        hostname=$(kubectl get svc forgejo-http -n "$FORGEJO_NAMESPACE" \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
     fi
 
     if [[ -z "$hostname" ]]; then
@@ -272,6 +261,18 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
 
+# Format workspace disk on first boot if not already formatted
+# Mounting is handled by konductor-mount@.service (systemd template)
+#
+# Serial ID format: <fstype>-<user>-<mode>-<path>
+#   e4-root-775-workspace → /dev/disk/by-id/virtio-e4-root-775-workspace
+fs_setup:
+  - label: workspace
+    filesystem: ext4
+    device: /dev/disk/by-id/virtio-e4-root-775-workspace
+    partition: none
+    overwrite: false
+
 write_files:
   # Cluster CA Certificate
   - path: /etc/konductor/cluster-ca.crt
@@ -310,6 +311,31 @@ $(echo "$cluster_ca" | sed 's/^/      /')
           - "konductor:host"
 
 runcmd:
+  # -----------------------------------------------------------------------
+  # Mount persistent volumes via systemd template service
+  # -----------------------------------------------------------------------
+  # konductor-mount@.service parses serial ID to mount:
+  #   Serial ID format: <fstype>-<user>-<mode>-<path>
+  #
+  #   e4-root-775-workspace → mount -t ext4 /dev/... /workspace, chown root:users, chmod 775
+  #   iso-root-755-m.kube   → mount -t iso9660 -o ro /dev/... /mnt/kubeconfig, chown root:root, chmod 755
+  # -----------------------------------------------------------------------
+  - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-root-775-workspace.service]
+  - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@iso-root-755-m.kube.service]
+
+  # Create symlink: /home/runner/workspace → /workspace (mounted by systemd)
+  - [/run/current-system/sw/bin/ln, -sf, /workspace, /home/runner/workspace]
+  - [/run/current-system/sw/bin/chown, -h, "runner:users", /home/runner/workspace]
+
+  # Copy kubeconfig to user directories (konductor-mount@iso-root-755-m.kube.service mounts it to /mnt/kubeconfig)
+  - [/run/current-system/sw/bin/mkdir, -p, /home/runner/.kube, /home/kc2admin/.kube]
+  - [/run/current-system/sw/bin/cp, /mnt/kubeconfig/config, /home/runner/.kube/config]
+  - [/run/current-system/sw/bin/cp, /mnt/kubeconfig/config, /home/kc2admin/.kube/config]
+  - [/run/current-system/sw/bin/chown, -R, "runner:users", /home/runner/.kube]
+  - [/run/current-system/sw/bin/chown, -R, "kc2admin:users", /home/kc2admin/.kube]
+  - [/run/current-system/sw/bin/chmod, "600", /home/runner/.kube/config]
+  - [/run/current-system/sw/bin/chmod, "600", /home/kc2admin/.kube/config]
+
   # Ensure runner config directory exists
   # Note: NixOS requires full paths - binaries in /run/current-system/sw/bin
   - /run/current-system/sw/bin/mkdir -p /home/runner/.config/forgejo-runner

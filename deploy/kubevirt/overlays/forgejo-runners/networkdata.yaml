@@ -1,12 +1,11 @@
 # =============================================================================
 # Network Data Secret - Forgejo Runners Configuration
 # =============================================================================
-# Cloud-init v2 network configuration for dual-NIC setup:
-#   - enp1s0: Primary interface with DHCP (OVS bridge to physical network)
-#   - enp2s0: Secondary interface (pod network for cluster-internal access)
-#
-# OVS bridge provides external connectivity without macvtap hairpin issues.
-# Pod interface enables access to cluster services (Forgejo, DNS, etc).
+# Cloud-init v2 network configuration for triple-NIC setup:
+#   - enp1s0: Pod network interface (for Kubernetes API access)
+#   - enp3s0: macvtap interface (physical network with DHCP)
+#   - enp2s0: OVS bridge slave (for nested virt, no IP)
+#   - br0: Bridge device with no IP (used by nested VMs)
 # =============================================================================
 apiVersion: v1
 kind: Secret
@@ -21,11 +20,40 @@ stringData:
     renderer: networkd
     ethernets:
       enp1s0:
+        # Pod network interface - for Kubernetes API access
         dhcp4: true
         dhcp6: false
-        dhcp-identifier: mac
+        routes:
+          # Route Kubernetes service CIDR through pod network
+          - to: 10.96.0.0/12
+            via: 0.0.0.0
+            metric: 100
+          # Route pod CIDR through pod network
+          - to: 10.244.0.0/16
+            via: 0.0.0.0
+            metric: 100
+        dhcp4-overrides:
+          route-metric: 200
       enp2s0:
+        # macvtap - physical network (default route)
         dhcp4: true
         dhcp6: false
         dhcp-identifier: mac
+        dhcp4-overrides:
+          route-metric: 300
+      enp3s0:
+        # OVS bridge slave - no IP
+        dhcp4: false
+        dhcp6: false
+        link-local: []
         optional: true
+    bridges:
+      br0:
+        interfaces:
+          - enp3s0
+        dhcp4: false
+        dhcp6: false
+        link-local: []
+        parameters:
+          stp: false
+          forward-delay: 0

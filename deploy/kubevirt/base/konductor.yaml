@@ -46,13 +46,18 @@ type: Opaque
 stringData:
   userdata: |
     #cloud-config
+    # Konductor Development VM Cloud-Init Configuration
+    # =========================================================================
+    # SSH Key Injection:
+    #   Keys are injected at runtime via QEMU Guest Agent.
+    #   Create secret: kubectl create secret generic konductor-ssh-key \
+    #     -n konductor --from-file=key=$HOME/.ssh/id_ed25519.pub
+    # =========================================================================
+
     # -------------------------------------------------------------------------
     # User Configuration
     # -------------------------------------------------------------------------
-    # SSH keys are injected via QEMU Guest Agent from konductor-ssh-key secret.
-    # Create the secret: kubectl create secret generic konductor-ssh-key \
-    #   -n konductor --from-file=key=$HOME/.ssh/id_ed25519.pub
-    # -------------------------------------------------------------------------
+    # UIDs match src/lib/users.nix for consistency across deployments
     users:
       - name: kc2
         uid: 1001
@@ -77,15 +82,16 @@ stringData:
     # -------------------------------------------------------------------------
     # Startup Commands
     # -------------------------------------------------------------------------
+    # Note: NixOS requires full paths - binaries in /run/current-system/sw/bin
     runcmd:
-      - [systemctl, start, docker]
-      - [systemctl, start, libvirtd]
+      - [/run/current-system/sw/bin/systemctl, start, docker]
+      - [/run/current-system/sw/bin/systemctl, start, libvirtd]
 
     final_message: |
-      ## template: jinja
-      Cloud-Init: v{{version}} | Datasource: {{datasource}} | Boot: {{uptime}}s
+      Cloud-Init Complete
+      VM: konductor
       Access: ssh kc2@<IP> or ssh kc2admin@<IP>
-      Ready: Full Konductor environment pre-installed
+      Environment: Full Konductor toolchain pre-installed
 ---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -164,7 +170,7 @@ spec:
       volumes:
         - name: root-disk
           containerDisk:
-            image: docker.io/containercraft/konductor@sha256:c0499607a28da69a3a0a55600bffeebed781aa59d188413540ed38ae986ea766
+            image: docker.io/containercraft/konductor:latest-qcow2
             path: /disk/nixos.qcow2
         - name: cloudinitdisk
           cloudInitNoCloud:

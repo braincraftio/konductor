@@ -1,0 +1,21 @@
+# =============================================================================
+# Persistent Volume Claim for Forgejo Runner Workspace
+# =============================================================================
+# ReadWriteMany CephFS volume for persistent runner workspace storage.
+# Mounted at /home/runner/workspace inside the VM for build artifacts,
+# caches, and persistent runner state across VM restarts.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forgejo-runner-workspace
+  labels:
+    app: forgejo-runner
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: cephfs-nvme-vm
+  resources:
+    requests:
+      storage: 100Gi
