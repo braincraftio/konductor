@@ -8,15 +8,22 @@
 #     fstype = e4 (ext4), iso (iso9660), xfs, auto
 #     user   = owner username OR "root"
 #     mode   = 3-digit octal permissions
-#     path   = mount point with "/" encoded as "." (e.g., h.alice = /home/alice)
+#     path   = mount point with "/" encoded as "." and abbreviations:
+#              h = home, m = mnt, u = $OWNER (expands to username)
+#
+#   Path Encoding (to fit 20 char limit):
+#     h.Git     → /home/Git
+#     h.u       → /home/$OWNER (e.g., /home/usrbinkat)
+#     m.kube    → /mnt/kube
+#     workspace → /workspace
 #
 #   Examples (all use kc2 group GID 1001 for shared access):
-#     e4-alice-700-h.alice   → ext4, alice:kc2, 700, /home/alice
+#     e4-alice-700-h.u       → ext4, alice:kc2, 700, /home/alice
 #     e4-root-775-h.Git      → ext4, root:kc2, 775, /home/Git
-#     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /m/kube
+#     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /mnt/kube
 #     e4-run-775-workspace   → ext4, runner:kc2, 775, /workspace
 #
-# The systemd unit is a simple parser - the serial string contains all instructions.
+# The systemd unit parses and expands the serial string into mount instructions.
 
 { pkgs, ... }:
 
@@ -79,8 +86,20 @@
             ;;
         esac
 
-        # Decode path: dots become slashes, prepend /
+        # Decode path: dots become slashes, expand abbreviations, prepend /
+        # Abbreviations: h=home, m=mnt, u=$OWNER
         MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
+
+        # Expand abbreviations (order matters: do component expansions first)
+        # ^h/ or ^h$ → home
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
+        # ^m/ or ^m$ → mnt
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
+        # /u$ → /$OWNER (final component only)
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
+        # ^u$ → $OWNER (single component)
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#^u\$#$OWNER#")
+
         if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then
           MOUNT_POINT="/$MOUNT_POINT"
         fi
@@ -165,7 +184,12 @@
         # Parse serial ID to get mount point
         IFS='-' read -r FSTYPE_CODE OWNER MODE PATH_ENCODED <<< "$SERIAL"
 
+        # Decode path: dots become slashes, expand abbreviations, prepend /
         MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#^u\$#$OWNER#")
         if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then
           MOUNT_POINT="/$MOUNT_POINT"
         fi

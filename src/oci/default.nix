@@ -146,15 +146,12 @@ let
     ${shellContent.inputrcContent}
     EOF
 
-        cat > $out/etc/skel/.gitconfig <<'EOF'
-    ${shellContent.gitconfigContent}
-    EOF
-
+        # Note: .gitconfig is NOT in skel - git config is at system level in /etc/gitconfig
         cat > $out/etc/skel/.config/starship.toml <<'EOF'
     ${config.shell.starship.configContent}
     EOF
 
-        chmod 644 $out/etc/skel/.bashrc $out/etc/skel/.bash_profile $out/etc/skel/.inputrc $out/etc/skel/.gitconfig
+        chmod 644 $out/etc/skel/.bashrc $out/etc/skel/.bash_profile $out/etc/skel/.inputrc
         chmod 644 $out/etc/skel/.config/starship.toml
   '';
 
@@ -172,7 +169,7 @@ let
       cp ${skelFiles}/etc/skel/.bashrc $out/home/$user/
       cp ${skelFiles}/etc/skel/.bash_profile $out/home/$user/
       cp ${skelFiles}/etc/skel/.inputrc $out/home/$user/
-      cp ${skelFiles}/etc/skel/.gitconfig $out/home/$user/
+      # Note: .gitconfig not copied - git uses /etc/gitconfig (system level)
       cp ${skelFiles}/etc/skel/.config/starship.toml $out/home/$user/.config/
     done
 
@@ -208,6 +205,42 @@ let
     ];
   });
 
+  # Git system-level configuration (/etc/gitconfig)
+  # User ~/.gitconfig can override - keeps credential helpers at system level with stable paths
+  gitconfigFile = pkgs.writeTextDir "etc/gitconfig" ''
+    [init]
+        defaultBranch = main
+    [core]
+        editor = nvim
+        pager = bat
+    [color]
+        ui = auto
+    [pull]
+        rebase = true
+    [credential]
+        helper =
+        helper = cache --timeout=3600
+    [credential "https://github.com"]
+        helper =
+        helper = !gh auth git-credential
+    [credential "https://gist.github.com"]
+        helper =
+        helper = !gh auth git-credential
+    [credential "https://git.braincraft.io"]
+        helper =
+        helper = cache --timeout=3600
+    [alias]
+        st = status
+        co = checkout
+        br = branch
+        ci = commit
+        lg = log --oneline --graph --decorate
+    [safe]
+        directory = /opt/konductor
+        directory = /workspace
+        directory = *
+  '';
+
   # Root filesystem combining all system files
   rootEnv = pkgs.buildEnv {
     name = "konductor-root";
@@ -236,6 +269,7 @@ let
       pkgs.cachix
       nixConf
       nixRegistry
+      gitconfigFile
     ];
     pathsToLink = [ "/" ];
   };

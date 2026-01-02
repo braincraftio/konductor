@@ -138,11 +138,32 @@ in
           };
         };
 
-        # Git global configuration
-        # safe.directory allows multiple users to access shared repositories
+        # Git global configuration (/etc/gitconfig)
+        # System-level defaults - user ~/.gitconfig can override
         programs.git = {
           enable = true;
           config = {
+            init.defaultBranch = "main";
+            core = {
+              editor = "nvim";
+              pager = "bat";
+            };
+            color.ui = "auto";
+            pull.rebase = true;
+            # Credential helpers - use stable paths for NixOS
+            credential.helper = [ "" "cache --timeout=3600" ];
+            "credential \"https://github.com\"".helper = [ "" "!/run/current-system/sw/bin/gh auth git-credential" ];
+            "credential \"https://gist.github.com\"".helper = [ "" "!/run/current-system/sw/bin/gh auth git-credential" ];
+            "credential \"https://git.braincraft.io\"".helper = [ "" "cache --timeout=3600" ];
+            # Aliases
+            alias = {
+              st = "status";
+              co = "checkout";
+              br = "branch";
+              ci = "commit";
+              lg = "log --oneline --graph --decorate";
+            };
+            # Safe directories for shared repos
             safe.directory = [ "/opt/konductor" "/home/Git" "/workspace" "*" ];
           };
         };
@@ -160,7 +181,7 @@ in
             "skel/.bashrc".text = shellContent.bashrcContentStandalone;
             "skel/.bash_profile".text = shellContent.bashProfileContent;
             "skel/.inputrc".text = shellContent.inputrcContent;
-            "skel/.gitconfig".text = shellContent.gitconfigContent;
+            # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
             "skel/.config/starship.toml".text = config.shell.starship.configContent;
 
             # /etc/skel/.envrc - for project .env files only (packages pre-installed)
@@ -193,11 +214,11 @@ in
               # =====================================================================
               # Copy shell configs from /etc/skel if missing (first login setup)
               # Use -L to dereference symlinks (nix store files are read-only)
+              # Note: .gitconfig is NOT copied - git uses /etc/gitconfig (system level)
               if [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ]; then
                 cp -L /etc/skel/.bashrc "$HOME/"
                 cp -L /etc/skel/.bash_profile "$HOME/" 2>/dev/null || true
                 cp -L /etc/skel/.inputrc "$HOME/" 2>/dev/null || true
-                cp -L /etc/skel/.gitconfig "$HOME/" 2>/dev/null || true
                 mkdir -p "$HOME/.config"
                 cp -L /etc/skel/.config/starship.toml "$HOME/.config/" 2>/dev/null || true
               fi

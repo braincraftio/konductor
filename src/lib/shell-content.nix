@@ -99,8 +99,8 @@ in
     [init]
         defaultBranch = main
     [core]
-        editor = ${env.EDITOR}
-        pager = ${env.PAGER}
+        editor = nvim
+        pager = bat
     [color]
         ui = auto
     [pull]

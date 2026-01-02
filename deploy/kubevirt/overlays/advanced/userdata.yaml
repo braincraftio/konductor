@@ -147,13 +147,14 @@ stringData:
       # -----------------------------------------------------------------------
       # konductor-mount@.service parses serial ID to mount:
       #   Serial ID format: <fstype>-<user>-<mode>-<path>
-      #   Path encoding: dots become slashes (e.g., h.Git → /home/Git)
+      #   Path encoding: dots become slashes, abbreviations expand:
+      #     h = home, m = mnt, u = $OWNER (the user field)
       #
-      #   e4-root-775-h.Git      → /home/Git (ext4, root:users, 775)
-      #   e4-usrbinkat-700-h.u   → /home/usrbinkat (ext4, usrbinkat:users, 700)
-      #   iso-root-755-m.kube    → /m/kube (iso9660 ro, root:root, 755)
+      #   e4-root-775-h.Git      → /home/Git (ext4, root:kc2, 775)
+      #   e4-usrbinkat-700-h.u   → /home/usrbinkat (ext4, usrbinkat:kc2, 700)
+      #   iso-root-755-m.kube    → /mnt/kube (iso9660 ro, root:root, 755)
       #
-      # Note: Serial IDs limited to 20 chars, so paths are abbreviated
+      # Note: Serial IDs limited to 20 chars, abbreviations save space
       # -----------------------------------------------------------------------
       - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-root-775-h.Git.service]
       - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-usrbinkat-700-h.u.service]
