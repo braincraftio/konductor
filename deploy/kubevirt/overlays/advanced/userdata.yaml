@@ -38,6 +38,7 @@ stringData:
     # UIDs: usrbinkat(1000) added via cloud-init
     # Image has: kc2(1001), kc2admin(1002), runner(1003) baked in
     # All users share kc2 group (GID 1001) for shared directory access
+    # SSH keypairs generated via runcmd for outbound SSH from VM
     users:
       - name: usrbinkat
         uid: 1000
@@ -120,6 +121,27 @@ stringData:
     # -------------------------------------------------------------------------
     # Note: NixOS requires full paths - binaries in /run/current-system/sw/bin
     runcmd:
+      # -----------------------------------------------------------------------
+      # Generate SSH keys for users
+      # -----------------------------------------------------------------------
+      - [/run/current-system/sw/bin/mkdir, -p, /home/usrbinkat/.ssh]
+      - [/run/current-system/sw/bin/ssh-keygen, -t, ed25519, -f, /home/usrbinkat/.ssh/id_ed25519, -N, "", -q]
+      - [/run/current-system/sw/bin/chmod, "700", /home/usrbinkat/.ssh]
+      - [/run/current-system/sw/bin/chmod, "600", /home/usrbinkat/.ssh/id_ed25519]
+      - [/run/current-system/sw/bin/chown, -R, "usrbinkat:kc2", /home/usrbinkat/.ssh]
+
+      - [/run/current-system/sw/bin/mkdir, -p, /home/kc2/.ssh]
+      - [/run/current-system/sw/bin/ssh-keygen, -t, ed25519, -f, /home/kc2/.ssh/id_ed25519, -N, "", -q]
+      - [/run/current-system/sw/bin/chmod, "700", /home/kc2/.ssh]
+      - [/run/current-system/sw/bin/chmod, "600", /home/kc2/.ssh/id_ed25519]
+      - [/run/current-system/sw/bin/chown, -R, "kc2:kc2", /home/kc2/.ssh]
+
+      - [/run/current-system/sw/bin/mkdir, -p, /home/kc2admin/.ssh]
+      - [/run/current-system/sw/bin/ssh-keygen, -t, ed25519, -f, /home/kc2admin/.ssh/id_ed25519, -N, "", -q]
+      - [/run/current-system/sw/bin/chmod, "700", /home/kc2admin/.ssh]
+      - [/run/current-system/sw/bin/chmod, "600", /home/kc2admin/.ssh/id_ed25519]
+      - [/run/current-system/sw/bin/chown, -R, "kc2admin:kc2", /home/kc2admin/.ssh]
+
       # -----------------------------------------------------------------------
       # Mount persistent volumes via systemd template service
       # -----------------------------------------------------------------------

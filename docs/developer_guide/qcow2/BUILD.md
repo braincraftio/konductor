@@ -480,11 +480,14 @@ Generate ephemeral cloud-init ISO with SSH credentials.
 
 ```sh {"name":"_build:qcow2:cloudinit"}
 set -e
-[ -n "$KONDUCTOR_SSH_PUBKEY" ] || { echo "Error: KONDUCTOR_SSH_PUBKEY not set. Run from devshell."; exit 1; }
-[ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set. Run from devshell."; exit 1; }
-[ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set. Run from devshell."; exit 1; }
+
+# Requires: nix develop .#konductor
+[ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set. Run: nix develop .#konductor"; exit 1; }
+[ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set. Run: nix develop .#konductor"; exit 1; }
+[ -f "$HOME/.ssh/id_ed25519.pub" ] || { echo "Error: ~/.ssh/id_ed25519.pub not found"; exit 1; }
+
 mkdir -p /tmp/konductor-build-cloud-init
-BUILD_SSH_KEY=$(cat "$KONDUCTOR_SSH_PUBKEY")
+BUILD_SSH_KEY=$(cat "$HOME/.ssh/id_ed25519.pub")
 BUILD_USER="$USER"
 BUILD_UID="$(id -u)"
 

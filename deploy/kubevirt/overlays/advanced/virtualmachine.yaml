@@ -35,7 +35,7 @@ spec:
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor:latest-qcow2
+            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:302254cb3af2816640894e185f3f7c7363440f6809e318d5327176ccbb3113bb
             # Using local Zot registry for faster image pulls and local development
             # pullMethod: node # Optional: pull to node first for better caching
             # Registry credentials - secret must exist in same namespace as VM
