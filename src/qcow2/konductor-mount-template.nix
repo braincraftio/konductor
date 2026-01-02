@@ -10,11 +10,11 @@
 #     mode   = 3-digit octal permissions
 #     path   = mount point with "/" encoded as "." (e.g., h.alice = /home/alice)
 #
-#   Examples:
-#     e4-alice-700-h.alice   → ext4, alice:users, 700, /home/alice
-#     e4-root-775-h.Git      → ext4, root:users, 775, /home/Git
-#     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /mnt/kubeconfig
-#     e4-run-775-workspace   → ext4, runner:users, 775, /workspace
+#   Examples (all use kc2 group GID 1001 for shared access):
+#     e4-alice-700-h.alice   → ext4, alice:kc2, 700, /home/alice
+#     e4-root-775-h.Git      → ext4, root:kc2, 775, /home/Git
+#     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /m/kube
+#     e4-run-775-workspace   → ext4, runner:kc2, 775, /workspace
 #
 # The systemd unit is a simple parser - the serial string contains all instructions.
 
@@ -92,17 +92,18 @@
         fi
 
         # Determine group based on filesystem type and owner
+        # All shared paths use kc2 group (GID 1001) - baked-in least-privilege group
         if [ "$FS_TYPE" = "iso9660" ]; then
           # ISO9660 is always root:root (read-only secret volumes)
           GROUP="root"
           FS_OPTS="ro,nofail"
         elif [ "$OWNER" = "root" ]; then
-          # root-owned paths use root:users (shared)
-          GROUP="users"
+          # root-owned paths use root:kc2 (shared)
+          GROUP="kc2"
           FS_OPTS="defaults,nofail"
         else
-          # User-owned paths use <user>:users
-          GROUP="users"
+          # User-owned paths use <user>:kc2
+          GROUP="kc2"
           FS_OPTS="defaults,nofail"
 
           # Verify user exists
@@ -112,7 +113,7 @@
             echo "  users:"
             echo "    - name: $OWNER"
             echo "      uid: XXXX"
-            echo "      groups: users"
+            echo "      groups: kc2"
             exit 1
           fi
         fi

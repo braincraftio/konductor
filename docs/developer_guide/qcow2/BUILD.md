@@ -174,7 +174,11 @@ FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 
 echo "Building containerDisk from: $QCOW2_OUTPUT"
 echo "Target image: $FULL_IMAGE"
-docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" --load -t "$FULL_IMAGE" .
+# --provenance=false --sbom=false: disable attestations for clean OCI images
+docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" \
+    --provenance=false \
+    --sbom=false \
+    --load -t "$FULL_IMAGE" .
 echo ""
 echo "Built: $FULL_IMAGE"
 docker images "$FULL_IMAGE" --format "Size: {{.Size}}"
@@ -275,8 +279,10 @@ FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 [ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
 
 echo "Pushing: $FULL_IMAGE (OCI format)"
+# --provenance=false --sbom=false: disable attestations that cause "manifest invalid" on some registries
 docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" \
     --provenance=false \
+    --sbom=false \
     --output type=image,oci-mediatypes=true,push=true \
     -t "$FULL_IMAGE" .
 echo ""
@@ -438,8 +444,10 @@ Nix builds the NixOS system closure → `result/nixos.qcow2`.
 ```sh {"name":"_build:qcow2:nix","tag":"requires:nix"}
 set -e
 nix build .#qcow2 --no-warn-dirty
-sudo chown -R "${USER}:${USER}" result/
-sudo chmod -R u+w result/
+# Use kc2:kc2 (1001:1001) - baked-in least-privilege user
+# UID 1000 reserved for dynamic cloud-init user creation
+sudo chown -R 1001:1001 result/
+sudo chmod -R a+rX result/
 ```
 
 ---
@@ -468,21 +476,22 @@ EOF
 
 cat > /tmp/konductor-build-cloud-init/user-data << EOF
 #cloud-config
+# All users in kc2 group (GID 1001) for shared directory access
 users:
   - name: $BUILD_USER
     uid: $BUILD_UID
-    groups: users, wheel, docker, libvirtd, kvm
+    groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - $BUILD_SSH_KEY
   - name: kc2
-    groups: users, docker, libvirtd, kvm
+    groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     lock_passwd: true
   - name: kc2admin
-    groups: users, wheel, docker, libvirtd, kvm
+    groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
@@ -570,7 +579,8 @@ ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 ssh localhost 'sudo rsync -a \
     --exclude={result,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled"} \
     /workspace/ /opt/konductor/'
-ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R root:root /opt/konductor'
+# Use kc2:kc2 (1001:1001) for consistent shared group ownership
+ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
 ssh localhost 'cd /opt/konductor && sudo git gc --aggressive --prune=now'
 ```
 

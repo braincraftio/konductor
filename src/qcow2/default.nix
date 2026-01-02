@@ -83,6 +83,7 @@ in
         # - See: nixos/lib/make-disk-image.nix in nixpkgs
 
         # Users
+        # All users in 'kc2' group (GID 1001) for shared directory access
         users.users = {
           kc2 = {
             isNormalUser = true;
@@ -94,13 +95,13 @@ in
             isNormalUser = true;
             inherit (users.kc2admin) uid home;
             description = users.kc2admin.gecos;
-            extraGroups = [ "wheel" "docker" "libvirtd" "kvm" ];
+            extraGroups = [ "kc2" "wheel" "docker" "libvirtd" "kvm" ];
           };
           runner = {
             isNormalUser = true;
             inherit (users.runner) uid home;
             description = users.runner.gecos;
-            extraGroups = [ "docker" "libvirtd" "kvm" ];
+            extraGroups = [ "kc2" "docker" "libvirtd" "kvm" ];
           };
         };
 
@@ -134,6 +135,15 @@ in
             whitelist = {
               prefix = [ "~" "/opt/konductor" "/workspace" "/home" ];
             };
+          };
+        };
+
+        # Git global configuration
+        # safe.directory allows multiple users to access shared repositories
+        programs.git = {
+          enable = true;
+          config = {
+            safe.directory = [ "/opt/konductor" "/home/Git" "/workspace" "*" ];
           };
         };
 
@@ -270,6 +280,14 @@ in
         # Systemd Configuration
         # =====================================================================
         systemd = {
+          # Shared directory ownership with setgid
+          # 2775 = setgid + rwxrwxr-x (new files inherit 'kc2' group)
+          tmpfiles.rules = [
+            "d /opt/konductor 2775 kc2 kc2 -"
+            "d /home/Git 2775 kc2 kc2 -"
+            "d /workspace 2775 kc2 kc2 -"
+          ];
+
           network = {
             enable = true;
             networks."10-ethernet" = {

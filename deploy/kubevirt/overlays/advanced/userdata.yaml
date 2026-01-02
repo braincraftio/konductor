@@ -37,11 +37,12 @@ stringData:
     # -------------------------------------------------------------------------
     # UIDs: usrbinkat(1000) added via cloud-init
     # Image has: kc2(1001), kc2admin(1002), runner(1003) baked in
+    # All users share kc2 group (GID 1001) for shared directory access
     users:
       - name: usrbinkat
         uid: 1000
         gecos: Primary User
-        groups: users, wheel, docker, libvirtd, kvm
+        groups: kc2, wheel, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
         sudo: ALL=(ALL) NOPASSWD:ALL
         lock_passwd: true
@@ -149,9 +150,9 @@ stringData:
       - [/run/current-system/sw/bin/cp, /m/kube/config, /home/usrbinkat/.kube/config]
       - [/run/current-system/sw/bin/cp, /m/kube/config, /home/kc2/.kube/config]
       - [/run/current-system/sw/bin/cp, /m/kube/config, /home/kc2admin/.kube/config]
-      - [/run/current-system/sw/bin/chown, -R, "usrbinkat:users", /home/usrbinkat/.kube]
-      - [/run/current-system/sw/bin/chown, -R, "kc2:users", /home/kc2/.kube]
-      - [/run/current-system/sw/bin/chown, -R, "kc2admin:users", /home/kc2admin/.kube]
+      - [/run/current-system/sw/bin/chown, -R, "usrbinkat:kc2", /home/usrbinkat/.kube]
+      - [/run/current-system/sw/bin/chown, -R, "kc2:kc2", /home/kc2/.kube]
+      - [/run/current-system/sw/bin/chown, -R, "kc2admin:kc2", /home/kc2admin/.kube]
       - [/run/current-system/sw/bin/chmod, "600", /home/usrbinkat/.kube/config]
       - [/run/current-system/sw/bin/chmod, "600", /home/kc2/.kube/config]
       - [/run/current-system/sw/bin/chmod, "600", /home/kc2admin/.kube/config]
