@@ -44,6 +44,10 @@ in
     k9s # Kubernetes TUI
     kubevirt # Includes virtctl for VM management
 
+    # Talos/Omni tools (unstable for latest versions)
+    unstable.talosctl # Talos Linux CLI (1.12.0)
+    unstable.omnictl # Sidero Omni CLI (1.4.4)
+
     # Infrastructure as Code
     pulumi # IaC with real programming languages
     pulumictl # Pulumi CLI utilities

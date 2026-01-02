@@ -13,6 +13,7 @@ resources:
   - kubeconfig-generator.yaml
   - git-pvc.yaml
   - usrbinkat-home-pvc.yaml
+  - registry-credentials.yaml
 
 # Override namespace
 namespace: konductor

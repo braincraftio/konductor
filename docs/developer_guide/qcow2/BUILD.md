@@ -174,7 +174,7 @@ FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 
 echo "Building containerDisk from: $QCOW2_OUTPUT"
 echo "Target image: $FULL_IMAGE"
-docker build --no-cache -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" -t "$FULL_IMAGE" .
+docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" --load -t "$FULL_IMAGE" .
 echo ""
 echo "Built: $FULL_IMAGE"
 docker images "$FULL_IMAGE" --format "Size: {{.Size}}"
@@ -261,21 +261,28 @@ fi
 
 ### build:qcow2:push
 
-Push container to registry.
+Push container to registry as OCI image.
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
+: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 : ${CONTAINER_REGISTRY:=docker.io}
 : ${CONTAINER_IMAGE:=containercraft/konductor}
 : ${CONTAINER_TAG:=latest-qcow2}
 FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
 
-echo "Pushing: $FULL_IMAGE"
-docker push "$FULL_IMAGE"
+[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found."; exit 1; }
+[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
+
+echo "Pushing: $FULL_IMAGE (OCI format)"
+docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" \
+    --provenance=false \
+    --output type=image,oci-mediatypes=true,push=true \
+    -t "$FULL_IMAGE" .
 echo ""
 echo "=== Push Complete ==="
 echo "Image: $FULL_IMAGE"
-docker inspect "$FULL_IMAGE" --format 'Digest: {{index .RepoDigests 0}}' 2>/dev/null || true
+echo "Format: OCI"
 ```
 
 `runme run build:qcow2:push`

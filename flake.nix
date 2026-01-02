@@ -20,7 +20,10 @@
     # See docs/GITHUB_AUTHENTICATION.md for token setup
     # FlakeHub URL caching causes mismatch errors - use GitHub directly
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # nixos-unstable lags behind on omnictl (1.4.4 vs 1.4.6 in nixpkgs-unstable)
+    # nixpkgs-unstable branch tracks upstream nixpkgs master more closely
+    # nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     # nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511.*";
     # nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
     # FlakeHub URL caching causes mismatch errors - use GitHub directly

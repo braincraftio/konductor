@@ -20,16 +20,17 @@ stringData:
     ethernets:
       enp1s0:
         # Pod network interface - for Kubernetes API access
+        # KubeVirt masquerade networking always uses 10.0.2.1 as gateway
         dhcp4: true
         dhcp6: false
         routes:
-          # Route Kubernetes service CIDR through pod network
+          # Route Kubernetes service CIDR through pod network gateway
           - to: 10.96.0.0/12
-            via: 0.0.0.0
+            via: 10.0.2.1
             metric: 100
-          # Route pod CIDR through pod network
+          # Route pod CIDR through pod network gateway
           - to: 10.244.0.0/16
-            via: 0.0.0.0
+            via: 10.0.2.1
             metric: 100
         dhcp4-overrides:
           route-metric: 200

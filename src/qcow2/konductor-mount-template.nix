@@ -26,14 +26,11 @@
     after = [ "local-fs-pre.target" ];
     before = [ "local-fs.target" ];
 
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-
-      ExecStart = pkgs.writeShellScript "konductor-mount-start" ''
+    serviceConfig = let
+      mountStart = pkgs.writeShellScript "konductor-mount-start" ''
         set -euo pipefail
 
-        SERIAL="%i"
+        SERIAL="$1"
         DEVICE="/dev/disk/by-id/virtio-$SERIAL"
 
         echo "========================================="
@@ -159,15 +156,15 @@
         echo "========================================="
       '';
 
-      ExecStop = pkgs.writeShellScript "konductor-mount-stop" ''
+      mountStop = pkgs.writeShellScript "konductor-mount-stop" ''
         set -euo pipefail
 
-        SERIAL="%i"
+        SERIAL="$1"
 
         # Parse serial ID to get mount point
         IFS='-' read -r FSTYPE_CODE OWNER MODE PATH_ENCODED <<< "$SERIAL"
 
-        MOUNT_POINT=$(echo "$PATH_ENCODED" | sed 's/\./\//g')
+        MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
         if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then
           MOUNT_POINT="/$MOUNT_POINT"
         fi
@@ -182,6 +179,11 @@
           echo "Not mounted: $MOUNT_POINT"
         fi
       '';
+    in {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${mountStart} %i";
+      ExecStop = "${mountStop} %i";
     };
   };
 }

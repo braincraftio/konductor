@@ -506,24 +506,6 @@ in
             enable = true;
             network.enable = true;
             settings = {
-              # Configure logging to suppress warnings
-              log_cfgs = [
-                [
-                  "logger_name"
-                  "level"
-                  "log_cfg"
-                ]
-                [
-                  "cloudinit"
-                  "DEBUG"
-                  "/var/log/cloud-init.log"
-                ]
-                [
-                  "cloudinit.util"
-                  "DEBUG"
-                  "/var/log/cloud-init.log"
-                ]
-              ];
               # Configure NixOS distro helper paths
               system_info = {
                 distro = "nixos";

@@ -45,7 +45,7 @@ spec:
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
-            url: docker://docker.io/containercraft/konductor:latest-qcow2
+            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor:latest-qcow2
   template:
     metadata:
       labels:
