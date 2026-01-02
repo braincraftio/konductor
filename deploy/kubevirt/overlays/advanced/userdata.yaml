@@ -100,11 +100,11 @@ stringData:
           IPv6AcceptRA=no
           LinkLocalAddressing=no
         permissions: '0644'
-      # Configure enp2s0 as br0 port with no IP
-      - path: /etc/systemd/network/05-enp2s0.network
+      # Configure enp3s0 as br0 port with no IP
+      - path: /etc/systemd/network/05-enp3s0.network
         content: |
           [Match]
-          Name=enp2s0
+          Name=enp3s0
 
           [Network]
           Bridge=br0
