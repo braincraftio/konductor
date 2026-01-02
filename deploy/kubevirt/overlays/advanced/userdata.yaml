@@ -22,6 +22,17 @@ stringData:
     # =========================================================================
 
     # -------------------------------------------------------------------------
+    # Disk Resize Configuration
+    # -------------------------------------------------------------------------
+    # Force resize root partition and filesystem on every boot (PER_ALWAYS)
+    # Allows DataVolume storage size increases to take effect
+    growpart:
+      mode: auto
+      devices: ["/"]
+      ignore_growroot_disabled: true
+    resize_rootfs: true
+
+    # -------------------------------------------------------------------------
     # User Configuration
     # -------------------------------------------------------------------------
     # UIDs: usrbinkat(1000) added via cloud-init

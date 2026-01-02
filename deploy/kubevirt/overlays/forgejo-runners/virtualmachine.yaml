@@ -41,7 +41,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 64Gi
+              storage: 120Gi
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
