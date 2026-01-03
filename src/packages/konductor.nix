@@ -38,6 +38,11 @@
     # CI/CD essentials
     gnumake
     cachix
+
+    # Bare metal / BMC management
+    ipmitool      # IPMI CLI for power control, sensors, SOL
+    redfishtool   # Modern Redfish API for iDRAC/iLO/BMC
+    megacli       # Dell PERC / LSI MegaRAID management
   ];
 
   # Note: SSH config is handled by config.shell.ssh.shellHook in devshells
