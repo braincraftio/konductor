@@ -164,7 +164,7 @@ Package QCOW2 as containerDisk for KubeVirt.
 
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 : ${CONTAINER_REGISTRY:=docker.io}
 : ${CONTAINER_IMAGE:=containercraft/konductor}
 : ${CONTAINER_TAG:=latest-qcow2}
@@ -685,7 +685,7 @@ ZSTD compress QCOW2.
 
 ```sh {"name":"_build:qcow2:img:compress","tag":"duration:slow"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
 ```
 
@@ -697,7 +697,7 @@ Sparsify to reclaim zero-filled space.
 
 ```sh {"name":"_build:qcow2:img:sparsify","tag":"duration:slow,requires:guestfs"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 export LIBGUESTFS_BACKEND=direct
 VIRT_SPARSIFY="$(which virt-sparsify)"
 sudo "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
@@ -722,7 +722,7 @@ Verify build output with SHA256 checksum.
 
 ```sh {"name":"_build:qcow2:verify","tag":"type:readonly","interactive":"false"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found"; exit 1; }
 echo "=== QCOW2 Build Complete ==="
 echo "FILE: $QCOW2_OUTPUT"
