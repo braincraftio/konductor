@@ -722,7 +722,8 @@ Verify build output with SHA256 checksum.
 
 ```sh {"name":"_build:qcow2:verify","tag":"type:readonly","interactive":"false"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
+export PATH="/run/current-system/sw/bin:$PATH"
+: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found"; exit 1; }
 echo "=== QCOW2 Build Complete ==="
 echo "FILE: $QCOW2_OUTPUT"

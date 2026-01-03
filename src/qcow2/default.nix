@@ -280,6 +280,10 @@ in
           # Environment Variables
           # Includes base env + language-specific + konductor settings
           variables = lib.mapAttrs (_name: value: lib.mkForce value) (env // {
+            # BASH_ENV: Ensures non-interactive bash (bash -c, bash script.sh)
+            # sources NixOS environment. Without this, tools like runme that
+            # spawn bash subprocesses won't have /run/current-system/sw/bin in PATH.
+            BASH_ENV = "/etc/set-environment";
             # Python
             UV_SYSTEM_PYTHON = "1";
             PYTHONDONTWRITEBYTECODE = "1";
