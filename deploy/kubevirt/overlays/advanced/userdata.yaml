@@ -123,6 +123,7 @@ stringData:
           LinkLocalAddressing=no
         permissions: '0644'
       # Configure enp3s0 as br0 port with no IP
+      # enp3s0 is the Linux bridge interface from KubeVirt NAD (net-br0)
       - path: /etc/systemd/network/05-enp3s0.network
         content: |
           [Match]
@@ -185,16 +186,17 @@ stringData:
       # Restart networkd to apply bridge config
       - [/run/current-system/sw/bin/systemctl, restart, systemd-networkd]
 
-      # Force ARP/MAC learning by pinging gateway and sending gratuitous ARP on physical interface
+      # Force ARP/MAC learning by pinging gateway and sending gratuitous ARP on macvtap interface
+      # enp2s0 is the macvtap interface with DHCP IP (default route)
       - [sh, -c, "sleep 5 && /run/current-system/sw/bin/ping -c 5 $(ip route | awk '/default/ {print $3}' | head -1) || true"]
-      - [sh, -c, "/run/current-system/sw/bin/arping -c 3 -U -I enp3s0 $(ip -4 addr show enp3s0 | awk '/inet / {print $2}' | cut -d/ -f1) 2>/dev/null || true"]
+      - [sh, -c, "/run/current-system/sw/bin/arping -c 3 -U -I enp2s0 $(ip -4 addr show enp2s0 | awk '/inet / {print $2}' | cut -d/ -f1) 2>/dev/null || true"]
 
       # Copy kubeconfig to user directories
-      # Mount point is /m/kube (from serial iso-root-755-m.kube: m.kube → /m/kube)
+      # Mount point is /mnt/kube (serial iso-root-755-m.kube: m.kube → mnt/kube → /mnt/kube)
       - [/run/current-system/sw/bin/mkdir, -p, /home/usrbinkat/.kube, /home/kc2/.kube, /home/kc2admin/.kube]
-      - [/run/current-system/sw/bin/cp, /m/kube/config, /home/usrbinkat/.kube/config]
-      - [/run/current-system/sw/bin/cp, /m/kube/config, /home/kc2/.kube/config]
-      - [/run/current-system/sw/bin/cp, /m/kube/config, /home/kc2admin/.kube/config]
+      - [/run/current-system/sw/bin/cp, /mnt/kube/config, /home/usrbinkat/.kube/config]
+      - [/run/current-system/sw/bin/cp, /mnt/kube/config, /home/kc2/.kube/config]
+      - [/run/current-system/sw/bin/cp, /mnt/kube/config, /home/kc2admin/.kube/config]
       - [/run/current-system/sw/bin/chown, -R, "usrbinkat:kc2", /home/usrbinkat/.kube]
       - [/run/current-system/sw/bin/chown, -R, "kc2:kc2", /home/kc2/.kube]
       - [/run/current-system/sw/bin/chown, -R, "kc2admin:kc2", /home/kc2admin/.kube]

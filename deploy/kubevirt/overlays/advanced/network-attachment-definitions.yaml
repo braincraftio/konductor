@@ -1,27 +1,23 @@
 # =============================================================================
-# NetworkAttachmentDefinitions for Advanced Konductor Deployment
+# NetworkAttachmentDefinitions for Konductor on t640
 # =============================================================================
-# These NADs provide L2 network connectivity for KubeVirt VMs:
+# Two NADs for konductor VM networking:
 #
-#   1. macvtap: Direct L2 access to physical NIC
-#      - Provides DHCP connectivity to external network
-#      - Requires macvtap-cni device plugin on nodes
-#      - Customize 'lowerDevice' annotation to match your physical NIC
+#   1. macvtap: Direct L2 access to Intel 82599 10GbE (ens4f1)
+#      - Konductor's primary network interface
+#      - Gets DHCP IP address and default route
+#      - High-performance passthrough to physical network
 #
-#   2. br0: Open vSwitch bridge for nested virtualization
-#      - Internal bridge with no external connectivity
-#      - Used by nested VMs inside the Konductor VM
-#      - Requires OVS CNI plugin and OVS installed on nodes
+#   2. br0: Linux bridge for nested virtualization
+#      - Connected to host's br0 Linux bridge (ens4f1 member)
+#      - No IP address on this interface
+#      - Used as uplink for konductor's internal br0 bridge
+#      - Nested VMs attach to internal br0 for L2 network access
 #
-# Prerequisites:
-#   - Multus CNI installed
-#   - macvtap-cni device plugin (for macvtap)
-#   - Open vSwitch + ovs-cni (for OVS bridge)
-#
-# Customization:
-#   - Change 'enp3s0' to your physical NIC name in the resourceName annotation
-#   - Adjust bridge name 'br0' if using different OVS bridge
-#   - Add VLAN tags, MTU, or trunk config as needed
+# t640 Network Architecture:
+#   Physical: ens4f1 (Intel 82599 10GbE SFP+)
+#   Host: br0 Linux bridge (ens4f1 as member, DHCP IP 192.168.1.41)
+#   Cilium: Uses br0 as direct-routing-device
 # =============================================================================
 ---
 apiVersion: k8s.cni.cncf.io/v1
@@ -31,10 +27,9 @@ metadata:
   labels:
     app: konductor
   annotations:
-    # Maps to macvtap device plugin resource
-    # Format: macvtap.network.kubevirt.io/<physical-nic-name>
-    # Change 'enp3s0' to match your node's physical NIC
-    k8s.v1.cni.cncf.io/resourceName: macvtap.network.kubevirt.io/enp3s0
+    # t640: Broadcom BCM57416 10G RDMA (eno1np0) - dedicated for VM macvtap
+    # ens4f1 is in br0 for Cilium/host networking, cannot be used for macvtap
+    k8s.v1.cni.cncf.io/resourceName: macvtap.network.kubevirt.io/eno1np0
 spec:
   config: |
     {
@@ -53,9 +48,9 @@ metadata:
 spec:
   config: |
     {
-      "cniVersion": "0.4.0",
+      "cniVersion": "0.3.1",
       "name": "br0",
-      "type": "ovs",
+      "type": "bridge",
       "bridge": "br0",
-      "mtu": 1500
+      "ipam": {}
     }

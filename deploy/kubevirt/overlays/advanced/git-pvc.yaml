@@ -17,4 +17,4 @@ spec:
   storageClassName: cephfs-nvme-vm
   resources:
     requests:
-      storage: 100Gi
+      storage: 200Gi

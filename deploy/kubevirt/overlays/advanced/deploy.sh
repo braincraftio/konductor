@@ -19,7 +19,7 @@
 #   - kubectl configured with cluster access
 #   - KubeVirt with CDI installed
 #   - StorageClasses: ceph-nvme-vm-block, cephfs-nvme-vm
-#   - macvtap and OVS CNI configured
+#   - macvtap and Linux bridge CNI configured
 # =============================================================================
 
 set -euo pipefail

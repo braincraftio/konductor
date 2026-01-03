@@ -1,18 +1,23 @@
 # =============================================================================
-# VirtualMachine Patch - Advanced Configuration
+# VirtualMachine Patch - Advanced Configuration for t640
 # =============================================================================
 # Patches the base VM with:
 #   - DataVolumeTemplate with persistent storage (imported from registry)
 #   - Higher resources (16Gi RAM, 4 cores + hyperthreading)
 #   - host-passthrough CPU for nested virtualization
-#   - macvtap primary interface (direct L2 to physical NIC)
-#   - OVS bridge secondary interface (for nested VMs)
-#   - networkdata secret reference
+#   - Pod interface for k8s API access
+#   - macvtap interface (direct L2 to ens4f1 10GbE)
+#   - Linux bridge interface (br0 for nested VM traffic)
+#
+# Network Architecture (inside VM):
+#   enp1s0: macvtap → ens4f1 → DHCP IP, default route (konductor's network)
+#   enp2s0: bridge → br0 → no IP → VM internal br0 → nested VMs
+#   eth0:   pod network (masquerade) → k8s service/pod CIDRs
 #
 # Prerequisites:
 #   - KubeVirt with CDI installed
-#   - StorageClass: ceph-nvme-vm-block (or modify below)
-#   - NetworkAttachmentDefinitions: enp3s0-macvtap, ovs-br0
+#   - StorageClass: ceph-nvme-vm-block
+#   - NetworkAttachmentDefinitions: macvtap, br0
 #   - KubeVirt macvtap binding plugin enabled
 # =============================================================================
 apiVersion: kubevirt.io/v1
@@ -35,13 +40,12 @@ spec:
           storageClassName: ceph-nvme-vm-block
         source:
           registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:0cd0059043409530dd99c95de2be8b06db33b636787e2552a0ea141446225ef6
-            # Using local Zot registry for faster image pulls and local development
-            # pullMethod: node # Optional: pull to node first for better caching
-            # Registry credentials - secret must exist in same namespace as VM
+            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:17b65bfd10e2c19f04d07f8670694c086175a410de56c5bcff5f87d4a594b416
             secretRef: zot-registry-credentials
   template:
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: t640
       accessCredentials:
         - sshPublicKey:
             source:
@@ -63,7 +67,6 @@ spec:
         resources:
           requests:
             memory: 16Gi
-        # EFI boot with OVMF firmware (qcow-efi image uses proper GPT alignment)
         firmware:
           bootloader:
             efi:
@@ -96,27 +99,29 @@ spec:
               disk:
                 bus: virtio
           interfaces:
-            # Pod network: For Kubernetes API access
+            # Pod network: For Kubernetes API/service access
             - name: default
               model: virtio
               masquerade: {}
-            # macvtap: Direct L2 access to 10GbE physical NIC
-            - name: enp1s0
+            # macvtap: Direct L2 access to 10GbE physical NIC (ens4f1)
+            # This is konductor's primary network - gets DHCP IP, default route
+            - name: net-macvtap
               model: virtio
-              macAddress: "02:00:00:c0:9d:01"
+              macAddress: "52:54:00:c0:9d:01"
               binding:
                 name: macvtap
-            # OVS bridge: For nested virt (no IP)
-            - name: enp2s0
+            # Linux bridge: For nested virtualization
+            # No IP on this interface - added to VM's internal br0
+            - name: net-br0
               model: virtio
               bridge: {}
       networks:
         - name: default
           pod: {}
-        - name: enp1s0
+        - name: net-macvtap
           multus:
             networkName: macvtap
-        - name: enp2s0
+        - name: net-br0
           multus:
             networkName: br0
       volumes:

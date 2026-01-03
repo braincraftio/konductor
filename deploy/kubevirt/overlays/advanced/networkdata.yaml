@@ -1,10 +1,22 @@
 # =============================================================================
-# Network Data Secret - Advanced Configuration
+# Network Data Secret - Advanced Configuration for t640
 # =============================================================================
-# Cloud-init v2 network configuration for dual-NIC setup:
-#   - enp1s0: Primary interface with DHCP (macvtap to physical NIC)
-#   - enp2s0: Secondary interface as br0 bridge slave (for nested virt)
-#   - br0: Bridge device with no IP (used by nested VMs)
+# Cloud-init v2 network configuration for three-NIC setup:
+#
+#   enp1s0: Pod network (masquerade) - routes to k8s service/pod CIDRs
+#   enp2s0: macvtap to eno1np0 - DHCP IP, default route (konductor's network)
+#   enp3s0: Linux bridge port - no IP, added to VM's internal br0
+#   br0:    Internal bridge for nested VMs (enp3s0 as uplink)
+#
+# Interface Order (KubeVirt virtio PCI naming):
+#   enp1s0 (PCI 0000:01:00.0) = default (pod/masquerade)
+#   enp2s0 (PCI 0000:02:00.0) = net-macvtap (macvtap to eno1np0)
+#   enp3s0 (PCI 0000:03:00.0) = net-br0 (Linux bridge)
+#
+# Traffic Flow:
+#   - K8s API/services: enp1s0 → pod network → Cilium → cluster
+#   - Internet/LAN: enp2s0 → macvtap → eno1np0 → physical network
+#   - Nested VMs: br0 → enp3s0 → host br0 → ens4f1 → physical network
 # =============================================================================
 apiVersion: v1
 kind: Secret
@@ -18,9 +30,9 @@ stringData:
     version: 2
     renderer: networkd
     ethernets:
+      # Pod network interface - for Kubernetes API/service access
+      # KubeVirt masquerade networking uses 10.0.2.0/24 internally
       enp1s0:
-        # Pod network interface - for Kubernetes API access
-        # KubeVirt masquerade networking always uses 10.0.2.1 as gateway
         dhcp4: true
         dhcp6: false
         routes:
@@ -33,21 +45,26 @@ stringData:
             via: 10.0.2.1
             metric: 100
         dhcp4-overrides:
-          route-metric: 200
+          route-metric: 300
+          use-routes: false
+      # macvtap interface - konductor's primary network
+      # Direct L2 to eno1np0 10GbE, gets DHCP IP and default route
       enp2s0:
-        # macvtap - physical network (default route)
         dhcp4: true
         dhcp6: false
         dhcp-identifier: mac
         dhcp4-overrides:
-          route-metric: 300
+          route-metric: 100
+      # Linux bridge uplink - for nested virtualization
+      # No IP, added to VM's internal br0 bridge
       enp3s0:
-        # OVS bridge slave - no IP
         dhcp4: false
         dhcp6: false
         link-local: []
         optional: true
     bridges:
+      # Internal bridge for nested VMs
+      # enp3s0 connects to host's br0 which has L2 access to physical network
       br0:
         interfaces:
           - enp3s0
