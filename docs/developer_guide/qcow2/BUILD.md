@@ -712,7 +712,7 @@ Sparsify to reclaim zero-filled space.
 set -e
 export LIBGUESTFS_BACKEND=direct
 VIRT_SPARSIFY="$(which virt-sparsify)"
-sudo "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
+sudo -E "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
 rm -f "${QCOW2_OUTPUT}.tmp"
 ```
 

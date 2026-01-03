@@ -288,6 +288,12 @@ write_files:
     content: |
 $(echo "$cluster_ca" | sed 's/^/      /')
 
+  # Containers policy for skopeo/podman
+  - path: /etc/containers/policy.json
+    permissions: '0644'
+    content: |
+      {"default": [{"type": "insecureAcceptAnything"}]}
+
   # Forgejo Runner Shared Secret
   - path: /etc/konductor/forgejo-runner/secret
     permissions: '0600'

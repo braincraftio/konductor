@@ -78,6 +78,28 @@ stringData:
         content: |
           kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
         permissions: '0440'
+      # Containers policy for skopeo/podman
+      - path: /etc/containers/policy.json
+        content: |
+          {"default": [{"type": "insecureAcceptAnything"}]}
+        permissions: '0644'
+      # Docker CA cert for local registry (Optiplex Lab cluster CA)
+      - path: /etc/docker/certs.d/registry.c0a801c5.sslip.io/ca.crt
+        content: |
+          -----BEGIN CERTIFICATE-----
+          MIIB6TCCAY6gAwIBAgIUWB2ggBMLM5bM4/7LLgaN2s8VEi4wCgYIKoZIzj0EAwIw
+          UjEQMA4GA1UEChMHQ2x1c3RlcjEXMBUGA1UECxMOSW5mcmFzdHJ1Y3R1cmUxJTAj
+          BgNVBAMTHE9wdGlwbGV4IExhYiBDbHVzdGVyIFJvb3QgQ0EwHhcNMjUxMjE1MDI0
+          MjA4WhcNMjYxMjE1MDI0MjA4WjBSMRAwDgYDVQQKEwdDbHVzdGVyMRcwFQYDVQQL
+          Ew5JbmZyYXN0cnVjdHVyZTElMCMGA1UEAxMcT3B0aXBsZXggTGFiIENsdXN0ZXIg
+          Um9vdCBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABMIcKzXnUQZsKcb9ujVP
+          He3s359FzEtAKDtCgTbO5w2Cn+S/RG1NtPLanuIYTALZgRxZbCXX7dHuFS/DgiaL
+          HX+jQjBAMA4GA1UdDwEB/wQEAwICpDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+          BBSEaGRSSq84F+IQQUJv3w0vaCj2/jAKBggqhkjOPQQDAgNJADBGAiEA3wDkcYqi
+          bB9/h5b8KnJeOqEr7XwGThT3nqOhILW6jRcCIQD8ppAvMjmOQ4b7IOd6RMAwbZ6A
+          +u4NbhqCQsa4UabgHQ==
+          -----END CERTIFICATE-----
+        permissions: '0644'
       # Create br0 bridge device (cloud-init v2 doesn't create .netdev)
       - path: /etc/systemd/network/05-br0.netdev
         content: |
