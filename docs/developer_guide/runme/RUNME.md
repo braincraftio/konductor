@@ -476,45 +476,93 @@ Owl Store is enabled when a project is configured and owl.yaml exists.
 
 ### Session Persistence
 
-Environment variables can persist across code blocks within a session.
+Environment variables persist across code blocks **within the same session**.
 
 **Important**: Session behavior differs between CLI modes:
 
 | Mode | Session Persistence | Use Case |
 |------|---------------------|----------|
-| `runme run` | No (LocalRunner) | Simple, isolated execution |
-| `runme run --server` | Yes (RemoteRunner) | Connected to gRPC server |
-| `runme beta run` | Yes (Runner V2) | Automatic session management |
+| `runme run task1` then `runme run task2` | No | Separate invocations = separate sessions |
+| `runme run --all` | **Yes** | All tasks run in single session |
+| `runme beta run task1 task2` | Yes | Multiple tasks in single session |
 | VS Code Extension | Yes | Interactive notebook experience |
 
-**With `runme beta run`** (recommended for multi-block workflows):
+**Key insight**: With `runme run --all`, tasks execute in markdown order within ONE session. Variables exported in early tasks are available to later tasks.
+
+**DRY Pattern - Setup Task First**:
 
 ````markdown
-```sh {"name":"set-env"}
-export PROJECT_NAME="konductor"
-export BUILD_DATE=$(date +%Y%m%d)
+### _setup:env
+
+Export shared variables once. Runs first (appears first in markdown).
+
+```sh {"name":"_setup:env"}
+# Export once - all subsequent tasks inherit these
+export BUILD_DATE="$(date +%Y%m%d)"
+export OUTPUT_FILE="build-${BUILD_DATE}.tar.gz"
+export REGISTRY="${REGISTRY:-docker.io}"
+export IMAGE="${IMAGE:-myorg/myapp}"
+export TAG="${TAG:-latest}"
+export FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
+
+echo "=== Build Environment ==="
+echo "OUTPUT_FILE: $OUTPUT_FILE"
+echo "FULL_IMAGE: $FULL_IMAGE"
 ```
 
-```sh {"name":"use-env"}
-echo "Building $PROJECT_NAME on $BUILD_DATE"
+### _build:compile
+
+```sh {"name":"_build:compile"}
+# Variables inherited from _setup:env - no redefinition needed!
+echo "Building $OUTPUT_FILE..."
+make build
+```
+
+### _build:package
+
+```sh {"name":"_build:package"}
+# Still has access to BUILD_DATE, OUTPUT_FILE, etc.
+tar -czf "$OUTPUT_FILE" ./dist
 ```
 ````
 
 ```sh
-# Variables persist between blocks
-runme beta run set-env use-env
-```
-
-**With `runme run --all`** (no persistence - use .env files instead):
-
-```sh
-# Create .env with shared variables
-echo 'PROJECT_NAME=konductor' > .env
-echo "BUILD_DATE=$(date +%Y%m%d)" >> .env
-
-# Variables loaded from .env for each block
+# All tasks share the same session - variables persist!
 runme run --all
 ```
+
+**Anti-pattern - DON'T repeat variables**:
+
+````markdown
+```sh {"name":"bad-task-1"}
+# DON'T: Repeating variable definitions wastes compute and risks inconsistency
+: ${BUILD_DATE:=$(date +%Y%m%d)}
+: ${OUTPUT_FILE:=build-${BUILD_DATE}.tar.gz}
+make build
+```
+
+```sh {"name":"bad-task-2"}
+# DON'T: If these run across midnight, BUILD_DATE will differ!
+: ${BUILD_DATE:=$(date +%Y%m%d)}
+: ${OUTPUT_FILE:=build-${BUILD_DATE}.tar.gz}
+tar -czf "$OUTPUT_FILE" ./dist
+```
+````
+
+**Standalone entry points** (run outside `--all`):
+
+Entry point tasks that users run directly need fallback defaults since they may not have the setup task's exports:
+
+````markdown
+```sh {"name":"build:package","excludeFromRunAll":"true"}
+# Fallback for standalone use, but prefers inherited values
+: ${OUTPUT_FILE:=build-$(date +%Y%m%d).tar.gz}
+: ${FULL_IMAGE:=${REGISTRY:-docker.io}/${IMAGE:-myorg/myapp}:${TAG:-latest}}
+
+tar -czf "$OUTPUT_FILE" ./dist
+docker build -t "$FULL_IMAGE" .
+```
+````
 
 ### Environment Prompts
 

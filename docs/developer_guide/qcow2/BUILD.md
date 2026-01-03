@@ -164,11 +164,9 @@ Package QCOW2 as containerDisk for KubeVirt.
 
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
-: ${CONTAINER_REGISTRY:=docker.io}
-: ${CONTAINER_IMAGE:=containercraft/konductor}
-: ${CONTAINER_TAG:=latest-qcow2}
-FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+# Variables from _build:qcow2:env or defaults for standalone run
+: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
+: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
 
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2:image first."; exit 1; }
 [ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
@@ -277,10 +275,8 @@ Push container to registry as OCI image.
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-: ${CONTAINER_REGISTRY:=docker.io}
-: ${CONTAINER_IMAGE:=containercraft/konductor}
-: ${CONTAINER_TAG:=latest-qcow2}
-FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+# Variables from _build:qcow2:env or defaults for standalone run
+: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
 
 # Verify image exists in local docker daemon (built by build:qcow2:container)
 docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found. Run build:qcow2:container first."; exit 1; }
@@ -383,10 +379,8 @@ build:qcow2:publish
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-: ${CONTAINER_REGISTRY:=docker.io}
-: ${CONTAINER_IMAGE:=containercraft/konductor}
-: ${CONTAINER_TAG:=latest-qcow2}
-FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+# Variables from _build:qcow2:env or defaults for standalone run
+: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
 
 echo "=== Publishing: $FULL_IMAGE ==="
 echo ""
@@ -420,6 +414,7 @@ Entry Points (user-facing):
   build:qcow2:publish      Full automation: image → container → login → push
 
 Pipeline Tasks (internal, run via --all):
+  _build:qcow2:env             Export shared environment variables
   _build:qcow2:nix             Nix build QCOW2
   _build:qcow2:cloudinit       Generate cloud-init ISO
   _build:qcow2:img:reset       Reset image to pristine
@@ -447,6 +442,25 @@ Registry: docker.io/containercraft/konductor:latest-qcow2
 ---
 
 ## Pipeline Tasks
+
+### _build:qcow2:env
+
+Export shared environment variables. Runs first, persists to all subsequent tasks in session.
+
+```sh {"name":"_build:qcow2:env"}
+# Shared variables - exported once, inherited by all tasks in --all session
+export QCOW2_OUTPUT="konductor-$(date +%Y%m%d).qcow2"
+export CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-docker.io}"
+export CONTAINER_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+export CONTAINER_TAG="${CONTAINER_TAG:-latest-qcow2}"
+export FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+
+echo "=== Build Environment ==="
+echo "QCOW2_OUTPUT: $QCOW2_OUTPUT"
+echo "FULL_IMAGE: $FULL_IMAGE"
+```
+
+---
 
 ### _build:qcow2:nix
 
@@ -685,7 +699,6 @@ ZSTD compress QCOW2.
 
 ```sh {"name":"_build:qcow2:img:compress","tag":"duration:slow"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
 ```
 
@@ -697,7 +710,6 @@ Sparsify to reclaim zero-filled space.
 
 ```sh {"name":"_build:qcow2:img:sparsify","tag":"duration:slow,requires:guestfs"}
 set -e
-: ${QCOW2_OUTPUT:=konductor-$(/run/current-system/sw/bin/date +%Y%m%d).qcow2}
 export LIBGUESTFS_BACKEND=direct
 VIRT_SPARSIFY="$(which virt-sparsify)"
 sudo "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
@@ -722,8 +734,6 @@ Verify build output with SHA256 checksum.
 
 ```sh {"name":"_build:qcow2:verify","tag":"type:readonly","interactive":"false"}
 set -e
-export PATH="/run/current-system/sw/bin:$PATH"
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found"; exit 1; }
 echo "=== QCOW2 Build Complete ==="
 echo "FILE: $QCOW2_OUTPUT"
