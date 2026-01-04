@@ -1,0 +1,143 @@
+# Build and publish Konductor QCOW2 containerDisk
+#
+# Builds a self-contained NixOS VM image with full Konductor environment
+# and packages it as a KubeVirt containerDisk.
+#
+# The runner is Konductor itself - all tools pre-installed:
+#   - nix, qemu, guestfs-tools (QCOW2 build)
+#   - docker, skopeo (container build/push)
+#   - runme (task orchestration)
+
+name: Build QCOW2
+
+on:
+  # Manual trigger with customizable options
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: 'Container registry'
+        required: false
+        default: 'docker.io'
+        type: choice
+        options:
+          - docker.io
+          - ghcr.io
+          - registry.c0a801c5.sslip.io
+      image:
+        description: 'Image name (org/repo)'
+        required: false
+        default: 'containercraft/konductor'
+      tag:
+        description: 'Image tag'
+        required: false
+        default: 'latest-qcow2'
+      skip_push:
+        description: 'Build only (skip push)'
+        required: false
+        default: false
+        type: boolean
+
+  # Build on release tags
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-qcow2:
+    name: Build QCOW2 containerDisk
+    runs-on: konductor
+    timeout-minutes: 120
+
+    env:
+      # Registry configuration (workflow inputs override defaults)
+      CONTAINER_REGISTRY: ${{ inputs.registry || 'docker.io' }}
+      CONTAINER_IMAGE: ${{ inputs.image || 'containercraft/konductor' }}
+      CONTAINER_TAG: ${{ inputs.tag || 'latest-qcow2' }}
+      # Nix settings
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for nix flake
+
+      - name: Show environment
+        run: |
+          echo "=== Build Environment ==="
+          echo "Registry: $CONTAINER_REGISTRY"
+          echo "Image: $CONTAINER_IMAGE:$CONTAINER_TAG"
+          echo "Runner: $(hostname)"
+          echo "User: $(whoami)"
+          echo ""
+          echo "=== Tool Versions ==="
+          nix --version
+          qemu-system-x86_64 --version | head -1
+          docker --version
+          runme --version
+          echo ""
+          echo "=== Disk Space ==="
+          df -h / /nix 2>/dev/null || df -h /
+
+      - name: Build QCOW2 image
+        run: |
+          echo "=== Building QCOW2 ==="
+          runme run build:qcow2:image
+
+      - name: Verify build
+        run: |
+          echo "=== Build Verification ==="
+          runme run _build:qcow2:verify
+          ls -lah konductor.qcow2
+
+      - name: Build container
+        run: |
+          echo "=== Building containerDisk ==="
+          runme run build:qcow2:container
+
+      - name: Login to registry
+        if: ${{ !inputs.skip_push }}
+        env:
+          # Docker Hub
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME || 'containercraft' }}
+          # GHCR
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          # Custom registry
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          echo "=== Registry Login ==="
+          runme run build:qcow2:login
+
+      - name: Push container
+        if: ${{ !inputs.skip_push }}
+        run: |
+          echo "=== Pushing to $CONTAINER_REGISTRY ==="
+          runme run build:qcow2:push
+
+      - name: Summary
+        run: |
+          FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
+          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| QCOW2 | konductor.qcow2 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Size | $(du -h konductor.qcow2 | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA256 | $(sha256sum konductor.qcow2 | cut -d' ' -f1 | head -c 16)... |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.skip_push }}" != "true" ]; then
+            echo "| Container | \`$FULL_IMAGE\` |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Container | (push skipped) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Clean up large artifacts to free runner disk space
+          rm -f konductor.qcow2 konductor.qcow2.tmp 2>/dev/null || true
+          rm -rf result result.writable 2>/dev/null || true
