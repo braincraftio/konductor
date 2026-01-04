@@ -34,6 +34,8 @@
 
   # CI/CD runner user (for forgejo-runner agents)
   # Executes Forgejo Actions workflows
+  # TODO: wheel is temporary for QCOW2 builds (guestmount, virt-sparsify require sudo)
+  # Replace with explicit sudo rules in qcow2/default.nix for better auditability
   runner = {
     uid = 1003;
     gid = 1003;
@@ -41,7 +43,7 @@
     home = "/home/runner";
     shell = "/bin/bash";
     gecos = "Forgejo Runner";
-    groups = [ "runner" "kc2" "docker" "libvirtd" "kvm" ];
+    groups = [ "runner" "kc2" "wheel" "docker" "libvirtd" "kvm" ];
   };
 
   # Forgejo server user
@@ -63,6 +65,6 @@
     kc2admin = { gid = 1002; members = [ ]; };
     runner = { gid = 1003; members = [ ]; };
     forgejo = { gid = 1004; members = [ ]; };
-    wheel = { gid = 10; members = [ "kc2admin" ]; };
+    wheel = { gid = 10; members = [ "kc2admin" "runner" ]; };
   };
 }

@@ -101,7 +101,8 @@ in
             isNormalUser = true;
             inherit (users.runner) uid home;
             description = users.runner.gecos;
-            extraGroups = [ "kc2" "docker" "libvirtd" "kvm" ];
+            # wheel needed for QCOW2 build (guestmount, virt-sparsify)
+            extraGroups = [ "kc2" "wheel" "docker" "libvirtd" "kvm" ];
           };
         };
 
@@ -109,6 +110,9 @@ in
         security = {
           sudo = {
             wheelNeedsPassword = false;
+            # TODO: Remove runner from wheel and add explicit guestfs sudo rules:
+            #   guestmount, guestunmount, virt-sparsify, mkdir, rm, rmdir
+            # Explicit constraints are safer, more traceable, and auditable.
             # Runner sudoers for docker and nix commands (CI/CD builds)
             extraRules = [
               {
