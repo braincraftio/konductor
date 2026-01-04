@@ -1,35 +1,29 @@
 # =============================================================================
-# Forgejo Runner VirtualMachine Patch
+# VM Strategic Merge Patch for k9fr01 Instance
 # =============================================================================
-# Strategic merge patch that modifies base VM for CI/CD workloads.
+# Complete VM spec for Forgejo runner instance k9fr01.
 #
 # IMPORTANT: Kustomize replaces arrays, it does not merge them.
-# This patch must include ALL disks, interfaces, and volumes - both base
-# elements AND additions - to produce a complete VM spec.
-#
-# Changes from base:
-#   - Rename VM to forgejo-konductor (via namePrefix)
-#   - Keep default storage (120Gi - sufficient for CI workloads)
-#   - Add workspace PVC disk for runner workspace
-#   - Limit SSH users to runner and kc2admin
-#   - Set unique MAC address for macvtap interface
-#   - Use registry source with immutable digest (not tag)
+# This patch must include ALL disks, interfaces, volumes, and networks
+# to produce a complete VM spec.
 #
 # Disk optimization for Rook Ceph NVMe block over RDMA:
 #   - cache: none (bypass host cache, direct to Ceph)
 #   - io: native (use native AIO for block devices)
-#   - Block mode PVC for optimal performance
+#   - volumeMode: Block for optimal performance
 # =============================================================================
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
-  name: konductor
+  name: forgejo-konductor
   labels:
-    app: forgejo-runner
+    app: k9fr01
 spec:
   dataVolumeTemplates:
     - metadata:
-        name: forgejo-konductor-root
+        name: k9fr01-root
+        labels:
+          app: k9fr01
       spec:
         pvc:
           accessModes:
@@ -45,27 +39,38 @@ spec:
   template:
     metadata:
       labels:
-        app: forgejo-runner
-        kubevirt.io/domain: forgejo-runner
+        app: k9fr01
+        kubevirt.io/domain: k9fr01
     spec:
-      hostname: forgejo-runner
+      hostname: k9fr01
       accessCredentials:
         - sshPublicKey:
             source:
               secret:
-                secretName: forgejo-runner-ssh-key
+                secretName: k9fr01-ssh-key
             propagationMethod:
               qemuGuestAgent:
                 users:
                   - runner
                   - kc2admin
       domain:
+        cpu:
+          cores: 8
+          sockets: 1
+          threads: 2
+          maxSockets: 4
+          model: host-passthrough
+        memory:
+          guest: 32Gi
+          maxGuest: 128Gi
+        resources:
+          requests:
+            memory: 32Gi
         devices:
-          # ===================================================================
-          # Disks - ALL disks (base + additions)
-          # ===================================================================
+          # =================================================================
+          # Disks - ALL disks (optimized for Rook Ceph NVMe block)
+          # =================================================================
           disks:
-            # Base disks - optimized for Rook Ceph NVMe block over RDMA
             - name: root-disk
               bootOrder: 1
               cache: none
@@ -80,31 +85,30 @@ spec:
               serial: iso-root-755-m.kube
               disk:
                 bus: virtio
-            # Additional disk for forgejo runner
             - name: workspace-disk
               serial: e4-runner-775-w
               cache: none
               io: native
               disk:
                 bus: virtio
-          # ===================================================================
-          # Interfaces - ALL interfaces (base + modifications)
-          # ===================================================================
+          # =================================================================
+          # Interfaces - ALL interfaces
+          # =================================================================
           interfaces:
             - name: pod
               model: virtio
               masquerade: {}
             - name: macvtap
               model: virtio
-              macAddress: "02:00:00:f0:9e:01"  # Unique MAC for runner
+              macAddress: "02:00:00:f0:9e:01"
               binding:
                 name: macvtap
             - name: br0
               model: virtio
               bridge: {}
-      # =======================================================================
-      # Networks - must reference NAD names as they appear AFTER namePrefix
-      # =======================================================================
+      # =====================================================================
+      # Networks - reference NADs with forgejo- prefix
+      # =====================================================================
       networks:
         - name: pod
           pod: {}
@@ -114,25 +118,23 @@ spec:
         - name: br0
           multus:
             networkName: forgejo-br0
-      # =======================================================================
-      # Volumes - ALL volumes (base + additions)
-      # =======================================================================
+      # =====================================================================
+      # Volumes - ALL volumes with k9fr01-specific references
+      # =====================================================================
       volumes:
-        # Base volumes
         - name: root-disk
           dataVolume:
-            name: forgejo-konductor-root
+            name: k9fr01-root
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
-              name: forgejo-konductor-userdata
+              name: k9fr01-userdata
             networkDataSecretRef:
-              name: forgejo-konductor-networkdata
+              name: k9fr01-networkdata
         - name: kubeconfig
           secret:
-            secretName: forgejo-konductor-kubeconfig
+            secretName: k9fr01-kubeconfig
             optional: true
-        # Additional volume for forgejo runner
         - name: workspace-disk
           persistentVolumeClaim:
-            claimName: forgejo-runner-workspace
+            claimName: k9fr01-workspace

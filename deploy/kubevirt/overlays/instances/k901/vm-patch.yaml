@@ -1,20 +1,6 @@
 # =============================================================================
-# VirtualMachine Patch - Advanced Configuration for t640
+# VM Strategic Merge Patch for k901 Instance
 # =============================================================================
-# Strategic merge patch that modifies base VM for dev workstation.
-#
-# IMPORTANT: Kustomize replaces arrays, it does not merge them.
-# This patch must include ALL disks, interfaces, and volumes - both base
-# elements AND additions - to produce a complete VM spec.
-#
-# Additions over base:
-#   - Larger DataVolume storage (500Gi)
-#   - Registry source with immutable digest
-#   - Node affinity (pin to t640)
-#   - Personal PVC disks (git, home)
-#   - Personal user in SSH key injection (usrbinkat)
-#   - MAC address for macvtap interface
-#
 # Disk optimization for Rook Ceph NVMe block over RDMA:
 #   - cache: none (bypass host cache, direct to Ceph)
 #   - io: native (use native AIO for block devices)
@@ -24,43 +10,61 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
   name: konductor
+  labels:
+    app: k901
 spec:
   dataVolumeTemplates:
     - metadata:
-        name: konductor-root
+        name: k901-root
+        labels:
+          app: k901
       spec:
         pvc:
           volumeMode: Block
           resources:
             requests:
-              storage: 500Gi    # Larger for dev workstation
+              storage: 500Gi
         source:
           registry:
             url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:821d041c5f757415993f5ea41cd75835e740976792aaee2896e00fe459d9bb50
             secretRef: zot-registry-credentials
   template:
+    metadata:
+      labels:
+        app: k901
+        kubevirt.io/domain: k901
     spec:
+      hostname: k901
       nodeSelector:
         kubernetes.io/hostname: t640
       accessCredentials:
         - sshPublicKey:
             source:
               secret:
-                secretName: konductor-ssh-key
+                secretName: k901-ssh-key
             propagationMethod:
               qemuGuestAgent:
                 users:
-                  - usrbinkat   # Deploy-time user (UID 1000)
+                  - usrbinkat
                   - kc2
                   - kc2admin
                   - runner
       domain:
+        cpu:
+          cores: 8
+          sockets: 1
+          threads: 2
+          maxSockets: 4
+          model: host-passthrough
+        memory:
+          guest: 32Gi
+          maxGuest: 128Gi
+        resources:
+          requests:
+            memory: 32Gi
         devices:
-          # ===================================================================
-          # Disks - ALL disks (optimized for Rook Ceph NVMe block)
-          # ===================================================================
+          # Disks optimized for Rook Ceph NVMe block over RDMA
           disks:
-            # Base disks
             - name: root-disk
               bootOrder: 1
               cache: none
@@ -75,7 +79,6 @@ spec:
               serial: iso-root-755-m.kube
               disk:
                 bus: virtio
-            # Additional disks for advanced overlay
             - name: git-disk
               serial: e4-root-775-h.Git
               cache: none
@@ -88,40 +91,42 @@ spec:
               io: native
               disk:
                 bus: virtio
-          # ===================================================================
-          # Interfaces - ALL interfaces (base + modifications)
-          # ===================================================================
           interfaces:
             - name: pod
               model: virtio
               masquerade: {}
             - name: macvtap
               model: virtio
-              macAddress: "52:54:00:c0:9d:01"  # Unique MAC for this instance
+              macAddress: "52:54:00:c0:9d:01"
               binding:
                 name: macvtap
             - name: br0
               model: virtio
               bridge: {}
-      # =======================================================================
-      # Volumes - ALL volumes (base + additions)
-      # =======================================================================
+      networks:
+        - name: pod
+          pod: {}
+        - name: macvtap
+          multus:
+            networkName: macvtap
+        - name: br0
+          multus:
+            networkName: br0
       volumes:
-        # Base volumes
         - name: root-disk
           dataVolume:
-            name: konductor-root
+            name: k901-root
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
-              name: konductor-userdata
+              name: k901-userdata
             networkDataSecretRef:
-              name: konductor-networkdata
+              name: k901-networkdata
         - name: kubeconfig
           secret:
-            secretName: konductor-kubeconfig
+            secretName: k901-kubeconfig
             optional: true
-        # Additional volumes for advanced overlay
+        # Shared PVCs with konductor - persistent user data across instances
         - name: git-disk
           persistentVolumeClaim:
             claimName: konductor-git

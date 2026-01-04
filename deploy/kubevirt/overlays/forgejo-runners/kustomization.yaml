@@ -18,15 +18,44 @@ metadata:
 # =============================================================================
 
 resources:
-  - namespace.yaml
-  - network-attachment-definitions.yaml
-  - networkdata.yaml
-  - serviceaccount.yaml
-  - kubeconfig-generator.yaml
+  - ../../base
   - runner-workspace-pvc.yaml
-  - virtualmachine.yaml
 
 namespace: forgejo-runners
+
+# Rename resources for this namespace
+namePrefix: forgejo-
+
+patches:
+  # VM: Rename, add workspace PVC, adjust sizing
+  - target:
+      kind: VirtualMachine
+      name: konductor
+    path: virtualmachine.yaml
+
+  # Job: Fix hardcoded resource names in kubeconfig generator script
+  - target:
+      kind: Job
+      name: konductor-kubeconfig-generator
+    path: kubeconfig-generator.yaml
+
+  # ClusterRoleBinding: Update SA namespace
+  - target:
+      kind: ClusterRoleBinding
+      name: konductor-vm-admin
+    patch: |-
+      - op: replace
+        path: /subjects/0/namespace
+        value: forgejo-runners
+
+  # Namespace: Rename from konductor to forgejo-runners
+  - target:
+      kind: Namespace
+      name: konductor
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: forgejo-runners
 
 labels:
   - pairs:

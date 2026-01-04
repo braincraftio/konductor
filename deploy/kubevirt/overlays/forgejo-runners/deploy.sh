@@ -273,11 +273,12 @@ users:
 # Mounting is handled by konductor-mount@.service (systemd template)
 #
 # Serial ID format: <fstype>-<user>-<mode>-<path>
-#   e4-root-775-workspace → /dev/disk/by-id/virtio-e4-root-775-workspace
+#   e4-runner-775-w → /dev/disk/by-id/virtio-e4-runner-775-w
+#   w expands to /workspace via konductor-mount@.service
 fs_setup:
   - label: workspace
     filesystem: ext4
-    device: /dev/disk/by-id/virtio-e4-root-775-workspace
+    device: /dev/disk/by-id/virtio-e4-runner-775-w
     partition: none
     overwrite: false
 
@@ -331,20 +332,20 @@ runcmd:
   # konductor-mount@.service parses serial ID to mount:
   #   Serial ID format: <fstype>-<user>-<mode>-<path>
   #
-  #   e4-root-775-workspace → mount -t ext4 /dev/... /workspace, chown root:users, chmod 775
-  #   iso-root-755-m.kube   → mount -t iso9660 -o ro /dev/... /mnt/kubeconfig, chown root:root, chmod 755
+  #   e4-runner-775-w → mount -t ext4 /dev/... /workspace, chown runner:kc2, chmod 775
+  #   iso-root-755-m.kube → mount -t iso9660 -o ro /dev/... /mnt/kube, chown root:root, chmod 755
   # -----------------------------------------------------------------------
-  - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-root-775-workspace.service]
+  - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-runner-775-w.service]
   - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@iso-root-755-m.kube.service]
 
-  # Create symlink: /home/runner/workspace → /workspace (mounted by systemd)
+  # Create symlink for user convenience: /home/runner/workspace → /workspace
   - [/run/current-system/sw/bin/ln, -sf, /workspace, /home/runner/workspace]
-  - [/run/current-system/sw/bin/chown, -h, "runner:users", /home/runner/workspace]
+  - [/run/current-system/sw/bin/chown, -h, "runner:kc2", /home/runner/workspace]
 
-  # Copy kubeconfig to user directories (konductor-mount@iso-root-755-m.kube.service mounts it to /mnt/kubeconfig)
+  # Copy kubeconfig to user directories (konductor-mount@iso-root-755-m.kube.service mounts it to /mnt/kube)
   - [/run/current-system/sw/bin/mkdir, -p, /home/runner/.kube, /home/kc2admin/.kube]
-  - [/run/current-system/sw/bin/cp, /mnt/kubeconfig/config, /home/runner/.kube/config]
-  - [/run/current-system/sw/bin/cp, /mnt/kubeconfig/config, /home/kc2admin/.kube/config]
+  - [/run/current-system/sw/bin/cp, /mnt/kube/config, /home/runner/.kube/config]
+  - [/run/current-system/sw/bin/cp, /mnt/kube/config, /home/kc2admin/.kube/config]
   - [/run/current-system/sw/bin/chown, -R, "runner:users", /home/runner/.kube]
   - [/run/current-system/sw/bin/chown, -R, "kc2admin:users", /home/kc2admin/.kube]
   - [/run/current-system/sw/bin/chmod, "600", /home/runner/.kube/config]
@@ -420,7 +421,8 @@ main() {
     log_info "Creating Forgejo Runner secrets..."
 
     # Create namespace first (needed for secrets)
-    kubectl apply -f "$SCRIPT_DIR/namespace.yaml"
+    # Namespace is managed by kustomize base, but we need it before secrets
+    kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
     # Get configuration
     log_info "Gathering configuration..."

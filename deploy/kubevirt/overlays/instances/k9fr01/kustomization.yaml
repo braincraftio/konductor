@@ -1,0 +1,82 @@
+# =============================================================================
+# Forgejo Runner Instance: k9fr01
+# =============================================================================
+# CI runner instance for canary deployments.
+# Inherits from forgejo-runners overlay, patches instance-specific values.
+#
+# Deploy:
+#   ./deploy.sh
+#   kubectl apply -k .
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: k9fr01
+
+resources:
+  - ../../forgejo-runners
+
+namespace: forgejo-runners
+
+patches:
+  # VM: Strategic merge patch for instance-specific values
+  - target:
+      kind: VirtualMachine
+      name: forgejo-konductor
+    path: vm-patch.yaml
+
+  # VM: Rename to k9fr01
+  - target:
+      kind: VirtualMachine
+      name: forgejo-konductor
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k9fr01
+
+  # Job: Fix kubeconfig generator for instance-specific secret name
+  - target:
+      kind: Job
+      name: forgejo-konductor-kubeconfig-generator
+    path: kubeconfig-generator.yaml
+
+  # Secrets: Rename via JSON patch
+  - target:
+      kind: Secret
+      name: forgejo-konductor-userdata
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k9fr01-userdata
+
+  - target:
+      kind: Secret
+      name: forgejo-konductor-networkdata
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k9fr01-networkdata
+
+  # PVC: Rename workspace
+  - target:
+      kind: PersistentVolumeClaim
+      name: forgejo-runner-workspace
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k9fr01-workspace
+
+  # Job: Rename kubeconfig generator
+  - target:
+      kind: Job
+      name: forgejo-konductor-kubeconfig-generator
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k9fr01-kubeconfig-generator
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: k9fr01
+    includeSelectors: false

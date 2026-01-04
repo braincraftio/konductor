@@ -1,0 +1,67 @@
+# =============================================================================
+# Konductor Instance: k901
+# =============================================================================
+# Dev workstation instance for canary deployments.
+#
+# Deploy:
+#   ./deploy.sh
+#   kubectl apply -k .
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: k901
+
+resources:
+  - ../../advanced
+
+namespace: konductor
+
+patches:
+  # VM: Strategic merge patch for instance-specific values
+  - path: vm-patch.yaml
+
+  # VM: Rename to k901
+  - target:
+      kind: VirtualMachine
+      name: konductor
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k901
+
+  # Secrets: Rename via JSON patch
+  - target:
+      kind: Secret
+      name: konductor-userdata
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k901-userdata
+
+  - target:
+      kind: Secret
+      name: konductor-networkdata
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k901-networkdata
+
+  # PVCs: SHARED with konductor (not renamed)
+  # k901 uses konductor-git and konductor-usrbinkat-home for persistent user data
+  # This makes the VM ephemeral while user data persists across instances
+
+  # Job: Rename
+  - target:
+      kind: Job
+      name: konductor-kubeconfig-generator
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: k901-kubeconfig-generator
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: k901
+    includeSelectors: false

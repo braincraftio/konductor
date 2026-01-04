@@ -7,10 +7,6 @@ metadata:
 # Inherit from base
 resources:
   - ../../base
-  - network-attachment-definitions.yaml
-  - networkdata.yaml
-  - serviceaccount.yaml
-  - kubeconfig-generator.yaml
   - git-pvc.yaml
   - usrbinkat-home-pvc.yaml
   - registry-credentials.yaml

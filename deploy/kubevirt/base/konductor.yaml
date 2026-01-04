@@ -1,39 +1,40 @@
 # =============================================================================
-# Konductor NixOS VM - KubeVirt ContainerDisk Deployment (Base)
+# Konductor NixOS VM - KubeVirt Base Deployment
 # =============================================================================
-# Ephemeral NixOS development workstation using containerDisk pattern.
-# Disk resets on VM restart - ideal for dev/test workloads.
+# Production-grade NixOS development workstation using snapshot-based cloning.
+# Provisions in ~5 seconds via Ceph RBD COW snapshots.
 #
-# This base configuration uses pod networking for maximum portability.
-# See overlays/advanced/ for persistent storage and advanced networking.
+# Architecture:
+#   - Triple-NIC: pod (masquerade), macvtap (L2), br0 (nested virt)
+#   - Persistent storage: DataVolume from golden image snapshot
+#   - Cluster access: ServiceAccount with cluster-admin (kubeconfig on ISO)
+#   - User model: kc2 (1001), kc2admin (1002), runner (1003) + overlay user (1000)
+#
+# This base configuration provides:
+#   - Full VM spec with DataVolumeTemplate (snapshot source)
+#   - Triple-NIC networking (pod, macvtap, br0)
+#   - Common cloud-init (users, services, bridge config)
+#   - ServiceAccount + kubeconfig generation
+#
+# Overlays patch this base to add:
+#   - Personal PVCs (git, home, workspace)
+#   - Environment-specific users
+#   - Sizing adjustments
+#   - Node affinity
 #
 # Prerequisites:
 #   - KubeVirt installed (https://kubevirt.io/quickstart_minikube/)
-#   - QEMU Guest Agent support in KubeVirt
+#   - Golden image snapshot: kubevirt/konductor-base-snapshot
+#   - StorageClass: ceph-nvme-vm-block
+#   - Multus CNI with macvtap support
 #
 # Deploy:
-#   # Create SSH key secret from your public key
-#   kubectl create secret generic konductor-ssh-key -n konductor \
-#     --from-file=key=$HOME/.ssh/id_ed25519.pub
-#
-#   # Deploy the VM
 #   kubectl apply -k https://github.com/containercraft/konductor//deploy/kubevirt/base
 #
 # Access:
 #   SSH:     ssh kc2@<VM_IP> or ssh kc2admin@<VM_IP>
 #   Console: virtctl console konductor -n konductor
 #   VNC:     virtctl vnc konductor -n konductor
-#
-# Users:
-#   kc2      - Unprivileged user (uid 1001)
-#   kc2admin - Privileged user with sudo access (uid 1002)
-#   runner   - CI/CD runner user (uid 1003)
-#
-# Environment:
-#   Full Konductor toolchain pre-installed - no setup required.
-#   Languages: Python, Go, Node.js, Rust
-#   IDE: Neovim, tmux
-#   Tools: Docker, QEMU, libvirt, linters, formatters
 # =============================================================================
 ---
 apiVersion: v1
@@ -46,18 +47,28 @@ type: Opaque
 stringData:
   userdata: |
     #cloud-config
-    # Konductor Development VM Cloud-Init Configuration
     # =========================================================================
-    # SSH Key Injection:
-    #   Keys are injected at runtime via QEMU Guest Agent.
-    #   Create secret: kubectl create secret generic konductor-ssh-key \
-    #     -n konductor --from-file=key=$HOME/.ssh/id_ed25519.pub
+    # Konductor Base Cloud-Init Configuration
     # =========================================================================
+    # Common configuration inherited by all overlays.
+    # Overlays patch this to add environment-specific settings.
+    # =========================================================================
+
+    # -------------------------------------------------------------------------
+    # Disk Resize (DataVolume size increases)
+    # -------------------------------------------------------------------------
+    growpart:
+      mode: auto
+      devices: ["/"]
+      ignore_growroot_disabled: true
+    resize_rootfs: true
 
     # -------------------------------------------------------------------------
     # User Configuration
     # -------------------------------------------------------------------------
-    # UIDs match src/lib/users.nix for consistency across deployments
+    # UIDs match src/lib/users.nix for consistency
+    # Image has: kc2(1001), kc2admin(1002), runner(1003) baked in
+    # Cloud-init can add deploy-time user (UID 1000, name specified in overlay)
     users:
       - name: kc2
         uid: 1001
@@ -75,15 +86,68 @@ stringData:
       - name: runner
         uid: 1003
         gecos: CI/CD Runner
-        groups: users, docker, libvirtd, kvm
+        groups: users, wheel, docker, libvirtd, kvm
         shell: /run/current-system/sw/bin/bash
+        sudo: ALL=(ALL) NOPASSWD:ALL
         lock_passwd: true
+
+    # -------------------------------------------------------------------------
+    # Common Configuration Files
+    # -------------------------------------------------------------------------
+    write_files:
+      # Containers policy for skopeo/podman
+      - path: /etc/containers/policy.json
+        permissions: '0644'
+        content: |
+          {"default": [{"type": "insecureAcceptAnything"}]}
+
+      # Bridge device (cloud-init v2 doesn't create .netdev)
+      - path: /etc/systemd/network/05-br0.netdev
+        permissions: '0644'
+        content: |
+          [NetDev]
+          Name=br0
+          Kind=bridge
+          [Bridge]
+          STP=false
+          ForwardDelaySec=0
+
+      # Bridge network config
+      - path: /etc/systemd/network/05-br0.network
+        permissions: '0644'
+        content: |
+          [Match]
+          Name=br0
+          [Network]
+          DHCP=no
+          IPv6AcceptRA=no
+          LinkLocalAddressing=no
+
+      # Bridge port config
+      - path: /etc/systemd/network/05-enp3s0.network
+        permissions: '0644'
+        content: |
+          [Match]
+          Name=enp3s0
+          [Network]
+          Bridge=br0
+          DHCP=no
+          IPv6AcceptRA=no
+          LinkLocalAddressing=no
+          [Link]
+          RequiredForOnline=no
 
     # -------------------------------------------------------------------------
     # Startup Commands
     # -------------------------------------------------------------------------
-    # Note: NixOS requires full paths - binaries in /run/current-system/sw/bin
     runcmd:
+      # Mount kubeconfig via systemd template service
+      - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@iso-root-755-m.kube.service]
+
+      # Restart networkd to apply bridge config
+      - [/run/current-system/sw/bin/systemctl, restart, systemd-networkd]
+
+      # Start services
       - [/run/current-system/sw/bin/systemctl, start, docker]
       - [/run/current-system/sw/bin/systemctl, start, libvirtd]
 
@@ -91,7 +155,6 @@ stringData:
       Cloud-Init Complete
       VM: konductor
       Access: ssh kc2@<IP> or ssh kc2admin@<IP>
-      Environment: Full Konductor toolchain pre-installed
 ---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -101,6 +164,33 @@ metadata:
     app: konductor
 spec:
   runStrategy: Always
+
+  # ===========================================================================
+  # DataVolumeTemplate - Cloned from Golden Image Snapshot
+  # ===========================================================================
+  # Optimized for Rook Ceph NVMe block over RDMA:
+  #   - volumeMode: Block for direct block device access
+  #   - storageClassName: ceph-nvme-vm-block for NVMe-backed RBD
+  # ===========================================================================
+  dataVolumeTemplates:
+    - metadata:
+        name: konductor-root
+        labels:
+          app: konductor
+      spec:
+        pvc:
+          accessModes:
+            - ReadWriteOnce
+          volumeMode: Block
+          resources:
+            requests:
+              storage: 120Gi                    # Default, patchable
+          storageClassName: ceph-nvme-vm-block  # Default, patchable
+        source:
+          snapshot:
+            name: konductor-base-snapshot       # Golden image
+            namespace: kubevirt
+
   template:
     metadata:
       labels:
@@ -109,70 +199,128 @@ spec:
     spec:
       hostname: konductor
       terminationGracePeriodSeconds: 30
-      # -----------------------------------------------------------------------
+
+      # =======================================================================
       # SSH Key Injection via QEMU Guest Agent
-      # -----------------------------------------------------------------------
-      # Keys are injected from the konductor-ssh-key secret into authorized_keys
-      # for both kc2 and kc2admin users. Create the secret with:
-      #   kubectl create secret generic konductor-ssh-key -n konductor \
-      #     --from-file=key=$HOME/.ssh/id_ed25519.pub
-      # -----------------------------------------------------------------------
+      # =======================================================================
       accessCredentials:
         - sshPublicKey:
             source:
               secret:
-                secretName: konductor-ssh-key
+                secretName: konductor-ssh-key   # Created by overlay deploy.sh
             propagationMethod:
               qemuGuestAgent:
                 users:
                   - kc2
                   - kc2admin
                   - runner
+
       domain:
+        # =====================================================================
+        # CPU Configuration (with hotplug support)
+        # =====================================================================
         cpu:
-          cores: 2
+          cores: 4
           sockets: 1
-          threads: 1
-          model: host-passthrough
+          threads: 2
+          maxSockets: 4                         # CPU hotplug up to 16 vCPUs
+          model: host-passthrough               # Required for nested virt
+
+        # =====================================================================
+        # Memory Configuration (with hotplug support)
+        # =====================================================================
+        memory:
+          guest: 16Gi
+          maxGuest: 64Gi                        # Memory hotplug up to 64Gi
         resources:
           requests:
-            memory: 4Gi
-          # Uncomment to set limits:
-          # limits:
-          #   memory: 8Gi
+            memory: 16Gi
+
+        # =====================================================================
+        # Machine Type
+        # =====================================================================
         machine:
           type: q35
-        # EFI boot with OVMF firmware (qcow-efi image uses proper GPT alignment)
-        # secureBoot disabled - NixOS uses its own integrity mechanisms
+
+        # =====================================================================
+        # Firmware (EFI)
+        # =====================================================================
         firmware:
           bootloader:
             efi:
-              secureBoot: false
+              secureBoot: false                 # NixOS manages integrity
+
+        # =====================================================================
+        # Devices
+        # =====================================================================
         devices:
           autoattachSerialConsole: true
           autoattachGraphicsDevice: true
+          networkInterfaceMultiqueue: true
           rng: {}
+
+          # Disks optimized for Rook Ceph NVMe block over RDMA
           disks:
             - name: root-disk
               bootOrder: 1
+              cache: none
+              io: native
               disk:
                 bus: virtio
             - name: cloudinitdisk
+              bootOrder: 2
               disk:
                 bus: virtio
+            - name: kubeconfig
+              serial: iso-root-755-m.kube       # konductor-mount@.service
+              disk:
+                bus: virtio
+
+          # ===================================================================
+          # Network Interfaces (Triple-NIC)
+          # ===================================================================
           interfaces:
-            - name: default
+            # Pod network: Kubernetes API/service access
+            - name: pod
               model: virtio
               masquerade: {}
+            # macvtap: Direct L2 to physical NIC (DHCP, default route)
+            - name: macvtap
+              model: virtio
+              binding:
+                name: macvtap
+            # Linux bridge: For nested virtualization
+            - name: br0
+              model: virtio
+              bridge: {}
+
+      # =======================================================================
+      # Networks
+      # =======================================================================
       networks:
-        - name: default
+        - name: pod
           pod: {}
+        - name: macvtap
+          multus:
+            networkName: macvtap
+        - name: br0
+          multus:
+            networkName: br0
+
+      # =======================================================================
+      # Volumes
+      # =======================================================================
       volumes:
         - name: root-disk
-          containerDisk:
-            image: docker.io/containercraft/konductor:latest-qcow2
-            path: /disk/nixos.qcow2
+          dataVolume:
+            name: konductor-root
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
               name: konductor-userdata
+            networkDataSecretRef:
+              name: konductor-networkdata
+        - name: kubeconfig
+          secret:
+            secretName: konductor-kubeconfig
+            optional: true
