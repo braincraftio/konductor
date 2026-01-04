@@ -26,7 +26,7 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 
 | Artifact | Size | Description |
 |----------|------|-------------|
-| `konductor-YYYYMMDD.qcow2` | ~4GB | ZSTD-compressed QCOW2, boots offline with full toolchain |
+| `konductor.qcow2` | ~4GB | ZSTD-compressed QCOW2, boots offline with full toolchain |
 | `docker.io/containercraft/konductor:latest-qcow2` | ~4GB | KubeVirt containerDisk (also on ghcr.io/braincraftio/konductor) |
 
 The image includes:
@@ -102,7 +102,7 @@ Examples:
   runme run build:qcow2:start && ssh localhost   # Local development
 
 Output:
-  konductor-YYYYMMDD.qcow2                         # ZSTD-compressed QCOW2
+  konductor.qcow2                                  # ZSTD-compressed QCOW2
   docker.io/containercraft/konductor:latest-qcow2  # KubeVirt containerDisk
 EOF
 ```
@@ -120,7 +120,7 @@ pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
 sudo guestunmount /tmp/nixmount 2>/dev/null || true
 sudo rm -rf /tmp/nixmount /tmp/konductor-build-cloud-init
-rm -rf result result.writable 2>/dev/null || true
+rm -rf result result.writable konductor.qcow2 konductor.qcow2.tmp 2>/dev/null || true
 ```
 
 `runme run build:qcow2:clean`
@@ -164,9 +164,8 @@ Package QCOW2 as containerDisk for KubeVirt.
 
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-# Variables from _build:qcow2:env or defaults for standalone run
-: ${QCOW2_OUTPUT:=konductor-$(date +%Y%m%d).qcow2}
-: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
+QCOW2_OUTPUT="konductor.qcow2"
+FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2:image first."; exit 1; }
 [ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
@@ -275,8 +274,7 @@ Push container to registry as OCI image.
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-# Variables from _build:qcow2:env or defaults for standalone run
-: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
+FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 # Verify image exists in local docker daemon (built by build:qcow2:container)
 docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found. Run build:qcow2:container first."; exit 1; }
@@ -379,8 +377,7 @@ build:qcow2:publish
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-# Variables from _build:qcow2:env or defaults for standalone run
-: ${FULL_IMAGE:=${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}}
+FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 echo "=== Publishing: $FULL_IMAGE ==="
 echo ""
@@ -445,11 +442,11 @@ Registry: docker.io/containercraft/konductor:latest-qcow2
 
 ### _build:qcow2:env
 
-Export shared environment variables. Runs first, persists to all subsequent tasks in session.
+Display build environment variables. Static filename avoids session persistence issues.
 
 ```sh {"name":"_build:qcow2:env"}
-# Shared variables - exported once, inherited by all tasks in --all session
-export QCOW2_OUTPUT="konductor-$(date +%Y%m%d).qcow2"
+# Static filename - no session persistence needed
+export QCOW2_OUTPUT="konductor.qcow2"
 export CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-docker.io}"
 export CONTAINER_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 export CONTAINER_TAG="${CONTAINER_TAG:-latest-qcow2}"
@@ -699,6 +696,7 @@ ZSTD compress QCOW2.
 
 ```sh {"name":"_build:qcow2:img:compress","tag":"duration:slow"}
 set -e
+QCOW2_OUTPUT="konductor.qcow2"
 qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
 ```
 
@@ -710,6 +708,7 @@ Sparsify to reclaim zero-filled space.
 
 ```sh {"name":"_build:qcow2:img:sparsify","tag":"duration:slow,requires:guestfs"}
 set -e
+QCOW2_OUTPUT="konductor.qcow2"
 export LIBGUESTFS_BACKEND=direct
 VIRT_SPARSIFY="$(which virt-sparsify)"
 sudo -E "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
@@ -734,6 +733,7 @@ Verify build output with SHA256 checksum.
 
 ```sh {"name":"_build:qcow2:verify","tag":"type:readonly","interactive":"false"}
 set -e
+QCOW2_OUTPUT="konductor.qcow2"
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found"; exit 1; }
 echo "=== QCOW2 Build Complete ==="
 echo "FILE: $QCOW2_OUTPUT"
