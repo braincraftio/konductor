@@ -1,0 +1,24 @@
+# =============================================================================
+# VolumeSnapshot - Konductor Golden Image
+# =============================================================================
+# Snapshot of the golden image DataVolume for instant cloning.
+# VM instances clone from this snapshot instead of re-importing from registry.
+#
+# Prerequisites:
+#   - konductor-golden DataVolume must be in Succeeded phase
+#   - PVC must exist: kubectl get pvc konductor-golden -n konductor
+# =============================================================================
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: konductor-golden-snapshot
+  namespace: konductor
+  labels:
+    app.kubernetes.io/name: konductor-golden-snapshot
+    app.kubernetes.io/component: golden-image
+    app.kubernetes.io/part-of: konductor
+spec:
+  volumeSnapshotClassName: ceph-rbd-snapshot
+  source:
+    # PVC name matches DataVolume name
+    persistentVolumeClaimName: konductor-golden

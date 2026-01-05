@@ -1,15 +1,16 @@
 # =============================================================================
-# Persistent Volume Claim for Git repositories
+# Persistent Volume Claim for k901 User Home Directory
 # =============================================================================
-# ReadWriteMany CephFS volume for persistent Git storage across VM restarts.
-# Mounted at /home/usrbinkat/Git inside the VM.
+# Separate home PVC for k901 instance (not shared with konductor)
+# QEMU disk locking prevents sharing disk images between running VMs
+# ReadWriteMany for future live migration support
 # =============================================================================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: konductor-git
+  name: k901-usrbinkat-home
   labels:
-    app: konductor
+    app: k901
 spec:
   accessModes:
     - ReadWriteMany
@@ -17,4 +18,4 @@ spec:
   storageClassName: cephfs-nvme-vm
   resources:
     requests:
-      storage: 200Gi
+      storage: 100Gi

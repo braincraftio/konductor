@@ -70,7 +70,7 @@ teardown() {
     fi
 
     # NOTE: PVCs are NOT deleted by default to preserve persistent data
-    # To delete PVCs, run: kubectl delete pvc -n konductor konductor-git konductor-usrbinkat-home
+    # To delete PVCs, run: kubectl delete pvc -n konductor konductor-workspace konductor-usrbinkat-home
 
     # Delete secrets
     for secret in konductor-userdata konductor-networkdata konductor-ssh-key konductor-kubeconfig; do

@@ -1,0 +1,37 @@
+# =============================================================================
+# Golden Image DataVolume - Konductor
+# =============================================================================
+# Central golden image imported from container registry.
+# Import once, snapshot, clone instantly for each VM instance.
+#
+# Storage: ceph-nvme-vm-block (Block volumeMode for efficient snapshot cloning)
+# Clone strategy: CSI clone via ceph-rbd-snapshot
+# =============================================================================
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: konductor-golden
+  namespace: konductor
+  labels:
+    app.kubernetes.io/name: konductor-golden
+    app.kubernetes.io/component: golden-image
+    app.kubernetes.io/part-of: konductor
+  annotations:
+    # Required for Block volumeMode with WaitForFirstConsumer storage classes
+    # Bypasses selected-node requirement so PVC Prime can be created for import
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  # Use spec.storage for CDI auto-inference from StorageProfile
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    volumeMode: Block
+    storageClassName: ceph-nvme-vm-block
+    resources:
+      requests:
+        # Base image size - clones can expand as needed
+        storage: 64Gi
+  source:
+    registry:
+      url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:a8985909b0b0a8fea8eae844fda27ec5203ce9572b0e4c3354e8369103b923a0
+      secretRef: zot-registry-credentials

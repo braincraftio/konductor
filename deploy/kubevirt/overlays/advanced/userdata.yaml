@@ -55,12 +55,12 @@ stringData:
     # Mounting is handled by konductor-mount@.service (systemd template)
     #
     # Serial ID format: <fstype>-<user>-<mode>-<path>
-    #   e4-root-775-h.Git      → /dev/disk/by-id/virtio-e4-root-775-h.Git
+    #   e4-usrbinkat-775-w          → /dev/disk/by-id/virtio-e4-usrbinkat-775-w → /workspace
     #   e4-usrbinkat-700-h.u   → /dev/disk/by-id/virtio-e4-usrbinkat-700-h.u
     fs_setup:
-      - label: git
+      - label: workspace
         filesystem: ext4
-        device: /dev/disk/by-id/virtio-e4-root-775-h.Git
+        device: /dev/disk/by-id/virtio-e4-usrbinkat-775-w
         partition: none
         overwrite: false
       - label: home-usrbinkat
@@ -173,13 +173,13 @@ stringData:
       #   Path encoding: dots become slashes, abbreviations expand:
       #     h = home, m = mnt, u = $OWNER (the user field)
       #
-      #   e4-root-775-h.Git      → /home/Git (ext4, root:kc2, 775)
+      #   e4-usrbinkat-775-w          → /workspace (ext4, root:kc2, 775)
       #   e4-usrbinkat-700-h.u   → /home/usrbinkat (ext4, usrbinkat:kc2, 700)
       #   iso-root-755-m.kube    → /mnt/kube (iso9660 ro, root:root, 755)
       #
       # Note: Serial IDs limited to 20 chars, abbreviations save space
       # -----------------------------------------------------------------------
-      - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-root-775-h.Git.service]
+      - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-usrbinkat-775-w.service]
       - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@e4-usrbinkat-700-h.u.service]
       - [/run/current-system/sw/bin/systemctl, enable, --now, konductor-mount@iso-root-755-m.kube.service]
 

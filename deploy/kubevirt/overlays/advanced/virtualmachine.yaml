@@ -9,9 +9,9 @@
 #
 # Additions over base:
 #   - Larger DataVolume storage (500Gi)
-#   - Registry source with immutable digest
+#   - Clone from golden image snapshot (instant provisioning)
 #   - Node affinity (pin to t640)
-#   - Personal PVC disks (git, home)
+#   - Personal PVC disks (workspace, home)
 #   - Personal user in SSH key injection (usrbinkat)
 #   - MAC address for macvtap interface
 #
@@ -29,15 +29,21 @@ spec:
     - metadata:
         name: konductor-root
       spec:
-        pvc:
+        # Use spec.storage for CDI auto-inference from StorageProfile
+        storage:
+          accessModes:
+            - ReadWriteOnce
           volumeMode: Block
+          storageClassName: ceph-nvme-vm-block
           resources:
             requests:
-              storage: 500Gi    # Larger for dev workstation
+              # Expand from golden image base size (64Gi) to full VM disk
+              storage: 500Gi
         source:
-          registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:821d041c5f757415993f5ea41cd75835e740976792aaee2896e00fe459d9bb50
-            secretRef: zot-registry-credentials
+          # Clone from golden image snapshot (instant, no registry import)
+          snapshot:
+            name: konductor-golden-snapshot
+            namespace: konductor
   template:
     spec:
       nodeSelector:
@@ -76,8 +82,8 @@ spec:
               disk:
                 bus: virtio
             # Additional disks for advanced overlay
-            - name: git-disk
-              serial: e4-root-775-h.Git
+            - name: workspace-disk
+              serial: e4-usrbinkat-775-w
               cache: none
               io: native
               disk:
@@ -122,9 +128,9 @@ spec:
             secretName: konductor-kubeconfig
             optional: true
         # Additional volumes for advanced overlay
-        - name: git-disk
+        - name: workspace-disk
           persistentVolumeClaim:
-            claimName: konductor-git
+            claimName: konductor-workspace
         - name: home-disk-usrbinkat
           persistentVolumeClaim:
             claimName: konductor-usrbinkat-home

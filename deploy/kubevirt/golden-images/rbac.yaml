@@ -1,0 +1,45 @@
+# =============================================================================
+# RBAC for Cross-Namespace Snapshot Cloning
+# =============================================================================
+# Allows DataVolumes in other namespaces to clone from VolumeSnapshots
+# in the konductor namespace.
+#
+# CDI requires 'datavolumes/source' permission in the source namespace.
+# Only needed for namespaces OTHER than konductor (e.g., forgejo-runners).
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cdi-clone-from-konductor
+  labels:
+    app.kubernetes.io/name: cdi-clone-from-konductor
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: konductor
+rules:
+  # Allow reading VolumeSnapshots
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch"]
+  # CDI clone source permission
+  - apiGroups: ["cdi.kubevirt.io"]
+    resources: ["datavolumes/source"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cdi-clone-from-konductor
+  namespace: konductor
+  labels:
+    app.kubernetes.io/name: cdi-clone-from-konductor
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: konductor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cdi-clone-from-konductor
+subjects:
+  # Allow all service accounts to clone from konductor namespace
+  - kind: Group
+    name: system:serviceaccounts
+    apiGroup: rbac.authorization.k8s.io

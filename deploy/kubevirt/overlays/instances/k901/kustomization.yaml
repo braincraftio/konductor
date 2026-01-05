@@ -15,6 +15,7 @@ metadata:
 
 resources:
   - ../../advanced
+  - usrbinkat-home-pvc.yaml
 
 namespace: konductor
 
@@ -48,9 +49,9 @@ patches:
         path: /metadata/name
         value: k901-networkdata
 
-  # PVCs: SHARED with konductor (not renamed)
-  # k901 uses konductor-git and konductor-usrbinkat-home for persistent user data
-  # This makes the VM ephemeral while user data persists across instances
+  # PVCs: workspace SHARED with konductor, home is k901-specific
+  # k901 uses konductor-workspace (shared) and k901-usrbinkat-home (standalone)
+  # Home PVC separate due to QEMU disk locking on disk images
 
   # Job: Rename
   - target:

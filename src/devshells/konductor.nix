@@ -36,11 +36,16 @@ baseShell.overrideAttrs (old: {
     ++ programs.forgejo.runnerPackages
     ++ programs.forgejo.cliPackages
     # Self-hosting: container + VM build tools
-    ++ konductor.packages;
+    ++ konductor.packages
+    # C++ stdlib for Python grpc (used by Pulumi)
+    ++ [ pkgs.stdenv.cc.cc.lib ];
 
   shellHook = ''
     # Skip base banner - we show our own
     export KONDUCTOR_SKIP_BANNER=1
+
+    # C++ stdlib for Python grpc (used by Pulumi)
+    export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   '' + old.shellHook + ''
     export KONDUCTOR_SHELL="konductor"
     export name="konductor"

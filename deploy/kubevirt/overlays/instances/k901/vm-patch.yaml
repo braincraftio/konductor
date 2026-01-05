@@ -1,10 +1,8 @@
 # =============================================================================
 # VM Strategic Merge Patch for k901 Instance
 # =============================================================================
-# Disk optimization for Rook Ceph NVMe block over RDMA:
-#   - cache: none (bypass host cache, direct to Ceph)
-#   - io: native (use native AIO for block devices)
-#   - volumeMode: Block for optimal performance
+# Clones root disk from golden image snapshot for instant provisioning.
+# Golden image: kubevirt/konductor-golden-snapshot
 # =============================================================================
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -19,15 +17,21 @@ spec:
         labels:
           app: k901
       spec:
-        pvc:
+        # Use spec.storage for CDI auto-inference from StorageProfile
+        storage:
+          accessModes:
+            - ReadWriteOnce
           volumeMode: Block
+          storageClassName: ceph-nvme-vm-block
           resources:
             requests:
+              # Expand from golden image base size (64Gi) to full VM disk
               storage: 500Gi
         source:
-          registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:821d041c5f757415993f5ea41cd75835e740976792aaee2896e00fe459d9bb50
-            secretRef: zot-registry-credentials
+          # Clone from golden image snapshot (instant, no registry import)
+          snapshot:
+            name: konductor-golden-snapshot
+            namespace: konductor
   template:
     metadata:
       labels:
@@ -57,6 +61,8 @@ spec:
           maxSockets: 4
           model: host-passthrough
         memory:
+          hugepages:
+            pageSize: "1Gi"
           guest: 32Gi
           maxGuest: 128Gi
         resources:
@@ -79,8 +85,8 @@ spec:
               serial: iso-root-755-m.kube
               disk:
                 bus: virtio
-            - name: git-disk
-              serial: e4-root-775-h.Git
+            - name: workspace-disk
+              serial: e4-usrbinkat-775-w
               cache: none
               io: native
               disk:
@@ -97,7 +103,7 @@ spec:
               masquerade: {}
             - name: macvtap
               model: virtio
-              macAddress: "52:54:00:c0:9d:01"
+              macAddress: "52:54:00:c0:9d:02"
               binding:
                 name: macvtap
             - name: br0
@@ -126,10 +132,11 @@ spec:
           secret:
             secretName: k901-kubeconfig
             optional: true
-        # Shared PVCs with konductor - persistent user data across instances
-        - name: git-disk
+        # Workspace: shared with konductor for collaborative git repos
+        - name: workspace-disk
           persistentVolumeClaim:
-            claimName: konductor-git
+            claimName: konductor-workspace
+        # Home: k901-specific (QEMU disk locking prevents shared disk images)
         - name: home-disk-usrbinkat
           persistentVolumeClaim:
-            claimName: konductor-usrbinkat-home
+            claimName: k901-usrbinkat-home

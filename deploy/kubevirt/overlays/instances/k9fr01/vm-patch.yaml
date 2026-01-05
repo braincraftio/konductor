@@ -34,8 +34,9 @@ spec:
               storage: 120Gi
           storageClassName: ceph-nvme-vm-block
         source:
-          registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:821d041c5f757415993f5ea41cd75835e740976792aaee2896e00fe459d9bb50
+          snapshot:
+            name: konductor-local-snapshot
+            namespace: kubevirt
   template:
     metadata:
       labels:
@@ -61,6 +62,8 @@ spec:
           maxSockets: 4
           model: host-passthrough
         memory:
+          hugepages:
+            pageSize: "1Gi"
           guest: 32Gi
           maxGuest: 128Gi
         resources:

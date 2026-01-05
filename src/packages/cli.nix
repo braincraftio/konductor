@@ -40,6 +40,7 @@ in
 
     # Kubernetes tools
     kubectl # Kubernetes CLI
+    kubecolor # Kubectl with color
     kubelogin-oidc # OIDC authentication for kubectl
     k9s # Kubernetes TUI
     kubevirt # Includes virtctl for VM management

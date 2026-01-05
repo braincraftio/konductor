@@ -1,0 +1,35 @@
+# =============================================================================
+# Kustomization - Golden Images
+# =============================================================================
+# Central golden image resources deployed to kubevirt namespace.
+#
+# Deployment order:
+#   1. RBAC and registry credentials (prerequisites)
+#   2. DataVolume (imports from registry - takes ~10 min first time)
+#   3. VolumeSnapshot (after DV succeeds)
+#
+# Usage:
+#   kubectl apply -k deploy/kubevirt/golden-images/
+#
+# After DataVolume succeeds:
+#   kubectl apply -f deploy/kubevirt/golden-images/konductor-golden-snapshot.yaml
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: konductor-golden-images
+
+namespace: konductor
+
+resources:
+  - rbac.yaml
+  - registry-credentials.yaml
+  - konductor-golden-dv.yaml
+  # Apply snapshot manually after DV succeeds:
+  # - konductor-golden-snapshot.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false

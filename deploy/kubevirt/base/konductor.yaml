@@ -188,7 +188,7 @@ spec:
           storageClassName: ceph-nvme-vm-block  # Default, patchable
         source:
           snapshot:
-            name: konductor-base-snapshot       # Golden image
+            name: konductor-local-snapshot
             namespace: kubevirt
 
   template:
@@ -230,6 +230,8 @@ spec:
         # Memory Configuration (with hotplug support)
         # =====================================================================
         memory:
+          hugepages:
+            pageSize: "1Gi"
           guest: 16Gi
           maxGuest: 64Gi                        # Memory hotplug up to 64Gi
         resources:

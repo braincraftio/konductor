@@ -1,0 +1,25 @@
+# =============================================================================
+# Persistent Volume Claim for Workspace
+# =============================================================================
+# ReadWriteMany CephFS volume for persistent workspace storage across VM restarts.
+# Mounted at /workspace inside the VM.
+#
+# Convention: /workspace/<server_fqdn>/<namespace>/<repo_name>/
+# Examples:
+#   /workspace/git.braincraft.io/braincraft/k9/
+#   /workspace/github.com/user/repo/
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konductor-workspace
+  labels:
+    app: konductor
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  storageClassName: cephfs-nvme-vm
+  resources:
+    requests:
+      storage: 200Gi

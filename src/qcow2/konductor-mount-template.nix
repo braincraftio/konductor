@@ -9,29 +9,46 @@
 #     user   = owner username OR "root"
 #     mode   = 3-digit octal permissions
 #     path   = mount point with "/" encoded as "." and abbreviations:
-#              h = home, m = mnt, u = $OWNER (expands to username)
+#              h = home, m = mnt, w = workspace, u = $OWNER
 #
 #   Path Encoding (to fit 20 char limit):
-#     h.Git     → /home/Git
 #     h.u       → /home/$OWNER (e.g., /home/usrbinkat)
 #     m.kube    → /mnt/kube
-#     workspace → /workspace
+#     w         → /workspace
+#
+#   Workspace Convention:
+#     /workspace/<server_fqdn>/<namespace>/<repo_name>/
+#     Examples:
+#       /workspace/git.braincraft.io/braincraft/k9/
+#       /workspace/github.com/user/repo/
 #
 #   Examples (all use kc2 group GID 1001 for shared access):
+#     e4-usrbinkat-775-w          → ext4, root:kc2, 775, /workspace
 #     e4-alice-700-h.u       → ext4, alice:kc2, 700, /home/alice
-#     e4-root-775-h.Git      → ext4, root:kc2, 775, /home/Git
 #     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /mnt/kube
-#     e4-run-775-workspace   → ext4, runner:kc2, 775, /workspace
 #
 # The systemd unit parses and expands the serial string into mount instructions.
 
 { pkgs, ... }:
 
 {
+  # udev rules to auto-start konductor-mount@ services for matching virtio disks
+  # Matches serial IDs with pattern: <fstype>-<user>-<mode>-<path>
+  # e.g., e4-usrbinkat-775-w, iso-root-755-m.kube
+  services.udev.extraRules = ''
+    # Auto-start konductor-mount@ for virtio disks with convention-based serials
+    # Pattern: (e4|iso|xfs|auto)-<user>-<mode>-<path>
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="e4-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="iso-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="xfs-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="auto-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
+  '';
+
   systemd.services."konductor-mount@" = {
     description = "Mount virtio disk by serial ID: %i";
-    after = [ "local-fs-pre.target" ];
-    before = [ "local-fs.target" ];
+    # Run after basic system is up - no 'before' constraint to avoid cycles
+    # when udev triggers this service after boot
+    after = [ "sysinit.target" ];
 
     serviceConfig = let
       mountStart = pkgs.writeShellScript "konductor-mount-start" ''
@@ -87,7 +104,7 @@
         esac
 
         # Decode path: dots become slashes, expand abbreviations, prepend /
-        # Abbreviations: h=home, m=mnt, u=$OWNER
+        # Abbreviations: h=home, m=mnt, w=workspace, u=$OWNER
         MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
 
         # Expand abbreviations (order matters: do component expansions first)
@@ -95,6 +112,8 @@
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
         # ^m/ or ^m$ → mnt
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
+        # ^w/ or ^w$ → workspace
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^w(/|$)#workspace\1#')
         # /u$ → /$OWNER (final component only)
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
         # ^u$ → $OWNER (single component)
@@ -152,9 +171,45 @@
           exit 0
         fi
 
+        # Check if disk has a filesystem, format if empty
+        EXISTING_FS=$(${pkgs.util-linux}/bin/blkid -o value -s TYPE "$DEVICE" 2>/dev/null || echo "")
+
+        if [ -z "$EXISTING_FS" ]; then
+          echo "No filesystem detected on $DEVICE"
+
+          if [ "$FS_TYPE" = "iso9660" ]; then
+            echo "ERROR: Cannot format iso9660 filesystem (read-only)"
+            exit 1
+          fi
+
+          # Determine filesystem to create
+          if [ "$FS_TYPE" = "auto" ]; then
+            FORMAT_FS="ext4"
+          else
+            FORMAT_FS="$FS_TYPE"
+          fi
+
+          echo "Formatting $DEVICE as $FORMAT_FS..."
+          case "$FORMAT_FS" in
+            ext4)
+              ${pkgs.e2fsprogs}/bin/mkfs.ext4 -L "$(basename "$MOUNT_POINT")" "$DEVICE"
+              ;;
+            xfs)
+              ${pkgs.xfsprogs}/bin/mkfs.xfs -L "$(basename "$MOUNT_POINT")" "$DEVICE"
+              ;;
+            *)
+              echo "ERROR: Cannot auto-format filesystem type: $FORMAT_FS"
+              exit 1
+              ;;
+          esac
+          echo "Formatted $DEVICE as $FORMAT_FS"
+        else
+          echo "Existing filesystem: $EXISTING_FS"
+        fi
+
         # Mount with specified or auto-detected filesystem type
         if [ "$FS_TYPE" = "auto" ]; then
-          # Auto-detect filesystem type
+          # Re-detect filesystem type after potential format
           DETECTED_FS=$(${pkgs.util-linux}/bin/blkid -o value -s TYPE "$DEVICE" || echo "unknown")
           echo "Auto-detected filesystem: $DETECTED_FS"
           ${pkgs.util-linux}/bin/mount -o "$FS_OPTS" "$DEVICE" "$MOUNT_POINT"
@@ -165,12 +220,15 @@
 
         echo "Mounted: $DEVICE → $MOUNT_POINT"
 
-        # Set ownership and permissions
-        ${pkgs.coreutils}/bin/chown "$OWNER:$GROUP" "$MOUNT_POINT"
-        ${pkgs.coreutils}/bin/chmod "$MODE" "$MOUNT_POINT"
-
-        echo "Ownership: $OWNER:$GROUP"
-        echo "Permissions: $MODE"
+        # Set ownership and permissions (skip for read-only filesystems like iso9660)
+        if [ "$FS_TYPE" != "iso9660" ]; then
+          ${pkgs.coreutils}/bin/chown "$OWNER:$GROUP" "$MOUNT_POINT"
+          ${pkgs.coreutils}/bin/chmod "$MODE" "$MOUNT_POINT"
+          echo "Ownership: $OWNER:$GROUP"
+          echo "Permissions: $MODE"
+        else
+          echo "Skipping chown/chmod for read-only filesystem"
+        fi
         echo "========================================="
         echo "Mount complete: $MOUNT_POINT"
         echo "========================================="
@@ -188,6 +246,7 @@
         MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
+        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^w(/|$)#workspace\1#')
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
         MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#^u\$#$OWNER#")
         if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then

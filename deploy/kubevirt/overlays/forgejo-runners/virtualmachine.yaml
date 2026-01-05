@@ -31,17 +31,20 @@ spec:
     - metadata:
         name: forgejo-konductor-root
       spec:
-        pvc:
+        # Use spec.storage for CDI auto-inference from StorageProfile
+        storage:
           accessModes:
             - ReadWriteOnce
           volumeMode: Block
+          storageClassName: ceph-nvme-vm-block
           resources:
             requests:
-              storage: 120Gi
-          storageClassName: ceph-nvme-vm-block
+              storage: 500Gi
         source:
-          registry:
-            url: docker://registry.c0a801c5.sslip.io/containercraft/konductor@sha256:821d041c5f757415993f5ea41cd75835e740976792aaee2896e00fe459d9bb50
+          # Clone from golden image snapshot (cross-namespace from konductor)
+          snapshot:
+            name: konductor-golden-snapshot
+            namespace: konductor
   template:
     metadata:
       labels:
