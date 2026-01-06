@@ -81,12 +81,13 @@ nix --version
 <summary><b>Install Lix (if not installed)</b></summary>
 
 ```bash
-# Install Lix with flakes and unfree packages enabled
+# Install Lix with flakes enabled and user trusted for flake configs
 curl -sSf -L https://install.lix.systems/lix | sh -s -- install \
   --no-confirm \
   --extra-conf "experimental-features = nix-command flakes" \
-  --extra-conf "allow-unfree = true" \
-  --extra-conf "warn-dirty = false"
+  --extra-conf "warn-dirty = false" \
+  --extra-conf "accept-flake-config = true" \
+  --extra-conf "trusted-users = root @wheel @admin $(whoami)"
 
 # Add Nix to your shell (bash - adjust for zsh/fish)
 cat <<'EOF' | tee -a ~/.bashrc
@@ -117,6 +118,16 @@ sudo --preserve-env=PATH nix run \
   upgrade-nix \
   --extra-substituters https://cache.lix.systems \
   --extra-trusted-public-keys "cache.lix.systems:aBnZUw8zA7H35Cz2RyKFVs3H4PlGTLawyY5KRbvJR8o="
+```
+
+**For existing installs, add trusted-users to enable flake caches:**
+
+```bash
+# Add to /etc/nix/nix.conf (requires restart of nix-daemon)
+echo "trusted-users = root @wheel @admin $(whoami)" | sudo tee -a /etc/nix/nix.conf
+echo "accept-flake-config = true" | sudo tee -a /etc/nix/nix.conf
+sudo systemctl restart nix-daemon  # Linux
+sudo launchctl kickstart -k system/org.nixos.nix-daemon  # macOS
 ```
 
 See [Lix installation guide](https://lix.systems/install/) for NixOS, nix-darwin, and other options.
@@ -151,10 +162,10 @@ nix develop ./konductor#full
 nix develop konductor#full
 
 # Language-specific shells
-nix develop konductor#python   # Python 3.12 + uv + ruff + mypy
+nix develop konductor#python   # Python 3.13 + uv + ruff + mypy
 nix develop konductor#go       # Go 1.24 + gopls + delve
 nix develop konductor#node     # Node.js 22 + pnpm + biome
-nix develop konductor#rust     # Rust 1.82.0 + cargo + clippy
+nix develop konductor#rust     # Rust 1.92.0 + cargo + clippy
 
 # IDE-only shell (Neovim + Tmux + LazyGit)
 nix develop konductor#dev
@@ -482,7 +493,7 @@ Hermetic configuration system with zero-trust config resolution:
 
 - 13 linters: shellcheck, ruff, mypy, eslint, golangci-lint, yamllint, markdownlint, hadolint,
   htmlhint, stylelint, statix, deadnix, lychee
-- 8 formatters: nixpkgs-fmt, shfmt, ruff, black, prettier, taplo, biome, gofumpt
+- 8 formatters: nixfmt-rfc-style, shfmt, ruff, black, prettier, taplo, biome, gofumpt
 - All tools wrapped with `/nix/store` config paths (no user override)
 
 ### Design Principles
