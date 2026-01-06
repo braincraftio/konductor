@@ -12,12 +12,19 @@
 #   rust      - Rust development
 #   dev       - Human workflow (IDE: neovim + tmux + forgejo-cli)
 #   full      - Everything (all languages + dev)
-#   konductor - Self-hosting (full + container/VM build tools)
-#   ci        - CI/CD runner (all languages + forgejo + build tools)
+#   konductor - Self-hosting (full + container/VM build tools) [Linux only]
+#   ci        - CI/CD runner (all languages + forgejo + build tools) [Linux only]
+#
+# Platform Support:
+#   All shells work on Linux and macOS except konductor and ci which require
+#   Linux-specific virtualization packages (qemu_kvm, libvirt, OVMF, etc.)
 
 { pkgs, lib, versions, programs, ... }:
 
 let
+  # Platform detection
+  isLinux = pkgs.stdenv.isLinux;
+
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
   config = import ../config { inherit pkgs lib versions; };
@@ -28,6 +35,21 @@ let
 
   # Base shell configuration (shared by all devshells)
   baseShell = import ./base.nix { inherit pkgs lib versions packages; };
+
+  # Helper to create a Linux-only shell with clear error message
+  linuxOnly = name: shell:
+    if isLinux then shell
+    else throw ''
+      The '${name}' devshell requires Linux.
+
+      It includes Linux-specific virtualization packages:
+        qemu_kvm, libvirt, virt-manager, libguestfs, OVMF
+
+      On macOS, use one of these cross-platform shells instead:
+        nix develop .#full      # All languages + IDE tools
+        nix develop .#dev       # IDE tools only
+        nix develop .#default   # Base tools only
+    '';
 
 in
 {
@@ -47,11 +69,11 @@ in
   # Full: Everything - all languages + dev tools
   full = import ./full.nix { inherit baseShell pkgs packages versions programs config; };
 
-  # Konductor: Self-hosting - full + container/VM build tools
+  # Konductor: Self-hosting - full + container/VM build tools [Linux only]
   # Use inside QCOW2 VM to get docker, qemu, libvirt, etc.
-  konductor = import ./konductor.nix { inherit baseShell pkgs packages versions programs config; };
+  konductor = linuxOnly "konductor" (import ./konductor.nix { inherit baseShell pkgs packages versions programs config; });
 
-  # CI: Forgejo Actions runner environment
+  # CI: Forgejo Actions runner environment [Linux only]
   # All languages + forgejo runner/cli + container/VM build tools
-  ci = import ./ci.nix { inherit baseShell pkgs packages versions programs config; };
+  ci = linuxOnly "ci" (import ./ci.nix { inherit baseShell pkgs packages versions programs config; });
 }
