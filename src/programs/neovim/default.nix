@@ -13,15 +13,14 @@
 #   - Snacks consolidation: picker, explorer, terminal, dashboard, etc.
 #   - LazyVim conventions: keybinding patterns and UX
 
-{ pkgs, lib, inputs }:
+{ pkgs, inputs }:
 
 let
-  nixvimLib = inputs.nixvim.lib.${pkgs.stdenv.hostPlatform.system};
   nixvimPkgs = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 
   # Import configuration modules
-  pluginsCfg = import ./plugins.nix { inherit pkgs lib; };
-  keymapsCfg = import ./keymaps.nix { inherit lib; };
+  pluginsCfg = import ./plugins.nix { inherit pkgs; };
+  keymapsCfg = import ./keymaps.nix { };
   optionsCfg = import ./options.nix { inherit pkgs; };
   autocmdsCfg = import ./autocmds.nix { };
   extraConfigCfg = import ./extraConfig.nix { };
@@ -41,7 +40,9 @@ let
           gitsigns = true;
           treesitter = true;
           which_key = true;
-          mini = { enabled = true; };
+          mini = {
+            enabled = true;
+          };
           snacks = true;
         };
         # Theme-aware dashboard customizations (adapts to any flavor)
@@ -95,9 +96,10 @@ let
 
     # Extra Lua packages for plugin dependencies
     # luasql-sqlite3: Required for snacks.picker frecency feature
-    extraLuaPackages = luaPkgs: with luaPkgs; [
-      luasql-sqlite3
-    ];
+    extraLuaPackages =
+      luaPkgs: with luaPkgs; [
+        luasql-sqlite3
+      ];
 
     # Lua configuration
     inherit (extraConfigCfg) extraConfigLua extraConfigLuaPre;
@@ -129,7 +131,10 @@ let
 
 in
 {
-  packages = [ nixvimConfig vimdiffWrapper ];
+  packages = [
+    nixvimConfig
+    vimdiffWrapper
+  ];
   shellHook = "";
   env = { };
 }

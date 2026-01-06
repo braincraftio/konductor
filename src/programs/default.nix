@@ -6,10 +6,14 @@
 #   tmux    - Terminal multiplexer with catppuccin
 #   forgejo - Git forge tooling (server, runner, cli)
 
-{ pkgs, lib, inputs }:
+{
+  pkgs,
+  lib,
+  inputs,
+}:
 
 {
-  neovim = import ./neovim { inherit pkgs lib inputs; };
+  neovim = import ./neovim { inherit pkgs inputs; };
   tmux = import ./tmux { inherit pkgs lib; };
   forgejo = import ./forgejo { inherit pkgs lib; };
 }

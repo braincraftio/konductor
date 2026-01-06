@@ -2,7 +2,7 @@
 # Autocommands for polish and UX excellence
 #
 # Every autocommand here makes the editor feel more responsive and polished
-{ }:
+_:
 
 {
   autoCmd = [
@@ -80,7 +80,11 @@
 
     # Check for file changes when focus returns
     {
-      event = [ "FocusGained" "TermClose" "TermLeave" ];
+      event = [
+        "FocusGained"
+        "TermClose"
+        "TermLeave"
+      ];
       command = "checktime";
     }
 
@@ -136,7 +140,12 @@
     # Go: tabs, 4-width
     {
       event = "FileType";
-      pattern = [ "go" "gomod" "gowork" "gotmpl" ];
+      pattern = [
+        "go"
+        "gomod"
+        "gowork"
+        "gotmpl"
+      ];
       callback.__raw = ''
         function()
           vim.opt_local.tabstop = 4
@@ -149,7 +158,10 @@
     # Markdown: wrap, spell, conceal
     {
       event = "FileType";
-      pattern = [ "markdown" "mdx" ];
+      pattern = [
+        "markdown"
+        "mdx"
+      ];
       callback.__raw = ''
         function()
           vim.opt_local.wrap = true
@@ -162,7 +174,12 @@
     # Text files: wrap, spell
     {
       event = "FileType";
-      pattern = [ "text" "plaintex" "typst" "gitcommit" ];
+      pattern = [
+        "text"
+        "plaintex"
+        "typst"
+        "gitcommit"
+      ];
       callback.__raw = ''
         function()
           vim.opt_local.wrap = true
@@ -174,7 +191,11 @@
     # JSON/JSONC: set conceal level
     {
       event = "FileType";
-      pattern = [ "json" "jsonc" "json5" ];
+      pattern = [
+        "json"
+        "jsonc"
+        "json5"
+      ];
       callback.__raw = ''
         function()
           vim.opt_local.conceallevel = 0
@@ -237,7 +258,10 @@
     # Explorer gets fixed width (left panel)
     {
       event = "FileType";
-      pattern = [ "snacks_layout_box" "snacks_explorer" ];
+      pattern = [
+        "snacks_layout_box"
+        "snacks_explorer"
+      ];
       callback.__raw = ''
         function()
           vim.opt_local.winfixwidth = true
@@ -323,7 +347,10 @@
 
     # Highlight references under cursor
     {
-      event = [ "CursorHold" "CursorHoldI" ];
+      event = [
+        "CursorHold"
+        "CursorHoldI"
+      ];
       callback.__raw = ''
         function()
           local clients = vim.lsp.get_clients({ bufnr = 0 })
@@ -339,7 +366,10 @@
 
     # Clear highlights when cursor moves
     {
-      event = [ "CursorMoved" "CursorMovedI" ];
+      event = [
+        "CursorMoved"
+        "CursorMovedI"
+      ];
       callback.__raw = ''
         function()
           vim.lsp.buf.clear_references()
