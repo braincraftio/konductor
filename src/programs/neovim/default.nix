@@ -114,8 +114,8 @@ let
       combinePlugins.enable = false;
     };
 
-    # Clipboard support
-    clipboard.providers.wl-copy.enable = true;
+    # Clipboard support (wl-copy for Linux/Wayland, macOS uses pbcopy automatically)
+    clipboard.providers.wl-copy.enable = pkgs.stdenv.isLinux;
 
     # Create vi/vim aliases
     viAlias = true;
