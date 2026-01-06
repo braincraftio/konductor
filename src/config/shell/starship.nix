@@ -20,10 +20,15 @@ let
 in
 {
   # Wrapped starship that forces hermetic config
+  # Silently exits on dumb terminals to avoid error spam in non-interactive shells
   package = pkgs.writeShellApplication {
     name = "starship";
     runtimeInputs = [ pkgs.starship ];
     text = ''
+      # Skip on dumb terminals (non-interactive shells, CI, etc.)
+      if [[ "''${TERM:-dumb}" == "dumb" ]]; then
+        exit 0
+      fi
       export STARSHIP_CONFIG="${configFile}/starship.toml"
       exec starship "$@"
     '';
