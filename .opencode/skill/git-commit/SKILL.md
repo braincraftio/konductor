@@ -30,8 +30,11 @@ Run ALL of these commands in parallel:
 git status                      # Working tree state
 git diff                        # Unstaged changes  
 git diff --staged               # Staged changes
-git log --oneline -5            # Recent commit style
+git log -5                      # Recent commits with full messages
 ```
+
+**NEVER use `--oneline`** - always show full commit messages to understand
+the project's commit style including body formatting.
 
 ### Step 2: Analyze Changes
 
@@ -253,6 +256,9 @@ checkhealth:
 ## Anti-Patterns (NEVER do these)
 
 ```
+# Using --oneline (hides commit body, prevents learning style)
+git log --oneline
+
 # Vague description
 fix: stuff
 
