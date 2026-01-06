@@ -1,11 +1,30 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "theme": "catppuccin",
+  "small_model": "opencode/gpt-5-nano",
   "mcp": {
     "deepwiki": {
       "type": "remote",
-      "url": "https://mcp.deepwiki.com/mcp",
-      "enabled": true
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "nixos": {
+      "type": "local",
+      "command": ["nix", "run", "github:utensils/mcp-nixos", "--"]
+    },
+    "github": {
+      "type": "local",
+      "command": ["github-mcp-server", "stdio"],
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "gitea": {
+      "type": "local",
+      "command": ["gitea-mcp", "-host", "{env:GITEA_URL}", "-token", "{env:GITEA_TOKEN}"]
+    },
+    "kubernetes": {
+      "type": "local",
+      "command": ["mcp-k8s-go"]
     }
   }
 }
