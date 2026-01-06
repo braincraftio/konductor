@@ -1,104 +1,231 @@
 ---
 name: git-commit
-description: Create conventional commits with proper ceremony for konductor
+description: Create conventional commits following conventionalcommits.org v1.0.0 specification
 ---
+
+## Conventional Commits Specification (v1.0.0)
+
+This skill implements the [Conventional Commits](https://conventionalcommits.org/en/v1.0.0/)
+specification for machine-parseable, SemVer-compatible commit messages.
+
+### Commit Message Structure
+
+```
+<type>[optional scope][optional !]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
 
 ## Commit Ceremony
 
-When asked to commit changes, follow this structured process.
+Execute these steps in order. Do NOT skip steps.
 
-### 1. Gather State
+### Step 1: Gather State
 
-Run these commands in parallel to understand current state:
+Run ALL of these commands in parallel:
 
 ```bash
-git status                    # Untracked and modified files
-git diff                      # Unstaged changes
-git diff --staged             # Already staged changes
-git log --oneline -5          # Recent commit style reference
+git status                      # Working tree state
+git diff                        # Unstaged changes  
+git diff --staged               # Staged changes
+git log --oneline -5            # Recent commit style
 ```
 
-### 2. Stage Logical Groups
+### Step 2: Analyze Changes
 
-Group related changes by scope. Stage one logical unit at a time:
+Before staging, determine:
 
-| Scope | Files |
-|-------|-------|
-| neovim | `src/programs/neovim/*` |
-| flake | `flake.nix`, `flake.lock`, `src/devshells/*` |
-| opencode | `opencode.json`, `src/config/opencode/*`, `.opencode/*` |
-| qcow2 | `src/qcow2/*` |
-| docs | `README.md`, `docs/*` |
-| deps | `flake.lock` only |
+1. **What changed?** - List modified files and their purpose
+2. **Why did it change?** - The motivation (fix bug, add feature, refactor)
+3. **What is the impact?** - Does it break existing behavior?
 
-Stage with:
+### Step 3: Stage Logical Groups
+
+MUST stage related changes together. MUST NOT mix unrelated changes.
+
+| Scope | Files | Example |
+|-------|-------|---------|
+| `neovim` | `src/programs/neovim/*` | keymaps, plugins, options |
+| `flake` | `flake.nix`, `src/devshells/*` | nix config, shells |
+| `opencode` | `opencode.json`, `.opencode/*` | ai config, skills |
+| `qcow2` | `src/qcow2/*` | vm image config |
+| `docs` | `README.md`, `docs/*` | documentation |
+| `deps` | `flake.lock` alone | dependency updates |
+
 ```bash
 git add <files>
-git diff --staged             # Review what will be committed
+git diff --staged               # MUST review before commit
 ```
 
-### 3. Commit Message Format
+### Step 4: Determine Commit Type
+
+Select ONE type based on the primary change:
+
+| Type | SemVer | Use When |
+|------|--------|----------|
+| `feat` | MINOR | Adding new functionality |
+| `fix` | PATCH | Correcting a bug |
+| `docs` | - | Documentation only changes |
+| `style` | - | Formatting, whitespace (no code change) |
+| `refactor` | - | Code restructuring (no behavior change) |
+| `perf` | PATCH | Performance improvement |
+| `test` | - | Adding or fixing tests |
+| `build` | - | Build system or dependencies |
+| `ci` | - | CI/CD configuration |
+| `chore` | - | Maintenance tasks |
+| `revert` | varies | Reverting previous commit |
+
+### Step 5: Check for Breaking Changes
+
+A breaking change:
+- Removes or renames public API
+- Changes behavior that consumers depend on
+- Requires consumers to modify their code
+
+If breaking change exists:
+- Add `!` before the colon: `feat(api)!: remove deprecated endpoint`
+- OR add footer: `BREAKING CHANGE: description of what breaks`
+
+### Step 6: Write Description
+
+The description MUST:
+- Immediately follow the colon and space
+- Be lowercase (except proper nouns)
+- Use imperative mood ("add" not "added" or "adds")
+- Not end with a period
+- Be under 72 characters
+- Summarize WHAT changed, not HOW
+
+### Step 7: Decide on Body
+
+Include a body when ANY of these apply:
+
+| Condition | Action |
+|-----------|--------|
+| Multiple logical changes in one commit | MUST include body |
+| Change requires explanation of WHY | SHOULD include body |
+| Commit touches 3+ files | SHOULD include body |
+| Breaking change needs detail | MUST include body |
+| Non-obvious implementation | SHOULD include body |
+| Simple single-file change | MAY omit body |
+| Description fully explains change | MAY omit body |
+
+Body format:
+- Blank line after description
+- Wrap at 72 characters
+- Explain WHAT and WHY, not HOW
+- Use bullet points for multiple items
+- Free-form paragraphs allowed
+
+### Step 8: Add Footers (if needed)
+
+Footer format: `Token: value` or `Token #value`
+
+| Footer | Use When |
+|--------|----------|
+| `BREAKING CHANGE:` | API/behavior breaking (MUST be uppercase) |
+| `Fixes #123` | Closes an issue |
+| `Refs #456` | References related issue |
+| `Reviewed-by:` | Code review attribution |
+
+NEVER include:
+- `Co-authored-by:` with AI names
+- `Signed-off-by:` with AI identities  
+- Any PII (emails, usernames) not already public in git config
+
+### Step 9: Execute Commit
+
+For subject-only commits:
+```bash
+git commit -m "type(scope): description"
+```
+
+For commits with body:
+```bash
+git commit -m "type(scope): description
+
+- first change explanation
+- second change explanation
+- third change explanation"
+```
+
+For commits with body and footer:
+```bash
+git commit -m "type(scope): description
+
+Explanation of the change and its motivation.
+
+BREAKING CHANGE: description of what breaks"
+```
+
+### Step 10: Verify Success
+
+MUST run after every commit:
+
+```bash
+git status                      # Confirm state
+git log -1 --format=fuller      # Show FULL commit (not oneline)
+```
+
+Report to user:
+- Commit hash (short)
+- Full commit message (type, scope, description, body if present)
+- Files changed count
+- Remaining unstaged changes (if any)
+
+### Step 11: Continue or Complete
+
+If unstaged changes remain:
+1. Count remaining files
+2. Ask: "N files remain unstaged. Continue with another commit?"
+3. If yes, return to Step 3
+
+## Quality Checklist
+
+Before executing commit, verify:
+
+- [ ] Type matches the primary change purpose
+- [ ] Scope matches the affected codebase area  
+- [ ] Description is lowercase imperative under 72 chars
+- [ ] Body included if multiple changes or non-obvious
+- [ ] No AI attribution in footers
+- [ ] No PII beyond git config
+- [ ] Breaking changes marked with `!` or `BREAKING CHANGE:`
+
+## Examples
+
+### Feature with body (correct)
 
 ```
-type(scope): subject
+feat(opencode): add git-commit skill for conventional commits
 
-body (optional, wrap at 72 chars)
+- implement conventionalcommits.org v1.0.0 specification
+- add decision tree for body inclusion
+- add breaking change detection guidance
+- include quality checklist for verification
 ```
 
-#### Types
-
-| Type | Use For |
-|------|---------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix or correction |
-| `refactor` | Code restructuring without behavior change |
-| `docs` | Documentation only |
-| `chore` | Maintenance (deps, config, tooling) |
-| `test` | Test additions or modifications |
-| `ci` | CI/CD configuration |
-
-#### Rules
-
-- **Subject**: lowercase, imperative mood, no period, <72 chars
-- **Scope**: lowercase, matches directory or feature area
-- **No attribution**: no "Co-authored-by", no names, no AI mentions
-- **No PII**: no emails, usernames in commit content
-- **No chatter**: no "I did this because...", no implementation narrative
-- **Technical tone**: diff-derived, objective, 3rd person neutral authoritative
-
-#### Good Examples
+### Bug fix without body (correct)
 
 ```
-feat(opencode): add mcp servers and fix title generation
-
-- add small_model: opencode/gpt-5-nano for free title generation
-- add nixos mcp server (github:utensils/mcp-nixos)
-- add github mcp server with token from environment
-- add gitea mcp server for git.braincraft.io forgejo
-- add kubernetes mcp server (mcp-k8s-go)
+fix(starship): silence error on dumb terminals
 ```
 
-```
-fix(flake): restrict konductor/ci devshells and qcow2 to x86_64-linux
-
-- konductor and ci devshells require libguestfs-appliance
-- qcow2 package requires libguestfs-appliance
-- oci package available on all linux systems
-- cross-platform shells available everywhere
-```
+### Breaking change with footer (correct)
 
 ```
-refactor(neovim): reorganize ai keymaps and fix checkhealth warnings
+feat(api)!: change authentication to OAuth2
 
-keymaps:
-- change ai prefix from <leader>v to <leader>a
-- flatten hierarchy for shallow access
+Migrate from API key authentication to OAuth2 flow.
+Existing API keys will stop working after v2.0.0.
 
-checkhealth fixes:
-- conform.nvim: switch nixpkgs-fmt to nixfmt-rfc-style
-- diffview: disable mercurial
-- render-markdown: disable latex rendering
+BREAKING CHANGE: API key authentication removed, use OAuth2 tokens
+Refs #142
 ```
+
+### Dependency update (correct)
 
 ```
 chore(deps): update flake inputs
@@ -108,57 +235,49 @@ chore(deps): update flake inputs
 - rust-overlay: 03c6e38 -> 056ce5b
 ```
 
-#### Bad Examples
+### Multiple scope refactor (correct)
 
 ```
-# Too vague
+refactor(neovim): reorganize ai keymaps and fix checkhealth
+
+keymaps:
+- change ai prefix from <leader>v to <leader>a
+- flatten hierarchy for direct tool access
+
+checkhealth:
+- switch nixpkgs-fmt to nixfmt-rfc-style
+- disable mercurial in diffview
+- disable latex in render-markdown
+```
+
+## Anti-Patterns (NEVER do these)
+
+```
+# Vague description
 fix: stuff
 
-# Attribution (forbidden)
+# Capitalized type or scope  
+Fix(Flake): update config
+
+# Past tense
+feat(api): added new endpoint
+
+# AI attribution
 feat(neovim): add keymaps
 
 Co-authored-by: Claude <claude@anthropic.com>
 
-# Implementation chatter (forbidden)
-fix(starship): I noticed the starship prompt was showing errors...
+# Implementation chatter
+fix(starship): I noticed the prompt was showing errors so I added a check...
 
-# Capitalized (wrong)
-Fix(Flake): Update dependencies
+# Missing body when needed (multiple files, non-obvious change)
+refactor(neovim): reorganize ai keymaps and fix checkhealth warnings
 ```
 
-### 4. Execute Commit
+## Activation
 
-```bash
-git commit -m "type(scope): subject"
-# Or with body:
-git commit -m "type(scope): subject
-
-- bullet point 1
-- bullet point 2"
-```
-
-### 5. Verify and Report
-
-```bash
-git status                    # Confirm clean or remaining changes
-git log --oneline -1          # Show committed
-```
-
-Report:
-- What was committed (files, scope)
-- Commit hash (short)
-- Remaining unstaged changes if any
-
-### 6. Continue or Complete
-
-If unstaged changes remain, ask:
-> "There are N more files with changes. Continue with another commit?"
-
-Group remaining changes logically and repeat.
-
-## When to Use This Skill
-
-- User says "commit", "stage and commit", "create commits"
-- User asks to "prepare changes for PR"
-- After completing a task when user asks to save work
-- When reviewing `git status` shows changes to commit
+Load this skill when user:
+- Says "commit", "stage and commit", "create commit"
+- Asks to "prepare for PR" or "save changes"  
+- Requests conventional commit format
+- After completing work and asking to persist changes
