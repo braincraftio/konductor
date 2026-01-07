@@ -448,11 +448,11 @@ _:
             return
           end
 
-          -- Open explorer
+          -- Open explorer without stealing focus from the file buffer
           vim.g.konductor_explorer_opened = true
           vim.defer_fn(function()
             if vim.o.columns >= 120 then
-              Snacks.explorer()
+              Snacks.explorer({ focus = false })
             end
           end, 50)
         end
