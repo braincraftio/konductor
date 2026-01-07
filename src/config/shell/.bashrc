@@ -78,7 +78,8 @@ alias rl='runme beta list'
 # ===========================================================================
 # Prompt (Starship)
 # ===========================================================================
-if command -v starship >/dev/null 2>&1 && [ -t 0 ]; then
+# Skip on dumb terminals (non-interactive shells, CI, piped commands)
+if command -v starship >/dev/null 2>&1 && [ -t 0 ] && [[ "${TERM:-dumb}" != "dumb" ]]; then
   eval "$(starship init bash)"
 fi
 

@@ -27,7 +27,8 @@ let
   nvimTerminalBashrcContent = ''
     export __MISE_NVIM_TERMINAL=1
 
-    if command -v starship &>/dev/null; then
+    # Starship prompt (skip on dumb terminals)
+    if command -v starship &>/dev/null && [[ "''${TERM:-dumb}" != "dumb" ]]; then
       eval "$(starship init bash)"
       export STARSHIP_SHELL="sh"
     else

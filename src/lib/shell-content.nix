@@ -30,8 +30,8 @@ let
         # Aliases
     ${aliasesToShellCommands}
 
-        # Starship prompt
-        if command -v starship >/dev/null 2>&1 && [ -t 0 ]; then
+        # Starship prompt (skip on dumb terminals)
+        if command -v starship >/dev/null 2>&1 && [ -t 0 ] && [[ "''${TERM:-dumb}" != "dumb" ]]; then
           eval "$(starship init bash)"
         fi
 
