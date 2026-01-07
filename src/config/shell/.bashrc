@@ -9,6 +9,11 @@
 # ===========================================================================
 # History Settings
 # ===========================================================================
+# Note: In the 'full' devshell, Atuin provides enhanced history with:
+# - Fuzzy search (Ctrl+R)
+# - Workspace-aware filtering
+# - SQLite storage with rich context
+# These native settings remain for fallback/compatibility.
 HISTCONTROL=ignoreboth
 shopt -s histappend
 
