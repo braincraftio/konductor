@@ -10,8 +10,17 @@
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
 # OpenCode theme from: ../config/opencode/
+# Atuin shell history from: ../config/shell/atuin.nix
 
-{ baseShell, pkgs, packages, versions, programs, config, ... }:
+{
+  baseShell,
+  pkgs,
+  packages,
+  versions,
+  programs,
+  config,
+  ...
+}:
 
 let
   langs = versions.languages;
@@ -22,7 +31,8 @@ baseShell.overrideAttrs (old: {
   name = "konductor";
 
   # Everything from full + konductor self-hosting packages + CI tools
-  buildInputs = old.buildInputs
+  buildInputs =
+    old.buildInputs
     # IDE tools (neovim + tmux from programs, rest from packages.nix)
     ++ programs.neovim.packages
     ++ programs.tmux.packages
@@ -32,6 +42,8 @@ baseShell.overrideAttrs (old: {
     ++ packages.goPackages
     ++ packages.nodejsPackages
     ++ packages.rustPackages
+    # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
+    ++ config.shell.atuin.packages
     # Forgejo runner + CLI (CI/CD tools)
     ++ programs.forgejo.runnerPackages
     ++ programs.forgejo.cliPackages
@@ -46,7 +58,9 @@ baseShell.overrideAttrs (old: {
 
     # C++ stdlib for Python grpc (used by Pulumi)
     export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  '' + old.shellHook + ''
+  ''
+  + old.shellHook
+  + ''
     export KONDUCTOR_SHELL="konductor"
     export name="konductor"
 
@@ -55,6 +69,9 @@ baseShell.overrideAttrs (old: {
 
     # OpenCode Catppuccin Frappe theme (matches neovim theme)
     ${config.opencode.shellHook}
+
+    # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
+    ${config.shell.atuin.shellHook}
 
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
@@ -112,16 +129,22 @@ baseShell.overrideAttrs (old: {
     echo ""
   '';
 
-  env = old.env // {
-    # Python
-    UV_SYSTEM_PYTHON = "1";
-    PYTHONDONTWRITEBYTECODE = "1";
-    # Go
-    GO111MODULE = "on";
-    CGO_ENABLED = "1";
-    # Node
-    NODE_ENV = "development";
-    # Rust
-    RUST_BACKTRACE = "1";
-  } // (konductor.env pkgs) // config.shell.ssh.env // config.opencode.env;
+  env =
+    old.env
+    // {
+      # Python
+      UV_SYSTEM_PYTHON = "1";
+      PYTHONDONTWRITEBYTECODE = "1";
+      # Go
+      GO111MODULE = "on";
+      CGO_ENABLED = "1";
+      # Node
+      NODE_ENV = "development";
+      # Rust
+      RUST_BACKTRACE = "1";
+    }
+    // (konductor.env pkgs)
+    // config.shell.ssh.env
+    // config.opencode.env
+    // config.shell.atuin.env;
 })

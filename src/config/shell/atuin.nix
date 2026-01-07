@@ -42,77 +42,14 @@ let
     text = builtins.readFile ./atuin.toml;
   };
 
-  # Shell initialization script
-  # Handles Bash (with bash-preexec), Zsh, and Fish
+  # Shell initialization script - Bash only, opinionated
   initScript = ''
-    # ===========================================================================
-    # Atuin Shell History - Magical fuzzy search with SQLite backend
-    # ===========================================================================
-    #
-    # Keybindings:
-    #   Ctrl+R  - Search history (cycles: workspace -> directory -> session -> host -> global)
-    #   Ctrl+S  - Switch search mode (fuzzy -> prefix -> fulltext -> skim)
-    #   Ctrl+O  - Toggle Inspector (charts, exit codes, usage patterns)
-    #   Up      - Directory-scoped search (quick "what did I just run here?")
-    #   Enter   - Execute selected command
-    #   Tab     - Copy to command line for editing
-    #   Esc     - Cancel search
-    #
-    # Local-only by default. To enable sync:
-    #   export ATUIN_SYNC=true
-    #   atuin login  # or: atuin register
-    #
-    # Commands:
-    #   atuin stats          - View usage statistics
-    #   atuin search <term>  - Non-interactive search
-    #   atuin history list   - List recent history
-    #   atuin doctor         - Check configuration
-    #   atuin import auto    - Import existing shell history
-
-    # Ensure XDG directories exist for Atuin state
-    # Data stored: history.db, records.db, key, session
-    export XDG_DATA_HOME="''${XDG_DATA_HOME:-$HOME/.local/share}"
-    export XDG_CONFIG_HOME="''${XDG_CONFIG_HOME:-$HOME/.config}"
-    mkdir -p "$XDG_DATA_HOME/atuin"
-
-    # Force hermetic config from Konductor
+    # Atuin Shell History - SQLite-backed fuzzy search
+    # Keybindings: Ctrl+R (search), Up (directory search), Ctrl+O (inspector)
+    mkdir -p "''${XDG_DATA_HOME:-$HOME/.local/share}/atuin"
     export ATUIN_CONFIG_DIR="${configFile}"
-
-    # Handle sync enable/disable via environment variable
-    if [[ "''${ATUIN_SYNC:-false}" == "true" ]]; then
-      # User has opted into sync
-      export ATUIN_SYNC_ADDRESS="''${ATUIN_SYNC_ADDRESS:-https://api.atuin.sh}"
-      unset ATUIN_AUTO_SYNC  # Let config.toml handle it
-    else
-      # Local-only mode - ensure no sync happens
-      export ATUIN_AUTO_SYNC="false"
-    fi
-
-    # Handle daemon enable/disable via environment variable
-    if [[ "''${ATUIN_DAEMON:-false}" == "true" && "''${ATUIN_SYNC:-false}" == "true" ]]; then
-      export ATUIN_DAEMON_ENABLED="true"
-    else
-      export ATUIN_DAEMON_ENABLED="false"
-    fi
-
-    # Initialize Atuin for current shell
-    if command -v atuin >/dev/null 2>&1; then
-      if [[ -n "$BASH_VERSION" ]]; then
-        # Bash requires bash-preexec for preexec/precmd hooks
-        if [[ :$SHELLOPTS: =~ :(vi|emacs): ]]; then
-          if [[ -f "${pkgs.bash-preexec}/share/bash/bash-preexec.sh" ]]; then
-            source "${pkgs.bash-preexec}/share/bash/bash-preexec.sh"
-          fi
-          eval "$(atuin init bash)"
-        fi
-      elif [[ -n "$ZSH_VERSION" ]]; then
-        # Zsh has native preexec/precmd hooks via add-zsh-hook
-        if [[ $options[zle] = on ]]; then
-          eval "$(atuin init zsh)"
-        fi
-      fi
-      # Note: Fish uses 'atuin init fish | source' but we're in bash/zsh here
-    fi
+    source "${pkgs.bash-preexec}/share/bash/bash-preexec.sh"
+    eval "$(atuin init bash)"
   '';
 
 in
@@ -137,7 +74,7 @@ in
   # Use in devshells: ${config.shell.atuin.shellHook}
   shellHook = initScript;
 
-  # Environment variables (static - dynamic ones set in shellHook)
+  # Environment variables
   env = {
     ATUIN_CONFIG_DIR = "${configFile}";
   };
