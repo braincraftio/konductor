@@ -1,6 +1,6 @@
 # src/programs/neovim/plugins.nix
 # All plugin configurations using nixvim native options
-{ pkgs, lib }:
+{ pkgs, ... }:
 
 let
   banner = import ./banner.nix { };
@@ -15,8 +15,18 @@ in
       enable = true;
       settings = {
         # Performance
-        bigfile = { enabled = true; size = 1572864; }; # 1.5MB
-        quickfile = { enabled = true; };
+        bigfile = {
+          enabled = true;
+          size = 1572864;
+        }; # 1.5MB
+        quickfile = {
+          enabled = true;
+        };
+
+        # Disable image rendering (requires terminal support + extra parsers)
+        image = {
+          enabled = false;
+        };
 
         # UI Components
         notifier = {
@@ -24,17 +34,30 @@ in
           timeout = 3000;
           style = "compact";
         };
-        input = { enabled = true; };
+        input = {
+          enabled = true;
+        };
         indent = {
           enabled = true;
-          animate = { enabled = true; };
+          animate = {
+            enabled = true;
+          };
         };
         scroll = {
           enabled = true;
-          animate = { duration = { step = 15; total = 250; }; };
+          animate = {
+            duration = {
+              step = 15;
+              total = 250;
+            };
+          };
         };
-        statuscolumn = { enabled = true; };
-        words = { enabled = true; };
+        statuscolumn = {
+          enabled = true;
+        };
+        words = {
+          enabled = true;
+        };
 
         # Dashboard - Professional UI with refined typography
         # Design: Clean vertical flow, elegant key styling, visual hierarchy
@@ -90,28 +113,6 @@ in
             # Dashboard keys - columnar layout matching Projects/Recent sections
             # Layout: | icon (2) | description centered (57) | [k] (3) | = 62 chars (full width)
             keys = [
-              # AI-first workflow (v for vibe coding) - opens AI menu
-              {
-                key = "v";
-                # Open the Vibe/AI which-key menu for discoverability
-                action.__raw = ''
-                  function()
-                    -- Trigger which-key for the Vibe group
-                    require('which-key').show({ keys = '<leader>v', loop = true })
-                  end
-                '';
-                text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 2 }, { "Vibe", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "v", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
-              }
-              # OpenCode - multi-provider AI agent with deep integration
-              {
-                key = "o";
-                action.__raw = ''
-                  function()
-                    require('which-key').show({ keys = '<leader>o', loop = true })
-                  end
-                '';
-                text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 2 }, { "OpenCode", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "o", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
-              }
               # Core file operations
               {
                 key = "f";
@@ -154,16 +155,25 @@ in
                 '';
                 text.__raw = ''{ { "󰆍 ", hl = "SnacksDashboardIcon", width = 2 }, { "Terminal", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "t", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
-              # Search menu (more useful than session)
+              # Search menu
               {
                 key = "s";
-                # Open Search which-key menu for discoverability
                 action.__raw = ''
                   function()
                     require('which-key').show({ keys = '<leader>s', loop = true })
                   end
                 '';
                 text.__raw = ''{ { " ", hl = "SnacksDashboardIcon", width = 2 }, { "Search", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "s", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
+              }
+              # AI tools menu (non-opinionated - shows all available tools)
+              {
+                key = "a";
+                action.__raw = ''
+                  function()
+                    require('which-key').show({ keys = '<leader>a', loop = true })
+                  end
+                '';
+                text.__raw = ''{ { "󰚩 ", hl = "SnacksDashboardIcon", width = 2 }, { "AI Tools", hl = "SnacksDashboardDesc", width = 57, align = "center" }, { "[", hl = "SnacksDashboardSpecial" }, { "a", hl = "SnacksDashboardKey" }, { "]", hl = "SnacksDashboardSpecial" } }'';
               }
               {
                 key = "q";
@@ -175,10 +185,17 @@ in
 
           sections = [
             # Header with breathing room
-            { section = "header"; padding = 3; }
+            {
+              section = "header";
+              padding = 3;
+            }
 
             # Action keys - full width columnar layout (62 chars = icon 2 + desc 57 + key 3)
-            { section = "keys"; gap = 1; padding = 2; }
+            {
+              section = "keys";
+              gap = 1;
+              padding = 2;
+            }
 
             # Visual separator
             {
@@ -236,7 +253,9 @@ in
         };
 
         # Scope detection for indent/dim
-        scope = { enabled = true; };
+        scope = {
+          enabled = true;
+        };
 
         # Terminal (replaces Toggleterm) - bottom by default
         terminal = {
@@ -250,21 +269,44 @@ in
         };
 
         # Git
-        lazygit = { enabled = true; configure = true; };
-        git = { enabled = true; };
-        gitbrowse = { enabled = true; };
+        lazygit = {
+          enabled = true;
+          configure = true;
+        };
+        git = {
+          enabled = true;
+        };
+        gitbrowse = {
+          enabled = true;
+        };
 
         # Focus
-        zen = { enabled = true; };
-        dim = { enabled = true; };
+        zen = {
+          enabled = true;
+        };
+        dim = {
+          enabled = true;
+        };
 
         # Utilities
-        bufdelete = { enabled = true; };
-        rename = { enabled = true; };
-        scratch = { enabled = true; };
-        toggle = { enabled = true; };
-        debug = { enabled = true; };
-        profiler = { enabled = true; };
+        bufdelete = {
+          enabled = true;
+        };
+        rename = {
+          enabled = true;
+        };
+        scratch = {
+          enabled = true;
+        };
+        toggle = {
+          enabled = true;
+        };
+        debug = {
+          enabled = true;
+        };
+        profiler = {
+          enabled = true;
+        };
       };
     };
 
@@ -331,39 +373,45 @@ in
         };
         sections = {
           lualine_a = [ "mode" ];
-          lualine_b = [ "branch" "diff" "diagnostics" ];
+          lualine_b = [
+            "branch"
+            "diff"
+            "diagnostics"
+          ];
           # Custom filename with location-aware context
-          lualine_c = [{
-            __unkeyed-1.__raw = ''
-              function()
-                local ft = vim.bo.filetype
-                -- Dashboard: brand name
-                if ft == "snacks_dashboard" then
-                  return "󰣇 Konductor"
-                -- Explorer/layout: hide (has own title)
-                elseif ft == "snacks_layout_box" or ft == "snacks_explorer" then
-                  return ""
-                -- Terminal: show cwd for "where am I" context
-                elseif ft == "snacks_terminal" or vim.bo.buftype == "terminal" then
-                  local snacks_info = vim.b.snacks_terminal
-                  if snacks_info and snacks_info.cwd then
-                    local cwd = snacks_info.cwd:gsub(vim.env.HOME, "~")
-                    return " " .. cwd
+          lualine_c = [
+            {
+              __unkeyed-1.__raw = ''
+                function()
+                  local ft = vim.bo.filetype
+                  -- Dashboard: brand name
+                  if ft == "snacks_dashboard" then
+                    return "󰣇 Konductor"
+                  -- Explorer/layout: hide (has own title)
+                  elseif ft == "snacks_layout_box" or ft == "snacks_explorer" then
+                    return ""
+                  -- Terminal: show cwd for "where am I" context
+                  elseif ft == "snacks_terminal" or vim.bo.buftype == "terminal" then
+                    local snacks_info = vim.b.snacks_terminal
+                    if snacks_info and snacks_info.cwd then
+                      local cwd = snacks_info.cwd:gsub(vim.env.HOME, "~")
+                      return " " .. cwd
+                    end
+                    return " Terminal"
+                  -- Claude Code: show context
+                  elseif ft == "claude-code" then
+                    return "󰚩 Claude"
+                  -- OpenCode: show context
+                  elseif ft == "opencode" then
+                    return " OpenCode"
+                  else
+                    -- Files: relative path for location context
+                    return vim.fn.expand("%:~:.")
                   end
-                  return " Terminal"
-                -- Claude Code: show context
-                elseif ft == "claude-code" then
-                  return "󰚩 Claude"
-                -- OpenCode: show context
-                elseif ft == "opencode" then
-                  return " OpenCode"
-                else
-                  -- Files: relative path for location context
-                  return vim.fn.expand("%:~:.")
                 end
-              end
-            '';
-          }];
+              '';
+            }
+          ];
           lualine_x = [ "filetype" ];
           lualine_y = [ "progress" ];
           lualine_z = [ "location" ];
@@ -378,30 +426,118 @@ in
         delay = 300;
         spec = [
           # Primary workflow groups
-          { __unkeyed-1 = "<leader>v"; group = "Vibe"; icon = "󰚩"; }
-          { __unkeyed-1 = "<leader>o"; group = "OpenCode"; icon = ""; }
-          { __unkeyed-1 = "<leader>op"; group = "Prompts"; icon = ""; }
-          { __unkeyed-1 = "<leader>os"; group = "Session"; icon = ""; }
-          { __unkeyed-1 = "<leader>l"; group = "LSP"; icon = ""; }
-          { __unkeyed-1 = "<leader>f"; group = "Find"; icon = ""; }
-          { __unkeyed-1 = "<leader>s"; group = "Search"; icon = ""; }
-          { __unkeyed-1 = "<leader>b"; group = "Buffer"; icon = "󰓩"; }
-          { __unkeyed-1 = "<leader>g"; group = "Git"; icon = ""; }
-          { __unkeyed-1 = "<leader>gh"; group = "Hunks"; icon = ""; }
-          { __unkeyed-1 = "<leader>t"; group = "Terminal"; icon = ""; }
-          { __unkeyed-1 = "<leader>w"; group = "Window"; icon = ""; }
-          { __unkeyed-1 = "<leader>x"; group = "Diagnostics"; icon = ""; }
-          { __unkeyed-1 = "<leader>m"; group = "Markdown"; icon = ""; }
-          { __unkeyed-1 = "<leader>r"; group = "REST"; icon = ""; }
-          { __unkeyed-1 = "<leader>q"; group = "Session/Quit"; icon = "󰈆"; }
-          { __unkeyed-1 = "<leader>u"; group = "UI Toggle"; icon = ""; }
+          # AI Tools (<leader>a) - shallow menu, direct tool access
+          {
+            __unkeyed-1 = "<leader>a";
+            group = "AI";
+            icon = "󰚩";
+          }
+          {
+            __unkeyed-1 = "<leader>ac";
+            group = "Claude";
+            icon = "󰚩";
+          }
+          {
+            __unkeyed-1 = "<leader>ao";
+            group = "OpenCode";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>aop";
+            group = "Prompts";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>aoss";
+            group = "Session";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>ai";
+            group = "Copilot";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>l";
+            group = "LSP";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>f";
+            group = "Find";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>s";
+            group = "Search";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>b";
+            group = "Buffer";
+            icon = "󰓩";
+          }
+          {
+            __unkeyed-1 = "<leader>g";
+            group = "Git";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>gh";
+            group = "Hunks";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>t";
+            group = "Terminal";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>w";
+            group = "Window";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>x";
+            group = "Diagnostics";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>m";
+            group = "Markdown";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>r";
+            group = "REST";
+            icon = "";
+          }
+          {
+            __unkeyed-1 = "<leader>q";
+            group = "Session/Quit";
+            icon = "󰈆";
+          }
+          {
+            __unkeyed-1 = "<leader>u";
+            group = "UI Toggle";
+            icon = "";
+          }
 
           # Bracket motions
-          { __unkeyed-1 = "]"; group = "Next"; }
-          { __unkeyed-1 = "["; group = "Previous"; }
+          {
+            __unkeyed-1 = "]";
+            group = "Next";
+          }
+          {
+            __unkeyed-1 = "[";
+            group = "Previous";
+          }
 
           # g prefix
-          { __unkeyed-1 = "g"; group = "Goto/Actions"; }
+          {
+            __unkeyed-1 = "g";
+            group = "Goto/Actions";
+          }
         ];
       };
     };
@@ -523,14 +659,17 @@ in
         # Nix
         nil_ls = {
           enable = true;
-          settings.formatting.command = [ "nixpkgs-fmt" ];
+          settings.formatting.command = [ "${pkgs.nixfmt-rfc-style}/bin/nixfmt" ];
         };
         # Lua
         lua_ls = {
           enable = true;
           settings = {
             telemetry.enable = false;
-            diagnostics.globals = [ "vim" "Snacks" ];
+            diagnostics.globals = [
+              "vim"
+              "Snacks"
+            ];
           };
         };
         # Python
@@ -570,11 +709,26 @@ in
       autoEnableSources = true;
       settings = {
         sources = [
-          { name = "copilot"; priority = 1100; }
-          { name = "nvim_lsp"; priority = 1000; }
-          { name = "luasnip"; priority = 750; }
-          { name = "buffer"; priority = 500; }
-          { name = "path"; priority = 250; }
+          {
+            name = "copilot";
+            priority = 1100;
+          }
+          {
+            name = "nvim_lsp";
+            priority = 1000;
+          }
+          {
+            name = "luasnip";
+            priority = 750;
+          }
+          {
+            name = "buffer";
+            priority = 500;
+          }
+          {
+            name = "path";
+            priority = 250;
+          }
         ];
         mapping = {
           "<C-n>" = "cmp.mapping.select_next_item()";
@@ -605,9 +759,15 @@ in
         };
         formatters_by_ft = {
           lua = [ "stylua" ];
-          nix = [ "nixpkgs-fmt" ];
-          python = [ "black" "isort" ];
-          go = [ "gofumpt" "goimports" ];
+          nix = [ "nixfmt" ];
+          python = [
+            "black"
+            "isort"
+          ];
+          go = [
+            "gofumpt"
+            "goimports"
+          ];
           rust = [ "rustfmt" ];
           javascript = [ "prettier" ];
           typescript = [ "prettier" ];
@@ -617,6 +777,18 @@ in
           sh = [ "shfmt" ];
           bash = [ "shfmt" ];
           toml = [ "taplo" ];
+        };
+        # Explicit formatter configurations with Nix store paths
+        formatters = {
+          nixfmt.command = "${pkgs.nixfmt-rfc-style}/bin/nixfmt";
+          stylua.command = "${pkgs.stylua}/bin/stylua";
+          black.command = "${pkgs.black}/bin/black";
+          isort.command = "${pkgs.isort}/bin/isort";
+          gofumpt.command = "${pkgs.gofumpt}/bin/gofumpt";
+          goimports.command = "${pkgs.gotools}/bin/goimports";
+          prettier.command = "${pkgs.nodePackages.prettier}/bin/prettier";
+          shfmt.command = "${pkgs.shfmt}/bin/shfmt";
+          taplo.command = "${pkgs.taplo}/bin/taplo";
         };
       };
     };
@@ -656,7 +828,13 @@ in
       };
     };
 
-    diffview.enable = true;
+    diffview = {
+      enable = true;
+      settings = {
+        # Disable mercurial (hg) since we don't use it - silences checkhealth warning
+        hg_cmd = null;
+      };
+    };
 
     # =========================================================================
     # AI LAYER
@@ -673,7 +851,7 @@ in
         # Window settings - vertical split on right side
         window = {
           split_ratio = 0.4;
-          position = "vertical";  # Creates vsplit (respects splitright)
+          position = "vertical"; # Creates vsplit (respects splitright)
           enter_insert = true;
           hide_numbers = true;
           hide_signcolumn = true;
@@ -699,8 +877,8 @@ in
         # <Esc><Esc> exits terminal mode, <C-o> interrupts the operation
         keymaps = {
           toggle = {
-            normal = false;  # Using <leader>vv from keymaps.nix
-            terminal = "<C-o>";  # Interrupt/close Claude from terminal mode
+            normal = false; # Using <leader>vv from keymaps.nix
+            terminal = "<C-o>"; # Interrupt/close Claude from terminal mode
           };
           window_navigation = true;
           scrolling = true;
@@ -765,7 +943,7 @@ in
   # =========================================================================
   extraPlugins =
     let
-      buildVimPlugin = pkgs.vimUtils.buildVimPlugin;
+      inherit (pkgs.vimUtils) buildVimPlugin;
     in
     [
       # -----------------------------------------------------------------------
@@ -787,34 +965,39 @@ in
       # -----------------------------------------------------------------------
       # render-markdown.nvim - live in-editor markdown rendering (normal mode)
       # -----------------------------------------------------------------------
-      ((buildVimPlugin {
-        name = "render-markdown.nvim";
-        src = pkgs.fetchFromGitHub {
-          owner = "MeanderingProgrammer";
-          repo = "render-markdown.nvim";
-          rev = "6e0e8902dac70fecbdd8ce557d142062a621ec38";
-          sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
-        };
-      }).overrideAttrs (old: {
-        doCheck = false;
-        postInstall = (old.postInstall or "") + ''
-          mkdir -p $out/plugin
-          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
-          -- Auto-initialize render-markdown on plugin load
-          local ok, render_markdown = pcall(require, "render-markdown")
-          if ok then
-            render_markdown.setup({
-              enabled = true,
-              preset = 'obsidian',
-              render_modes = { 'n', 'c', 't' },
-              anti_conceal = { enabled = true },
-              heading = { enabled = true },
-              code = { enabled = true, style = 'full' },
-            })
-          end
-          EOF
-        '';
-      }))
+      (
+        (buildVimPlugin {
+          name = "render-markdown.nvim";
+          src = pkgs.fetchFromGitHub {
+            owner = "MeanderingProgrammer";
+            repo = "render-markdown.nvim";
+            rev = "6e0e8902dac70fecbdd8ce557d142062a621ec38";
+            sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
+          };
+        }).overrideAttrs
+        (old: {
+          doCheck = false;
+          postInstall = (old.postInstall or "") + ''
+                          mkdir -p $out/plugin
+                          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+            -- Auto-initialize render-markdown on plugin load
+            local ok, render_markdown = pcall(require, "render-markdown")
+            if ok then
+              render_markdown.setup({
+                enabled = true,
+                preset = "obsidian",
+                render_modes = { "n", "c", "t" },
+                anti_conceal = { enabled = true },
+                heading = { enabled = true },
+                code = { enabled = true, style = "full" },
+                -- Disable latex rendering (requires latex treesitter parser)
+                latex = { enabled = false },
+              })
+            end
+            EOF
+          '';
+        })
+      )
     ];
 
   # =========================================================================

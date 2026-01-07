@@ -1,0 +1,221 @@
+# Konductor Atuin Configuration
+# Magical shell history with SQLite, fuzzy search, and workspace awareness
+#
+# Atuin: https://github.com/atuinsh/atuin
+# Full config reference: https://docs.atuin.sh/configuration/config/
+#
+# Design Philosophy:
+# - LOCAL-ONLY by default: No sync, no telemetry, complete privacy
+# - POWER-USER optimized: Every feature enabled for maximum productivity
+# - WORKSPACE-AWARE: Git repository context for developer workflows
+# - FAST: SQLite with WAL mode, optimized queries, instant fuzzy search
+#
+# The goal: Make local history so excellent that users WANT to enable sync
+#
+# To enable sync (optional):
+#   export ATUIN_SYNC=true
+#   atuin login  # or: atuin register
+
+# ===========================================================================
+# SYNC SETTINGS (disabled by default for privacy)
+# ===========================================================================
+auto_sync = false
+sync_frequency = "0"
+sync_address = "https://api.atuin.sh"
+
+# ===========================================================================
+# DATABASE PERFORMANCE
+# ===========================================================================
+# SQLite uses WAL mode internally for concurrent reads/writes
+# Timeout for acquiring local database connection (seconds)
+local_timeout = 2.0
+
+# Network timeouts (only matter if sync is enabled)
+network_connect_timeout = 5
+network_timeout = 30
+
+# ===========================================================================
+# HISTORY CAPTURE - What gets recorded
+# ===========================================================================
+# Store failed commands (exit code != 0) - essential for debugging
+store_failed = true
+
+# Automatic secret detection and filtering
+# Matches: AWS keys, GitHub PATs, Slack tokens, Stripe keys
+secrets_filter = true
+
+# Commands matching these regex patterns are NEVER stored
+# Patterns are unanchored (match anywhere) unless using ^ or $
+history_filter = [
+  "^password",
+  "^secret",
+  "^token",
+  "^export.*PASSWORD",
+  "^export.*SECRET",
+  "^export.*TOKEN",
+  "^export.*API.KEY",
+  "^export.*PRIVATE.KEY",
+  ".*--password[= ]",
+  ".*--token[= ]",
+  ".*--secret[= ]",
+]
+
+# Directories where commands should NOT be recorded
+cwd_filter = []
+
+# ===========================================================================
+# SEARCH BEHAVIOR - Fuzzy search with workspace awareness
+# ===========================================================================
+# Search algorithm: prefix, fulltext, fuzzy, skim
+search_mode = "fuzzy"
+
+# Default filter scope: global, host, session, directory, workspace
+filter_mode = "workspace"
+
+# Enable git workspace detection
+workspaces = true
+
+# Smart sorting: prioritize relevant results over purely recent ones
+smart_sort = true
+
+# ===========================================================================
+# UP ARROW BEHAVIOR (distinct from Ctrl+R)
+# ===========================================================================
+# Up arrow: quick recall of recent commands in CURRENT DIRECTORY
+filter_mode_shell_up_key_binding = "directory"
+search_mode_shell_up_key_binding = "fuzzy"
+
+# ===========================================================================
+# INTERACTIVE UI
+# ===========================================================================
+# UI style: auto (adapts to terminal), full (more space), compact (minimal)
+style = "auto"
+
+# Maximum lines for inline search (0 = fullscreen)
+inline_height = 40
+
+# Search bar position: false = bottom (default), true = top
+invert = false
+
+# Minimum height before tabs auto-hide (compact mode only)
+auto_hide_height = 8
+
+# ===========================================================================
+# PREVIEW PANE
+# ===========================================================================
+# Show preview of selected command (working dir, duration, exit code)
+show_preview = true
+
+# Maximum preview pane height (lines)
+max_preview_height = 4
+
+# ===========================================================================
+# KEYBINDING CONFIGURATION
+# ===========================================================================
+# Keymap mode: emacs, vim-normal, vim-insert, auto
+keymap_mode = "emacs"
+
+# Word jump behavior: emacs (default), subl (Sublime Text style)
+word_jump_mode = "emacs"
+
+# Characters considered part of a word (for Ctrl+W, Ctrl+Left/Right)
+word_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+
+# Context lines shown when scrolling by page
+scroll_context_lines = 2
+
+# Use Ctrl+N instead of Alt+N for numeric selection shortcuts
+ctrl_n_shortcuts = false
+
+# ===========================================================================
+# SELECTION BEHAVIOR
+# ===========================================================================
+# true = execute on Enter, false = copy to command line for editing
+enter_accept = true
+
+# Escape behavior: return-original, return-query
+exit_mode = "return-original"
+
+# ===========================================================================
+# UI ELEMENTS
+# ===========================================================================
+# Show help row with keybinding hints
+show_help = true
+
+# Show tabs (Search / Inspector)
+show_tabs = true
+
+# Reduce motion/animations
+prefers_reduced_motion = false
+
+# ===========================================================================
+# DATE/TIME DISPLAY
+# ===========================================================================
+# Date format for stats: us (MM/DD), uk (DD/MM)
+dialect = "us"
+
+# Timezone for displaying timestamps
+timezone = "local"
+
+# Format string for history list output
+history_format = "{time}\t{command}\t{duration}"
+
+# ===========================================================================
+# TABLE SECTIONS (must come after all root-level options in TOML)
+# ===========================================================================
+
+# Cursor style per keymap mode
+# Options: default, blink-block, steady-block, blink-underline,
+#          steady-underline, blink-bar, steady-bar
+[keymap_cursor]
+emacs = "blink-block"
+vim_insert = "blink-bar"
+vim_normal = "steady-block"
+
+# Preview strategy
+[preview]
+strategy = "auto"
+
+# Search filter cycle order for Ctrl+R
+[search]
+filters = [
+  "workspace",
+  "directory",
+  "session",
+  "host",
+  "global",
+]
+
+# Statistics configuration
+[stats]
+common_subcommands = [
+  "git",
+  "npm", "yarn", "pnpm", "cargo", "go", "pip", "poetry", "uv",
+  "docker", "podman", "kubectl", "helm", "talosctl", "omnictl",
+  "nix", "nixos-rebuild", "home-manager",
+  "pulumi", "terraform", "ansible",
+  "mise", "make", "just",
+  "aws", "gcloud", "az",
+]
+common_prefix = ["sudo", "time", "env", "nice", "nohup", "watch", "xargs"]
+ignored_commands = [
+  "cd", "z", "j",
+  "ls", "ll", "la", "l",
+  "cat", "bat", "less", "more",
+  "clear", "cls", "reset",
+  "pwd", "echo", "printf",
+  "exit", "logout", "q",
+  "true", "false",
+  "fg", "bg", "jobs",
+  "history",
+]
+
+# Daemon settings (disabled by default)
+[daemon]
+enabled = false
+sync_frequency = 300
+
+# Theme configuration
+[theme]
+name = "default"
+debug = false

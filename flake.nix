@@ -70,7 +70,8 @@
     ];
   };
 
-  outputs = { nixpkgs, flake-utils, ... }@inputs:
+  outputs =
+    { nixpkgs, flake-utils, ... }@inputs:
     let
       # Import overlays
       overlays = import ./src/overlays {
@@ -81,56 +82,88 @@
     in
 
     # Per-system outputs (devShells, packages)
-    flake-utils.lib.eachDefaultSystem
-      (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
-            config.allowUnfree = true;
-          };
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
+          config.allowUnfree = true;
+        };
 
-          # Import versions for devshells
-          versions = import ./src/lib/versions.nix;
+        # Import versions for devshells
+        versions = import ./src/lib/versions.nix;
 
-          # Import programs (neovim, tmux)
-          programs = import ./src/programs { inherit pkgs inputs; inherit (nixpkgs) lib; };
+        # Import programs (neovim, tmux)
+        programs = import ./src/programs {
+          inherit pkgs inputs;
+          inherit (nixpkgs) lib;
+        };
 
-          # Import devshells (single source of truth for all development shells)
-          devshells = import ./src/devshells {
-            inherit pkgs inputs versions programs;
-            inherit (nixpkgs) lib;
-          };
+        # Import devshells (single source of truth for all development shells)
+        devshells = import ./src/devshells {
+          inherit
+            pkgs
+            inputs
+            versions
+            programs
+            ;
+          inherit (nixpkgs) lib;
+        };
 
-          # OCI container (Linux-only)
-          oci = import ./src/oci {
-            inherit pkgs inputs;
-            inherit (nixpkgs) lib;
-            inherit (inputs.nix2container.packages.${system}) nix2container;
-          };
+        # OCI container (Linux-only)
+        oci = import ./src/oci {
+          inherit pkgs inputs;
+          inherit (nixpkgs) lib;
+          inherit (inputs.nix2container.packages.${system}) nix2container;
+        };
 
-          # QCOW2 VM (Linux-only)
-          qcow2 = import ./src/qcow2 {
-            inherit pkgs inputs system versions programs;
-            inherit (nixpkgs) lib;
-            inherit (inputs) nixos-generators;
-          };
+        # QCOW2 VM (Linux-only)
+        qcow2 = import ./src/qcow2 {
+          inherit
+            pkgs
+            inputs
+            system
+            versions
+            programs
+            ;
+          inherit (nixpkgs) lib;
+          inherit (inputs) nixos-generators;
+        };
 
-        in
-        {
-          # Development shells from src/devshells
-          devShells = {
-            inherit (devshells) default python go node rust dev full konductor ci;
-          };
+      in
+      {
+        # Development shells from src/devshells
+        # Cross-platform shells available everywhere
+        # Linux-only shells (konductor, ci) conditionally included
+        devShells = {
+          inherit (devshells)
+            default
+            python
+            go
+            node
+            rust
+            dev
+            full
+            ;
+        }
+        // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
+          # x86_64-linux only: requires libguestfs-appliance (qemu_kvm, libvirt, virt-manager, etc.)
+          inherit (devshells) konductor ci;
+        };
 
-          # Packages (build outputs, not shells)
-          packages = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-            # OCI and QCOW2 are Linux-only
+        # Packages (build outputs, not shells)
+        packages =
+          pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+            # OCI is Linux-only (Docker/podman)
             oci = oci.image;
+          }
+          // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
+            # qcow2 requires libguestfs-appliance which only supports x86_64-linux
             qcow2 = qcow2.image;
           };
-        }
-      )
+      }
+    )
 
     # Cross-system outputs (modules, overlays)
     // {

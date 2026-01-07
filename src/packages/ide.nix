@@ -26,6 +26,7 @@ in
     htop # Process monitor
     btop
     bottom # System monitor (btm)
+    macchina # System info fetcher
     bat # cat with syntax highlighting
     eza # Modern ls
     dust # Disk usage analyzer

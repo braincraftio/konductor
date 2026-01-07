@@ -1,7 +1,12 @@
 # src/config/default.nix
 # Aggregates all wrapped tools
 
-{ pkgs, lib, versions, ... }:
+{
+  pkgs,
+  lib,
+  versions,
+  ...
+}:
 
 {
   # ===========================================================================
@@ -12,6 +17,7 @@
     starship = import ./shell/starship.nix { inherit pkgs; };
     git = import ./shell/git.nix { inherit pkgs lib; };
     ssh = import ./shell/ssh.nix { inherit pkgs; };
+    atuin = import ./shell/atuin.nix { inherit pkgs; };
   };
 
   # ===========================================================================

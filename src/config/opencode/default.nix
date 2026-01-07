@@ -1,41 +1,23 @@
 # src/config/opencode/default.nix
-# OpenCode theme configuration - Catppuccin
+# OpenCode configuration values
 #
-# Uses OpenCode's built-in catppuccin theme for visual consistency
-# with the Neovim catppuccin-frappe setup.
+# Project-level config lives in opencode.json at repo root.
+# OpenCode automatically merges project config with global (~/.config/opencode/).
 #
-# Available themes: opencode, catppuccin, dracula, flexoki, gruvbox,
-#                   monokai, onedark, tokyonight, tron
+# This file exports values for reference by other Nix expressions.
 
-{ pkgs }:
+_:
 
-let
-  themeName = "catppuccin";
-in
 {
-  inherit themeName;
+  # Catppuccin theme for visual consistency with Neovim
+  themeName = "catppuccin";
 
-  # Shell hook to set theme in opencode config if not already configured
-  shellHook = ''
-    # Configure OpenCode catppuccin theme
-    _opencode_config="$HOME/.config/opencode/opencode.json"
-    if [ -f "$_opencode_config" ]; then
-      # Check if theme is already set to catppuccin
-      if ! grep -q '"theme".*"${themeName}"' "$_opencode_config" 2>/dev/null; then
-        # Update theme in existing config (requires jq)
-        if command -v jq &>/dev/null; then
-          _tmp=$(mktemp)
-          jq '.tui.theme = "${themeName}"' "$_opencode_config" > "$_tmp" 2>/dev/null && mv "$_tmp" "$_opencode_config" || rm -f "$_tmp"
-        fi
-      fi
-    else
-      # Create minimal config with theme
-      mkdir -p "$(dirname "$_opencode_config")"
-      echo '{"$schema": "https://opencode.ai/config.json", "tui": {"theme": "${themeName}"}}' > "$_opencode_config"
-    fi
-    unset _opencode_config _tmp
-  '';
+  # Free model from OpenCode Zen for title generation (no API key required)
+  smallModel = "opencode/gpt-5-nano";
 
-  # Environment variables (none needed for theme)
+  # No shell hook needed - opencode.json in project root handles config
+  shellHook = "";
+
+  # No environment variables needed
   env = { };
 }

@@ -5,8 +5,17 @@
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
 # OpenCode theme from: ../config/opencode/
+# Atuin shell history from: ../config/shell/atuin.nix
 
-{ baseShell, packages, versions, programs, config, pkgs, ... }:
+{
+  baseShell,
+  packages,
+  versions,
+  programs,
+  config,
+  pkgs,
+  ...
+}:
 
 let
   langs = versions.languages;
@@ -16,7 +25,8 @@ baseShell.overrideAttrs (old: {
   name = "full";
 
   # All packages from ./packages.nix (single source of truth)
-  buildInputs = old.buildInputs
+  buildInputs =
+    old.buildInputs
     # IDE tools (neovim + tmux from programs, rest from packages.nix)
     ++ programs.neovim.packages
     ++ programs.tmux.packages
@@ -25,7 +35,9 @@ baseShell.overrideAttrs (old: {
     ++ packages.pythonPackages
     ++ packages.goPackages
     ++ packages.nodejsPackages
-    ++ packages.rustPackages;
+    ++ packages.rustPackages
+    # Atuin shell history (includes bash-preexec)
+    ++ config.shell.atuin.packages;
 
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="full"
@@ -36,6 +48,9 @@ baseShell.overrideAttrs (old: {
 
     # OpenCode Catppuccin Frappe theme (matches neovim theme)
     ${config.opencode.shellHook}
+
+    # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
+    ${config.shell.atuin.shellHook}
 
     # Native library support for pip-installed packages (grpc, etc.)
     export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
@@ -71,16 +86,21 @@ baseShell.overrideAttrs (old: {
     echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
   '';
 
-  env = old.env // {
-    # Python
-    UV_SYSTEM_PYTHON = "1";
-    PYTHONDONTWRITEBYTECODE = "1";
-    # Go
-    GO111MODULE = "on";
-    CGO_ENABLED = "1";
-    # Node
-    NODE_ENV = "development";
-    # Rust
-    RUST_BACKTRACE = "1";
-  } // config.shell.ssh.env // config.opencode.env;
+  env =
+    old.env
+    // {
+      # Python
+      UV_SYSTEM_PYTHON = "1";
+      PYTHONDONTWRITEBYTECODE = "1";
+      # Go
+      GO111MODULE = "on";
+      CGO_ENABLED = "1";
+      # Node
+      NODE_ENV = "development";
+      # Rust
+      RUST_BACKTRACE = "1";
+    }
+    // config.shell.ssh.env
+    // config.opencode.env
+    // config.shell.atuin.env;
 })

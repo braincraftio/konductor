@@ -13,7 +13,15 @@
 # Services installed but not auto-started (lean boot).
 # Start via cloud-init or: systemctl start docker libvirtd
 
-{ pkgs, lib, nixos-generators, system, versions, programs, ... }:
+{
+  pkgs,
+  lib,
+  nixos-generators,
+  system,
+  versions,
+  programs,
+  ...
+}:
 
 let
   users = import ../lib/users.nix;
@@ -26,7 +34,12 @@ let
 
   # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
-    inherit pkgs lib versions config;
+    inherit
+      pkgs
+      lib
+      versions
+      config
+      ;
   };
 
   # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
@@ -71,9 +84,6 @@ in
           nixos.enable = false;
         };
 
-        # Disable command-not-found (requires nixpkgs channel)
-        programs.command-not-found.enable = false;
-
         # TODO: Investigate channel copy reduction (~400MB)
         # - nixos-generators doesn't expose `copyChannel` parameter from make-disk-image.nix
         # - `system.installer.channel.enable` doesn't exist in NixOS
@@ -89,20 +99,36 @@ in
             isNormalUser = true;
             inherit (users.kc2) uid home;
             description = users.kc2.gecos;
-            extraGroups = [ "docker" "libvirtd" "kvm" ];
+            extraGroups = [
+              "docker"
+              "libvirtd"
+              "kvm"
+            ];
           };
           kc2admin = {
             isNormalUser = true;
             inherit (users.kc2admin) uid home;
             description = users.kc2admin.gecos;
-            extraGroups = [ "kc2" "wheel" "docker" "libvirtd" "kvm" ];
+            extraGroups = [
+              "kc2"
+              "wheel"
+              "docker"
+              "libvirtd"
+              "kvm"
+            ];
           };
           runner = {
             isNormalUser = true;
             inherit (users.runner) uid home;
             description = users.runner.gecos;
             # wheel needed for QCOW2 build (guestmount, virt-sparsify)
-            extraGroups = [ "kc2" "wheel" "docker" "libvirtd" "kvm" ];
+            extraGroups = [
+              "kc2"
+              "wheel"
+              "docker"
+              "libvirtd"
+              "kvm"
+            ];
           };
         };
 
@@ -118,57 +144,103 @@ in
               {
                 users = [ "runner" ];
                 commands = [
-                  { command = "/run/current-system/sw/bin/docker"; options = [ "NOPASSWD" ]; }
-                  { command = "/run/current-system/sw/bin/nix"; options = [ "NOPASSWD" ]; }
-                  { command = "/run/current-system/sw/bin/nix-build"; options = [ "NOPASSWD" ]; }
-                  { command = "/run/current-system/sw/bin/nix-shell"; options = [ "NOPASSWD" ]; }
-                  { command = "/run/current-system/sw/bin/nix-env"; options = [ "NOPASSWD" ]; }
-                  { command = "/run/current-system/sw/bin/nixos-rebuild"; options = [ "NOPASSWD" ]; }
+                  {
+                    command = "/run/current-system/sw/bin/docker";
+                    options = [ "NOPASSWD" ];
+                  }
+                  {
+                    command = "/run/current-system/sw/bin/nix";
+                    options = [ "NOPASSWD" ];
+                  }
+                  {
+                    command = "/run/current-system/sw/bin/nix-build";
+                    options = [ "NOPASSWD" ];
+                  }
+                  {
+                    command = "/run/current-system/sw/bin/nix-shell";
+                    options = [ "NOPASSWD" ];
+                  }
+                  {
+                    command = "/run/current-system/sw/bin/nix-env";
+                    options = [ "NOPASSWD" ];
+                  }
+                  {
+                    command = "/run/current-system/sw/bin/nixos-rebuild";
+                    options = [ "NOPASSWD" ];
+                  }
                 ];
               }
             ];
           };
         };
 
-        # Direnv for automatic flake loading with trusted paths
-        programs.direnv = {
-          enable = true;
-          nix-direnv.enable = true;
-          # Auto-trust .envrc in these locations (writes to /etc/direnv/direnv.toml)
-          settings = {
-            whitelist = {
-              prefix = [ "~" "/opt/konductor" "/workspace" "/home" ];
+        # Programs configuration (consolidated to avoid repeated keys warning)
+        programs = {
+          # Disable command-not-found (requires nixpkgs channel)
+          command-not-found.enable = false;
+
+          # Direnv for automatic flake loading with trusted paths
+          direnv = {
+            enable = true;
+            nix-direnv.enable = true;
+            # Auto-trust .envrc in these locations (writes to /etc/direnv/direnv.toml)
+            settings = {
+              whitelist = {
+                prefix = [
+                  "~"
+                  "/opt/konductor"
+                  "/workspace"
+                  "/home"
+                ];
+              };
             };
           };
-        };
 
-        # Git global configuration (/etc/gitconfig)
-        # System-level defaults - user ~/.gitconfig can override
-        programs.git = {
-          enable = true;
-          config = {
-            init.defaultBranch = "main";
-            core = {
-              editor = "nvim";
-              pager = "bat";
+          # Git global configuration (/etc/gitconfig)
+          # System-level defaults - user ~/.gitconfig can override
+          git = {
+            enable = true;
+            config = {
+              init.defaultBranch = "main";
+              core = {
+                editor = "nvim";
+                pager = "bat";
+              };
+              color.ui = "auto";
+              pull.rebase = true;
+              # Credential helpers - use stable paths for NixOS
+              credential.helper = [
+                ""
+                "cache --timeout=3600"
+              ];
+              "credential \"https://github.com\"".helper = [
+                ""
+                "!/run/current-system/sw/bin/gh auth git-credential"
+              ];
+              "credential \"https://gist.github.com\"".helper = [
+                ""
+                "!/run/current-system/sw/bin/gh auth git-credential"
+              ];
+              "credential \"https://git.braincraft.io\"".helper = [
+                ""
+                "cache --timeout=3600"
+              ];
+              # Aliases
+              alias = {
+                st = "status";
+                co = "checkout";
+                br = "branch";
+                ci = "commit";
+                lg = "log --oneline --graph --decorate";
+              };
+              # Safe directories for shared repos
+              safe.directory = [
+                "/opt/konductor"
+                "/home/Git"
+                "/workspace"
+                "*"
+              ];
             };
-            color.ui = "auto";
-            pull.rebase = true;
-            # Credential helpers - use stable paths for NixOS
-            credential.helper = [ "" "cache --timeout=3600" ];
-            "credential \"https://github.com\"".helper = [ "" "!/run/current-system/sw/bin/gh auth git-credential" ];
-            "credential \"https://gist.github.com\"".helper = [ "" "!/run/current-system/sw/bin/gh auth git-credential" ];
-            "credential \"https://git.braincraft.io\"".helper = [ "" "cache --timeout=3600" ];
-            # Aliases
-            alias = {
-              st = "status";
-              co = "checkout";
-              br = "branch";
-              ci = "commit";
-              lg = "log --oneline --graph --decorate";
-            };
-            # Safe directories for shared repos
-            safe.directory = [ "/opt/konductor" "/home/Git" "/workspace" "*" ];
           };
         };
 
@@ -258,7 +330,8 @@ in
           # Full Konductor Package Set
           # Complete konductor devshell packages pre-installed for immediate use.
           # SSH in and start working - no `nix develop` required.
-          systemPackages = devshellPackages.default
+          systemPackages =
+            devshellPackages.default
             # All languages
             ++ devshellPackages.pythonPackages
             ++ devshellPackages.goPackages
@@ -275,34 +348,37 @@ in
             ++ programs.forgejo.cliPackages
             # Essentials
             ++ (with pkgs; [
-            git
-            gh
-            gnumake
-            cachix
-          ]);
+              git
+              gh
+              gnumake
+              cachix
+            ]);
 
           # Environment Variables
           # Includes base env + language-specific + konductor settings
-          variables = lib.mapAttrs (_name: value: lib.mkForce value) (env // {
-            # BASH_ENV: Ensures non-interactive bash (bash -c, bash script.sh)
-            # sources NixOS environment. Without this, tools like runme that
-            # spawn bash subprocesses won't have /run/current-system/sw/bin in PATH.
-            BASH_ENV = "/etc/set-environment";
-            # Python
-            UV_SYSTEM_PYTHON = "1";
-            PYTHONDONTWRITEBYTECODE = "1";
-            # Go
-            GO111MODULE = "on";
-            CGO_ENABLED = "1";
-            # Node
-            NODE_ENV = "development";
-            # Rust
-            RUST_BACKTRACE = "1";
-            # Docker
-            DOCKER_BUILDKIT = "1";
-            # Konductor
-            KONDUCTOR_SHELL = "konductor";
-          });
+          variables = lib.mapAttrs (_name: value: lib.mkForce value) (
+            env
+            // {
+              # BASH_ENV: Ensures non-interactive bash (bash -c, bash script.sh)
+              # sources NixOS environment. Without this, tools like runme that
+              # spawn bash subprocesses won't have /run/current-system/sw/bin in PATH.
+              BASH_ENV = "/etc/set-environment";
+              # Python
+              UV_SYSTEM_PYTHON = "1";
+              PYTHONDONTWRITEBYTECODE = "1";
+              # Go
+              GO111MODULE = "on";
+              CGO_ENABLED = "1";
+              # Node
+              NODE_ENV = "development";
+              # Rust
+              RUST_BACKTRACE = "1";
+              # Docker
+              DOCKER_BUILDKIT = "1";
+              # Konductor
+              KONDUCTOR_SHELL = "konductor";
+            }
+          );
         };
 
         # =====================================================================
@@ -508,8 +584,15 @@ in
             # CA trust is configured by konductor-ca-setup service (drop-in).
             forgejo-runner = {
               description = "Forgejo Actions Runner";
-              after = [ "network-online.target" "docker.service" "konductor-ca-setup.service" ];
-              wants = [ "network-online.target" "docker.service" ];
+              after = [
+                "network-online.target"
+                "docker.service"
+                "konductor-ca-setup.service"
+              ];
+              wants = [
+                "network-online.target"
+                "docker.service"
+              ];
               requires = [ "konductor-ca-setup.service" ];
               wantedBy = [ "multi-user.target" ];
               unitConfig = {
@@ -661,12 +744,24 @@ in
         # Nix configuration
         nix = {
           settings = {
-            experimental-features = [ "nix-command" "flakes" ];
+            experimental-features = [
+              "nix-command"
+              "flakes"
+            ];
             auto-optimise-store = true;
             accept-flake-config = true;
-            trusted-users = [ "root" "@wheel" ];
-            substituters = [ "https://cache.nixos.org" "https://nix-community.cachix.org" ];
-            trusted-substituters = [ "https://cache.nixos.org" "https://nix-community.cachix.org" ];
+            trusted-users = [
+              "root"
+              "@wheel"
+            ];
+            substituters = [
+              "https://cache.nixos.org"
+              "https://nix-community.cachix.org"
+            ];
+            trusted-substituters = [
+              "https://cache.nixos.org"
+              "https://nix-community.cachix.org"
+            ];
             trusted-public-keys = [
               "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
               "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
@@ -675,8 +770,15 @@ in
           # Pre-configured flake registry for updates/customization
           # All tools pre-installed - this registry is for advanced use
           registry.konductor = {
-            from = { type = "indirect"; id = "konductor"; };
-            to = { type = "github"; owner = "braincraftio"; repo = "konductor"; };
+            from = {
+              type = "indirect";
+              id = "konductor";
+            };
+            to = {
+              type = "github";
+              owner = "braincraftio";
+              repo = "konductor";
+            };
           };
         };
       }

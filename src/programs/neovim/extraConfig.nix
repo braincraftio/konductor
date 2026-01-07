@@ -1,6 +1,6 @@
 # src/programs/neovim/extraConfig.nix
 # Raw Lua configuration (minimal - only what can't be done via nixvim options)
-{ }:
+_:
 
 {
   extraConfigLuaPre = ''
