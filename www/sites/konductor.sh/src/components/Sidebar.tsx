@@ -56,7 +56,7 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto space-y-8 custom-scrollbar">
+      <nav className="flex-1 overflow-y-auto space-y-8 no-scrollbar">
         {sections.map(section => {
           const docs = filteredGroups[section];
           if (!docs || docs.length === 0) return null;

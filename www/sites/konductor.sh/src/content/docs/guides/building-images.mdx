@@ -5,21 +5,93 @@ section: "Guides"
 order: 1
 ---
 
-# Building Images
+import { Card, CardGrid, FeatureList, Note } from '../../../components/docs/MDXComponents';
 
-Konductor allows you to export your exact development environment as a deployable artifact. This ensures that the environment you develop in is identical to the one you deploy.
+**Konductor** allows you to export your exact development environment as a deployable artifact. This ensures that the environment you develop in is identical to the one you deploy.
 
 ## OCI Containers
 
 Konductor builds multi-architecture container images (amd64 + arm64) using `nix2container` and Docker Buildx.
 
-### Building
+<CardGrid>
+  <Card title="Build Single Arch" icon="🏗️">
+    Build a container image for the current architecture:
 
-To build a container image for the current architecture:
+    ```bash
+    nix build .#oci
+    # or
+    mise run docker:build
+    ```
+  </Card>
+  <Card title="Run Image" icon="🏃">
+    Load and run the built image:
 
-```bash
-nix build .#oci
-```
+    ```bash
+    docker load < result
+    docker run --rm -it $(cat result)
+    ```
+  </Card>
+</CardGrid>
+
+<Note type="info" title="User Model">
+  The container includes two specific users:
+  - **`kc2admin` (UID 1001)**: Admin user with passwordless sudo (wheel group).
+  - **`kc2` (UID 1002)**: Unprivileged user for CI/CD workflows.
+</Note>
+
+## QCOW2 Virtual Machines
+
+Konductor generates NixOS 25.11 virtual machine images optimized for KVM, Proxmox, and OpenStack.
+
+<FeatureList items={[
+  {
+    title: "One-Command Deploy",
+    description: "Build image, generate ISO, and start VM in one go.",
+    icon: "🚀"
+  },
+  {
+    title: "Auto-SSH Injection",
+    description: "Your local SSH key is automatically injected via cloud-init.",
+    icon: "🔑"
+  },
+  {
+    title: "Serial Console",
+    description: "Integrated serial console for debugging boot issues.",
+    icon: "📺"
+  }
+]} />
+
+### Workflow
+
+<div className="my-8 space-y-4">
+  <div className="p-4 bg-surface-paper border border-border-default rounded-lg flex items-center gap-4">
+    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">1</div>
+    <div className="flex-1">
+      <h4 className="font-bold text-text-primary">Deploy VM</h4>
+      <p className="text-sm text-text-secondary mb-2">Builds the QCOW2 image and cloud-init ISO, then starts the VM.</p>
+      <code className="text-xs bg-black/30 p-1 rounded text-text-code">runme run nix-build-qcow2-deploy</code>
+    </div>
+  </div>
+
+  <div className="p-4 bg-surface-paper border border-border-default rounded-lg flex items-center gap-4">
+    <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold">2</div>
+    <div className="flex-1">
+      <h4 className="font-bold text-text-primary">Connect via SSH</h4>
+      <p className="text-sm text-text-secondary mb-2">Connects to port 2222 with automatic key authentication.</p>
+      <code className="text-xs bg-black/30 p-1 rounded text-text-code">ssh localhost</code>
+    </div>
+  </div>
+
+  <div className="p-4 bg-surface-paper border border-border-default rounded-lg flex items-center gap-4">
+    <div className="w-10 h-10 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">3</div>
+    <div className="flex-1">
+      <h4 className="font-bold text-text-primary">Debug (Optional)</h4>
+      <p className="text-sm text-text-secondary mb-2">Launch with interactive serial console if boot issues occur.</p>
+      <code className="text-xs bg-black/30 p-1 rounded text-text-code">mise run nix:qcow2:deploy:console</code>
+    </div>
+  </div>
+</div>
+
 
 To load and run the result:
 

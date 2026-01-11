@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import Navbar from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
+import CopyButton from '../../components/docs/CopyButton';
 import { getCollection } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -11,6 +12,12 @@ export async function getStaticPaths() {
     props: { entry, allDocs: docs },
   }));
 }
+
+import { Pre } from '../../components/docs/MDXComponents';
+
+const components = {
+  pre: Pre,
+};
 
 const { entry, allDocs } = Astro.props as any;
 const { Content } = await entry.render();
@@ -61,11 +68,13 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
         <!-- Main Content -->
         <main class="flex-1 md:pl-64 w-full">
             <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
-                <!-- Breadcrumbs -->
-                <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium">
-                    <a href="/manual/getting-started/introduction" class="hover:text-text-primary transition-colors">Manual</a>
-                    <span>/</span>
-                    <span class="text-text-secondary">{entry.data.section}</span>
+                <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium justify-between">
+                    <div class="flex items-center gap-2">
+                        <a href="/manual/getting-started/introduction" class="hover:text-text-primary transition-colors">Manual</a>
+                        <span>/</span>
+                        <span class="text-text-secondary">{entry.data.section}</span>
+                    </div>
+                    <CopyButton client:load label="Copy Page" />
                 </div>
 
                 <article class="prose prose-lg prose-slate dark:prose-invert max-w-none
@@ -91,9 +100,13 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                     prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md
                     prose-code:before:content-none prose-code:after:content-none
                     
+                    /* This prose-pre style was overriding global CSS. Removing specific BG/Border/Shadow here to let global CSS win, 
+                       or we must update it to match global. Let's update it to match global conventions. */
                     prose-pre:bg-slate-900 prose-pre:text-slate-50 prose-pre:rounded-xl 
-                    prose-pre:border prose-pre:border-slate-800 prose-pre:shadow-sm
+                    prose-pre:border prose-pre:border-slate-700 prose-pre:shadow-sm
                     prose-pre:p-5 prose-pre:my-8 prose-pre:leading-normal
+                    /* Ensure overflow is handled */
+                    prose-pre:overflow-x-auto
                     
                     /* Blockquotes */
                     prose-blockquote:border-l-4 prose-blockquote:border-brand-primary 
@@ -109,7 +122,7 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                         {entry.data.description}
                     </p>
                     
-                    <Content />
+                    <Content components={components} />
                 </article>
 
                 <!-- Pagination -->

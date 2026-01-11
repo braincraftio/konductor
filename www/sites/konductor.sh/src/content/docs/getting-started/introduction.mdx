@@ -5,33 +5,92 @@ section: "Getting Started"
 order: 1
 ---
 
+import { Card, CardGrid, FeatureList, Note } from '../../../components/docs/MDXComponents';
+
 **Konductor** is a Nix flake providing hermetic, multi-target polyglot development environments. It delivers consistent tooling across devshells, OCI containers, QCOW2 VMs, and NixOS/Darwin/Home-Manager modules using the **Single Source of Truth (SSOT)** pattern.
 
-## The Core Problem
+<Note type="info" title="Why Konductor?">
+  Konductor targets **senior developers and platform engineers** who value reproducibility over convenience and architecture over ad-hoc scripting. It is designed for those who want to treat their development environment as code.
+</Note>
 
-Modern software development often suffers from configuration drift between local environments, CI pipelines, and production deployments. "Works on my machine" is a symptom of relying on mutable system state (`brew install`, global `pip`, `npm -g`).
+## The Problem & Solution
 
-## The Konductor Solution
+<CardGrid>
+  <Card title="The Core Problem" icon="🌪️">
+    Modern software development often suffers from configuration drift between local environments, CI pipelines, and production deployments. "Works on my machine" is a symptom of relying on mutable system state (`brew install`, global `pip`, `npm -g`).
+  </Card>
+  <Card title="The Konductor Solution" icon="🛡️">
+    Konductor inverts this model by enforcing **hermetic configuration management**. Tools and their configurations are injected at runtime via Nix wrapper scripts, ensuring consistent behavior across all environments without relying on user home directories or project dotfiles.
+  </Card>
+</CardGrid>
 
-Konductor inverts this model by enforcing **hermetic configuration management**. Tools and their configurations are injected at runtime via Nix wrapper scripts, ensuring consistent behavior across all environments without relying on user home directories or project dotfiles.
+## Key Features
 
-### Key Features
+<FeatureList items={[
+  {
+    title: "Multi-target Consistency",
+    description: "Define once, run as a DevShell, OCI Container, QCOW2 VM, or System Module.",
+    icon: "🎯"
+  },
+  {
+    title: "Hermetic Configuration",
+    description: "13 linters and 8 formatters are fully managed by Nix, isolated from the host system.",
+    icon: "📦"
+  },
+  {
+    title: "Compositional Architecture",
+    description: "Shells are built hierarchically (Base → Language → Full), allowing flexible environment composition.",
+    icon: "🧩"
+  },
+  {
+    title: "Zero-trust Dependency Management",
+    description: "Integrates with FlakeHub for secure, verified dependency updates.",
+    icon: "🔒"
+  },
+  {
+    title: "Single Source of Truth (SSOT)",
+    description: "A central `versions.nix` drives versions across all outputs, preventing drift.",
+    icon: "💎"
+  }
+]} />
 
-- **Multi-target consistency**: Define once, run as a DevShell, OCI Container, QCOW2 VM, or System Module.
-- **Hermetic configuration**: 13 linters and 8 formatters are fully managed by Nix.
-- **Compositional architecture**: Shells are built hierarchically (Base → Language → Full).
-- **Zero-trust dependency management**: Integrates with FlakeHub for secure updates.
-- **Single Source of Truth (SSOT)**: A central `versions.nix` drives versions across all outputs.
+## Architecture
 
-### Architecture
+Konductor uses a data-flow architecture to maintain consistency across all outputs:
 
-Konductor uses a data-flow architecture to maintain consistency:
-
-1.  `src/lib/versions.nix` (SSOT data)
-2.  `src/packages/` (Composition)
-3.  `src/devshells/` (Environment definitions)
-4.  **Outputs**: DevShells, OCI Images, QCOW2 Images, Modules.
-
-## Target Audience
-
-Konductor targets **senior developers and platform engineers** who value reproducibility over convenience and architecture over ad-hoc scripting. It is designed for those who want to treat their development environment as code.
+<div className="my-8 p-6 bg-slate-900 rounded-xl border border-slate-800 shadow-2xl overflow-hidden relative">
+  <div className="absolute top-0 right-0 p-4 opacity-10 font-mono text-6xl font-bold text-white select-none">DATA FLOW</div>
+  <div className="relative z-10 font-mono text-sm md:text-base text-slate-300 space-y-4">
+    <div className="flex items-center gap-4">
+      <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">1</div>
+      <div>
+        <code className="text-purple-400 font-bold">src/lib/versions.nix</code>
+        <div className="text-slate-500 text-xs mt-1">Single Source of Truth (Data)</div>
+      </div>
+    </div>
+    <div className="pl-4 h-6 border-l-2 border-slate-800 ml-3.5"></div>
+    <div className="flex items-center gap-4">
+      <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">2</div>
+      <div>
+        <code className="text-blue-400 font-bold">src/packages/</code>
+        <div className="text-slate-500 text-xs mt-1">Package Composition Logic</div>
+      </div>
+    </div>
+    <div className="pl-4 h-6 border-l-2 border-slate-800 ml-3.5"></div>
+    <div className="flex items-center gap-4">
+      <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold">3</div>
+      <div>
+        <code className="text-teal-400 font-bold">src/devshells/</code>
+        <div className="text-slate-500 text-xs mt-1">Environment Definitions</div>
+      </div>
+    </div>
+    <div className="pl-4 h-6 border-l-2 border-slate-800 ml-3.5"></div>
+    <div className="flex items-center gap-4">
+      <div className="w-8 h-8 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold">4</div>
+      <div>
+        <span className="font-bold text-white">Outputs</span>
+        <div className="text-slate-500 text-xs mt-1">DevShells • OCI Images • QCOW2 • Modules</div>
+      </div>
+    </div>
+  </div>
+</div>

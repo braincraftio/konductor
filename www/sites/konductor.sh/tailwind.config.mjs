@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
 	content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
+	darkMode: ['class', '[data-theme="dark"]'],
 	theme: {
 		extend: {
 			colors: {
@@ -112,6 +113,7 @@ export default {
 				32: 'var(--space-32)',
 			},
 			borderRadius: {
+				DEFAULT: 'var(--radius-md)',
 				sm: 'var(--radius-sm)',
 				md: 'var(--radius-md)',
 				lg: 'var(--radius-lg)',

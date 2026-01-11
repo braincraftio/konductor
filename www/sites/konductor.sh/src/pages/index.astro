@@ -1,7 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Navbar from '../components/Navbar';
-import HeroTerminal from '../components/HeroTerminal';
+import { Image } from 'astro:assets';
+import konductorImage from '../../public/images/konductor.png';
 ---
 
 <Layout>
@@ -20,7 +21,7 @@ import HeroTerminal from '../components/HeroTerminal';
                 </div>
                 
                 <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-text-primary leading-[1.1]">
-                    Orchestrate <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary via-brand-accent to-brand-secondary animate-gradient bg-300%">Entropy</span>.
+                    Orchestrate <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 dark:from-lavender-300 dark:via-fuchsia-300 dark:to-mint-300 animate-gradient bg-300%">Entropy</span>.
                 </h1>
                 
                 <p class="text-xl md:text-2xl text-text-secondary max-w-3xl mx-auto leading-relaxed font-light">
@@ -30,14 +31,14 @@ import HeroTerminal from '../components/HeroTerminal';
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-                    <a href="/manual" class="w-full sm:w-auto group relative inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white transition-all duration-200 bg-brand-primary rounded-xl shadow-lavender hover:shadow-xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary overflow-hidden">
+                    <a href="/manual" class="btn btn-primary w-full sm:w-auto group relative overflow-hidden">
                         <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shimmer"></div>
                         Get Started
                         <svg class="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
                     </a>
-                    <a href="https://github.com/braincraftio/konductor" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-medium text-text-primary transition-all duration-200 bg-surface-paper border border-border-default rounded-xl hover:bg-surface-subtle hover:border-text-tertiary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 shadow-sm">
+                    <a href="https://github.com/braincraftio/konductor" class="btn btn-secondary w-full sm:w-auto">
                         View Source
                     </a>
                 </div>
@@ -53,10 +54,11 @@ import HeroTerminal from '../components/HeroTerminal';
                 </div>
                 
                 <div class="relative w-full h-full">
-                   <img 
-                    src="/images/konductor.png" 
+                   <Image 
+                    src={konductorImage}
                     alt="Konductor Development Environment" 
                     class="w-full h-full object-cover"
+                    loading="eager"
                    />
                 </div>
             </div>

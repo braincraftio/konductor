@@ -1,0 +1,42 @@
+<script>
+  // Global listener for copy code blocks
+  document.addEventListener('click', async (event) => {
+    const target = event.target;
+    // Safety check for TS/JS
+    if (!target || !(target instanceof Element)) return;
+
+    // Check if click originated from a copy button
+    const button = target.closest('button.copy-code-button');
+    if (!button) return;
+
+    event.preventDefault();
+
+    const wrapper = button.closest('.code-block-wrapper');
+    if (!wrapper) return;
+
+    // Find the code element - Astro usually renders <pre><code>...</code></pre>
+    const codeEl = wrapper.querySelector('code') || wrapper.querySelector('pre');
+    
+    if (codeEl && codeEl.textContent) {
+      try {
+        await navigator.clipboard.writeText(codeEl.textContent);
+        
+        // Toggle icons for feedback
+        const copyIcon = button.querySelector('.copy-icon');
+        const checkIcon = button.querySelector('.check-icon');
+        
+        if (copyIcon && checkIcon) {
+          copyIcon.classList.add('hidden');
+          checkIcon.classList.remove('hidden');
+          
+          setTimeout(() => {
+            copyIcon.classList.remove('hidden');
+            checkIcon.classList.add('hidden');
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Failed to copy code:', err);
+      }
+    }
+  });
+</script>

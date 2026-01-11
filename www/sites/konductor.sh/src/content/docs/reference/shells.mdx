@@ -5,52 +5,108 @@ section: "Reference"
 order: 1
 ---
 
-# Shell Environments
+import { Card, CardGrid, FeatureList, Note } from '../../../components/docs/MDXComponents';
 
-Konductor provides 8 specialized shells designed for different workflows. They follow a compositional hierarchy, where more complex shells inherit from simpler ones.
+**Konductor** provides 8 specialized shells designed for different workflows. They follow a compositional hierarchy, where more complex shells inherit from simpler ones.
 
-## Shell Hierarchy
-
-```text
-base (default shell)
+<div className="my-8 p-6 bg-surface-paper border border-border-default rounded-xl overflow-hidden relative">
+  <div className="absolute top-0 right-0 p-4 opacity-10 font-mono text-6xl font-bold text-text-primary select-none">HIERARCHY</div>
+  <pre className="font-mono text-sm md:text-base text-text-secondary bg-transparent p-0 m-0 border-none shadow-none">
+{`base (default shell)
   ├─> python (base + Python 3.12 + uv)
   ├─> go (base + Go 1.24 + workspace setup)
   ├─> node (base + Node.js 22 + pnpm)
   ├─> rust (base + Rust 1.82.0 + cargo)
   ├─> dev (base + neovim + tmux + IDE tools)
   ├─> full (base + all languages + IDE)
-  └─> konductor (full + docker + qemu + libvirt)
-```
+  └─> konductor (full + docker + qemu + libvirt)`}
+  </pre>
+</div>
 
 ## Available Shells
 
-You can enter any shell using `nix develop .#<name>` (or `konductor#<name>` if using the registry).
+Enter any shell using `nix develop .#<name>` (or `konductor#<name>` via registry).
 
-| Shell | Command | Description | Key Packages |
-| :--- | :--- | :--- | :--- |
-| **default** | `nix develop` | Foundation shell | `git`, `jq`, `ripgrep`, `fzf` |
-| **python** | `. #python` | Python 3.12 dev | `uv`, `ruff`, `mypy`, `bandit` |
-| **go** | `. #go` | Go 1.24 dev | `gopls`, `delve`, `golangci-lint` |
-| **node** | `. #node` | JS/TS dev | `pnpm`, `biome`, `prettier`, `eslint` |
-| **rust** | `. #rust` | Rust 1.82.0 dev | `cargo`, `clippy`, `rust-analyzer` |
-| **dev** | `. #dev` | IDE tools only | `neovim` (nixvim), `tmux`, `lazygit` |
-| **full** | `. #full` | Polyglot environment | All languages + IDE tools |
-| **konductor** | `. #konductor` | Self-hosting | Full + `docker`, `qemu`, `libvirt` |
+<div className="overflow-x-auto my-8">
+  <table className="w-full text-left text-sm text-text-secondary border-collapse">
+    <thead className="bg-surface-subtle text-text-primary uppercase font-medium">
+      <tr>
+        <th className="p-4 rounded-tl-lg">Shell</th>
+        <th className="p-4">Command</th>
+        <th className="p-4">Description</th>
+        <th className="p-4 rounded-tr-lg">Key Packages</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-border-subtle bg-surface-paper">
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">default</td>
+        <td className="p-4 font-mono text-xs">nix develop</td>
+        <td className="p-4">Foundation shell</td>
+        <td className="p-4 font-mono text-xs text-text-code">git, jq, ripgrep, fzf</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">python</td>
+        <td className="p-4 font-mono text-xs">. #python</td>
+        <td className="p-4">Python 3.12 dev</td>
+        <td className="p-4 font-mono text-xs text-text-code">uv, ruff, mypy, bandit</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">go</td>
+        <td className="p-4 font-mono text-xs">. #go</td>
+        <td className="p-4">Go 1.24 dev</td>
+        <td className="p-4 font-mono text-xs text-text-code">gopls, delve, golangci-lint</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">node</td>
+        <td className="p-4 font-mono text-xs">. #node</td>
+        <td className="p-4">JS/TS dev</td>
+        <td className="p-4 font-mono text-xs text-text-code">pnpm, biome, prettier, eslint</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">rust</td>
+        <td className="p-4 font-mono text-xs">. #rust</td>
+        <td className="p-4">Rust 1.82.0 dev</td>
+        <td className="p-4 font-mono text-xs text-text-code">cargo, clippy, rust-analyzer</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">dev</td>
+        <td className="p-4 font-mono text-xs">. #dev</td>
+        <td className="p-4">IDE tools only</td>
+        <td className="p-4 font-mono text-xs text-text-code">neovim, tmux, lazygit</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">full</td>
+        <td className="p-4 font-mono text-xs">. #full</td>
+        <td className="p-4">Polyglot env</td>
+        <td className="p-4 font-mono text-xs text-text-code">All languages + IDE tools</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">konductor</td>
+        <td className="p-4 font-mono text-xs">. #konductor</td>
+        <td className="p-4">Self-hosting</td>
+        <td className="p-4 font-mono text-xs text-text-code">Full + docker, qemu, libvirt</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 ## Language-Specific Features
 
-### Python
-- **Auto-setup**: Sources `.venv/bin/activate` if present.
-- **Env**: Sets `UV_SYSTEM_PYTHON=1` and `PYTHONDONTWRITEBYTECODE=1`.
-
-### Go
-- **Workspace**: Automatically sets up `GOPATH` and `GOBIN`.
-- **Env**: `GO111MODULE=on`, `CGO_ENABLED=1`.
-
-### Node.js
-- **Env**: `NODE_ENV=development`.
-- **Path**: Adds global `pnpm` bin to PATH.
-
-### Rust
-- **Version**: Pinned to 1.82.0 via rust-overlay.
-- **Env**: `RUST_BACKTRACE=1` for debugging.
+<CardGrid>
+  <Card title="Python" icon="🐍">
+    - **Auto-setup**: Sources `.venv/bin/activate` if present.
+    - **Env**: Sets `UV_SYSTEM_PYTHON=1` and `PYTHONDONTWRITEBYTECODE=1`.
+  </Card>
+  <Card title="Go" icon="🐹">
+    - **Workspace**: Automatically sets up `GOPATH` and `GOBIN`.
+    - **Env**: `GO111MODULE=on`, `CGO_ENABLED=1`.
+  </Card>
+  <Card title="Node.js" icon="🟢">
+    - **Env**: `NODE_ENV=development`.
+    - **Path**: Adds global `pnpm` bin to PATH.
+  </Card>
+  <Card title="Rust" icon="🦀">
+    - **Version**: Pinned to 1.82.0 via rust-overlay.
+    - **Env**: `RUST_BACKTRACE=1` for debugging.
+  </Card>
+</CardGrid>
