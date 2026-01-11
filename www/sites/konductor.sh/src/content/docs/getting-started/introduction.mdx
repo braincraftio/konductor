@@ -1,0 +1,39 @@
+---
+title: "Introduction"
+description: "Hermetic, multi-target polyglot development environments."
+section: "Getting Started"
+order: 1
+---
+
+# Introduction
+
+**Konductor** is a Nix flake providing hermetic, multi-target polyglot development environments. It delivers consistent tooling across devshells, OCI containers, QCOW2 VMs, and NixOS/Darwin/Home-Manager modules using the **Single Source of Truth (SSOT)** pattern.
+
+## The Core Problem
+
+Modern software development often suffers from configuration drift between local environments, CI pipelines, and production deployments. "Works on my machine" is a symptom of relying on mutable system state (`brew install`, global `pip`, `npm -g`).
+
+## The Konductor Solution
+
+Konductor inverts this model by enforcing **hermetic configuration management**. Tools and their configurations are injected at runtime via Nix wrapper scripts, ensuring consistent behavior across all environments without relying on user home directories or project dotfiles.
+
+### Key Features
+
+- **Multi-target consistency**: Define once, run as a DevShell, OCI Container, QCOW2 VM, or System Module.
+- **Hermetic configuration**: 13 linters and 8 formatters are fully managed by Nix.
+- **Compositional architecture**: Shells are built hierarchically (Base → Language → Full).
+- **Zero-trust dependency management**: Integrates with FlakeHub for secure updates.
+- **Single Source of Truth (SSOT)**: A central `versions.nix` drives versions across all outputs.
+
+### Architecture
+
+Konductor uses a data-flow architecture to maintain consistency:
+
+1.  `src/lib/versions.nix` (SSOT data)
+2.  `src/packages/` (Composition)
+3.  `src/devshells/` (Environment definitions)
+4.  **Outputs**: DevShells, OCI Images, QCOW2 Images, Modules.
+
+## Target Audience
+
+Konductor targets **senior developers and platform engineers** who value reproducibility over convenience and architecture over ad-hoc scripting. It is designed for those who want to treat their development environment as code.

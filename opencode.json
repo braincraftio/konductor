@@ -25,6 +25,20 @@
     "kubernetes": {
       "type": "local",
       "command": ["mcp-k8s-go"]
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "environment": {
+        "PLAYWRIGHT_MCP_BROWSER": "chromium",
+        "PLAYWRIGHT_MCP_EXECUTABLE_PATH": "/usr/bin/google-chrome",
+        "PLAYWRIGHT_BROWSERS_PATH": "{env:HOME}/.cache/ms-playwright"
+      },
+      "enabled": true
     }
   }
 }

@@ -143,4 +143,16 @@ in
       config
       ;
   };
+
+  # Frontend: Full shell + Playwright browsers
+  frontend = import ./frontend.nix {
+    inherit
+      baseShell
+      pkgs
+      packages
+      versions
+      programs
+      config
+      ;
+  };
 }

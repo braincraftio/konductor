@@ -1,0 +1,118 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar';
+
+// Data derived from src/lib/versions.nix
+const specs = {
+    system: [
+        { name: "NixOS Channel", version: "25.11", id: "nixos-25.11" },
+        { name: "Nix Package Manager", version: "2.24.10", id: "nix-2.24" },
+    ],
+    languages: [
+        { name: "Python", version: "3.13", id: "python-313" },
+        { name: "Go", version: "1.24", id: "go-1.24" },
+        { name: "Node.js", version: "22 (LTS)", id: "node-22" },
+        { name: "Rust", version: "1.92.0", id: "rust-1.92" },
+    ],
+    tooling: [
+        { name: "Neovim", version: "0.10+", details: "LazyVim-based, heavily customized" },
+        { name: "Tmux", version: "3.5a", details: "Catppuccin Macchiato Theme" },
+        { name: "Docker", version: "27.x", details: "Rootless / Mobyle integration" },
+        { name: "QEMU", version: "9.x", details: "Full virtualization suite" },
+    ]
+};
+---
+
+<Layout>
+    <Navbar client:load />
+
+    <main class="min-h-screen flex flex-col items-center pt-24 md:pt-32 p-4 md:p-8 bg-surface-base">
+        <div class="max-w-5xl w-full space-y-16 pb-24">
+            <!-- Header -->
+            <header class="space-y-6 text-center md:text-left">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-paper border border-border-default shadow-sm text-sm font-medium text-text-secondary">
+                    <span class="w-2 h-2 rounded-full bg-brand-secondary"></span>
+                    Technical Specifications
+                </div>
+                <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-text-primary leading-tight">
+                    The Konductor <br/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-secondary to-brand-primary">Golden Image</span>
+                </h1>
+                <p class="text-xl text-text-secondary leading-relaxed font-light max-w-2xl">
+                    We treat software versions like hardware specifications. This is the current "Model Year" configuration for the Konductor standard environment.
+                </p>
+            </header>
+
+            <!-- Specs Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <!-- Core System -->
+                <div class="col-span-full md:col-span-1 lg:col-span-1 space-y-4">
+                    <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Core System</h3>
+                    <div class="space-y-3">
+                        {specs.system.map((item) => (
+                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-primary/30 transition-colors group">
+                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.id}</div>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="font-medium text-text-primary">{item.name}</span>
+                                    <span class="font-bold text-brand-primary">{item.version}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <!-- Languages -->
+                <div class="col-span-full md:col-span-1 lg:col-span-1 space-y-4">
+                    <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Language Runtimes</h3>
+                    <div class="space-y-3">
+                        {specs.languages.map((item) => (
+                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-secondary/30 transition-colors group">
+                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.id}</div>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="font-medium text-text-primary">{item.name}</span>
+                                    <span class="font-bold text-brand-secondary">{item.version}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <!-- Tooling -->
+                <div class="col-span-full md:col-span-1 lg:col-span-1 space-y-4">
+                    <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Developer Experience</h3>
+                    <div class="space-y-3">
+                        {specs.tooling.map((item) => (
+                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-accent/30 transition-colors group">
+                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.details}</div>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="font-medium text-text-primary">{item.name}</span>
+                                    <span class="font-bold text-brand-accent">{item.version}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Source of Truth -->
+            <div class="mt-16 p-8 bg-slate-900 rounded-2xl border border-slate-700 shadow-xl overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-4 opacity-20 text-6xl font-mono font-bold text-white pointer-events-none">SSOT</div>
+                <h3 class="text-white text-xl font-bold mb-4">Verified Single Source of Truth</h3>
+                <p class="text-slate-400 mb-6 max-w-2xl">
+                    These versions are not just documentation. They are pulled directly from <code>src/lib/versions.nix</code>, the immutable definition file that drives every build artifact in the ecosystem.
+                </p>
+                <div class="font-mono text-sm text-slate-300 bg-slate-950/50 p-4 rounded-lg border border-slate-800 overflow-x-auto">
+                    <span class="text-purple-400">languages</span> = {'{'} <br/>
+                    &nbsp;&nbsp;<span class="text-blue-400">python</span> = {'{'} version = <span class="text-green-400">"313"</span>; display = <span class="text-green-400">"3.13"</span>; {'}'}; <br/>
+                    &nbsp;&nbsp;<span class="text-blue-400">go</span>&nbsp;&nbsp;&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"1_24"</span>; display = <span class="text-green-400">"1.24"</span>; {'}'}; <br/>
+                    &nbsp;&nbsp;<span class="text-blue-400">node</span>&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"22"</span>;&nbsp;&nbsp; display = <span class="text-green-400">"22"</span>;&nbsp;&nbsp; {'}'}; <br/>
+                    &nbsp;&nbsp;<span class="text-blue-400">rust</span>&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"1.92.0"</span>; display = <span class="text-green-400">"1.92.0"</span>; {'}'}; <br/>
+                    {'}'};
+                </div>
+            </div>
+
+        </div>
+    </main>
+</Layout>

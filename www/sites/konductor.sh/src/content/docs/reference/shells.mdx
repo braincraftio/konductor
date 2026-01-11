@@ -1,0 +1,56 @@
+---
+title: "Shell Environments"
+description: "Reference guide for Konductor's 8 specialized development shells."
+section: "Reference"
+order: 1
+---
+
+# Shell Environments
+
+Konductor provides 8 specialized shells designed for different workflows. They follow a compositional hierarchy, where more complex shells inherit from simpler ones.
+
+## Shell Hierarchy
+
+```text
+base (default shell)
+  ├─> python (base + Python 3.12 + uv)
+  ├─> go (base + Go 1.24 + workspace setup)
+  ├─> node (base + Node.js 22 + pnpm)
+  ├─> rust (base + Rust 1.82.0 + cargo)
+  ├─> dev (base + neovim + tmux + IDE tools)
+  ├─> full (base + all languages + IDE)
+  └─> konductor (full + docker + qemu + libvirt)
+```
+
+## Available Shells
+
+You can enter any shell using `nix develop .#<name>` (or `konductor#<name>` if using the registry).
+
+| Shell | Command | Description | Key Packages |
+| :--- | :--- | :--- | :--- |
+| **default** | `nix develop` | Foundation shell | `git`, `jq`, `ripgrep`, `fzf` |
+| **python** | `. #python` | Python 3.12 dev | `uv`, `ruff`, `mypy`, `bandit` |
+| **go** | `. #go` | Go 1.24 dev | `gopls`, `delve`, `golangci-lint` |
+| **node** | `. #node` | JS/TS dev | `pnpm`, `biome`, `prettier`, `eslint` |
+| **rust** | `. #rust` | Rust 1.82.0 dev | `cargo`, `clippy`, `rust-analyzer` |
+| **dev** | `. #dev` | IDE tools only | `neovim` (nixvim), `tmux`, `lazygit` |
+| **full** | `. #full` | Polyglot environment | All languages + IDE tools |
+| **konductor** | `. #konductor` | Self-hosting | Full + `docker`, `qemu`, `libvirt` |
+
+## Language-Specific Features
+
+### Python
+- **Auto-setup**: Sources `.venv/bin/activate` if present.
+- **Env**: Sets `UV_SYSTEM_PYTHON=1` and `PYTHONDONTWRITEBYTECODE=1`.
+
+### Go
+- **Workspace**: Automatically sets up `GOPATH` and `GOBIN`.
+- **Env**: `GO111MODULE=on`, `CGO_ENABLED=1`.
+
+### Node.js
+- **Env**: `NODE_ENV=development`.
+- **Path**: Adds global `pnpm` bin to PATH.
+
+### Rust
+- **Version**: Pinned to 1.82.0 via rust-overlay.
+- **Env**: `RUST_BACKTRACE=1` for debugging.

@@ -49,14 +49,14 @@ rec {
     gotools
 
     # Release automation
-    goreleaser           # Build, release, and publish Go binaries
-    git-cliff            # Changelog generation from conventional commits
+    goreleaser # Build, release, and publish Go binaries
+    git-cliff # Changelog generation from conventional commits
 
     # Code generation
-    ogen                 # OpenAPI v3 server/client code generator
-    cobra-cli            # CLI scaffolding for Cobra applications
-    go-swag              # Swagger 2.0 RESTful API documentation generator
-    mockgen              # Mock generation for Go interfaces (uber/mock)
+    ogen # OpenAPI v3 server/client code generator
+    cobra-cli # CLI scaffolding for Cobra applications
+    go-swag # Swagger 2.0 RESTful API documentation generator
+    mockgen # Mock generation for Go interfaces (uber/mock)
   ];
 
   # ===========================================================================
@@ -77,7 +77,12 @@ rec {
   # ===========================================================================
   rustPackages = with pkgs; [
     (rust-bin.stable."${langs.rust.version}".default.override {
-      extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+      extensions = [
+        "rust-src"
+        "rust-analyzer"
+        "clippy"
+        "rustfmt"
+      ];
     })
     cargo-watch
     cargo-edit

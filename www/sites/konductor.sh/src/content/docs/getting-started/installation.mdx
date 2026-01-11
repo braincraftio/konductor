@@ -1,0 +1,88 @@
+---
+title: "Installation"
+description: "Setting up Lix and initializing a Konductor project."
+section: "Getting Started"
+order: 2
+---
+
+# Installation
+
+Konductor requires a Nix installation with Flakes enabled. We explicitly recommend **Lix**, a robust Nix variant.
+
+## Prerequisites
+
+### 1. Install Lix
+
+To install Lix with flakes enabled and trusted user configuration (required for binary caches):
+
+```bash
+curl -sSf -L https://install.lix.systems/lix | sh -s -- install \
+  --no-confirm \
+  --extra-conf "experimental-features = nix-command flakes" \
+  --extra-conf "warn-dirty = false" \
+  --extra-conf "accept-flake-config = true" \
+  --extra-conf "trusted-users = root @wheel @admin $(whoami)"
+```
+
+### 2. Configure Shell
+
+Add the Nix daemon to your shell profile (e.g., `~/.bashrc` or `~/.zshrc`):
+
+```bash
+if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+fi
+```
+
+## Quick Start
+
+### Using the Registry (Recommended)
+
+Add Konductor to your Nix registry for convenient access from any directory:
+
+```bash
+nix registry add konductor github:braincraftio/konductor
+```
+
+Now you can enter any Konductor environment instantly:
+
+```bash
+nix develop konductor#full
+```
+
+### Local VM Development (Canonical)
+
+The canonical way to develop Konductor itself is using a local NixOS VM with your repository mounted.
+
+1.  **Clone the repo**:
+    ```bash
+    gh repo clone braincraftio/konductor ~/Git/github.com/braincraftio/konductor
+    ln -s ~/Git/github.com/braincraftio/konductor ~/.konductor
+    cd ~/.konductor
+    ```
+
+2.  **Deploy the VM**:
+    ```bash
+    nix develop .#konductor
+    runme run nix-build-qcow2-deploy
+    ```
+
+3.  **Connect**:
+    ```bash
+    ssh localhost
+    cd /workspace && nix develop .#konductor
+    ```
+
+## Optional: Task Automation
+
+Konductor uses **mise** for task automation. If you prefer `mise` over raw Nix commands:
+
+```bash
+curl https://mise.run | sh
+echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
+```
+
+Inside the repo, you can now run:
+- `mise run lint`
+- `mise run format`
+- `mise run doctor`

@@ -145,6 +145,7 @@
             rust
             dev
             full
+            frontend
             ;
         }
         // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {

@@ -62,6 +62,9 @@ in
       pulumi # IaC with real programming languages
       pulumictl # Pulumi CLI utilities
       pulumiPackages.pulumi-python # Python language plugin
+
+      # Cloud provider CLIs (unstable for faster updates)
+      unstable.awscli2 # AWS CLI v2
     ]);
 
   shellHook = "";

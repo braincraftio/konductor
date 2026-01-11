@@ -1,0 +1,86 @@
+---
+title: "Building Images"
+description: "Generating QCOW2 VMs and OCI Containers from the same source."
+section: "Guides"
+order: 1
+---
+
+# Building Images
+
+Konductor allows you to export your exact development environment as a deployable artifact. This ensures that the environment you develop in is identical to the one you deploy.
+
+## OCI Containers
+
+Konductor builds multi-architecture container images (amd64 + arm64) using `nix2container` and Docker Buildx.
+
+### Building
+
+To build a container image for the current architecture:
+
+```bash
+nix build .#oci
+```
+
+To load and run the result:
+
+```bash
+docker load < result
+docker run --rm -it $(cat result)
+```
+
+### User Model
+
+The container includes two specific users:
+- **`kc2admin` (UID 1001)**: Admin user with passwordless sudo (wheel group).
+- **`kc2` (UID 1002)**: Unprivileged user for CI/CD workflows.
+
+### Automation via Mise
+
+```bash
+# Single architecture build
+mise run docker:build
+
+# Multi-arch build (amd64 + arm64)
+mise run docker:buildx:bake
+```
+
+## QCOW2 Virtual Machines
+
+Konductor generates NixOS 25.11 virtual machine images optimized for KVM, Proxmox, and OpenStack.
+
+### Building & Deploying
+
+The recommended workflow uses the `konductor` devshell:
+
+```bash
+# Build image + cloud-init ISO and start VM
+runme run nix-build-qcow2-deploy
+```
+
+### Manual Build
+
+If you need just the image artifact:
+
+```bash
+mise run nix:qcow2
+```
+
+This produces `result/nixos.qcow2`.
+
+### SSH Access
+
+When using `runme run nix-build-qcow2-deploy`, SSH is automatically configured via a hermetic config file. You can simply run:
+
+```bash
+ssh localhost
+```
+
+This connects you to the running VM (port 2222) with your local SSH key automatically injected via cloud-init.
+
+### Serial Console
+
+For debugging boot issues, you can launch with an interactive serial console:
+
+```bash
+mise run nix:qcow2:deploy:console
+```

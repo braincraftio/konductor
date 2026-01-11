@@ -1,0 +1,108 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navbar from '../../components/Navbar';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  return docs.map(entry => ({
+    params: { slug: entry.slug },
+    props: { entry, allDocs: docs },
+  }));
+}
+
+const { entry, allDocs } = Astro.props;
+const { Content } = await entry.render();
+
+// Group docs by section for the sidebar
+const groupedDocs = allDocs.reduce((acc, doc) => {
+    const section = doc.data.section;
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(doc);
+    return acc;
+}, {} as Record<string, typeof allDocs>);
+
+// Sort order within groups
+Object.values(groupedDocs).forEach(group => {
+    group.sort((a, b) => a.data.order - b.data.order);
+});
+
+// Section order
+const sections = ['Getting Started', 'Core Concepts', 'Guides', 'Reference'];
+
+// Flatten docs for pagination
+const flatDocs = sections
+  .flatMap(section => groupedDocs[section] || [])
+  .sort((a, b) => {
+    // Custom sort order based on sections then internal order
+    const sectionIdxA = sections.indexOf(a.data.section);
+    const sectionIdxB = sections.indexOf(b.data.section);
+    if (sectionIdxA !== sectionIdxB) return sectionIdxA - sectionIdxB;
+    return a.data.order - b.data.order;
+  });
+
+const currentIndex = flatDocs.findIndex(doc => doc.slug === entry.slug);
+const prevDoc = currentIndex > 0 ? flatDocs[currentIndex - 1] : null;
+const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] : null;
+
+import Sidebar from '../../components/Sidebar';
+---
+
+<Layout>
+    <Navbar client:load />
+
+    <div class="flex min-h-screen pt-20">
+        <!-- Sidebar (Client Component) -->
+        <Sidebar 
+            client:load 
+            sections={sections} 
+            groupedDocs={groupedDocs} 
+            currentSlug={entry.slug} 
+        />
+
+        <!-- Main Content -->
+        <main class="flex-1 md:pl-64 w-full">
+            <div class="max-w-4xl mx-auto px-6 py-12 md:py-16">
+                <!-- Breadcrumbs -->
+                <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8">
+                    <a href="/manual/getting-started/introduction" class="hover:text-text-primary transition-colors">Manual</a>
+                    <span>/</span>
+                    <span>{entry.data.section}</span>
+                </div>
+
+                <article class="prose prose-lg prose-slate dark:prose-invert max-w-none 
+                    prose-headings:text-text-primary 
+                    prose-a:text-brand-primary prose-a:no-underline hover:prose-a:underline
+                    prose-code:text-brand-accent prose-code:bg-surface-paper prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
+                    prose-pre:bg-surface-raised prose-pre:border prose-pre:border-border-default prose-pre:shadow-lg
+                ">
+                    <h1 class="text-4xl font-bold tracking-tight mb-4">{entry.data.title}</h1>
+                    <p class="text-xl text-text-secondary leading-relaxed mb-12 border-b border-border-subtle pb-8">
+                        {entry.data.description}
+                    </p>
+                    
+                    <Content />
+                </article>
+
+                <!-- Pagination -->
+                <div class="mt-16 pt-8 border-t border-border-subtle grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {prevDoc ? (
+                        <a href={`/manual/${prevDoc.slug}`} class="group block p-4 rounded-lg border border-border-default hover:border-brand-primary/50 hover:bg-surface-paper transition-all duration-200">
+                            <span class="text-xs font-semibold text-text-tertiary uppercase tracking-wider group-hover:text-brand-primary mb-1 block">Previous</span>
+                            <span class="text-lg font-medium text-text-primary">{prevDoc.data.title}</span>
+                        </a>
+                    ) : (
+                        <div /> /* Spacer */
+                    )}
+
+                    {nextDoc && (
+                        <a href={`/manual/${nextDoc.slug}`} class="group block p-4 rounded-lg border border-border-default hover:border-brand-primary/50 hover:bg-surface-paper transition-all duration-200 text-right">
+                            <span class="text-xs font-semibold text-text-tertiary uppercase tracking-wider group-hover:text-brand-primary mb-1 block">Next</span>
+                            <span class="text-lg font-medium text-text-primary">{nextDoc.data.title}</span>
+                        </a>
+                    )}
+                </div>
+            </div>
+        </main>
+    </div>
+</Layout>
