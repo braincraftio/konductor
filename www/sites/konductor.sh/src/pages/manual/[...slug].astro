@@ -1,30 +1,31 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import Navbar from '../../components/Navbar';
+import Sidebar from '../../components/Sidebar';
 import { getCollection } from 'astro:content';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
-  return docs.map(entry => ({
+  return docs.map((entry: any) => ({
     params: { slug: entry.slug },
     props: { entry, allDocs: docs },
   }));
 }
 
-const { entry, allDocs } = Astro.props;
+const { entry, allDocs } = Astro.props as any;
 const { Content } = await entry.render();
 
 // Group docs by section for the sidebar
-const groupedDocs = allDocs.reduce((acc, doc) => {
-    const section = doc.data.section;
-    if (!acc[section]) acc[section] = [];
-    acc[section].push(doc);
-    return acc;
-}, {} as Record<string, typeof allDocs>);
+const groupedDocs = (allDocs as any[]).reduce((acc: Record<string, any[]>, doc: any) => {
+  const section = doc.data.section;
+  if (!acc[section]) acc[section] = [];
+  acc[section].push(doc);
+  return acc;
+}, {});
 
 // Sort order within groups
-Object.values(groupedDocs).forEach(group => {
-    group.sort((a, b) => a.data.order - b.data.order);
+Object.values(groupedDocs).forEach((group: any) => {
+  group.sort((a: any, b: any) => a.data.order - b.data.order);
 });
 
 // Section order
@@ -33,19 +34,16 @@ const sections = ['Getting Started', 'Core Concepts', 'Guides', 'Reference'];
 // Flatten docs for pagination
 const flatDocs = sections
   .flatMap(section => groupedDocs[section] || [])
-  .sort((a, b) => {
-    // Custom sort order based on sections then internal order
+  .sort((a: any, b: any) => {
     const sectionIdxA = sections.indexOf(a.data.section);
     const sectionIdxB = sections.indexOf(b.data.section);
     if (sectionIdxA !== sectionIdxB) return sectionIdxA - sectionIdxB;
     return a.data.order - b.data.order;
   });
 
-const currentIndex = flatDocs.findIndex(doc => doc.slug === entry.slug);
+const currentIndex = flatDocs.findIndex((doc: any) => doc.slug === entry.slug);
 const prevDoc = currentIndex > 0 ? flatDocs[currentIndex - 1] : null;
 const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] : null;
-
-import Sidebar from '../../components/Sidebar';
 ---
 
 <Layout>
@@ -62,22 +60,52 @@ import Sidebar from '../../components/Sidebar';
 
         <!-- Main Content -->
         <main class="flex-1 md:pl-64 w-full">
-            <div class="max-w-4xl mx-auto px-6 py-12 md:py-16">
+            <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
                 <!-- Breadcrumbs -->
-                <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8">
+                <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium">
                     <a href="/manual/getting-started/introduction" class="hover:text-text-primary transition-colors">Manual</a>
                     <span>/</span>
-                    <span>{entry.data.section}</span>
+                    <span class="text-text-secondary">{entry.data.section}</span>
                 </div>
 
-                <article class="prose prose-lg prose-slate dark:prose-invert max-w-none 
-                    prose-headings:text-text-primary 
-                    prose-a:text-brand-primary prose-a:no-underline hover:prose-a:underline
-                    prose-code:text-brand-accent prose-code:bg-surface-paper prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
-                    prose-pre:bg-surface-raised prose-pre:border prose-pre:border-border-default prose-pre:shadow-lg
+                <article class="prose prose-lg prose-slate dark:prose-invert max-w-none
+                    /* Typography Base */
+                    prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-text-primary
+                    prose-h1:text-4xl prose-h1:mb-6 prose-h1:leading-tight
+                    prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:pb-2 prose-h2:border-b prose-h2:border-border-subtle
+                    prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4
+                    
+                    /* Content Text */
+                    prose-p:text-text-secondary prose-p:leading-8 prose-p:mb-6
+                    prose-strong:text-text-primary prose-strong:font-semibold
+                    prose-ul:text-text-secondary prose-ul:my-6 prose-ul:list-disc prose-ul:pl-6
+                    prose-li:my-2 prose-li:leading-7
+                    
+                    /* Links */
+                    prose-a:text-brand-primary prose-a:font-medium prose-a:no-underline 
+                    prose-a:transition-colors hover:prose-a:text-brand-primary-hover hover:prose-a:underline
+                    
+                    /* Code & Pre */
+                    prose-code:font-mono prose-code:text-sm prose-code:font-medium
+                    prose-code:text-brand-accent prose-code:bg-surface-subtle 
+                    prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md
+                    prose-code:before:content-none prose-code:after:content-none
+                    
+                    prose-pre:bg-slate-900 prose-pre:text-slate-50 prose-pre:rounded-xl 
+                    prose-pre:border prose-pre:border-slate-800 prose-pre:shadow-sm
+                    prose-pre:p-5 prose-pre:my-8 prose-pre:leading-normal
+                    
+                    /* Blockquotes */
+                    prose-blockquote:border-l-4 prose-blockquote:border-brand-primary 
+                    prose-blockquote:bg-surface-subtle/50 prose-blockquote:rounded-r-lg
+                    prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:my-8
+                    prose-blockquote:text-text-secondary prose-blockquote:italic
+                    
+                    /* HR */
+                    prose-hr:border-border-default prose-hr:my-12
                 ">
-                    <h1 class="text-4xl font-bold tracking-tight mb-4">{entry.data.title}</h1>
-                    <p class="text-xl text-text-secondary leading-relaxed mb-12 border-b border-border-subtle pb-8">
+                    <h1 class="text-5xl font-extrabold tracking-tight text-text-primary mb-6">{entry.data.title}</h1>
+                    <p class="text-xl text-text-secondary leading-relaxed mb-10 border-b border-border-default pb-10 font-light">
                         {entry.data.description}
                     </p>
                     
@@ -85,20 +113,30 @@ import Sidebar from '../../components/Sidebar';
                 </article>
 
                 <!-- Pagination -->
-                <div class="mt-16 pt-8 border-t border-border-subtle grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="mt-20 pt-8 border-t border-border-default grid grid-cols-1 md:grid-cols-2 gap-6">
                     {prevDoc ? (
-                        <a href={`/manual/${prevDoc.slug}`} class="group block p-4 rounded-lg border border-border-default hover:border-brand-primary/50 hover:bg-surface-paper transition-all duration-200">
-                            <span class="text-xs font-semibold text-text-tertiary uppercase tracking-wider group-hover:text-brand-primary mb-1 block">Previous</span>
-                            <span class="text-lg font-medium text-text-primary">{prevDoc.data.title}</span>
+                        <a href={`/manual/${prevDoc.slug}`} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300">
+                            <span class="text-xs font-bold text-text-tertiary uppercase tracking-widest group-hover:text-brand-primary mb-2 block transition-colors">Previous</span>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-text-tertiary group-hover:text-brand-primary transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span class="text-lg font-semibold text-text-primary group-hover:text-brand-primary transition-colors">{prevDoc.data.title}</span>
+                            </div>
                         </a>
                     ) : (
                         <div /> /* Spacer */
                     )}
 
                     {nextDoc && (
-                        <a href={`/manual/${nextDoc.slug}`} class="group block p-4 rounded-lg border border-border-default hover:border-brand-primary/50 hover:bg-surface-paper transition-all duration-200 text-right">
-                            <span class="text-xs font-semibold text-text-tertiary uppercase tracking-wider group-hover:text-brand-primary mb-1 block">Next</span>
-                            <span class="text-lg font-medium text-text-primary">{nextDoc.data.title}</span>
+                        <a href={`/manual/${nextDoc.slug}`} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300 text-right">
+                            <span class="text-xs font-bold text-text-tertiary uppercase tracking-widest group-hover:text-brand-primary mb-2 block transition-colors">Next</span>
+                            <div class="flex items-center justify-end gap-2">
+                                <span class="text-lg font-semibold text-text-primary group-hover:text-brand-primary transition-colors">{nextDoc.data.title}</span>
+                                <svg class="w-4 h-4 text-text-tertiary group-hover:text-brand-primary transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
                         </a>
                     )}
                 </div>
