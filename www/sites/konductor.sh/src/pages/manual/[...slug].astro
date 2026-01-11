@@ -54,7 +54,9 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
 ---
 
 <Layout>
-    <Navbar client:load />
+    <div class="fixed top-0 left-0 right-0 z-50">
+       <Navbar client:load />
+    </div>
 
     <div class="flex min-h-screen pt-20">
         <!-- Sidebar (Client Component) -->
@@ -66,7 +68,7 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
         />
 
         <!-- Main Content -->
-        <main class="flex-1 md:pl-64 w-full">
+        <main class="flex-1 w-full transition-all duration-300 ease-spring pl-0 md:pl-[var(--sidebar-width,16rem)]">
             <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
                 <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium justify-between">
                     <div class="flex items-center gap-2">

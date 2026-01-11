@@ -80,6 +80,7 @@
     --text-5xl: clamp(3rem, 2.5rem + 2.5vw, 4rem);
 
     /* Spacing System (8px Grid) */
+    --sidebar-width: 16rem;
     --space-px: 1px;
     --space-0_5: 0.125rem;
     --space-1: 0.25rem;
@@ -221,11 +222,11 @@
 
   /* Dark Theme */
   :root[data-theme="dark"] {
-      --color-surface-base: color-mix(in oklch, var(--slate-900) 95%, var(--lavender-500) 5%);
-      --color-surface-paper: color-mix(in oklch, var(--slate-800) 90%, var(--lavender-400) 10%);
-      --color-surface-raised: color-mix(in oklch, var(--slate-800) 92%, var(--lavender-400) 8%);
-      --color-surface-overlay: color-mix(in oklch, var(--slate-800) 85%, transparent);
-      --color-surface-subtle: color-mix(in oklch, var(--slate-700) 88%, var(--lavender-400) 12%);
+      --color-surface-base: var(--slate-900); /* Removed color-mix for opacity */
+      --color-surface-paper: var(--slate-800); /* Removed color-mix for opacity */
+      --color-surface-raised: var(--slate-700); /* Removed color-mix for opacity */
+      --color-surface-overlay: color-mix(in oklch, var(--slate-800) 95%, transparent); /* Kept for overlay */
+      --color-surface-subtle: var(--slate-700);
 
       --color-text-primary: var(--cream-100);
       --color-text-secondary: var(--cream-300);
@@ -481,6 +482,65 @@
     background: color-mix(in oklch, var(--color-primary) 20%, var(--color-surface-paper));
     color: var(--color-primary);
     border: 1px solid color-mix(in oklch, var(--color-primary) 30%, transparent);
+  }
+  
+  /* Flyout Menus (Strict Opaque Overrides) */
+  .flyout-menu {
+    background-color: var(--cream-100) !important;
+  }
+  :root[data-theme="dark"] .flyout-menu {
+    background-color: var(--slate-900) !important;
+  }
+
+  /* Mobile Menu (Strict Opaque Overrides) */
+  .mobile-menu {
+    background-color: var(--cream-100) !important;
+  }
+  :root[data-theme="dark"] .mobile-menu {
+    background-color: var(--slate-900) !important;
+  }
+
+  /* Navbar Solid (Strict Opaque Overrides) */
+  .navbar-solid {
+    background-color: var(--cream-100) !important;
+  }
+  :root[data-theme="dark"] .navbar-solid {
+    background-color: var(--slate-900) !important;
+  }
+
+  /* Sidebar Solid (Strict Opaque Overrides) */
+  .sidebar-solid {
+    background-color: var(--cream-100) !important;
+  }
+  :root[data-theme="dark"] .sidebar-solid {
+    background-color: var(--slate-900) !important;
+  }
+
+  /* Surface Paper Solid (For floating buttons/cards needing opacity) */
+  .surface-paper-solid {
+    background-color: white !important;
+  }
+  :root[data-theme="dark"] .surface-paper-solid {
+    background-color: var(--slate-800) !important;
+  }
+
+  /* 
+   * Sidebar Toggle Button (Complex Theme Switch)
+   * Light: Brand Gradient + Slate 900 Text
+   * Dark: Solid Paper + Cream Text + Border
+   */
+  .btn-sidebar-toggle {
+    background-image: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: var(--slate-900);
+    border: 1px solid transparent;
+  }
+  
+  :root[data-theme="dark"] .btn-sidebar-toggle {
+    background-image: none !important;
+    background-color: var(--color-surface-paper) !important;
+    color: var(--color-text-primary) !important;
+    border-color: var(--color-border-default) !important;
+    box-shadow: 0 0 15px var(--shadow-lavender) !important; /* Subtle highlight glow for dark mode using semantic token */
   }
 }
 

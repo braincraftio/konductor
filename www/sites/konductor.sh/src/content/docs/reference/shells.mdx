@@ -6,22 +6,11 @@ order: 1
 ---
 
 import { Card, CardGrid, FeatureList, Note } from '../../../components/docs/MDXComponents';
+import { HierarchyDiagram } from '../../../components/docs/HierarchyDiagram';
 
 **Konductor** provides 8 specialized shells designed for different workflows. They follow a compositional hierarchy, where more complex shells inherit from simpler ones.
 
-<div className="my-8 p-6 bg-surface-paper border border-border-default rounded-xl overflow-hidden relative">
-  <div className="absolute top-0 right-0 p-4 opacity-10 font-mono text-6xl font-bold text-text-primary select-none">HIERARCHY</div>
-  <pre className="font-mono text-sm md:text-base text-text-secondary bg-transparent p-0 m-0 border-none shadow-none">
-{`base (default shell)
-  ├─> python (base + Python 3.12 + uv)
-  ├─> go (base + Go 1.24 + workspace setup)
-  ├─> node (base + Node.js 22 + pnpm)
-  ├─> rust (base + Rust 1.82.0 + cargo)
-  ├─> dev (base + neovim + tmux + IDE tools)
-  ├─> full (base + all languages + IDE)
-  └─> konductor (full + docker + qemu + libvirt)`}
-  </pre>
-</div>
+<HierarchyDiagram />
 
 ## Available Shells
 
@@ -79,6 +68,18 @@ Enter any shell using `nix develop .#<name>` (or `konductor#<name>` via registry
         <td className="p-4 font-mono text-xs">. #full</td>
         <td className="p-4">Polyglot env</td>
         <td className="p-4 font-mono text-xs text-text-code">All languages + IDE tools</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">frontend</td>
+        <td className="p-4 font-mono text-xs">. #frontend</td>
+        <td className="p-4">Frontend dev</td>
+        <td className="p-4 font-mono text-xs text-text-code">full + playwright browsers</td>
+      </tr>
+      <tr>
+        <td className="p-4 font-bold text-brand-primary">ci</td>
+        <td className="p-4 font-mono text-xs">. #ci</td>
+        <td className="p-4">CI/CD Runner</td>
+        <td className="p-4 font-mono text-xs text-text-code">full + forgejo-runner + build tools</td>
       </tr>
       <tr>
         <td className="p-4 font-bold text-brand-primary">konductor</td>

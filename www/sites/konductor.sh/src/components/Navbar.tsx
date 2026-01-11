@@ -40,23 +40,13 @@ export default function Navbar() {
 
   return (
     <header  
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b h-20 flex items-center ${
         isScrolled 
-          ? 'bg-surface-paper/90 backdrop-blur-md border-border-subtle py-3 shadow-sm' 
-          : 'bg-transparent border-transparent py-5'
+          ? 'navbar-solid border-border-subtle shadow-sm' 
+          : 'bg-transparent border-transparent'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        {/* Logo / Home */}
-        <a href="/" className="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary rounded-lg p-1">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-slate-800 font-mono font-bold text-lg shadow-lg group-hover:scale-105 transition-transform duration-300">
-            K
-          </div>
-          <span className="font-bold text-lg tracking-tight text-text-primary group-hover:text-brand-primary transition-colors">
-            Konductor<span className="text-text-tertiary">.sh</span>
-          </span>
-        </a>
-
+      <div className="w-full max-w-7xl mx-auto px-6 flex items-center justify-end h-full">
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8">
           <div className="flex items-center gap-6 border-r border-border-subtle pr-6 mr-2">
@@ -64,7 +54,9 @@ export default function Navbar() {
               <a
                 key={link.name}
                 href={link.href}
-                className="text-sm font-medium text-text-secondary hover:text-brand-primary transition-colors hover:-translate-y-0.5 transform duration-200"
+                className={`text-sm font-medium transition-colors hover:-translate-y-0.5 transform duration-200 ${
+                  isScrolled ? 'text-text-secondary hover:text-brand-primary' : 'text-text-secondary hover:text-brand-primary'
+                }`}
               >
                 {link.name}
               </a>
@@ -120,7 +112,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-surface-paper border-b border-border-subtle shadow-xl p-6 space-y-6 animate-in slide-in-from-top-2 duration-200">
+        <div className="md:hidden absolute top-full left-0 right-0 mobile-menu border-b border-border-subtle shadow-xl p-6 space-y-6 animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col gap-4">
             {navLinks.map((link) => (
               <a
