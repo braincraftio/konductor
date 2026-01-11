@@ -29,9 +29,9 @@ export const CardGrid = ({ children }: { children: React.ReactNode }) => {
 
 export const FeatureList = ({ items }: { items: { title: string, description: string, icon?: string }[] }) => {
     return (
-        <div className="grid grid-cols-1 gap-4 my-8 not-prose">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-8 not-prose">
             {items.map((item, idx) => (
-                <div key={idx} className="flex gap-4 p-4 rounded-lg bg-surface-subtle/50 border border-border-subtle">
+                <div key={idx} className="flex gap-4 p-4 rounded-lg bg-surface-subtle/50 border border-border-subtle hover:bg-surface-subtle transition-colors duration-200">
                     {item.icon && (
                         <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
                             {item.icon}

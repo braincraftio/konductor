@@ -74,7 +74,6 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                         <span>/</span>
                         <span class="text-text-secondary">{entry.data.section}</span>
                     </div>
-                    <CopyButton client:load label="Copy Page" />
                 </div>
 
                 <article class="prose prose-lg prose-slate dark:prose-invert max-w-none
@@ -117,10 +116,19 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                     /* HR */
                     prose-hr:border-border-default prose-hr:my-12
                 ">
-                    <h1 class="text-5xl font-extrabold tracking-tight text-text-primary mb-6">{entry.data.title}</h1>
-                    <p class="text-xl text-text-secondary leading-relaxed mb-10 border-b border-border-default pb-10 font-light">
+                    <div class="flex items-start justify-between gap-4 mb-6">
+                        <h1 class="text-5xl font-extrabold tracking-tight text-text-primary m-0">{entry.data.title}</h1>
+                        <div class="mt-2">
+                            <CopyButton client:load label="Copy Page" />
+                        </div>
+                    </div>
+                    
+                    <p class="text-xl text-text-secondary leading-relaxed mb-10 font-light">
                         {entry.data.description}
                     </p>
+                    
+                    <!-- Gradient Divider -->
+                    <div class="w-full h-px bg-gradient-to-r from-transparent via-text-tertiary/30 to-transparent mb-12"></div>
                     
                     <Content components={components} />
                 </article>

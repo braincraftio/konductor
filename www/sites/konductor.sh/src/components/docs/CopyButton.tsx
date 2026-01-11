@@ -27,10 +27,10 @@ export default function CopyButton({ text, label = 'Copy', className = '' }: { t
   return (
     <button
       onClick={handleCopy}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-300 ${
         copied 
-          ? 'bg-success-bg text-success-base border border-success-border' 
-          : 'bg-surface-subtle text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-default hover:border-border-strong'
+          ? 'bg-success-bg text-success-base border border-success-border shadow-sm' 
+          : 'bg-surface-paper text-text-secondary hover:text-text-primary border border-border-default hover:border-border-strong shadow-sm hover:shadow-md hover:-translate-y-0.5'
       } ${className}`}
     >
       {copied ? (
