@@ -39,6 +39,21 @@ target/
 
 # Node.js
 node_modules/
+pnpm-lock.yaml
+
+# =============================================================================
+# Astro Websites
+# =============================================================================
+# Build cache
+**/.astro/
+**/dist/
+
+# Test results
+**/test-results/
+**/test-results/**/
+
+# Playwright
+.playwright/
 
 # =============================================================================
 # Editors & IDEs
