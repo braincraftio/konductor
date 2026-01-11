@@ -356,6 +356,14 @@
       font-size: 0.875em;
       white-space: nowrap; /* Prevent breaking inline code awkwardly */
   }
+
+  /* Specific override for inline code inside cards/white backgrounds in light mode */
+  :root:not([data-theme="dark"]) .card :not(pre):not(.astro-code) > code,
+  :root:not([data-theme="dark"]) .prose :not(pre):not(.astro-code) > code {
+      color: #7e22ce; /* purple-700 - accessible contrast */
+      background-color: #faf5ff; /* purple-50 - matches DataFlow diagram */
+      border-color: #f3e8ff; /* purple-100 - matches DataFlow diagram */
+  }
 }
 
 @layer components {

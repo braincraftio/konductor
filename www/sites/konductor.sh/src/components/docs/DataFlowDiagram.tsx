@@ -4,7 +4,7 @@ export const DataFlowDiagram = () => {
   return (
     <div className="my-8 rounded-xl border border-border-default bg-surface-raised shadow-lg relative overflow-hidden transition-all duration-300 hover:shadow-xl">
       {/* Background decoration */}
-      <div className="absolute top-0 right-0 p-4 opacity-[0.03] dark:opacity-[0.05] font-mono text-6xl font-bold text-text-primary select-none pointer-events-none">
+      <div className="absolute top-0 right-0 p-4 opacity-[0.12] dark:opacity-[0.05] font-mono text-6xl font-bold text-text-primary select-none pointer-events-none">
         DATA FLOW
       </div>
       
@@ -13,9 +13,9 @@ export const DataFlowDiagram = () => {
         
         {/* Step 1 */}
         <div className="flex items-start gap-4 group">
-          <div className="w-8 h-8 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-brand-primary/20 shadow-sm">1</div>
+          <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border border-purple-200 dark:bg-brand-primary/10 dark:text-brand-primary dark:border-brand-primary/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-purple-200 dark:group-hover:bg-brand-primary/20 shadow-sm">1</div>
           <div className="pt-1">
-            <code className="text-brand-primary font-bold bg-brand-primary/5 px-1.5 py-0.5 rounded border border-brand-primary/10">src/lib/versions.nix</code>
+            <code className="text-purple-700 bg-purple-50 border-purple-100 dark:text-brand-primary font-bold dark:bg-brand-primary/5 px-1.5 py-0.5 rounded border dark:border-brand-primary/10">src/lib/versions.nix</code>
             <div className="text-text-secondary text-xs mt-1.5 font-sans">Single Source of Truth (Data)</div>
           </div>
         </div>
@@ -25,9 +25,9 @@ export const DataFlowDiagram = () => {
 
         {/* Step 2 */}
         <div className="flex items-start gap-4 group">
-          <div className="w-8 h-8 rounded-full bg-brand-secondary/10 text-brand-secondary border border-brand-secondary/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-brand-secondary/20 shadow-sm">2</div>
+          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-brand-secondary/10 dark:text-brand-secondary dark:border-brand-secondary/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-200 dark:group-hover:bg-brand-secondary/20 shadow-sm">2</div>
           <div className="pt-1">
-            <code className="text-brand-secondary font-bold bg-brand-secondary/5 px-1.5 py-0.5 rounded border border-brand-secondary/10">src/packages/</code>
+            <code className="text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-brand-secondary font-bold dark:bg-brand-secondary/5 px-1.5 py-0.5 rounded border dark:border-brand-secondary/10">src/packages/</code>
             <div className="text-text-secondary text-xs mt-1.5 font-sans">Package Composition Logic</div>
           </div>
         </div>
@@ -37,9 +37,9 @@ export const DataFlowDiagram = () => {
 
         {/* Step 3 */}
         <div className="flex items-start gap-4 group">
-          <div className="w-8 h-8 rounded-full bg-brand-accent/10 text-brand-accent border border-brand-accent/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-brand-accent/20 shadow-sm">3</div>
+          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 border border-orange-200 dark:bg-brand-accent/10 dark:text-brand-accent dark:border-brand-accent/20 flex items-center justify-center font-bold shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-200 dark:group-hover:bg-brand-accent/20 shadow-sm">3</div>
           <div className="pt-1">
-            <code className="text-brand-accent font-bold bg-brand-accent/5 px-1.5 py-0.5 rounded border border-brand-accent/10">src/devshells/</code>
+            <code className="text-orange-700 bg-orange-50 border-orange-100 dark:text-brand-accent font-bold dark:bg-brand-accent/5 px-1.5 py-0.5 rounded border dark:border-brand-accent/10">src/devshells/</code>
             <div className="text-text-secondary text-xs mt-1.5 font-sans">Environment Definitions</div>
           </div>
         </div>
