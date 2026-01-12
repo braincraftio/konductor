@@ -7,7 +7,9 @@ import {
   Code, 
   Menu,
   X,
-  Home
+  Home,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface DocEntry {
@@ -36,46 +38,92 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
 const normalizeSlug = (slug: string) => slug.replace(/^\/|\/$/g, '').toLowerCase();
 
 export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Check localStorage specifically for manual interaction
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-collapsed');
+      return stored === 'true';
+    }
+    return false; // Default expanded
+  });
+
+  const toggleSidebar = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem('sidebar-collapsed', String(newState));
+  };
+  
+  // Sync main content padding with sidebar state
+  // We attach to 'astro:page-load' to ensure this runs every time the page swaps content
+  // in addition to running when 'isCollapsed' changes.
+  useEffect(() => {
+    const updateLayout = () => {
+      const main = document.querySelector('main');
+      if (main) {
+        if (isCollapsed) {
+          main.classList.remove('md:pl-64');
+          main.classList.add('md:pl-20');
+        } else {
+          main.classList.remove('md:pl-20');
+          main.classList.add('md:pl-64');
+        }
+      }
+    };
+
+    // Run immediately
+    updateLayout();
+
+    // Run on subsequent navigations (View Transitions)
+    // The Sidebar persists, so this effect doesn't re-run automatically on nav unless we listen.
+    document.addEventListener('astro:page-load', updateLayout);
+    
+    return () => {
+        document.removeEventListener('astro:page-load', updateLayout);
+    };
+  }, [isCollapsed]);
+
   const [search, setSearch] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFlyout, setActiveFlyout] = useState<string | null>(null);
   const [searchFlyoutOpen, setSearchFlyoutOpen] = useState(false);
 
-  // Normalize current slug for comparison
-  const normalizedCurrentSlug = normalizeSlug(currentSlug);
+  const [activeSlug, setActiveSlug] = useState(currentSlug);
 
-  // Handle CSS variable for layout
   useEffect(() => {
-    // Only update on desktop breakpoint
-    const updateLayout = () => {
-        if (window.innerWidth >= 768) {
-            const width = isCollapsed ? '5rem' : '16rem';
-            document.documentElement.style.setProperty('--sidebar-width', width);
-        } else {
-            // On mobile, sidebar is fixed/overlay, so layout padding should be 0 or standard
-            document.documentElement.style.removeProperty('--sidebar-width');
-        }
+    // Update active slug on navigation
+    setActiveSlug(currentSlug);
+    
+    // Also listen to Astro navigation events if props don't update automatically
+    const handleNav = () => {
+         const path = window.location.pathname;
+         const match = path.match(/\/manual\/(.+)/);
+         if (match) {
+             setActiveSlug(match[1].replace(/\/$/, ''));
+         }
     };
+    
+    document.addEventListener('astro:page-load', handleNav);
+    return () => document.removeEventListener('astro:page-load', handleNav);
+  }, [currentSlug]);
 
-    updateLayout();
-    window.addEventListener('resize', updateLayout);
-    return () => window.removeEventListener('resize', updateLayout);
-  }, [isCollapsed]);
+  // Normalize active slug for comparison
+  const normalizedCurrentSlug = normalizeSlug(activeSlug);
 
-  // Filter docs based on search term
   const filteredGroups = useMemo(() => {
     if (!search.trim()) return groupedDocs;
-    const query = search.toLowerCase();
+    const lowerSearch = search.toLowerCase();
     const filtered: Record<string, DocEntry[]> = {};
-    Object.keys(groupedDocs).forEach(section => {
-      const matches = groupedDocs[section].filter(doc => 
-        doc.data.title.toLowerCase().includes(query)
+    
+    Object.keys(groupedDocs).forEach(key => {
+      const docs = groupedDocs[key].filter(doc => 
+        doc.data.title.toLowerCase().includes(lowerSearch)
       );
-      if (matches.length > 0) filtered[section] = matches;
+      if (docs.length > 0) {
+        filtered[key] = docs;
+      }
     });
     return filtered;
-  }, [search, groupedDocs]);
+  }, [groupedDocs, search]);
 
   return (
     <>
@@ -83,7 +131,7 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
       <div className="fixed top-24 left-4 z-[60] md:hidden">
         <button 
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 surface-paper-solid border border-border-default rounded-md shadow-sm text-text-secondary"
+          className="btn-secondary p-2 surface-paper-solid rounded-md shadow-sm"
         >
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -99,15 +147,15 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
       >
         {/* Top Control Bar (Within Sidebar) */}
         <div className={`
-           h-20 flex items-center border-b border-border-subtle shrink-0 transition-all duration-300 z-[61] sidebar-solid
+           h-20 flex items-center border-b border-border-subtle shrink-0 transition-all duration-300 z-[61] sidebar-solid overflow-hidden
            ${isCollapsed ? 'justify-center px-0' : 'px-4'}
         `}>
            {/* Unified Toggle/Brand Button */}
            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={toggleSidebar}
               className={`
                 group flex items-center justify-center rounded-xl transition-all duration-300 ease-spring shadow-sm hover:shadow-md
-                font-bold font-sans btn-sidebar-toggle
+                font-bold font-sans btn-sidebar-toggle whitespace-nowrap
                 ${isCollapsed ? 'w-12 h-12 p-0' : 'w-full h-12 px-0'}
               `}
               title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -115,7 +163,7 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
               <div className="flex items-baseline text-lg">
                 <span>K</span>
                 <span className={`
-                  overflow-hidden transition-all duration-500 ease-in-out whitespace-nowrap
+                  transition-all duration-500 ease-in-out whitespace-nowrap overflow-hidden
                   ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'}
                 `}>
                   onductor.sh
@@ -124,18 +172,13 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
            </button>
         </div>
         
-        {/* 
-            Sidebar Content 
-            CRITICAL FIX: 
-            We need overflow-visible when collapsed so flyouts can pop out.
-            We need overflow-hidden (or auto) when expanded so we can scroll the list.
-        */}
+        {/* Sidebar Content */}
         <div className={`flex-1 flex flex-col p-4 ${isCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
           
           {/* Navigation Container */}
           <nav className={`flex-1 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto no-scrollbar'} space-y-2 pb-20`}>
 
-            {/* 1. Search UI (MOVED TO TOP) */}
+            {/* 1. Search UI */}
             <div 
               className={`relative mb-2 transition-all duration-300 ${isCollapsed ? 'mt-4' : 'mt-4'}`}
               onMouseEnter={() => isCollapsed && setSearchFlyoutOpen(true)}
@@ -217,7 +260,7 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
               )}
             </div>
             
-            {/* 2. Home Link (MOVED BELOW SEARCH) */}
+            {/* 2. Home Link */}
             <div className="relative group">
                <a 
                  href="/"
@@ -233,7 +276,6 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
                  <Home size={isCollapsed ? 24 : 18} />
                  {!isCollapsed && <span className="text-sm font-medium">Home</span>}
                </a>
-               {/* No Tooltip for Home anymore */}
             </div>
 
             {/* 3. Doc Sections */}
@@ -260,8 +302,8 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
                       }
                   `}>
                     <Icon 
-                        size={isCollapsed ? 24 : 16} 
-                        className={`transition-colors duration-200 ${isActiveGroup ? 'text-brand-primary' : 'group-hover:text-text-primary'}`} 
+                      size={isCollapsed ? 24 : 16} 
+                      className={`transition-colors duration-200 ${isActiveGroup ? 'text-brand-primary' : 'group-hover:text-text-primary'}`} 
                     />
                     {!isCollapsed && (
                       <h5 className="text-xs font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden">
@@ -333,6 +375,27 @@ export default function Sidebar({ sections, groupedDocs, currentSlug }: SidebarP
               );
             })}
           </nav>
+
+          {/* Bottom Collapse Toggle (Carrot) */}
+          <div className="pt-4 border-t border-border-subtle mt-auto">
+             <button
+               onClick={toggleSidebar}
+               className={`
+                 w-full flex items-center justify-center p-2 rounded-lg text-text-tertiary hover:text-brand-primary hover:bg-surface-subtle transition-all duration-200 group
+                 ${isCollapsed ? 'aspect-square' : 'h-10'}
+               `}
+               title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+             >
+                {isCollapsed ? (
+                  <ChevronRight size={20} className="transition-transform group-hover:scale-110" />
+                ) : (
+                  <div className="flex items-center gap-3 w-full px-2">
+                    <ChevronLeft size={20} className="transition-transform group-hover:-translate-x-1" />
+                    <span className="text-sm font-medium">Collapse Sidebar</span>
+                  </div>
+                )}
+             </button>
+          </div>
         </div>
       </aside>
       

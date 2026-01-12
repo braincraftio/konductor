@@ -1,15 +1,64 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import { getCollection } from 'astro:content';
+
+// Fetch docs for the sidebar
+const allDocs = await getCollection('docs');
+
+// Group docs by section for the sidebar
+const groupedDocs = allDocs.reduce((acc: Record<string, any[]>, doc: any) => {
+  const section = doc.data.section;
+  if (!acc[section]) acc[section] = [];
+  acc[section].push(doc);
+  return acc;
+}, {});
+
+// Sort order within groups
+Object.values(groupedDocs).forEach((group: any) => {
+  group.sort((a: any, b: any) => a.data.order - b.data.order);
+});
+
+// Section order
+const sections = ['Getting Started', 'Core Concepts', 'Guides', 'Reference'];
 ---
 
 <Layout>
-    <Navbar client:load />
+    <div class="fixed top-0 left-0 right-0 z-50">
+       <Navbar client:load />
+    </div>
 
-    <main class="min-h-screen flex flex-col items-center pt-24 md:pt-32 p-4 md:p-8">
-        <div class="max-w-3xl w-full space-y-16 pb-24">
-            <!-- Header -->
-            <header class="space-y-6 text-center md:text-left">
+    <div class="flex min-h-screen pt-20">
+        <Sidebar 
+            client:load 
+            transition:persist="sidebar-main"
+            sections={sections} 
+            groupedDocs={groupedDocs} 
+            currentSlug="about" 
+        />
+
+        <main class="flex-1 w-full transition-all duration-300 ease-spring pl-0 md:pl-64" transition:animate="fade">
+            <script is:inline>
+                (function() {
+                   if (window.innerWidth >= 768) {
+                       const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+                       const main = document.currentScript ? document.currentScript.parentElement : document.querySelector('main');
+                       if (main) {
+                           if (isCollapsed) {
+                               main.classList.remove('md:pl-64');
+                               main.classList.add('md:pl-20');
+                           } else {
+                               main.classList.remove('md:pl-20');
+                               main.classList.add('md:pl-64');
+                           }
+                       }
+                   }
+                })();
+            </script>
+            <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
+                <!-- Header -->
+                <header class="space-y-6 text-center md:text-left">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-paper border border-border-default shadow-sm text-sm font-medium text-text-secondary">
                     <span class="w-2 h-2 rounded-full bg-brand-primary"></span>
                     The Philosophy
@@ -74,7 +123,7 @@ import Navbar from '../components/Navbar';
                             You can continue to lease your productivity from vendors who profit from your lock-in. Or you can own your stack.
                         </p>
                         <div class="flex gap-4 pt-4">
-                             <a href="/" class="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-text-inverse bg-brand-primary rounded-lg hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20">
+                             <a href="/manual" class="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-text-inverse bg-brand-primary rounded-lg hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20">
                                 Join the Resistance
                             </a>
                         </div>
@@ -82,6 +131,7 @@ import Navbar from '../components/Navbar';
 
                 </div>
             </article>
-        </div>
-    </main>
+            </div>
+        </main>
+    </div>
 </Layout>

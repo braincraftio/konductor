@@ -222,36 +222,37 @@
 
   /* Dark Theme */
   :root[data-theme="dark"] {
-      --color-surface-base: var(--slate-900); /* Removed color-mix for opacity */
-      --color-surface-paper: var(--slate-800); /* Removed color-mix for opacity */
-      --color-surface-raised: var(--slate-700); /* Removed color-mix for opacity */
-      --color-surface-overlay: color-mix(in oklch, var(--slate-800) 95%, transparent); /* Kept for overlay */
+      --color-surface-base: var(--slate-900);
+      --color-surface-paper: var(--slate-800);
+      --color-surface-raised: var(--slate-700);
+      --color-surface-overlay: color-mix(in oklch, var(--slate-800) 90%, transparent);
       --color-surface-subtle: var(--slate-700);
 
       --color-text-primary: var(--cream-100);
-      --color-text-secondary: var(--cream-300);
+      --color-text-secondary: var(--cream-200);
       --color-text-tertiary: var(--slate-400);
       --color-text-disabled: var(--slate-500);
       --color-text-inverse: var(--slate-900);
 
-      --color-border-subtle: color-mix(in oklch, var(--slate-700) 70%, transparent);
-      --color-border-default: var(--slate-700);
-      --color-border-strong: var(--slate-600);
+      /* Aurora Signature: Lavender-tinted borders for Dark Mode */
+      --color-border-subtle: color-mix(in oklch, var(--slate-700), var(--lavender-400) 15%);
+      --color-border-default: color-mix(in oklch, var(--slate-600), var(--lavender-400) 20%);
+      --color-border-strong: color-mix(in oklch, var(--slate-500), var(--lavender-400) 25%);
 
-      --color-primary: var(--lavender-300);
-      --color-primary-hover: var(--lavender-400);
+      --color-primary: var(--lavender-400);
+      --color-primary-hover: var(--lavender-300);
       --color-primary-active: var(--lavender-500);
 
-      --color-secondary: var(--mint-300);
-      --color-secondary-hover: var(--mint-400);
+      --color-secondary: var(--mint-400);
+      --color-secondary-hover: var(--mint-300);
       --color-secondary-active: var(--mint-500);
 
-      --color-accent: var(--peach-300);
-      --color-accent-hover: var(--peach-400);
+      --color-accent: var(--peach-400);
+      --color-accent-hover: var(--peach-300);
       --color-accent-active: var(--peach-500);
 
-      --color-focus: var(--sky-300);
-      --color-focus-ring: color-mix(in oklch, var(--sky-300) 30%, transparent);
+      --color-focus: var(--sky-400);
+      --color-focus-ring: color-mix(in oklch, var(--sky-400) 30%, transparent);
 
       --color-success: var(--success-light);
       --color-success-bg: color-mix(in oklch, var(--success-dark) 20%, var(--slate-800));
@@ -302,8 +303,8 @@
   .astro-code, pre {
     padding: var(--space-4) !important;
     border-radius: var(--radius-lg) !important;
-    background-color: var(--slate-900) !important; /* Force dark background */
-    border: 1px solid var(--slate-700) !important;
+    background-color: var(--slate-900) !important; /* Keep deep slate for code */
+    border: 1px solid var(--color-border-subtle) !important; /* Use tinted border */
     overflow-x: auto !important;
     margin: var(--space-4) 0 !important;
     box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3) !important; /* Inner shadow for depth */
@@ -347,7 +348,7 @@
     border: none !important;
   }
   
-  /* Inline code styling override */
+  /* Inline code styling override - Dark Mode Specifics handled via vars */
   :not(pre):not(.astro-code) > code {
       background-color: var(--color-surface-subtle);
       color: var(--color-primary);
@@ -420,6 +421,29 @@
     box-shadow: var(--shadow-sm);
   }
 
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-text-secondary);
+    box-shadow: none;
+    padding: var(--space-2);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-subtle);
+    color: var(--color-text-primary);
+  }
+
+  /* Button Variants (Shape) */
+  .btn-icon {
+    padding: var(--space-2);
+    aspect-ratio: 1;
+  }
+  
+  .btn-circle {
+    border-radius: var(--radius-full);
+    padding: var(--space-2);
+    aspect-ratio: 1;
+  }
+
   /* Cards */
   .card {
     background: var(--color-surface-paper);
@@ -435,6 +459,31 @@
     transform: translateY(var(--translate-hover));
     box-shadow: var(--shadow-md);
     border-color: var(--color-border-default);
+  }
+
+  /* Gradient Border Card (Special Highlight) */
+  .card-gradient {
+    position: relative;
+    background: var(--color-surface-paper);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-md);
+    z-index: var(--z-base);
+  }
+  
+  .card-gradient::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    border-radius: calc(var(--radius-xl) + 2px);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    opacity: 0.5;
+    transition: opacity var(--duration-normal);
+  }
+  
+  .card-gradient:hover::before {
+    opacity: 1;
   }
 
   /* Feature Card (from example) */
@@ -477,11 +526,25 @@
     font-weight: var(--font-medium);
     border-radius: var(--radius-full);
     white-space: nowrap;
+    border: 1px solid transparent;
   }
+  
   .badge-primary {
     background: color-mix(in oklch, var(--color-primary) 20%, var(--color-surface-paper));
     color: var(--color-primary);
-    border: 1px solid color-mix(in oklch, var(--color-primary) 30%, transparent);
+    border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  }
+  
+  .badge-secondary {
+    background: color-mix(in oklch, var(--color-secondary) 20%, var(--color-surface-paper));
+    color: var(--color-secondary-active);
+    border-color: color-mix(in oklch, var(--color-secondary) 30%, transparent);
+  }
+  
+  .badge-accent {
+    background: color-mix(in oklch, var(--color-accent) 20%, var(--color-surface-paper));
+    color: var(--color-accent-active);
+    border-color: color-mix(in oklch, var(--color-accent) 30%, transparent);
   }
   
   /* Flyout Menus (Strict Opaque Overrides) */
@@ -489,7 +552,8 @@
     background-color: var(--cream-100) !important;
   }
   :root[data-theme="dark"] .flyout-menu {
-    background-color: var(--slate-900) !important;
+    background-color: var(--color-surface-raised) !important;
+    border: 1px solid var(--color-border-default) !important;
   }
 
   /* Mobile Menu (Strict Opaque Overrides) */
@@ -497,7 +561,8 @@
     background-color: var(--cream-100) !important;
   }
   :root[data-theme="dark"] .mobile-menu {
-    background-color: var(--slate-900) !important;
+    background-color: var(--color-surface-raised) !important;
+    border-bottom: 1px solid var(--color-border-subtle) !important;
   }
 
   /* Navbar Solid (Strict Opaque Overrides) */
@@ -505,7 +570,8 @@
     background-color: var(--cream-100) !important;
   }
   :root[data-theme="dark"] .navbar-solid {
-    background-color: var(--slate-900) !important;
+    background-color: var(--color-surface-paper) !important; /* Distinct from base */
+    border-bottom: 1px solid var(--color-border-subtle) !important;
   }
 
   /* Sidebar Solid (Strict Opaque Overrides) */
@@ -513,7 +579,8 @@
     background-color: var(--cream-100) !important;
   }
   :root[data-theme="dark"] .sidebar-solid {
-    background-color: var(--slate-900) !important;
+    background-color: var(--color-surface-paper) !important; /* Distinct from base */
+    border-right: 1px solid var(--color-border-subtle) !important;
   }
 
   /* Surface Paper Solid (For floating buttons/cards needing opacity) */
@@ -521,7 +588,7 @@
     background-color: white !important;
   }
   :root[data-theme="dark"] .surface-paper-solid {
-    background-color: var(--slate-800) !important;
+    background-color: var(--color-surface-raised) !important;
   }
 
   /* 

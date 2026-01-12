@@ -20,15 +20,26 @@ export default function Navbar() {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    // Theme handler
-    const storedTheme = localStorage.getItem('aurora-theme');
-    // Default to 'light' if no stored preference, ignoring system preference
-    const initialTheme = (storedTheme as 'light' | 'dark') || 'light';
-    
-    setTheme(initialTheme);
-    document.documentElement.setAttribute('data-theme', initialTheme);
+    // Theme initialization function
+    const initTheme = () => {
+      const storedTheme = localStorage.getItem('aurora-theme');
+      // Use 'light' as fallback if no stored preference
+      const currentTheme = (storedTheme as 'light' | 'dark') || 'light';
+      
+      setTheme(currentTheme);
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    };
 
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Run on mount
+    initTheme();
+
+    // Listen for Astro page transitions to re-apply theme
+    document.addEventListener('astro:after-swap', initTheme);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('astro:after-swap', initTheme);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -78,7 +89,7 @@ export default function Navbar() {
             
             <button
                 onClick={toggleTheme}
-                className="p-2 ml-2 rounded-full text-text-secondary hover:text-brand-primary hover:bg-surface-subtle transition-all duration-200"
+                className="btn-ghost btn-circle ml-2 transition-all duration-200"
                 aria-label="Toggle theme"
             >
                 {theme === 'light' ? (
@@ -97,7 +108,7 @@ export default function Navbar() {
         {/* Mobile Menu Toggle */}
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-md"
+          className="md:hidden btn-ghost rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
           aria-label="Toggle menu"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

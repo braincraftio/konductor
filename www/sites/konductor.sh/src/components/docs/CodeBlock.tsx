@@ -4,7 +4,7 @@ export default function CodeBlock({ children, className = '' }: { children: Reac
   return (
     <div className={`relative group code-block-wrapper ${className}`}>
       <button
-        className="copy-code-button absolute top-3 right-3 p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+        className="copy-code-button absolute top-3 right-3 p-2 rounded-lg bg-surface-paper border border-border-default text-text-secondary hover:text-text-primary hover:bg-surface-subtle transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
         aria-label="Copy code"
       >
         <span className="copy-icon">
@@ -13,7 +13,7 @@ export default function CodeBlock({ children, className = '' }: { children: Reac
           </svg>
         </span>
         <span className="check-icon hidden">
-          <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </span>

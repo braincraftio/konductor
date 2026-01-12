@@ -73,6 +73,26 @@ export default {
 				focus: {
 					DEFAULT: 'var(--color-focus)',
 					ring: 'var(--color-focus-ring)',
+				},
+				success: {
+					DEFAULT: 'var(--color-success)',
+					bg: 'var(--color-success-bg)',
+					border: 'var(--color-success-border)',
+				},
+				warning: {
+					DEFAULT: 'var(--color-warning)',
+					bg: 'var(--color-warning-bg)',
+					border: 'var(--color-warning-border)',
+				},
+				danger: {
+					DEFAULT: 'var(--color-danger)',
+					bg: 'var(--color-danger-bg)',
+					border: 'var(--color-danger-border)',
+				},
+				info: {
+					DEFAULT: 'var(--color-info)',
+					bg: 'var(--color-info-bg)',
+					border: 'var(--color-info-border)',
 				}
 			},
 			fontFamily: {

@@ -11,7 +11,7 @@ export const Pre = (props: any) => {
 
 export const Card = ({ children, title, icon, className = '' }: { children: React.ReactNode, title?: string, icon?: string, className?: string }) => {
     return (
-        <div className={`p-6 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 not-prose ${className}`}>
+        <div className={`card not-prose ${className}`}>
             {icon && <div className="text-3xl mb-4">{icon}</div>}
             {title && <h3 className="text-lg font-bold text-text-primary mb-2">{title}</h3>}
             <div className="text-text-secondary leading-relaxed">{children}</div>
@@ -48,6 +48,7 @@ export const FeatureList = ({ items }: { items: { title: string, description: st
 };
 
 export const Note = ({ children, type = 'info', title }: { children: React.ReactNode, type?: 'info' | 'warning' | 'danger' | 'success', title?: string }) => {
+    // These should rely on the configured Tailwind theme classes which map to CSS variables
     const styles = {
         info: "bg-info-bg border-info-border text-text-secondary",
         warning: "bg-warning-bg border-warning-border text-text-secondary",

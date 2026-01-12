@@ -1,6 +1,27 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import { getCollection } from 'astro:content';
+
+// Fetch docs for the sidebar
+const allDocs = await getCollection('docs');
+
+// Group docs by section for the sidebar
+const groupedDocs = allDocs.reduce((acc: Record<string, any[]>, doc: any) => {
+  const section = doc.data.section;
+  if (!acc[section]) acc[section] = [];
+  acc[section].push(doc);
+  return acc;
+}, {});
+
+// Sort order within groups
+Object.values(groupedDocs).forEach((group: any) => {
+  group.sort((a: any, b: any) => a.data.order - b.data.order);
+});
+
+// Section order
+const sections = ['Getting Started', 'Core Concepts', 'Guides', 'Reference'];
 
 // Data derived from src/lib/versions.nix
 const specs = {
@@ -24,21 +45,49 @@ const specs = {
 ---
 
 <Layout>
-    <Navbar client:load />
+    <div class="fixed top-0 left-0 right-0 z-50">
+       <Navbar client:load />
+    </div>
 
-    <main class="min-h-screen flex flex-col items-center pt-24 md:pt-32 p-4 md:p-8 bg-surface-base">
-        <div class="max-w-5xl w-full space-y-16 pb-24">
-            <!-- Header -->
-            <header class="space-y-6 text-center md:text-left">
+    <div class="flex min-h-screen pt-20">
+        <Sidebar 
+            client:load 
+            transition:persist="sidebar-main"
+            sections={sections} 
+            groupedDocs={groupedDocs} 
+            currentSlug="specs" 
+        />
+
+        <main class="flex-1 w-full transition-all duration-300 ease-spring pl-0 md:pl-64" transition:animate="fade">
+            <script is:inline>
+                (function() {
+                   if (window.innerWidth >= 768) {
+                       const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+                       const main = document.currentScript ? document.currentScript.parentElement : document.querySelector('main');
+                       if (main) {
+                           if (isCollapsed) {
+                               main.classList.remove('md:pl-64');
+                               main.classList.add('md:pl-20');
+                           } else {
+                               main.classList.remove('md:pl-20');
+                               main.classList.add('md:pl-64');
+                           }
+                       }
+                   }
+                })();
+            </script>
+            <div class="max-w-5xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
+                <!-- Header -->
+                <header class="space-y-6 text-center md:text-left">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-paper border border-border-default shadow-sm text-sm font-medium text-text-secondary">
                     <span class="w-2 h-2 rounded-full bg-brand-secondary"></span>
                     Technical Specifications
                 </div>
                 <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-text-primary leading-tight">
                     The Konductor <br/>
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-secondary to-brand-primary">Golden Image</span>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-lavender-400 to-mint-400">Golden Image</span>
                 </h1>
-                <p class="text-xl text-text-secondary leading-relaxed font-light max-w-2xl">
+                <p class="text-lg text-text-secondary leading-relaxed font-normal max-w-2xl">
                     We treat software versions like hardware specifications. This is the current "Model Year" configuration for the Konductor standard environment.
                 </p>
             </header>
@@ -51,11 +100,11 @@ const specs = {
                     <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Core System</h3>
                     <div class="space-y-3">
                         {specs.system.map((item) => (
-                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-primary/30 transition-colors group">
-                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.id}</div>
-                                <div class="flex justify-between items-baseline">
+                            <div class="card card-interactive group transition-colors">
+                                <div class="text-xs text-text-tertiary font-mono mb-2 uppercase tracking-wider">{item.id}</div>
+                                <div class="flex justify-between items-center">
                                     <span class="font-medium text-text-primary">{item.name}</span>
-                                    <span class="font-bold text-brand-primary">{item.version}</span>
+                                    <span class="badge badge-primary">{item.version}</span>
                                 </div>
                             </div>
                         ))}
@@ -67,11 +116,11 @@ const specs = {
                     <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Language Runtimes</h3>
                     <div class="space-y-3">
                         {specs.languages.map((item) => (
-                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-secondary/30 transition-colors group">
-                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.id}</div>
-                                <div class="flex justify-between items-baseline">
+                            <div class="card card-interactive group transition-colors">
+                                <div class="text-xs text-text-tertiary font-mono mb-2 uppercase tracking-wider">{item.id}</div>
+                                <div class="flex justify-between items-center">
                                     <span class="font-medium text-text-primary">{item.name}</span>
-                                    <span class="font-bold text-brand-secondary">{item.version}</span>
+                                    <span class="badge badge-secondary">{item.version}</span>
                                 </div>
                             </div>
                         ))}
@@ -83,11 +132,11 @@ const specs = {
                     <h3 class="text-lg font-bold text-text-primary border-b border-border-subtle pb-2">Developer Experience</h3>
                     <div class="space-y-3">
                         {specs.tooling.map((item) => (
-                            <div class="p-4 bg-surface-paper border border-border-default rounded-xl shadow-sm hover:border-brand-accent/30 transition-colors group">
-                                <div class="text-sm text-text-tertiary font-mono mb-1">{item.details}</div>
-                                <div class="flex justify-between items-baseline">
+                            <div class="card card-interactive group transition-colors">
+                                <div class="text-xs text-text-tertiary font-mono mb-2 uppercase tracking-wider">{item.details}</div>
+                                <div class="flex justify-between items-center">
                                     <span class="font-medium text-text-primary">{item.name}</span>
-                                    <span class="font-bold text-brand-accent">{item.version}</span>
+                                    <span class="badge badge-accent">{item.version}</span>
                                 </div>
                             </div>
                         ))}
@@ -97,22 +146,130 @@ const specs = {
             </div>
             
             <!-- Source of Truth -->
-            <div class="mt-16 p-8 bg-slate-900 rounded-2xl border border-slate-700 shadow-xl overflow-hidden relative">
-                <div class="absolute top-0 right-0 p-4 opacity-20 text-6xl font-mono font-bold text-white pointer-events-none">SSOT</div>
-                <h3 class="text-white text-xl font-bold mb-4">Verified Single Source of Truth</h3>
-                <p class="text-slate-400 mb-6 max-w-2xl">
-                    These versions are not just documentation. They are pulled directly from <code>src/lib/versions.nix</code>, the immutable definition file that drives every build artifact in the ecosystem.
-                </p>
-                <div class="font-mono text-sm text-slate-300 bg-slate-950/50 p-4 rounded-lg border border-slate-800 overflow-x-auto">
-                    <span class="text-purple-400">languages</span> = {'{'} <br/>
-                    &nbsp;&nbsp;<span class="text-blue-400">python</span> = {'{'} version = <span class="text-green-400">"313"</span>; display = <span class="text-green-400">"3.13"</span>; {'}'}; <br/>
-                    &nbsp;&nbsp;<span class="text-blue-400">go</span>&nbsp;&nbsp;&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"1_24"</span>; display = <span class="text-green-400">"1.24"</span>; {'}'}; <br/>
-                    &nbsp;&nbsp;<span class="text-blue-400">node</span>&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"22"</span>;&nbsp;&nbsp; display = <span class="text-green-400">"22"</span>;&nbsp;&nbsp; {'}'}; <br/>
-                    &nbsp;&nbsp;<span class="text-blue-400">rust</span>&nbsp;&nbsp; = {'{'} version = <span class="text-green-400">"1.92.0"</span>; display = <span class="text-green-400">"1.92.0"</span>; {'}'}; <br/>
-                    {'}'};
+            <div class="mt-16 card-gradient group">
+                <div class="relative z-10 p-2">
+                    <div class="flex flex-col gap-8">
+                        <!-- Header Section - Full Width -->
+                        <div class="flex items-center gap-4 border-b border-border-subtle pb-6">
+                            <span class="flex items-center justify-center w-12 h-12 rounded-full bg-lavender-500/10 text-lavender-500 shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                            </span>
+                            <div>
+                                <h3 class="text-2xl font-bold text-text-primary">
+                                    Verified Single Source of Truth
+                                </h3>
+                                <p class="text-sm text-text-tertiary mt-1">
+                                    Automated propagation from definition to production artifacts
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Content Grid -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                            
+                            <!-- Left: Description -->
+                            <div class="flex flex-col gap-6">
+                                <p class="text-text-secondary leading-relaxed text-lg">
+                                    These versions are not just documentation. They are pulled directly from <code class="text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md font-mono text-sm border border-purple-100 dark:text-lavender-400 dark:bg-lavender-400/10 dark:border-lavender-400/20">src/lib/versions.nix</code>, the immutable definition file that drives every build artifact in the ecosystem.
+                                </p>
+                                <div class="flex items-start gap-3 text-lavender-500 text-sm italic bg-lavender-500/5 p-4 rounded-lg border border-lavender-500/10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                    <span>Updates propagate to devshells, containers, and VMs automatically.</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Right: Code Window -->
+                            <div class="w-full min-w-0">
+                             <!-- Code Block container matching global pre styling from introduction page -->
+                            <div class="code-window rounded-xl border border-border-default shadow-lg overflow-hidden transition-colors duration-300">
+                                <!-- Window controls and file path -->
+                                <div class="code-header flex items-center gap-2 px-4 py-3 border-b border-border-default transition-colors duration-300">
+                                    <div class="flex gap-1.5">
+                                        <div class="w-3 h-3 rounded-full bg-[#ff5f57] border border-[#e0443e]"></div>
+                                        <div class="w-3 h-3 rounded-full bg-[#febc2e] border border-[#d89e24]"></div>
+                                        <div class="w-3 h-3 rounded-full bg-[#28c840] border border-[#1aab29]"></div>
+                                    </div>
+                                    <div class="flex-1 text-center pr-10">
+                                        <span class="text-xs text-text-secondary font-mono">src/lib/versions.nix</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Code Content -->
+                                <div class="code-body p-6 overflow-x-auto transition-colors duration-300">
+                                    <pre class="font-mono text-sm leading-relaxed !bg-transparent !border-0 !p-0 !m-0 !shadow-none" style="background-color: transparent !important;">
+<span class="syntax-key font-bold transition-colors duration-300">languages</span> = &#123;
+  <span class="syntax-key font-bold transition-colors duration-300">python</span> = &#123; version = <span class="syntax-string px-1 py-0.5 rounded font-medium transition-colors duration-300">"3.13"</span>; &#125;;
+  <span class="syntax-key font-bold transition-colors duration-300">go</span>     = &#123; version = <span class="syntax-string px-1 py-0.5 rounded font-medium transition-colors duration-300">"1.24"</span>; &#125;;
+  <span class="syntax-key font-bold transition-colors duration-300">node</span>   = &#123; version = <span class="syntax-string px-1 py-0.5 rounded font-medium transition-colors duration-300">"22"</span>;   &#125;;
+  <span class="syntax-key font-bold transition-colors duration-300">rust</span>   = &#123; version = <span class="syntax-string px-1 py-0.5 rounded font-medium transition-colors duration-300">"1.92"</span>; &#125;;
+&#125;;</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
         </div>
     </main>
+    </div>
 </Layout>
+
+<style>
+    /* 
+     * Explicitly target data-theme="dark" to ensure contrast regardless of Tailwind config.
+     * This mimics the robustness of global.css variables.
+     */
+    
+    /* Window Container Background */
+    .code-window {
+        background-color: var(--color-surface-raised);
+    }
+    :global([data-theme="dark"]) .code-window {
+        background-color: var(--slate-900);
+    }
+
+    /* Header Background */
+    .code-header {
+        background-color: var(--color-surface-subtle);
+    }
+    :global([data-theme="dark"]) .code-header {
+        background-color: rgba(2, 6, 23, 0.5); /* slate-950/50 */
+    }
+
+    /* Body Background */
+    .code-body {
+        background-color: var(--color-surface-raised);
+    }
+    :global([data-theme="dark"]) .code-body {
+        background-color: var(--slate-900);
+    }
+
+    /* Base Text Color in Code Block */
+    .code-body pre {
+        color: var(--slate-700);
+    }
+    :global([data-theme="dark"]) .code-body pre {
+        color: var(--slate-300);
+    }
+
+    /* Syntax Highlighting: Keys (Purple/Lavender) */
+    .syntax-key {
+        color: #7e22ce; /* purple-700 */
+    }
+    :global([data-theme="dark"]) .syntax-key {
+        color: var(--lavender-300);
+    }
+
+    /* Syntax Highlighting: Strings/Values (Orange) */
+    .syntax-string {
+        color: #ea580c; /* orange-600 */
+        background-color: #fff7ed; /* orange-50 */
+        border: 1px solid #fed7aa; /* orange-200 */
+    }
+    :global([data-theme="dark"]) .syntax-string {
+        color: #fdba74; /* orange-300 */
+        background-color: rgba(251, 146, 60, 0.1); /* orange-400/10 */
+        border: 1px solid rgba(251, 146, 60, 0.2); /* orange-400/20 */
+    }
+</style>

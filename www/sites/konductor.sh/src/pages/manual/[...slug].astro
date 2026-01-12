@@ -62,13 +62,36 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
         <!-- Sidebar (Client Component) -->
         <Sidebar 
             client:load 
+            transition:persist="sidebar-main"
             sections={sections} 
             groupedDocs={groupedDocs} 
             currentSlug={entry.slug} 
         />
 
         <!-- Main Content -->
-        <main class="flex-1 w-full transition-all duration-300 ease-spring pl-0 md:pl-[var(--sidebar-width,16rem)]">
+        <main class="flex-1 w-full transition-all duration-300 ease-spring pl-0 md:pl-64" transition:animate="fade">
+            <script is:inline>
+                // Initialize padding based on stored preference to prevent layout shift
+                // This runs immediately when the HTML is parsed (on initial load AND after navigation swaps)
+                (function() {
+                   if (window.innerWidth >= 768) {
+                       const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+                       // In inline scripts, document.currentScript.parentElement refers to the <main> tag 
+                       // because the script is inside it.
+                       const main = document.currentScript ? document.currentScript.parentElement : document.querySelector('main');
+                       
+                       if (main) {
+                           if (isCollapsed) {
+                               main.classList.remove('md:pl-64');
+                               main.classList.add('md:pl-20');
+                           } else {
+                               main.classList.remove('md:pl-20');
+                               main.classList.add('md:pl-64');
+                           }
+                       }
+                   }
+                })();
+            </script>
             <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
                 <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium justify-between">
                     <div class="flex items-center gap-2">
@@ -103,8 +126,8 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                     
                     /* This prose-pre style was overriding global CSS. Removing specific BG/Border/Shadow here to let global CSS win, 
                        or we must update it to match global. Let's update it to match global conventions. */
-                    prose-pre:bg-slate-900 prose-pre:text-slate-50 prose-pre:rounded-xl 
-                    prose-pre:border prose-pre:border-slate-700 prose-pre:shadow-sm
+                    prose-pre:bg-surface-raised prose-pre:text-text-secondary prose-pre:rounded-xl 
+                    prose-pre:border prose-pre:border-border-subtle prose-pre:shadow-sm
                     prose-pre:p-5 prose-pre:my-8 prose-pre:leading-normal
                     /* Ensure overflow is handled */
                     prose-pre:overflow-x-auto
