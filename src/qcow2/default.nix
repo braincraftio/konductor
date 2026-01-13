@@ -378,6 +378,8 @@ in
               # Konductor
               KONDUCTOR_SHELL = "konductor";
             }
+            # Konductor self-hosting env (OVMF_CODE, OVMF_VARS, etc.)
+            // (konductor.env pkgs)
           );
         };
 
