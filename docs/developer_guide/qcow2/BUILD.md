@@ -411,6 +411,7 @@ Entry Points (user-facing):
   build:qcow2:publish      Full automation: image → container → login → push
 
 Pipeline Tasks (internal, run via --all):
+  _build:qcow2:preflight       Validate tools/env before build
   _build:qcow2:env             Export shared environment variables
   _build:qcow2:nix             Nix build QCOW2
   _build:qcow2:cloudinit       Generate cloud-init ISO
@@ -439,6 +440,194 @@ Registry: docker.io/containercraft/konductor:latest-qcow2
 ---
 
 ## Pipeline Tasks
+
+### _build:qcow2:preflight
+
+Validate all required tools and environment before build starts. Fails fast with clear errors.
+
+```sh {"name":"_build:qcow2:preflight"}
+set -e
+ERRORS=0
+
+echo "=== Preflight Check ==="
+echo ""
+
+# --- Required Binaries ---
+echo "Checking binaries..."
+REQUIRED_BINS=(
+    # Core build tools
+    "nix:Build NixOS system closure"
+    "qemu-img:Create/convert QCOW2 images"
+    "qemu-system-x86_64:Boot VM with KVM"
+    "genisoimage:Create cloud-init ISO"
+    # Guestfs tools
+    "guestmount:Mount QCOW2 images"
+    "guestunmount:Unmount QCOW2 images"
+    "virt-sparsify:Sparsify final image"
+    # VM communication
+    "ssh:Connect to build VM"
+    "rsync:Sync files to VM"
+    "timeout:Wait operations"
+    "ss:Check port availability"
+    # Coreutils (often missing in nested runme)
+    "du:File size reporting"
+    "cut:Text processing"
+    "sha256sum:Checksum verification"
+    "grep:Text filtering"
+    "readlink:Resolve symlinks"
+    "id:Get user/group IDs"
+    "cat:Read files"
+    "mkdir:Create directories"
+    "rm:Remove files"
+    "cp:Copy files"
+    "chmod:Set permissions"
+    "chown:Set ownership"
+    "sync:Flush buffers"
+    "sleep:Delays"
+    "kill:Process signals"
+    "pkill:Kill by name"
+    "tail:View logs"
+    "date:Timestamps"
+)
+
+for entry in "${REQUIRED_BINS[@]}"; do
+    bin="${entry%%:*}"
+    desc="${entry#*:}"
+    if command -v "$bin" &>/dev/null; then
+        printf "  ✓ %-20s %s\n" "$bin" "$(command -v "$bin")"
+    else
+        printf "  ✗ %-20s MISSING - %s\n" "$bin" "$desc"
+        ((ERRORS++))
+    fi
+done
+
+# --- Optional Binaries (container build) ---
+echo ""
+echo "Checking optional binaries (container build)..."
+OPTIONAL_BINS=(
+    "docker:Build containerDisk"
+    "skopeo:Push to registry"
+    "jq:Parse JSON responses"
+)
+
+for entry in "${OPTIONAL_BINS[@]}"; do
+    bin="${entry%%:*}"
+    desc="${entry#*:}"
+    if command -v "$bin" &>/dev/null; then
+        printf "  ✓ %-20s %s\n" "$bin" "$(command -v "$bin")"
+    else
+        printf "  ⚠ %-20s MISSING - %s (optional)\n" "$bin" "$desc"
+    fi
+done
+
+# --- Environment Variables ---
+echo ""
+echo "Checking environment variables..."
+if [ -n "$OVMF_CODE" ]; then
+    printf "  ✓ %-20s %s\n" "OVMF_CODE" "$OVMF_CODE"
+    if [ -f "$OVMF_CODE" ]; then
+        printf "    └─ file exists\n"
+    else
+        printf "    └─ ✗ FILE NOT FOUND\n"
+        ((ERRORS++))
+    fi
+else
+    printf "  ✗ %-20s NOT SET - EFI firmware path\n" "OVMF_CODE"
+    ((ERRORS++))
+fi
+
+if [ -n "$OVMF_VARS" ]; then
+    printf "  ✓ %-20s %s\n" "OVMF_VARS" "$OVMF_VARS"
+    if [ -f "$OVMF_VARS" ]; then
+        printf "    └─ file exists\n"
+    else
+        printf "    └─ ✗ FILE NOT FOUND\n"
+        ((ERRORS++))
+    fi
+else
+    printf "  ✗ %-20s NOT SET - EFI vars template\n" "OVMF_VARS"
+    ((ERRORS++))
+fi
+
+if [ -n "$HOME" ]; then
+    printf "  ✓ %-20s %s\n" "HOME" "$HOME"
+else
+    printf "  ✗ %-20s NOT SET\n" "HOME"
+    ((ERRORS++))
+fi
+
+# --- Required Files ---
+echo ""
+echo "Checking required files..."
+SSH_KEY="$HOME/.ssh/id_ed25519.pub"
+if [ -f "$SSH_KEY" ]; then
+    printf "  ✓ %-20s exists\n" "SSH public key"
+else
+    printf "  ✗ %-20s NOT FOUND - %s\n" "SSH public key" "$SSH_KEY"
+    ((ERRORS++))
+fi
+
+# --- KVM Access ---
+echo ""
+echo "Checking KVM access..."
+if [ -e /dev/kvm ]; then
+    if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+        printf "  ✓ %-20s accessible\n" "/dev/kvm"
+    else
+        printf "  ✗ %-20s no read/write permission\n" "/dev/kvm"
+        ((ERRORS++))
+    fi
+else
+    printf "  ✗ %-20s not found (KVM not available)\n" "/dev/kvm"
+    ((ERRORS++))
+fi
+
+# --- SSH Config ---
+echo ""
+echo "Checking SSH config..."
+if grep -q "Host localhost" "$HOME/.ssh/config" 2>/dev/null && grep -q "Port 2222" "$HOME/.ssh/config" 2>/dev/null; then
+    printf "  ✓ %-20s localhost:2222 configured\n" "SSH config"
+else
+    printf "  ⚠ %-20s localhost:2222 not found (devshell should configure)\n" "SSH config"
+fi
+
+# --- Port 2222 ---
+echo ""
+echo "Checking port 2222..."
+if ss -tlnp 2>/dev/null | grep -q ':2222 '; then
+    printf "  ⚠ %-20s IN USE (VM may be running)\n" "Port 2222"
+else
+    printf "  ✓ %-20s available\n" "Port 2222"
+fi
+
+# --- PATH diagnostics ---
+echo ""
+echo "PATH entries:"
+PATH_COUNT=$(echo "$PATH" | tr ':' '\n' | wc -l)
+echo "$PATH" | tr ':' '\n' | head -20 | while IFS= read -r p; do
+    if [ -d "$p" ]; then
+        printf "  ✓ %s\n" "$p"
+    else
+        printf "  ⚠ %s (not a directory)\n" "$p"
+    fi
+done || true
+[ "$PATH_COUNT" -gt 20 ] && echo "  ... (showing first 20 of $PATH_COUNT entries)"
+
+# --- Summary ---
+echo ""
+echo "=== Preflight Summary ==="
+if [ "$ERRORS" -eq 0 ]; then
+    echo "✓ All checks passed - ready to build"
+    exit 0
+else
+    echo "✗ $ERRORS error(s) found - fix before building"
+    echo ""
+    echo "Hint: Run 'direnv reload' or 'nix develop .#konductor' to ensure devshell is loaded"
+    exit 1
+fi
+```
+
+---
 
 ### _build:qcow2:env
 
@@ -615,11 +804,11 @@ Rsync source to `/opt/konductor`.
 set -e
 ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 ssh localhost 'sudo rsync -a \
-    --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled"} \
+    --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled",www,.venv,.git} \
     /workspace/ /opt/konductor/'
 # Use kc2:kc2 (1001:1001) for consistent shared group ownership
 ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
-ssh localhost 'cd /opt/konductor && sudo git gc --aggressive --prune=now'
+ssh localhost 'cd /opt/konductor && sudo git init && sudo git gc --aggressive --prune=now'
 ```
 
 ---
