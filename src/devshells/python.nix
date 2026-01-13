@@ -13,7 +13,8 @@ baseShell.overrideAttrs (old: {
   name = "python";
 
   # packages.pythonPackages from ./packages.nix (single source of truth)
-  buildInputs = old.buildInputs ++ packages.pythonPackages;
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs ++ packages.pythonPackages;
 
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="python"

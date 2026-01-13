@@ -13,7 +13,8 @@ baseShell.overrideAttrs (old: {
   name = "node";
 
   # packages.nodejsPackages from ./packages.nix (single source of truth)
-  buildInputs = old.buildInputs ++ packages.nodejsPackages;
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs ++ packages.nodejsPackages;
 
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="node"

@@ -7,6 +7,16 @@
 # - neovim terminals (via wrapped bash)
 
 # ===========================================================================
+# User Bashrc (FIRST - so Konductor aliases take precedence)
+# ===========================================================================
+# Source user's bashrc first to get their base settings
+# Konductor aliases defined below will override any conflicts
+if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ]; then
+  export KONDUCTOR_BASHRC_SOURCED=1
+  source "$HOME/.bashrc"
+fi
+
+# ===========================================================================
 # History Settings
 # ===========================================================================
 # Note: In the 'full' devshell, Atuin provides enhanced history with:
@@ -61,7 +71,7 @@ alias lg='lazygit'
 # ===========================================================================
 # Kubernetes
 # ===========================================================================
-alias k='kubectl'
+alias k='kubecolor'
 # Inherit kubectl completions for k alias
 if command -v kubectl >/dev/null 2>&1; then
   source <(kubectl completion bash)
@@ -104,12 +114,3 @@ if command -v direnv >/dev/null 2>&1 && [ -z "$IN_NIX_SHELL" ]; then
   eval "$(direnv hook bash)"
 fi
 
-# ===========================================================================
-# User Customization
-# ===========================================================================
-# Source user's bashrc last to allow personal overrides
-# This respects user preferences while providing sensible defaults
-if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ]; then
-  export KONDUCTOR_BASHRC_SOURCED=1
-  source "$HOME/.bashrc"
-fi

@@ -13,7 +13,8 @@ baseShell.overrideAttrs (old: {
 
   # packages.idePackages from ./packages.nix (single source of truth)
   # plus neovim, tmux, and forgejo-cli from programs
-  buildInputs = old.buildInputs
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs
     ++ programs.neovim.packages
     ++ programs.tmux.packages
     ++ programs.forgejo.cliPackages

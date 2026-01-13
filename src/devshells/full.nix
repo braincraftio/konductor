@@ -25,8 +25,9 @@ baseShell.overrideAttrs (old: {
   name = "full";
 
   # All packages from ./packages.nix (single source of truth)
-  buildInputs =
-    old.buildInputs
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs =
+    old.nativeBuildInputs
     # IDE tools (neovim + tmux from programs, rest from packages.nix)
     ++ programs.neovim.packages
     ++ programs.tmux.packages

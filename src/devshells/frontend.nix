@@ -28,7 +28,8 @@ in
 konductorShell.overrideAttrs (old: {
   name = "frontend";
 
-  buildInputs = old.buildInputs ++ [
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs ++ [
     pkgs.playwright-driver.browsers
   ];
 

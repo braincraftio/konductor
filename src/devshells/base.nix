@@ -17,11 +17,19 @@ pkgs.mkShell {
   name = "default";
 
   # packages.default from ./packages.nix (single source of truth)
-  buildInputs = packages.default;
+  # Using `packages` (modern) instead of `buildInputs` (legacy)
+  # This properly sets up PATH and XDG_DATA_DIRS for CLI tools
+  packages = packages.default;
 
   shellHook = ''
     export KONDUCTOR_SHELL="default"
     export name="default"
+
+    # Source bash-completion for programmable completions
+    # This enables lazy-loading of completions from XDG_DATA_DIRS
+    if [ -f "${pkgs.bash-completion}/share/bash-completion/bash_completion" ]; then
+      source "${pkgs.bash-completion}/share/bash-completion/bash_completion"
+    fi
 
     # Source hermetic bashrc (aliases, shell options, prompt)
     ${bashrcContent}

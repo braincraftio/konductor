@@ -33,7 +33,8 @@ baseShell.overrideAttrs (old: {
   # - All language toolchains
   # - Forgejo runner and CLI
   # - Container and VM build tools (from konductor packages)
-  buildInputs = old.buildInputs
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs
     # All languages from packages.nix
     ++ packages.pythonPackages
     ++ packages.goPackages

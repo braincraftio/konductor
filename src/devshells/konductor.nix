@@ -31,8 +31,9 @@ baseShell.overrideAttrs (old: {
   name = "konductor";
 
   # Everything from full + konductor self-hosting packages + CI tools
-  buildInputs =
-    old.buildInputs
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs =
+    old.nativeBuildInputs
     # IDE tools (neovim + tmux from programs, rest from packages.nix)
     ++ programs.neovim.packages
     ++ programs.tmux.packages

@@ -34,6 +34,7 @@ in
   packages =
     shellTools
     ++ (with pkgs; [
+      bash-completion # Bash programmable completion
       jq # JSON processor
       yq-go # YAML processor
       sqlite # SQLite for snacks.picker frecency

@@ -13,7 +13,8 @@ baseShell.overrideAttrs (old: {
   name = "rust";
 
   # packages.rustPackages from ./packages.nix (single source of truth)
-  buildInputs = old.buildInputs ++ packages.rustPackages;
+  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  nativeBuildInputs = old.nativeBuildInputs ++ packages.rustPackages;
 
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="rust"

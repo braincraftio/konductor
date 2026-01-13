@@ -27,6 +27,10 @@ let
   ide = import ./ide.nix { inherit pkgs; };
   konductor = import ./konductor.nix { inherit pkgs; };
 
+  # Alias wrappers - executable scripts that provide hermetic "aliases"
+  # These work with direnv (which can't export shell aliases)
+  aliasWrappers = import ../lib/alias-wrappers.nix { inherit pkgs lib; };
+
 in
 rec {
   # ===========================================================================
@@ -54,9 +58,13 @@ rec {
   # AI tools
   aiPackages = ai.packages;
 
+  # Alias wrappers package (provides k, ll, la, etc. as executables)
+  aliasWrappersPackage = [ aliasWrappers ];
+
   # Default: The base for all devshells
   # This is what OCI and QCOW2 use
-  default = corePackages ++ networkPackages ++ systemPackages ++ cliPackages ++ lintersPackages ++ formattersPackages ++ aiPackages;
+  # aliasWrappers FIRST so they take priority in PATH
+  default = aliasWrappersPackage ++ corePackages ++ networkPackages ++ systemPackages ++ cliPackages ++ lintersPackages ++ formattersPackages ++ aiPackages;
 
   # ===========================================================================
   # LANGUAGE PACKAGES (added to default in language-specific shells)
