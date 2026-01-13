@@ -1,6 +1,7 @@
 # src/devshells/frontend.nix
 # Frontend development shell
-# Extends 'full' with Playwright browser dependencies
+# Extends 'konductor' with Playwright browser dependencies
+# Includes all VM/container build tools (OVMF, qemu, libvirt) for QCOW2 builds
 
 {
   baseShell,
@@ -13,7 +14,7 @@
 }:
 
 let
-  fullShell = import ./full.nix {
+  konductorShell = import ./konductor.nix {
     inherit
       baseShell
       pkgs
@@ -24,7 +25,7 @@ let
       ;
   };
 in
-fullShell.overrideAttrs (old: {
+konductorShell.overrideAttrs (old: {
   name = "frontend";
 
   buildInputs = old.buildInputs ++ [
@@ -38,6 +39,6 @@ fullShell.overrideAttrs (old: {
   };
 
   shellHook = old.shellHook + ''
-    echo "Frontend shell ready (Playwright enabled)"
+    echo "Frontend shell ready (Playwright + VM build tools enabled)"
   '';
 })
