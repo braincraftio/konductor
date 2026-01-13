@@ -42,14 +42,14 @@ let
     text = builtins.readFile ./atuin.toml;
   };
 
-  # Shell initialization script - Bash only, opinionated
+  # Shell initialization script - sets up env vars, actual init in .bashrc
   initScript = ''
     # Atuin Shell History - SQLite-backed fuzzy search
     # Keybindings: Ctrl+R (search), Up (directory search), Ctrl+O (inspector)
+    # Actual init happens in .bashrc for proper interactive shell context
     mkdir -p "''${XDG_DATA_HOME:-$HOME/.local/share}/atuin"
     export ATUIN_CONFIG_DIR="${configFile}"
-    source "${pkgs.bash-preexec}/share/bash/bash-preexec.sh"
-    eval "$(atuin init bash)"
+    export BASH_PREEXEC_PATH="${pkgs.bash-preexec}/share/bash/bash-preexec.sh"
   '';
 
 in

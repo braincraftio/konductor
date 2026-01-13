@@ -84,6 +84,19 @@ if command -v starship >/dev/null 2>&1 && [ -t 0 ] && [[ "${TERM:-dumb}" != "dum
 fi
 
 # ===========================================================================
+# Atuin (Shell History)
+# ===========================================================================
+# Fuzzy search with Ctrl+R, directory-scoped Up arrow, inspector with Ctrl+O
+# Requires bash-preexec for hooks. ATUIN_CONFIG_DIR set by devshell.
+if command -v atuin >/dev/null 2>&1 && [ -t 0 ] && [[ "${TERM:-dumb}" != "dumb" ]]; then
+  # Source bash-preexec if available (provides preexec/precmd hooks)
+  if [ -n "$BASH_PREEXEC_PATH" ] && [ -f "$BASH_PREEXEC_PATH" ]; then
+    source "$BASH_PREEXEC_PATH"
+  fi
+  eval "$(atuin init bash)"
+fi
+
+# ===========================================================================
 # Direnv
 # ===========================================================================
 # Skip direnv hook if already inside a nix shell to prevent double-loading
