@@ -1,10 +1,11 @@
 # src/packages/formatters.nix
 # Formatting tools - composed from config wrappers
 
-{ pkgs, config ? null }:
+{ pkgs, lib, config ? null }:
 
 let
   hasConfig = config != null;
+  inherit (pkgs) stdenv;
 in
 
 {
@@ -20,6 +21,8 @@ in
       pkgs.gofumpt
       pkgs.nixpkgs-fmt
       pkgs.stylua
+    ] ++ lib.optionals (!stdenv.isDarwin) [
+      # Darwin 25.x: black/isort pull setproctitle which fails tests in nix sandbox
       pkgs.black
       pkgs.isort
     ] else

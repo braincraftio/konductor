@@ -2,10 +2,11 @@
 # Version-locked language runtimes + package managers
 # Individual exports for each language to support per-devshell composition
 
-{ pkgs, versions }:
+{ pkgs, lib, versions }:
 
 let
   langs = versions.languages;
+  inherit (pkgs) stdenv;
 in
 
 rec {
@@ -24,6 +25,8 @@ rec {
     ruff
     mypy
     bandit
+  ] ++ lib.optionals (!stdenv.isDarwin) [
+    # Darwin 25.x: black/isort pull setproctitle which fails tests in nix sandbox
     black
     isort
   ];

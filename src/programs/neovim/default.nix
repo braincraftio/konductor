@@ -13,13 +13,13 @@
 #   - Snacks consolidation: picker, explorer, terminal, dashboard, etc.
 #   - LazyVim conventions: keybinding patterns and UX
 
-{ pkgs, inputs }:
+{ pkgs, lib, inputs }:
 
 let
   nixvimPkgs = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 
   # Import configuration modules
-  pluginsCfg = import ./plugins.nix { inherit pkgs; };
+  pluginsCfg = import ./plugins.nix { inherit pkgs lib; };
   keymapsCfg = import ./keymaps.nix { };
   optionsCfg = import ./options.nix { inherit pkgs; };
   autocmdsCfg = import ./autocmds.nix { };

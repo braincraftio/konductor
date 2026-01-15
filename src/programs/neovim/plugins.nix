@@ -1,9 +1,10 @@
 # src/programs/neovim/plugins.nix
 # All plugin configurations using nixvim native options
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 let
   banner = import ./banner.nix { };
+  inherit (pkgs) stdenv;
 in
 
 {
@@ -699,8 +700,8 @@ in
         dockerls.enable = true;
         # TOML
         taplo.enable = true;
-        # Markdown
-        marksman.enable = true;
+        # Markdown (Darwin 25.x: marksman requires .NET which pulls LLVM 20.x, not cached)
+        marksman.enable = !stdenv.isDarwin;
       };
     };
 
@@ -760,10 +761,7 @@ in
         formatters_by_ft = {
           lua = [ "stylua" ];
           nix = [ "nixfmt" ];
-          python = [
-            "black"
-            "isort"
-          ];
+          python = [ "ruff_format" "ruff_organize_imports" ];
           go = [
             "gofumpt"
             "goimports"
@@ -782,8 +780,10 @@ in
         formatters = {
           nixfmt.command = "${pkgs.nixfmt-rfc-style}/bin/nixfmt";
           stylua.command = "${pkgs.stylua}/bin/stylua";
-          black.command = "${pkgs.black}/bin/black";
-          isort.command = "${pkgs.isort}/bin/isort";
+          ruff_format.command = "${pkgs.ruff}/bin/ruff";
+          ruff_format.args = [ "format" "--stdin-filename" "$FILENAME" "-" ];
+          ruff_organize_imports.command = "${pkgs.ruff}/bin/ruff";
+          ruff_organize_imports.args = [ "check" "--select" "I" "--fix" "--stdin-filename" "$FILENAME" "-" ];
           gofumpt.command = "${pkgs.gofumpt}/bin/gofumpt";
           goimports.command = "${pkgs.gotools}/bin/goimports";
           prettier.command = "${pkgs.nodePackages.prettier}/bin/prettier";

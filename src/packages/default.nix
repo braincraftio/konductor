@@ -19,10 +19,10 @@ let
   core = import ./core.nix { inherit pkgs; };
   network = import ./network.nix { inherit pkgs; };
   system = import ./system.nix { inherit pkgs lib; };
-  languages = import ./languages.nix { inherit pkgs versions; };
+  languages = import ./languages.nix { inherit pkgs lib versions; };
   cli = import ./cli.nix { inherit pkgs config; };
   linters = import ./linters.nix { inherit pkgs config; };
-  formatters = import ./formatters.nix { inherit pkgs config; };
+  formatters = import ./formatters.nix { inherit pkgs lib config; };
   ai = import ./ai.nix { inherit pkgs; };
   ide = import ./ide.nix { inherit pkgs; };
   konductor = import ./konductor.nix { inherit pkgs; };
