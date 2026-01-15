@@ -54,6 +54,8 @@ in
       unstable.kubernetes-helm # Helm package manager
       unstable.k9s # Kubernetes TUI
       unstable.kubevirt # Includes virtctl for VM management
+      unstable.hubble # Cilium network flow observability
+      unstable.cilium-cli # Cilium CLI for network management
 
       # Talos/Omni tools (unstable for latest versions)
       unstable.talosctl # Talos Linux CLI (1.12.0)
