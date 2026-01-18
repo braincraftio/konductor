@@ -53,8 +53,14 @@ baseShell.overrideAttrs (old: {
     # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
     ${config.shell.atuin.shellHook}
 
-    # Native library support for pip-installed packages (grpc, etc.)
-    export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
+    # Runtime libraries for:
+    # - C++ stdlib: Python grpc (Pulumi)
+    # - liblzma/libzstd: Rust crates using compression (cargo install targets)
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc.lib
+      pkgs.xz
+      pkgs.zstd
+    ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}

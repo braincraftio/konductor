@@ -3,7 +3,7 @@
 #
 # Package composition defined in: ../packages/
 
-{ baseShell, packages, versions, ... }:
+{ baseShell, pkgs, packages, versions, ... }:
 
 let
   langs = versions.languages;
@@ -19,6 +19,9 @@ baseShell.overrideAttrs (old: {
   shellHook = old.shellHook + ''
     export KONDUCTOR_SHELL="rust"
     export name="rust"
+
+    # Runtime libraries for Rust crates using compression (cargo install targets)
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
     # Cargo home
     export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"

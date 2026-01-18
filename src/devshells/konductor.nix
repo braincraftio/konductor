@@ -57,8 +57,14 @@ baseShell.overrideAttrs (old: {
     # Skip base banner - we show our own
     export KONDUCTOR_SKIP_BANNER=1
 
-    # C++ stdlib for Python grpc (used by Pulumi)
-    export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    # Runtime libraries for:
+    # - C++ stdlib: Python grpc (Pulumi)
+    # - liblzma/libzstd: Rust crates using compression (cargo install targets)
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc.lib
+      pkgs.xz
+      pkgs.zstd
+    ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   ''
   + old.shellHook
   + ''

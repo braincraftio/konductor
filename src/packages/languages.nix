@@ -89,6 +89,14 @@ rec {
     })
     cargo-watch
     cargo-edit
+    cargo-tauri # Tauri CLI from nixpkgs (properly patched, no cargo install needed)
+  ];
+
+  # Runtime libraries for Rust crates that use compression
+  # These are needed when users run `cargo install` for crates not in nixpkgs
+  rustRuntimeLibs = with pkgs; [
+    xz # provides liblzma.so.5
+    zstd # provides libzstd.so
   ];
 
   # ===========================================================================

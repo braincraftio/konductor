@@ -49,6 +49,9 @@ baseShell.overrideAttrs (old: {
   shellHook = ''
     # Skip base banner - we show our own
     export KONDUCTOR_SKIP_BANNER=1
+
+    # Runtime libraries for Rust crates using compression (cargo install targets)
+    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   '' + old.shellHook + ''
     export KONDUCTOR_SHELL="ci"
     export name="ci"
