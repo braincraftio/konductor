@@ -10,6 +10,7 @@
     wget # HTTP/FTP retrieval
     gnupg # GPG for signing
     cacert # CA certificates
+    netcat-gnu
   ];
 
   shellHook = "";
