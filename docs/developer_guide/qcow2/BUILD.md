@@ -432,7 +432,7 @@ Debug Tasks:
   _build:qcow2:debug:log       View boot log
   _build:qcow2:vm:kill         Force kill VM
 
-Configuration: example.env (defaults) → .env (overrides)
+Configuration: .env.example (defaults) → .env (overrides)
 SSH: ssh localhost (devshell configures port 2222)
 Registry: docker.io/containercraft/konductor:latest-qcow2
 ```

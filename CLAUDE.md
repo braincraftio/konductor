@@ -142,7 +142,7 @@ Configured in `.mcp.json`:
 
 ## Environment Variables
 
-Loaded via direnv from `example.env` (defaults) and `.env` (local overrides):
+Loaded via direnv from `.env.example` (defaults) and `.env` (local overrides):
 - `GITHUB_TOKEN` - GitHub authentication
 - `GITEA_TOKEN` - Gitea/Forgejo authentication
 - `CONTAINER_REGISTRY` - Container registry (default: docker.io)
