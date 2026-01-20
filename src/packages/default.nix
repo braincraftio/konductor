@@ -26,6 +26,7 @@ let
   ai = import ./ai.nix { inherit pkgs; };
   ide = import ./ide.nix { inherit pkgs; };
   konductor = import ./konductor.nix { inherit pkgs; };
+  tauri = import ./tauri.nix { inherit pkgs lib; };
 
   # Alias wrappers - executable scripts that provide hermetic "aliases"
   # These work with direnv (which can't export shell aliases)
@@ -84,6 +85,12 @@ rec {
 
   # Full konductor module (packages, shellHook, env)
   inherit konductor;
+
+  # ===========================================================================
+  # TAURI BUILD DEPENDENCIES (for Tauri desktop applications)
+  # ===========================================================================
+  # Full tauri module (packages, shellHook, env, pkgConfigPath)
+  inherit tauri;
 
   # ===========================================================================
   # Individual Categories (for fine-grained control)
