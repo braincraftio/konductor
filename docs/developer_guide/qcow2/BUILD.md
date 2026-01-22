@@ -165,7 +165,7 @@ Package QCOW2 as containerDisk for KubeVirt.
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
 QCOW2_OUTPUT="konductor.qcow2"
-FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
+FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 [ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2:image first."; exit 1; }
 [ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
@@ -197,66 +197,82 @@ Logic:
 
 ```sh {"name":"build:qcow2:login","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-: ${CONTAINER_REGISTRY:=docker.io}
+# Default to local Zot registry for docker-dev workflow
+# Override with CONTAINER_REGISTRY=docker.io for public push
+: ${CONTAINER_REGISTRY:=registry.docker.arpa}
 
-# Normalize registry name for config lookup
-if [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
-  CONFIG_REGISTRY="https://index.docker.io/v1/"
-else
-  CONFIG_REGISTRY="$CONTAINER_REGISTRY"
-fi
+# Local Zot registry (docker-dev cluster)
+if [[ "$CONTAINER_REGISTRY" == "registry.docker.arpa" ]] || [[ "$CONTAINER_REGISTRY" =~ ^registry\..+\.sslip\.io$ ]]; then
+  # Check if already logged in
+  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONTAINER_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
+    echo "Already authenticated to $CONTAINER_REGISTRY"
+    exit 0
+  fi
+
+  # Fetch cluster CA for TLS verification (gateway-tls-https has the root CA)
+  # REGISTRY_K8S_CONTEXT: cluster context where registry runs (default: admin@docker-dev)
+  CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$CONTAINER_REGISTRY"
+  mkdir -p "$CERT_DIR"
+  kubectl --context "${REGISTRY_K8S_CONTEXT:-admin@docker-dev}" \
+    get secret gateway-tls-https -n envoy-gateway-system \
+    -o jsonpath='{.data.ca\.crt}' | base64 -d > "$CERT_DIR/ca.crt"
+  echo "Installed cluster CA to $CERT_DIR/ca.crt"
+
+  # Login with admin:admin (Zot default)
+  # --compat-auth-file: store in docker config so docker commands also work
+  : ${REGISTRY_USERNAME:=admin}
+  : ${REGISTRY_PASSWORD:=admin}
+  echo "$REGISTRY_PASSWORD" | skopeo login "$CONTAINER_REGISTRY" \
+    --username "$REGISTRY_USERNAME" \
+    --password-stdin \
+    --cert-dir "$CERT_DIR" \
+    --compat-auth-file ~/.docker/config.json
+  echo "Logged in to $CONTAINER_REGISTRY as $REGISTRY_USERNAME"
+  exit 0
 
 # Docker Hub authentication
-if [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
-  # If token provided, always login (CI path - token injected as secret)
+elif [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
+  CONFIG_REGISTRY="https://index.docker.io/v1/"
   if [[ -n "$DOCKER_TOKEN" ]]; then
     echo "$DOCKER_TOKEN" | docker login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
     echo "Logged in to Docker Hub as ${DOCKER_USERNAME:-containercraft}"
     exit 0
   fi
-  # Check if already logged in via docker config
-  if grep -q "$CONFIG_REGISTRY" ~/.docker/config.json 2>/dev/null; then
-    echo "Already authenticated to Docker Hub (found in docker config)"
+  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONFIG_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
+    echo "Already authenticated to Docker Hub"
     exit 0
   fi
-  # Not authenticated
   echo "Not authenticated to Docker Hub."
   echo ""
   echo "Options:"
   echo "  1. Run: docker login"
   echo "  2. Set DOCKER_TOKEN in .env (DOCKER_USERNAME defaults to containercraft)"
-  echo "  3. Export DOCKER_TOKEN in environment"
   exit 1
 
 # GHCR authentication
 elif [[ "$CONTAINER_REGISTRY" == "ghcr.io" ]]; then
-  # If token provided, always login (CI path)
   if [[ -n "$GITHUB_TOKEN" ]]; then
     echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin
     echo "Logged in to GHCR as ${GITHUB_ACTOR:-github}"
     exit 0
   fi
-  # Check if already logged in via docker config
-  if grep -q "$CONFIG_REGISTRY" ~/.docker/config.json 2>/dev/null; then
-    echo "Already authenticated to GHCR (found in docker config)"
+  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"ghcr.io\"]" ~/.docker/config.json &>/dev/null; then
+    echo "Already authenticated to GHCR"
     exit 0
   fi
-  # Not authenticated
   echo "Not authenticated to GHCR."
   echo ""
   echo "Options:"
   echo "  1. Run: docker login ghcr.io"
   echo "  2. Set GITHUB_TOKEN in .env (GITHUB_ACTOR defaults to github)"
-  echo "  3. Export GITHUB_TOKEN in environment"
   exit 1
 
 else
-  # Custom registry - check if already authenticated
-  if grep -q "$CONTAINER_REGISTRY" ~/.docker/config.json 2>/dev/null; then
-    echo "Already authenticated to $CONTAINER_REGISTRY (found in docker config)"
+  # Custom registry
+  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONTAINER_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
+    echo "Already authenticated to $CONTAINER_REGISTRY"
     exit 0
   fi
-  # Login with custom creds or default admin:admin
   : ${REGISTRY_USERNAME:=admin}
   : ${REGISTRY_PASSWORD:=admin}
   echo "$REGISTRY_PASSWORD" | docker login "$CONTAINER_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
@@ -274,14 +290,18 @@ Push container to registry as OCI image.
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
+FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 # Verify image exists in local docker daemon (built by build:qcow2:container)
 docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found. Run build:qcow2:container first."; exit 1; }
 
 echo "Pushing: $FULL_IMAGE"
+
+# Use cluster CA for TLS verification (installed by build:qcow2:login)
+CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/${CONTAINER_REGISTRY:-registry.docker.arpa}"
+
 # Use skopeo for reliable OCI push (docker buildx has manifest issues with some registries)
-skopeo copy --dest-tls-verify=false \
+skopeo copy --dest-cert-dir "$CERT_DIR" \
     docker-daemon:"$FULL_IMAGE" \
     docker://"$FULL_IMAGE"
 
@@ -292,7 +312,7 @@ echo "Image: $FULL_IMAGE"
 # Validate image in registry
 echo ""
 echo "=== Validating ==="
-skopeo inspect --tls-verify=false docker://"$FULL_IMAGE" | jq '{Digest, Created, Architecture, Os}'
+skopeo inspect --cert-dir "$CERT_DIR" docker://"$FULL_IMAGE" | jq '{Digest, Created, Architecture, Os}'
 ```
 
 `runme run build:qcow2:push`
@@ -377,7 +397,7 @@ build:qcow2:publish
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-FULL_IMAGE="${CONTAINER_REGISTRY:-docker.io}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
+FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 echo "=== Publishing: $FULL_IMAGE ==="
 echo ""
@@ -636,7 +656,7 @@ Display build environment variables. Static filename avoids session persistence 
 ```sh {"name":"_build:qcow2:env"}
 # Static filename - no session persistence needed
 export QCOW2_OUTPUT="konductor.qcow2"
-export CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-docker.io}"
+export CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 export CONTAINER_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 export CONTAINER_TAG="${CONTAINER_TAG:-latest-qcow2}"
 export FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
@@ -791,6 +811,7 @@ sleep 1
 Wait for VM SSH to become available.
 
 ```sh {"name":"_build:qcow2:vm:wait","tag":"duration:slow"}
+# SSH client config in /etc/ssh/ssh_config handles localhost:2222 + host key
 timeout 180 bash -c 'until ssh localhost true 2>/dev/null; do sleep 3; done' || { echo "Error: VM failed to boot within 3 minutes"; exit 1; }
 ```
 
