@@ -166,9 +166,35 @@
       }
     )
 
-    # Cross-system outputs (modules, overlays)
+    # Cross-system outputs (modules, overlays, nixosConfigurations)
     // {
       overlays.default = nixpkgs.lib.composeManyExtensions overlays;
+
+      # NixOS configurations for live rebuilds on running VMs
+      # Usage: sudo nixos-rebuild switch --flake .#konductor
+      nixosConfigurations.konductor =
+        let
+          system = "x86_64-linux";
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
+            config.allowUnfree = true;
+          };
+          versions = import ./src/lib/versions.nix;
+          programs = import ./src/programs {
+            inherit pkgs inputs;
+            inherit (nixpkgs) lib;
+          };
+          qcow2 = import ./src/qcow2 {
+            inherit pkgs system versions programs;
+            inherit (nixpkgs) lib;
+            inherit (inputs) nixos-generators;
+          };
+        in
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ qcow2.konductorModule ];
+        };
 
       # NixOS module - standard flake output per `nix flake check --help`
       nixosModules = {

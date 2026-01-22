@@ -17,19 +17,21 @@ baseShell.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ packages.goPackages;
 
   shellHook = old.shellHook + ''
-    export KONDUCTOR_SHELL="go"
-    export name="go"
-
-    # Go workspace
-    export GOPATH="''${GOPATH:-$HOME/go}"
-    export GOBIN="$GOPATH/bin"
+    # Go workspace (dynamic, needs $HOME)
+    GOPATH="''${GOPATH:-$HOME/go}"
+    GOBIN="$GOPATH/bin"
     mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
     export PATH="$GOBIN:$PATH"
 
     echo "Go ${langs.go.display} ready"
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env = old.env // {
+    KONDUCTOR_SHELL = "go";
     GO111MODULE = "on";
     CGO_ENABLED = "1";
   };

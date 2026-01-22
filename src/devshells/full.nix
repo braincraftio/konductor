@@ -41,61 +41,64 @@ baseShell.overrideAttrs (old: {
     ++ config.shell.atuin.packages;
 
   shellHook = old.shellHook + ''
-    export KONDUCTOR_SHELL="full"
-    export name="full"
-
-    # SSH config generation from centralized src/config/shell/ssh.nix
+    # SSH identity detection (dynamic, needs $HOME)
     ${config.shell.ssh.shellHook}
 
-    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    # OpenCode theme (empty hook, config in opencode.json)
     ${config.opencode.shellHook}
 
-    # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
+    # Atuin data dir creation (dynamic, needs $HOME)
     ${config.shell.atuin.shellHook}
 
-    # Runtime libraries for:
-    # - C++ stdlib: Python grpc (Pulumi)
-    # - liblzma/libzstd: Rust crates using compression (cargo install targets)
+    # Runtime libraries (dynamic: appends to existing LD_LIBRARY_PATH)
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
       pkgs.stdenv.cc.cc.lib
       pkgs.xz
       pkgs.zstd
     ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
+    # Program hooks
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
-    # Python
-    export UV_SYSTEM_PYTHON="1"
-    export PYTHONDONTWRITEBYTECODE="1"
+    # Python: auto-activate venv if present (dynamic)
     if [ -d .venv ]; then
       source .venv/bin/activate 2>/dev/null || true
     fi
 
-    # Go
-    export GOPATH="''${GOPATH:-$HOME/go}"
-    export GOBIN="$GOPATH/bin"
+    # Go workspace (dynamic, needs $HOME)
+    GOPATH="''${GOPATH:-$HOME/go}"
+    GOBIN="$GOPATH/bin"
     mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
 
-    # Node
-    export PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
+    # Node (dynamic, needs $HOME)
+    PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
     mkdir -p "$PNPM_HOME"
 
-    # Rust
-    export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
+    # Rust (dynamic, needs $HOME)
+    CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
 
-    # Update PATH
+    # Update PATH (depends on dynamic vars above)
     export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
     echo "Full polyglot ready"
     echo "  Python ${langs.python.display} | Go ${langs.go.display}"
     echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
+  # Cannot use old.env - mkShell's env doesn't become a derivation attribute
+  # Import env sources directly instead
   env =
-    old.env
+    import ../lib/env.nix
+    // packages.env
     // {
+      # Shell identity
+      KONDUCTOR_SHELL = "full";
       # Python
       UV_SYSTEM_PYTHON = "1";
       PYTHONDONTWRITEBYTECODE = "1";
@@ -109,5 +112,6 @@ baseShell.overrideAttrs (old: {
     }
     // config.shell.ssh.env
     // config.opencode.env
-    // config.shell.atuin.env;
+    // config.shell.atuin.env
+    // programs.tmux.env;
 })

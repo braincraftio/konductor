@@ -47,47 +47,37 @@ baseShell.overrideAttrs (old: {
     ++ konductor.packages;
 
   shellHook = ''
-    # Skip base banner - we show our own
-    export KONDUCTOR_SKIP_BANNER=1
-
-    # Runtime libraries for Rust crates using compression (cargo install targets)
+    # Runtime libraries (dynamic: appends to existing LD_LIBRARY_PATH)
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   '' + old.shellHook + ''
-    export KONDUCTOR_SHELL="ci"
-    export name="ci"
-    export CI="true"
-
-    # SSH config generation from centralized src/config/shell/ssh.nix
+    # SSH identity detection (dynamic, needs $HOME)
     ${config.shell.ssh.shellHook}
 
-    # Python
-    export UV_SYSTEM_PYTHON="1"
-    export PYTHONDONTWRITEBYTECODE="1"
+    # Python: auto-activate venv if present (dynamic)
     if [ -d .venv ]; then
       source .venv/bin/activate 2>/dev/null || true
     fi
 
-    # Go
-    export GOPATH="''${GOPATH:-$HOME/go}"
-    export GOBIN="$GOPATH/bin"
+    # Go workspace (dynamic, needs $HOME)
+    GOPATH="''${GOPATH:-$HOME/go}"
+    GOBIN="$GOPATH/bin"
     mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
 
-    # Node
-    export PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
+    # Node (dynamic, needs $HOME)
+    PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
     mkdir -p "$PNPM_HOME"
 
-    # Rust
-    export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
+    # Rust (dynamic, needs $HOME)
+    CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
 
-    # Docker
-    export DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
-    export DOCKER_BUILDKIT=1
+    # Docker host (dynamic, uses default if not set)
+    DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
 
-    # Update PATH
+    # Update PATH (depends on dynamic vars above)
     export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
-    # Forgejo shell hook
+    # Forgejo shell hook (conditional)
     ${programs.forgejo.shellHook}
 
     # Konductor self-hosting shell hook
@@ -112,9 +102,16 @@ baseShell.overrideAttrs (old: {
     echo "  nix build .#oci           # Build OCI container"
     echo "  nix flake check           # Run all checks"
     echo ""
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env = old.env // {
+    # Shell identity
+    KONDUCTOR_SHELL = "ci";
+    KONDUCTOR_SKIP_BANNER = "1";
     # Python
     UV_SYSTEM_PYTHON = "1";
     PYTHONDONTWRITEBYTECODE = "1";
@@ -127,5 +124,7 @@ baseShell.overrideAttrs (old: {
     RUST_BACKTRACE = "1";
     # CI
     CI = "true";
+    # Docker
+    DOCKER_BUILDKIT = "1";
   } // (konductor.env pkgs) // config.shell.ssh.env;
 })

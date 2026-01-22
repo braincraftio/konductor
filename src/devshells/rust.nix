@@ -17,21 +17,24 @@ baseShell.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ packages.rustPackages;
 
   shellHook = old.shellHook + ''
-    export KONDUCTOR_SHELL="rust"
-    export name="rust"
-
     # Runtime libraries for Rust crates using compression (cargo install targets)
+    # Dynamic: appends to existing LD_LIBRARY_PATH
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-    # Cargo home
-    export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
+    # Cargo home (dynamic, needs $HOME)
+    CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
     export PATH="$CARGO_HOME/bin:$PATH"
 
     echo "Rust ${langs.rust.display} ready"
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env = old.env // {
+    KONDUCTOR_SHELL = "rust";
     RUST_BACKTRACE = "1";
   };
 })

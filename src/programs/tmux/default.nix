@@ -337,11 +337,11 @@ in
     pkgs.reattach-to-user-namespace
   ];
 
-  # Shell hook to export config path
-  shellHook = ''
-    export KONDUCTOR_TMUX_CONF="${tmuxConfig}"
-  '';
+  # No shell hook needed - config path set via env attribute
+  shellHook = "";
 
-  # No extra env vars needed
-  env = { };
+  # Environment variables (static nix paths)
+  env = {
+    KONDUCTOR_TMUX_CONF = "${tmuxConfig}";
+  };
 }

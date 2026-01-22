@@ -16,6 +16,7 @@
     wget # HTTP/FTP retrieval
     gnupg # GPG for signing
     cacert # CA certificates
+    openssl # TLS/SSL toolkit
     netcat
     # netcat-openbsd  # BROKEN: marked broken on Darwin/macOS in nixpkgs
     # netcat-gnu  # BROKEN: nc -zv returns exit 1 on open ports, unusable for scripting

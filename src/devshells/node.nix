@@ -17,18 +17,20 @@ baseShell.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ packages.nodejsPackages;
 
   shellHook = old.shellHook + ''
-    export KONDUCTOR_SHELL="node"
-    export name="node"
-
-    # pnpm home
-    export PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
+    # pnpm home (dynamic, needs $HOME)
+    PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
     mkdir -p "$PNPM_HOME"
     export PATH="$PNPM_HOME:$PATH"
 
     echo "Node.js ${langs.node.display} ready"
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env = old.env // {
+    KONDUCTOR_SHELL = "node";
     NODE_ENV = "development";
   };
 })

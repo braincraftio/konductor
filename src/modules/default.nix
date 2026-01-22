@@ -5,4 +5,7 @@
   nixos = import ./nixos.nix;
   homeManager = import ./home-manager.nix;
   darwin = import ./darwin.nix;
+
+  # Konductor-specific modules
+  pki = import ./pki.nix;  # VM identity and certificate chain of trust
 }

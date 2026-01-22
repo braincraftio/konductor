@@ -40,6 +40,7 @@ konductorShell.overrideAttrs (old: {
     # Tauri 2.x desktop application build dependencies (Linux only)
     ++ tauri.packages;
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env = old.env // {
     KONDUCTOR_SHELL = "frontend";
     PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
@@ -56,5 +57,8 @@ konductorShell.overrideAttrs (old: {
     ${tauri.shellHook}
   '' + old.shellHook + ''
     echo "Frontend shell ready (Playwright + Tauri 2.x enabled)"
+
+    # Clean up shellHook from env output (must be at very end)
+    unset shellHook
   '';
 })

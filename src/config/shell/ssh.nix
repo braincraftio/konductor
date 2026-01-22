@@ -42,16 +42,14 @@ let
         ConnectTimeout 5
   '';
 
-  # Shell hook to export config path and detect SSH identity
+  # Shell hook to detect SSH identity (dynamic, needs $HOME)
+  # KONDUCTOR_SSH_CONFIG is set via env attribute (static nix path)
   shellHookScript = ''
-    # Export path to Konductor SSH config (in nix store)
-    export KONDUCTOR_SSH_CONFIG="${sshConfigFile}"
-
-    # Detect SSH identity for cloud-init and automation
+    # Detect SSH identity for cloud-init and automation (needs $HOME at runtime)
     if [[ -f "$HOME/.ssh/id_ed25519" ]]; then
-      export KONDUCTOR_SSH_PUBKEY="$HOME/.ssh/id_ed25519.pub"
+      KONDUCTOR_SSH_PUBKEY="$HOME/.ssh/id_ed25519.pub"
     elif [[ -f "$HOME/.ssh/id_rsa" ]]; then
-      export KONDUCTOR_SSH_PUBKEY="$HOME/.ssh/id_rsa.pub"
+      KONDUCTOR_SSH_PUBKEY="$HOME/.ssh/id_rsa.pub"
     fi
   '';
 

@@ -42,14 +42,14 @@ let
     text = builtins.readFile ./atuin.toml;
   };
 
-  # Shell initialization script - sets up env vars, actual init in .bashrc
+  # Shell initialization script - creates data dir (needs $HOME at runtime)
+  # ATUIN_CONFIG_DIR and KONDUCTOR_PREEXEC_PATH set via env attribute (static nix paths)
+  # Note: Cannot use BASH_ prefix - bash reserves variables starting with BASH_
   initScript = ''
     # Atuin Shell History - SQLite-backed fuzzy search
     # Keybindings: Ctrl+R (search), Up (directory search), Ctrl+O (inspector)
     # Actual init happens in .bashrc for proper interactive shell context
     mkdir -p "''${XDG_DATA_HOME:-$HOME/.local/share}/atuin"
-    export ATUIN_CONFIG_DIR="${configFile}"
-    export BASH_PREEXEC_PATH="${pkgs.bash-preexec}/share/bash/bash-preexec.sh"
   '';
 
 in
@@ -74,9 +74,11 @@ in
   # Use in devshells: ${config.shell.atuin.shellHook}
   shellHook = initScript;
 
-  # Environment variables
+  # Environment variables (static nix paths)
+  # Note: KONDUCTOR_PREEXEC_PATH instead of BASH_PREEXEC_PATH - bash reserves BASH_* variables
   env = {
     ATUIN_CONFIG_DIR = "${configFile}";
+    KONDUCTOR_PREEXEC_PATH = "${pkgs.bash-preexec}/share/bash/bash-preexec.sh";
   };
 
   # Metadata

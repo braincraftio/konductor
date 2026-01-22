@@ -21,20 +21,24 @@ baseShell.overrideAttrs (old: {
     ++ packages.idePackages;
 
   shellHook = old.shellHook + ''
-    export KONDUCTOR_SHELL="dev"
-    export name="dev"
-
-    # SSH config generation from centralized src/config/shell/ssh.nix
+    # SSH identity detection (dynamic, needs $HOME)
     ${config.shell.ssh.shellHook}
 
-    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    # OpenCode theme (empty hook, config in opencode.json)
     ${config.opencode.shellHook}
 
+    # Program hooks (neovim and tmux are empty now)
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
     echo "IDE ready: nvim, tmux, forgejo-cli"
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
-  env = old.env // config.shell.ssh.env // config.opencode.env;
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
+  env = old.env // {
+    KONDUCTOR_SHELL = "dev";
+  } // config.shell.ssh.env // config.opencode.env // programs.tmux.env;
 })

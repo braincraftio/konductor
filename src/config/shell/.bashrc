@@ -100,8 +100,9 @@ fi
 # Requires bash-preexec for hooks. ATUIN_CONFIG_DIR set by devshell.
 if command -v atuin >/dev/null 2>&1 && [ -t 0 ] && [[ "${TERM:-dumb}" != "dumb" ]]; then
   # Source bash-preexec if available (provides preexec/precmd hooks)
-  if [ -n "$BASH_PREEXEC_PATH" ] && [ -f "$BASH_PREEXEC_PATH" ]; then
-    source "$BASH_PREEXEC_PATH"
+  # Note: Using KONDUCTOR_PREEXEC_PATH - bash reserves variables starting with BASH_
+  if [ -n "$KONDUCTOR_PREEXEC_PATH" ] && [ -f "$KONDUCTOR_PREEXEC_PATH" ]; then
+    source "$KONDUCTOR_PREEXEC_PATH"
   fi
   eval "$(atuin init bash)"
 fi

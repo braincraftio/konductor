@@ -111,7 +111,8 @@ rec {
   # ===========================================================================
   # Environment Variables (merged from categories, excluding languages)
   # ===========================================================================
-  env = (linters.env or { })
+  env = (cli.env or { })
+    // (linters.env or { })
     // (formatters.env or { })
     // (ai.env or { });
 }

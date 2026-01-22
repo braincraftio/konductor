@@ -22,11 +22,14 @@ let
         config.shell.starship.package # Starship with Konductor theme
         # Note: bash.package is not included here - it's used via shellHook/bashrcContent
       ]
+      ++ config.shell.atuin.packages # Atuin + bash-preexec for shell history
     else
       [
         pkgs.git
         pkgs.openssh
         pkgs.starship
+        pkgs.atuin
+        pkgs.bash-preexec
       ];
 in
 
@@ -71,5 +74,5 @@ in
     ]);
 
   shellHook = "";
-  env = { };
+  env = if hasConfig then config.shell.atuin.env else { };
 }

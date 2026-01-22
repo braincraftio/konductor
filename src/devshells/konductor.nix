@@ -54,12 +54,7 @@ baseShell.overrideAttrs (old: {
     ++ [ pkgs.stdenv.cc.cc.lib ];
 
   shellHook = ''
-    # Skip base banner - we show our own
-    export KONDUCTOR_SKIP_BANNER=1
-
-    # Runtime libraries for:
-    # - C++ stdlib: Python grpc (Pulumi)
-    # - liblzma/libzstd: Rust crates using compression (cargo install targets)
+    # Runtime libraries (dynamic: appends to existing LD_LIBRARY_PATH)
     export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
       pkgs.stdenv.cc.cc.lib
       pkgs.xz
@@ -68,52 +63,47 @@ baseShell.overrideAttrs (old: {
   ''
   + old.shellHook
   + ''
-    export KONDUCTOR_SHELL="konductor"
-    export name="konductor"
-
-    # SSH config generation from centralized src/config/shell/ssh.nix
+    # SSH identity detection (dynamic, needs $HOME)
     ${config.shell.ssh.shellHook}
 
-    # OpenCode Catppuccin Frappe theme (matches neovim theme)
+    # OpenCode theme (empty hook)
     ${config.opencode.shellHook}
 
-    # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
+    # Atuin data dir creation (dynamic, needs $HOME)
     ${config.shell.atuin.shellHook}
 
+    # Program hooks
     ${programs.neovim.shellHook}
     ${programs.tmux.shellHook}
 
-    # Python
-    export UV_SYSTEM_PYTHON="1"
-    export PYTHONDONTWRITEBYTECODE="1"
+    # Python: auto-activate venv if present (dynamic)
     if [ -d .venv ]; then
       source .venv/bin/activate 2>/dev/null || true
     fi
 
-    # Go
-    export GOPATH="''${GOPATH:-$HOME/go}"
-    export GOBIN="$GOPATH/bin"
+    # Go workspace (dynamic, needs $HOME)
+    GOPATH="''${GOPATH:-$HOME/go}"
+    GOBIN="$GOPATH/bin"
     mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
 
-    # Node
-    export PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
+    # Node (dynamic, needs $HOME)
+    PNPM_HOME="''${PNPM_HOME:-$HOME/.local/share/pnpm}"
     mkdir -p "$PNPM_HOME"
 
-    # Rust
-    export CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
+    # Rust (dynamic, needs $HOME)
+    CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
 
-    # Docker
-    export DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
-    export DOCKER_BUILDKIT=1
+    # Docker host (dynamic, uses default if not set)
+    DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
 
     # Konductor self-hosting
     ${konductor.shellHook}
 
-    # Forgejo CI/CD
+    # Forgejo CI/CD (conditional)
     ${programs.forgejo.shellHook}
 
-    # Update PATH
+    # Update PATH (depends on dynamic vars above)
     export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
     echo ""
@@ -134,11 +124,18 @@ baseShell.overrideAttrs (old: {
     echo ""
     echo "Commands:  mise run help"
     echo ""
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   env =
     old.env
     // {
+      # Shell identity
+      KONDUCTOR_SHELL = "konductor";
+      KONDUCTOR_SKIP_BANNER = "1";
       # Python
       UV_SYSTEM_PYTHON = "1";
       PYTHONDONTWRITEBYTECODE = "1";
@@ -149,9 +146,12 @@ baseShell.overrideAttrs (old: {
       NODE_ENV = "development";
       # Rust
       RUST_BACKTRACE = "1";
+      # Docker
+      DOCKER_BUILDKIT = "1";
     }
     // (konductor.env pkgs)
     // config.shell.ssh.env
     // config.opencode.env
-    // config.shell.atuin.env;
+    // config.shell.atuin.env
+    // programs.tmux.env;
 })

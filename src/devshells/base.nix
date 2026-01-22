@@ -22,8 +22,7 @@ pkgs.mkShell {
   packages = packages.default;
 
   shellHook = ''
-    export KONDUCTOR_SHELL="default"
-    export name="default"
+    # KONDUCTOR_SHELL and name set via env attribute
 
     # Source bash-completion for programmable completions
     # This enables lazy-loading of completions from XDG_DATA_DIRS
@@ -54,8 +53,14 @@ pkgs.mkShell {
       echo "Commands:  mise run help"
       echo ""
     fi
+
+    # Clean up shellHook from env output
+    unset shellHook
   '';
 
-  # Use centralized environment variables
-  env = import ../lib/env.nix;
+  # Use centralized environment variables + shell identity + package env
+  # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
+  env = import ../lib/env.nix // packages.env // {
+    KONDUCTOR_SHELL = "default";
+  };
 }
