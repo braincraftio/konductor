@@ -291,6 +291,19 @@ let
         };
       };
 
+      # SSH client configuration (/etc/ssh/ssh_config)
+      # Localhost:2222 for QCOW2 build VM access with auto-accept host keys
+      ssh = {
+        extraConfig = ''
+          Host localhost
+              Port 2222
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+              LogLevel ERROR
+              ConnectTimeout 5
+        '';
+      };
+
       # Git global configuration (/etc/gitconfig)
       # System-level defaults - user ~/.gitconfig can override
       git = {
