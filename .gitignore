@@ -17,6 +17,11 @@ docker-bake.override.json
 *.core
 core.[0-9]*
 
+# QCOW2 build artifacts (provenance written during build)
+.konductor
+.nix_drv
+*.meta
+
 # =============================================================================
 # Language Runtimes & Dependencies
 # =============================================================================
