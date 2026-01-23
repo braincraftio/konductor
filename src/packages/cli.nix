@@ -45,6 +45,12 @@ in
       ripgrep # Fast grep (rg)
       fd # Fast find
       fzf # Fuzzy finder
+      bottom # System monitor TUI (btm)
+      fastfetch # System info display
+      dnsutils # dig, nslookup, host
+      ncdu # Disk usage analyzer
+      watch # Run commands periodically
+      file # File type detection
       # starship is in shellTools (wrapped)
       unstable.mise # Task runner and version manager
       direnv # Directory-based environments
