@@ -15,6 +15,8 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 
 - [Output](#output)
 - [Supply Chain Provenance](#supply-chain-provenance)
+- [Cluster Infrastructure](#cluster-infrastructure)
+- [Registry Setup](#registry-setup)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Task Reference](#task-reference)
@@ -126,6 +128,127 @@ oci_digest = "sha256:abc123..."
 
 ---
 
+## Cluster Infrastructure
+
+The QCOW2 build publishes to `registry.docker.arpa`, which runs on a local Talos Kubernetes cluster. These tasks invoke mise (which finds `projv-engprod/.mise.toml` via upward search) and use `WORKSPACE_ROOT` from the environment.
+
+### cluster:up
+
+Start Talos cluster and deploy platform services.
+
+```sh {"name":"cluster:up","excludeFromRunAll":"true","tag":"type:entry,scope:cluster"}
+# Clean any existing cluster
+mise run dev:k8s:compose:clean
+
+# Start Talos in Docker
+mise run dev:k8s:compose:up
+
+# Deploy platform (Cilium, cert-manager, Envoy Gateway, Zot registry, etc.)
+mise run dev:k8s:pulumi:up
+```
+
+### cluster:down
+
+Destroy the cluster.
+
+```sh {"name":"cluster:down","excludeFromRunAll":"true","tag":"type:entry,type:destructive,scope:cluster"}
+mise run dev:k8s:compose:clean
+```
+
+### cluster:status
+
+Check cluster and registry status.
+
+```sh {"name":"cluster:status","excludeFromRunAll":"true","tag":"type:entry,scope:cluster"}
+kubectl get nodes
+kubectl get po -n registry
+kubectl get httproute -n registry
+curl -sk -u admin:admin https://registry.docker.arpa/v2/_catalog | jq
+```
+
+---
+
+## Registry Setup
+
+Configure Docker and Skopeo to trust the cluster CA and authenticate to `registry.docker.arpa`.
+
+### registry:trust
+
+Install cluster CA certificate for Docker daemon.
+
+```sh {"name":"registry:trust","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+set -e
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+K8S_CONTEXT="${REGISTRY_K8S_CONTEXT:-admin@docker-dev}"
+
+# Docker daemon cert directory
+DOCKER_CERT_DIR="/etc/docker/certs.d/$REGISTRY"
+sudo mkdir -p "$DOCKER_CERT_DIR"
+
+# Extract CA from gateway TLS secret
+kubectl --context "$K8S_CONTEXT" \
+    get secret gateway-tls-https -n envoy-gateway-system \
+    -o jsonpath='{.data.ca\.crt}' | base64 -d \
+    | sudo tee "$DOCKER_CERT_DIR/ca.crt" > /dev/null
+
+echo "✓ CA installed: $DOCKER_CERT_DIR/ca.crt"
+
+# Skopeo/Podman cert directory
+CONTAINERS_CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+mkdir -p "$CONTAINERS_CERT_DIR"
+kubectl --context "$K8S_CONTEXT" \
+    get secret gateway-tls-https -n envoy-gateway-system \
+    -o jsonpath='{.data.ca\.crt}' | base64 -d \
+    > "$CONTAINERS_CERT_DIR/ca.crt"
+
+echo "✓ CA installed: $CONTAINERS_CERT_DIR/ca.crt"
+```
+
+### registry:login
+
+Authenticate Docker and Skopeo to registry.
+
+```sh {"name":"registry:login","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+set -e
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+USERNAME="${REGISTRY_USERNAME:-admin}"
+PASSWORD="${REGISTRY_PASSWORD:-admin}"
+CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+
+# Docker login
+echo "$PASSWORD" | docker login "$REGISTRY" -u "$USERNAME" --password-stdin
+
+# Skopeo login (writes to ~/.docker/config.json for compat)
+echo "$PASSWORD" | skopeo login "$REGISTRY" \
+    --username "$USERNAME" --password-stdin \
+    --cert-dir "$CERT_DIR" --compat-auth-file ~/.docker/config.json
+
+echo "✓ Logged in to $REGISTRY"
+```
+
+### registry:list
+
+List images in registry.
+
+```sh {"name":"registry:list","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
+    "https://$REGISTRY/v2/_catalog" | jq
+```
+
+### registry:tags
+
+List tags for konductor image.
+
+```sh {"name":"registry:tags","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
+    "https://$REGISTRY/v2/$IMAGE/tags/list" | jq
+```
+
+---
+
 ## Prerequisites
 
 All prerequisites are provided by `nix develop .#konductor` (devshell).
@@ -145,17 +268,50 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 
 ## Quick Start
 
+### Full Workflow
+
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  build:qcow2                    Show this help                              │
-│    ├── :rebase                  Rebuild NixOS host from flake (dogfood)     │
+│  End-to-End: Build → Cluster → Trust → Push                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  1. build:qcow2:image   Build QCOW2 (no cluster needed)                     │
+│  2. build:qcow2:container Package as containerDisk                          │
+│  3. cluster:up          Start Talos + deploy platform (projv-engprod)       │
+│  4. registry:trust      Install cluster CA for Docker/Skopeo                │
+│  5. registry:login      Authenticate to registry.docker.arpa                │
+│  6. build:qcow2:push    Push with git/nix/latest tags                       │
+│  7. registry:tags       Verify pushed tags                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Task Tree
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  build:qcow2 (no cluster required)                                          │
 │    ├── :clean                   Reset build state                           │
 │    ├── :image                   Build QCOW2 (nix → VM configure → seal)     │
-│    ├── :container               Package QCOW2 as containerDisk              │
+│    └── :container               Package QCOW2 as containerDisk              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  cluster:                       Kubernetes cluster management               │
+│    ├── :up                      Start Talos + deploy platform               │
+│    ├── :down                    Destroy cluster                             │
+│    └── :status                  Check cluster and registry status           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  registry:                      Container registry setup                    │
+│    ├── :trust                   Install cluster CA for Docker/Skopeo        │
+│    ├── :login                   Authenticate to registry                    │
+│    ├── :list                    List images in registry                     │
+│    └── :tags                    List tags for konductor image               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  build:qcow2 (requires cluster)                                             │
 │    ├── :login                   Authenticate to registry                    │
 │    ├── :push                    Push with git/nix/latest tags               │
+│    └── :promote                 Copy to public registry (docker.io)         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  build:qcow2 (convenience)                                                  │
 │    ├── :publish                 Full pipeline: image → container → push     │
-│    ├── :promote                 Copy to public registry (docker.io)         │
+│    ├── :rebase                  Rebuild NixOS host from flake (dogfood)     │
 │    ├── :start                   Boot image for local development            │
 │    ├── :ssh                     SSH into running VM                         │
 │    └── :stop                    Graceful VM shutdown                        │
@@ -409,6 +565,69 @@ cat .konductor
 
 ---
 
+### build:qcow2:all
+
+Complete end-to-end: build → cluster → trust → push.
+
+```sh {"name":"build:qcow2:all","excludeFromRunAll":"true","tag":"type:entry"}
+set -e
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  build:qcow2:all - Complete End-to-End Pipeline"
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+echo "  1. build:qcow2:image     Build QCOW2 (nix → VM configure → seal)"
+echo "  2. build:qcow2:container Package as containerDisk"
+echo "  3. cluster:up            Start Talos + deploy platform"
+echo "  4. registry:trust        Install cluster CA for Docker/Skopeo"
+echo "  5. registry:login        Authenticate to registry"
+echo "  6. build:qcow2:push      Push with git/nix/latest tags"
+echo "  7. registry:tags         Verify pushed tags"
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
+
+# Phase 1: Build (no cluster required)
+echo ""
+echo "▶ Phase 1: Build QCOW2 image..."
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+
+echo ""
+echo "▶ Phase 2: Package as containerDisk..."
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+
+# Phase 2: Cluster
+echo ""
+echo "▶ Phase 3: Start cluster and deploy platform..."
+runme run --filename "$QCOW2_BUILD_FILE" cluster:up
+
+# Phase 3: Registry setup
+echo ""
+echo "▶ Phase 4: Install cluster CA..."
+runme run --filename "$QCOW2_BUILD_FILE" registry:trust
+
+echo ""
+echo "▶ Phase 5: Authenticate to registry..."
+runme run --filename "$QCOW2_BUILD_FILE" registry:login
+
+# Phase 4: Push
+echo ""
+echo "▶ Phase 6: Push to registry..."
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+
+# Verify
+echo ""
+echo "▶ Phase 7: Verify pushed tags..."
+runme run --filename "$QCOW2_BUILD_FILE" registry:tags
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  ✓ Complete! Image pushed to registry.docker.arpa"
+echo "═══════════════════════════════════════════════════════════════════════════"
+cat .konductor
+```
+
+---
+
 ### build:qcow2:promote
 
 Copy to public registry.
@@ -470,16 +689,31 @@ skopeo inspect docker://"$DST_REGISTRY/$DST_IMAGE:$DST_TAG" | jq '{Digest, Creat
 ## Task Reference
 
 ```text
-Entry Points:
+Build (no cluster required):
   build:qcow2              Show help
-  build:qcow2:rebase       Rebuild NixOS host from flake
   build:qcow2:clean        Reset build state
   build:qcow2:image        Build QCOW2
   build:qcow2:container    Package as containerDisk
-  build:qcow2:login        Authenticate to registry
-  build:qcow2:push         Push with multi-tag
-  build:qcow2:publish      Full pipeline
-  build:qcow2:promote      Copy to public registry
+
+Cluster Management:
+  cluster:up               Start Talos + deploy platform (projv-engprod)
+  cluster:down             Destroy cluster
+  cluster:status           Check cluster and registry status
+
+Registry Setup:
+  registry:trust           Install cluster CA for Docker/Skopeo
+  registry:login           Authenticate to registry
+  registry:list            List images in registry
+  registry:tags            List tags for konductor image
+
+Push & Promote:
+  build:qcow2:login        Authenticate to registry (alias for registry:login)
+  build:qcow2:push         Push with multi-tag (git/nix/latest)
+  build:qcow2:promote      Copy to public registry (docker.io/ghcr.io)
+
+Convenience:
+  build:qcow2:publish      Full pipeline (image → container → login → push)
+  build:qcow2:rebase       Rebuild NixOS host from flake (dogfood)
   build:qcow2:start        Boot for development
   build:qcow2:ssh          SSH into VM
   build:qcow2:stop         Shutdown VM

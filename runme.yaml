@@ -36,10 +36,11 @@ project:
 
   # Environment configuration
   env:
-    # Load order for .env files (later overrides earlier)
+    # Load order: .env.example (operational defaults) -> .env.local/.env (overrides)
     sources:
+      - .env.example  # Operational defaults (CI runs on this)
       - .env.local    # Local developer overrides (gitignored)
-      - .env          # Shared defaults
+      - .env          # Shared overrides
 
 # Task filters (applied to beta commands)
 # Reference: TASKS.v2.md Filter System
