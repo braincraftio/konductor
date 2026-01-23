@@ -14,6 +14,7 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 ## Contents
 
 - [Output](#output)
+- [Supply Chain Provenance](#supply-chain-provenance)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Task Reference](#task-reference)
@@ -24,37 +25,121 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 
 ## Output
 
-| Artifact | Size | Description |
-|----------|------|-------------|
-| `konductor.qcow2` | ~4GB | ZSTD-compressed QCOW2, boots offline with full toolchain |
-| `docker.io/containercraft/konductor:latest-qcow2` | ~4GB | KubeVirt containerDisk (also on ghcr.io/braincraftio/konductor) |
+| Artifact | Description |
+|----------|-------------|
+| `konductor.qcow2` | ZSTD-compressed QCOW2 (~4GB) |
+| `registry.docker.arpa/.../konductor:latest-qcow2` | KubeVirt containerDisk |
+| `registry.docker.arpa/.../konductor:git-<commit>` | Git commit tag |
+| `registry.docker.arpa/.../konductor:nix-<drv>` | Nix derivation tag |
 
 The image includes:
 
-- NixOS with cloud-init for dynamic configuration
-- **Full Konductor environment pre-installed** - no `nix develop` needed
-- All languages: Python, Go, Node.js, Rust
-- IDE: Neovim (fully configured), tmux
+- NixOS with cloud-init
+- Full Konductor environment pre-installed (built natively via `nixos-rebuild switch`)
+- Pre-cached devshells: `default`, `full`, `konductor` (airgap-ready)
+- Languages: Python, Go, Node.js, Rust
+- IDE: Neovim, tmux
 - Self-hosting: Docker, QEMU, libvirt, Buildkit
-- Linters, formatters, AI tools
-- Users: `kc2` (unprivileged), `kc2admin` (sudo), `runner` (CI/CD)
-- Services: SSH, QEMU guest agent, Docker, Libvirt (not auto-started)
+- Users: `kc2`, `kc2admin`, `runner`
+- Source: `/opt/konductor` (git history preserved for verification)
+
+---
+
+## Supply Chain Provenance
+
+Single file `.konductor` accumulates through the supply chain:
+
+```text
+SOURCE ────► NIX ────► BUILD ────► SEAL ────► OCI ────► PUSH
+   │          │          │           │          │         │
+   ▼          ▼          ▼           ▼          ▼         ▼
+┌────────────────────────────────────────────────────────────┐
+│ .konductor                                                 │
+├────────────────────────────────────────────────────────────┤
+│ git_commit     ✓                                           │
+│ git_dirty      ✓  (trust gate: 0 = reproducible)           │
+│ nix_version         ✓                                      │
+│ nix_hash            ✓                                      │
+│ nix_drv             ✓  (reproducible build ID)             │
+│ flake_lock_sha256   ✓                                      │
+│ build_date               ✓                                 │
+│ build_host               ✓                                 │
+│ strict                   ✓  (KONDUCTOR_STRICT env)         │
+│ image_sha256                  ✓                            │
+│ image_size                    ✓                            │
+│ oci_image                          ✓                       │
+│ oci_tags                           ✓                       │
+│ oci_digest                                   ✓             │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Deterministic Identifiers
+
+| ID | Example | Reproducible | Use |
+|----|---------|--------------|-----|
+| `git-<7>` | `git-b7c2ab9` | Yes (if !dirty) | OCI tag, source trace |
+| `nix-<12>` | `nix-ish8abfw47k7` | Yes | OCI tag, build ID |
+| `sha-<12>` | `sha-def456abc123` | Yes | Content verification |
+
+### Locations
+
+| Location | Contents |
+|----------|----------|
+| `/.konductor` (inside VM) | git, nix, build, oci_image, oci_tags |
+| `/disk/.konductor` (in OCI) | above + image_sha256, image_size, oci_digest |
+| `/disk/build.log` (in OCI) | Serial console capture |
+
+### Self-Pull from Running VM
+
+```bash {"excludeFromRunAll":"true","name":"example:self-pull"}
+# Parse provenance (run inside a Konductor VM)
+oci_image=$(sed -n 's/^oci_image = "\(.*\)"$/\1/p' /.konductor)
+git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
+
+# Pull source container
+docker pull "${oci_image}:git-${git_commit:0:7}"
+```
+
+### Example
+
+```toml
+[konductor]
+git_commit = "b7c2ab9def456789..."
+git_branch = "main"
+git_remote = "https://github.com/containercraft/konductor.git"
+git_dirty = 0
+nix_version = "2.24.0"
+nix_hash = "sha256-Syola5vIforGUKQxoj9Mp8pC42OMHLepe1O41/gI8ZQ="
+nix_drv = "ish8abfw47k70cw4il324sr6fqz4wdvn"
+flake_lock_sha256 = "abc123def456..."
+build_date = "2025-01-22T10:30:00-08:00"
+build_host = "konductor-builder"
+build_user = "runner"
+qemu = "8.2.0"
+strict = false
+oci_image = "registry.docker.arpa/containercraft/konductor"
+oci_tags = ["latest-qcow2", "git-b7c2ab9", "nix-ish8abfw47k7"]
+image_sha256 = "def456..."
+image_size = "3.8G"
+oci_digest = "sha256:abc123..."
+```
 
 ---
 
 ## Prerequisites
 
-All prerequisites are provided by `nix develop` (devshell).
+All prerequisites are provided by `nix develop .#konductor` (devshell).
 
-| Tool | Purpose | Tag |
-|------|---------|-----|
-| `nix` | Build NixOS system closure | `requires:nix` |
-| `qemu-system-x86_64` | Run build VM with KVM acceleration | `requires:kvm` |
-| `OVMF` | EFI firmware (env: `$OVMF_CODE`, `$OVMF_VARS`) | `requires:efi` |
-| `guestfs-tools` | Mount and optimize QCOW2 images | `requires:guestfs` |
-| `genisoimage` | Create cloud-init ISO | - |
-| `docker` | Build containerDisk image (optional) | `requires:docker` |
-| SSH config | `ssh localhost` → port 2222 (auto-configured by devshell) | - |
+| Tool | Purpose |
+|------|---------|
+| `nix` | Build NixOS system closure |
+| `qemu-system-x86_64` | Run build VM with KVM acceleration |
+| `OVMF` | EFI firmware (`$OVMF_CODE`, `$OVMF_VARS`) |
+| `guestfs-tools` | Mount and optimize QCOW2 images |
+| `genisoimage` | Create cloud-init ISO |
+| `docker` | Build containerDisk image |
+| `skopeo` | Push to registry with multi-tag |
+| SSH | `ssh localhost` → port 2222 |
 
 ---
 
@@ -63,398 +148,364 @@ All prerequisites are provided by `nix develop` (devshell).
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  build:qcow2                    Show this help                              │
+│    ├── :rebase                  Rebuild NixOS host from flake (dogfood)     │
 │    ├── :clean                   Reset build state                           │
-│    ├── :image                   Build QCOW2 (nix → VM configure → package)  │
+│    ├── :image                   Build QCOW2 (nix → VM configure → seal)     │
 │    ├── :container               Package QCOW2 as containerDisk              │
 │    ├── :login                   Authenticate to registry                    │
-│    ├── :push                    Push container to registry                  │
+│    ├── :push                    Push with git/nix/latest tags               │
+│    ├── :publish                 Full pipeline: image → container → push     │
+│    ├── :promote                 Copy to public registry (docker.io)         │
 │    ├── :start                   Boot image for local development            │
 │    ├── :ssh                     SSH into running VM                         │
-│    ├── :stop                    Graceful VM shutdown                        │
-│    └── :publish                 Full automation: image → container → push   │
+│    └── :stop                    Graceful VM shutdown                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### build:qcow2
 
-Show available tasks.
-
 ```sh {"name":"build:qcow2","excludeFromRunAll":"true","tag":"type:entry"}
 cat << 'EOF'
-build:qcow2 - Konductor QCOW2 Build Tasks
+build:qcow2 - Konductor QCOW2 Build
 
 Usage: runme run build:qcow2:<task>
 
 Tasks:
+  :rebase     Rebuild NixOS host from flake
   :clean      Reset build state
-  :image      Build QCOW2 (nix → VM configure → compress → verify)
-  :container  Package QCOW2 as containerDisk
+  :image      Build QCOW2
+  :container  Package as containerDisk
   :login      Authenticate to registry
-  :push       Push container to registry
-  :start      Boot image for local development
-  :ssh        SSH into running VM
-  :stop       Graceful VM shutdown
-  :publish    Full automation: image → container → login → push
+  :push       Push with multi-tag (git/nix/latest)
+  :publish    Full pipeline
+  :promote    Copy to public registry
+  :start      Boot for development
+  :ssh        SSH into VM
+  :stop       Shutdown VM
 
-Examples:
-  runme run build:qcow2:publish                  # From zero to published
-  runme run build:qcow2:image                    # Build QCOW2 only
-  runme run build:qcow2:start && ssh localhost   # Local development
+Workflow:
+  1. runme run build:qcow2:publish    # Build and push to local Zot
+  2. kubectl apply -k deploy/kubevirt # Deploy to KubeVirt
+  3. runme run build:qcow2:promote    # Promote to docker.io
 
-Output:
-  konductor.qcow2                                  # ZSTD-compressed QCOW2
-  docker.io/containercraft/konductor:latest-qcow2  # KubeVirt containerDisk
+Tags pushed:
+  - latest-qcow2           (convenience)
+  - git-<commit>           (source trace)
+  - nix-<drv>              (reproducible build ID)
+
+Skip Flags:
+  SKIP_NIX_BUILD=true    Reuse existing result/
+  SKIP_VM_PHASE=true     Reuse existing image
+  SKIP_COMPRESS=true     Skip ZSTD compression
 EOF
 ```
-
-`runme run build:qcow2`
 
 ---
 
 ### build:qcow2:clean
 
-Reset build state. Kills running VM, removes temp files.
-
 ```sh {"name":"build:qcow2:clean","excludeFromRunAll":"true","tag":"type:entry,type:destructive"}
-pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
-rm -f /tmp/konductor-build-vm.pid /tmp/konductor-build-vm.log
-sudo guestunmount /tmp/nixmount 2>/dev/null || true
-sudo rm -rf /tmp/nixmount /tmp/konductor-build-cloud-init
-rm -rf result result.writable konductor.qcow2 konductor.qcow2.tmp 2>/dev/null || true
+(pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
+rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
+sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
+fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
+sudo rm -rf "${QCOW2_MOUNT:-/tmp/nixmount}" "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+rm -rf result result.writable konductor.qcow2 konductor.qcow2.tmp .konductor .nix_drv
 ```
 
-`runme run build:qcow2:clean`
+---
+
+### build:qcow2:rebase
+
+Rebuild NixOS host from flake.
+
+```sh {"name":"build:qcow2:rebase","excludeFromRunAll":"true","tag":"type:entry,requires:nixos"}
+set -e
+sudo nixos-rebuild switch --flake .#konductor
+echo "Run 'direnv reload' to pick up changes"
+```
 
 ---
 
 ### build:qcow2:image
 
-Build QCOW2: nix build → VM configure → compress → sparsify → verify.
-
-```text
-build:qcow2:image
-
-  stop → clean → nix → cloudinit → img:reset → vm:boot → vm:wait → vm:sync
-    │       │      │        │           │           │         │         │
-    ▼       ▼      ▼        ▼           ▼           ▼         ▼         ▼
- graceful force  build  generate    reset VM    boot VM   wait for   rsync to
- shutdown clean  QCOW2  cloud-init  to pristine           SSH ready  /opt/konductor
-
-  → vm:gc → vm:zero → vm:halt → img:clean → img:compress → img:sparsify → verify
-       │        │          │          │            │              │           │
-       ▼        ▼          ▼          ▼            ▼              ▼           ▼
-    garbage   zero     shutdown   clean SSH     ZSTD          reclaim      show
-    collect   free     VM         keys/git     compress       sparse       size
-```
+Build QCOW2: nix → VM configure → seal → verify.
 
 ```sh {"name":"build:qcow2:image","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run build:qcow2:stop
-runme run build:qcow2:clean
-runme run --filename docs/developer_guide/qcow2/BUILD.md --all
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:stop
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --filename "$QCOW2_BUILD_FILE" --all
 ```
-
-`runme run build:qcow2:image`
 
 ---
 
 ### build:qcow2:container
 
-Package QCOW2 as containerDisk for KubeVirt.
+Package QCOW2 as containerDisk.
 
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-QCOW2_OUTPUT="konductor.qcow2"
 FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
-[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found. Run build:qcow2:image first."; exit 1; }
+[ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
+[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
 [ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
+[ -f "${QCOW2_LOGFILE:-build-vm.log}" ] || echo "# VM phase skipped" > "${QCOW2_LOGFILE:-build-vm.log}"
 
-echo "Building containerDisk from: $QCOW2_OUTPUT"
-echo "Target image: $FULL_IMAGE"
-# --provenance=false --sbom=false: disable attestations for clean OCI images
-docker buildx build -f Dockerfile.qcow2 --build-arg QCOW2_FILE="$QCOW2_OUTPUT" \
-    --provenance=false \
-    --sbom=false \
+docker buildx build -f Dockerfile.qcow2 \
+    --build-arg QCOW2_FILE=konductor.qcow2 \
+    --build-arg BUILD_LOG="${QCOW2_LOGFILE:-build-vm.log}" \
+    --build-arg PROVENANCE=.konductor \
+    --provenance=false --sbom=false \
     --load -t "$FULL_IMAGE" .
-echo ""
-echo "Built: $FULL_IMAGE"
-docker images "$FULL_IMAGE" --format "Size: {{.Size}}"
 ```
-
-`runme run build:qcow2:container`
 
 ---
 
 ### build:qcow2:login
 
-Authenticate to container registry. Supports Docker Hub and GHCR.
-
-Logic:
-1. If token provided (DOCKER_TOKEN or GITHUB_TOKEN) → login with token
-2. If already authenticated (docker config) → skip
-3. Otherwise → error with instructions
+Authenticate to container registry.
 
 ```sh {"name":"build:qcow2:login","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-# Default to local Zot registry for docker-dev workflow
-# Override with CONTAINER_REGISTRY=docker.io for public push
-: ${CONTAINER_REGISTRY:=registry.docker.arpa}
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 
-# Local Zot registry (docker-dev cluster)
-if [[ "$CONTAINER_REGISTRY" == "registry.docker.arpa" ]] || [[ "$CONTAINER_REGISTRY" =~ ^registry\..+\.sslip\.io$ ]]; then
-  # Check if already logged in
-  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONTAINER_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
-    echo "Already authenticated to $CONTAINER_REGISTRY"
-    exit 0
-  fi
-
-  # Fetch cluster CA for TLS verification (gateway-tls-https has the root CA)
-  # REGISTRY_K8S_CONTEXT: cluster context where registry runs (default: admin@docker-dev)
-  CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$CONTAINER_REGISTRY"
-  mkdir -p "$CERT_DIR"
-  kubectl --context "${REGISTRY_K8S_CONTEXT:-admin@docker-dev}" \
-    get secret gateway-tls-https -n envoy-gateway-system \
-    -o jsonpath='{.data.ca\.crt}' | base64 -d > "$CERT_DIR/ca.crt"
-  echo "Installed cluster CA to $CERT_DIR/ca.crt"
-
-  # Login with admin:admin (Zot default)
-  # --compat-auth-file: store in docker config so docker commands also work
-  : ${REGISTRY_USERNAME:=admin}
-  : ${REGISTRY_PASSWORD:=admin}
-  echo "$REGISTRY_PASSWORD" | skopeo login "$CONTAINER_REGISTRY" \
-    --username "$REGISTRY_USERNAME" \
-    --password-stdin \
-    --cert-dir "$CERT_DIR" \
-    --compat-auth-file ~/.docker/config.json
-  echo "Logged in to $CONTAINER_REGISTRY as $REGISTRY_USERNAME"
-  exit 0
-
-# Docker Hub authentication
-elif [[ "$CONTAINER_REGISTRY" == "docker.io" ]]; then
-  CONFIG_REGISTRY="https://index.docker.io/v1/"
-  if [[ -n "$DOCKER_TOKEN" ]]; then
+if [[ "$REGISTRY" == "registry.docker.arpa" ]] || [[ "$REGISTRY" =~ ^registry\..+\.sslip\.io$ ]]; then
+    if jq -e ".auths[\"$REGISTRY\"]" ~/.docker/config.json &>/dev/null 2>&1; then
+        exit 0
+    fi
+    CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+    mkdir -p "$CERT_DIR"
+    kubectl --context "${REGISTRY_K8S_CONTEXT:-admin@docker-dev}" \
+        get secret gateway-tls-https -n envoy-gateway-system \
+        -o jsonpath='{.data.ca\.crt}' | base64 -d > "$CERT_DIR/ca.crt"
+    echo "$REGISTRY_PASSWORD" | skopeo login "$REGISTRY" \
+        --username "${REGISTRY_USERNAME:-admin}" --password-stdin \
+        --cert-dir "$CERT_DIR" --compat-auth-file ~/.docker/config.json
+elif [[ "$REGISTRY" == "docker.io" ]]; then
+    if jq -e '.auths["https://index.docker.io/v1/"]' ~/.docker/config.json &>/dev/null 2>&1; then
+        exit 0
+    fi
+    [ -n "$DOCKER_TOKEN" ] || { echo "Error: DOCKER_TOKEN not set"; exit 1; }
     echo "$DOCKER_TOKEN" | docker login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
-    echo "Logged in to Docker Hub as ${DOCKER_USERNAME:-containercraft}"
-    exit 0
-  fi
-  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONFIG_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
-    echo "Already authenticated to Docker Hub"
-    exit 0
-  fi
-  echo "Not authenticated to Docker Hub."
-  echo ""
-  echo "Options:"
-  echo "  1. Run: docker login"
-  echo "  2. Set DOCKER_TOKEN in .env (DOCKER_USERNAME defaults to containercraft)"
-  exit 1
-
-# GHCR authentication
-elif [[ "$CONTAINER_REGISTRY" == "ghcr.io" ]]; then
-  if [[ -n "$GITHUB_TOKEN" ]]; then
+elif [[ "$REGISTRY" == "ghcr.io" ]]; then
+    if jq -e '.auths["ghcr.io"]' ~/.docker/config.json &>/dev/null 2>&1; then
+        exit 0
+    fi
+    [ -n "$GITHUB_TOKEN" ] || { echo "Error: GITHUB_TOKEN not set"; exit 1; }
     echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin
-    echo "Logged in to GHCR as ${GITHUB_ACTOR:-github}"
-    exit 0
-  fi
-  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"ghcr.io\"]" ~/.docker/config.json &>/dev/null; then
-    echo "Already authenticated to GHCR"
-    exit 0
-  fi
-  echo "Not authenticated to GHCR."
-  echo ""
-  echo "Options:"
-  echo "  1. Run: docker login ghcr.io"
-  echo "  2. Set GITHUB_TOKEN in .env (GITHUB_ACTOR defaults to github)"
-  exit 1
-
 else
-  # Custom registry
-  if [[ -f ~/.docker/config.json ]] && jq -e ".auths[\"$CONTAINER_REGISTRY\"]" ~/.docker/config.json &>/dev/null; then
-    echo "Already authenticated to $CONTAINER_REGISTRY"
-    exit 0
-  fi
-  : ${REGISTRY_USERNAME:=admin}
-  : ${REGISTRY_PASSWORD:=admin}
-  echo "$REGISTRY_PASSWORD" | docker login "$CONTAINER_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
-  echo "Logged in to $CONTAINER_REGISTRY as $REGISTRY_USERNAME"
+    echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "${REGISTRY_USERNAME:-admin}" --password-stdin
 fi
 ```
-
-`runme run build:qcow2:login`
 
 ---
 
 ### build:qcow2:push
 
-Push container to registry as OCI image.
+Push container with multi-tag (git/nix/latest).
 
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
+CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
 
-# Verify image exists in local docker daemon (built by build:qcow2:container)
-docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found. Run build:qcow2:container first."; exit 1; }
+[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
 
-echo "Pushing: $FULL_IMAGE"
+# Read provenance
+git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
+git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
+nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
 
-# Use cluster CA for TLS verification (installed by build:qcow2:login)
-CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/${CONTAINER_REGISTRY:-registry.docker.arpa}"
+# Build tag list
+TAGS=("$BASE_TAG")
+if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
+    TAGS+=("git-${git_commit:0:7}")
+fi
+if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
+    TAGS+=("nix-${nix_drv:0:12}")
+fi
 
-# Use skopeo for reliable OCI push (docker buildx has manifest issues with some registries)
-skopeo copy --dest-cert-dir "$CERT_DIR" \
-    docker-daemon:"$FULL_IMAGE" \
-    docker://"$FULL_IMAGE"
+# Push with all tags
+FULL_IMAGE="$REGISTRY/$IMAGE:$BASE_TAG"
+docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found"; exit 1; }
 
-echo ""
-echo "=== Push Complete ==="
-echo "Image: $FULL_IMAGE"
+for tag in "${TAGS[@]}"; do
+    docker tag "$FULL_IMAGE" "$REGISTRY/$IMAGE:$tag"
+    skopeo copy --dest-cert-dir "$CERT_DIR" \
+        docker-daemon:"$REGISTRY/$IMAGE:$tag" \
+        docker://"$REGISTRY/$IMAGE:$tag"
+done
 
-# Validate image in registry
-echo ""
-echo "=== Validating ==="
-skopeo inspect --cert-dir "$CERT_DIR" docker://"$FULL_IMAGE" | jq '{Digest, Created, Architecture, Os}'
+# Get digest and update .konductor
+OCI_DIGEST=$(skopeo inspect --cert-dir "$CERT_DIR" docker://"$FULL_IMAGE" | jq -r '.Digest')
+cat >> .konductor << EOF
+oci_digest = "$OCI_DIGEST"
+EOF
+
+# Display
+echo "Pushed: $REGISTRY/$IMAGE"
+printf "  %s\n" "${TAGS[@]}"
+echo "Digest: $OCI_DIGEST"
 ```
-
-`runme run build:qcow2:push`
 
 ---
 
 ### build:qcow2:start
 
-Boot image for local development. Auto-builds if missing.
-
-```text
-build:qcow2:start
-
-  [check running] → [check image] → clean → cloudinit → vm:boot → vm:wait
-         │                │           │          │           │         │
-         ▼                ▼           ▼          ▼           ▼         ▼
-   if running:      if missing:    force     generate     boot VM   wait for
-   exit early       run build      cleanup   cloud-init   with EFI  SSH ready
-```
+Boot image for local development.
 
 ```sh {"name":"build:qcow2:start","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-if [ -f /tmp/konductor-build-vm.pid ] && kill -0 "$(cat /tmp/konductor-build-vm.pid)" 2>/dev/null; then
-    echo "VM already running. Use: ssh localhost"
+PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
+
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    echo "VM running. Use: ssh localhost"
     exit 0
 fi
-if [ ! -f result/nixos.qcow2 ]; then
-    echo "No image found. Building..."
-    runme run build:qcow2:image
-fi
-runme run build:qcow2:clean
-runme run _build:qcow2:cloudinit
-runme run _build:qcow2:vm:boot
-runme run _build:qcow2:vm:wait
-echo ""
-echo "VM ready! Run: ssh localhost"
-```
+[ -f result/nixos.qcow2 ] || { echo "No image. Run build:qcow2:image first."; exit 1; }
 
-`runme run build:qcow2:start && ssh localhost`
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
+runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
+runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
+echo "VM ready: ssh localhost"
+```
 
 ---
 
 ### build:qcow2:ssh
 
-SSH into running VM.
-
 ```sh {"name":"build:qcow2:ssh","excludeFromRunAll":"true","tag":"type:entry"}
 ssh localhost
 ```
-
-`runme run build:qcow2:ssh`
 
 ---
 
 ### build:qcow2:stop
 
-Graceful VM shutdown.
-
 ```sh {"name":"build:qcow2:stop","excludeFromRunAll":"true","tag":"type:entry"}
-set -e
-runme run _build:qcow2:vm:halt
-echo "VM stopped"
+runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:halt
 ```
-
-`runme run build:qcow2:stop`
 
 ---
 
 ### build:qcow2:publish
 
-Full automation: clean → image → container → login → push.
-
-```text
-build:qcow2:publish
-
-  :clean → :image → :container → :login → :push
-     │        │          │          │        │
-     ▼        ▼          ▼          ▼        ▼
-   reset    build     package    registry  skopeo
-   state    QCOW2     container   auth     push
-```
+Full pipeline: clean → image → container → login → push.
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
-
-echo "=== Publishing: $FULL_IMAGE ==="
-echo ""
-runme run build:qcow2:clean
-runme run build:qcow2:image
-runme run build:qcow2:container
-runme run build:qcow2:login
-runme run build:qcow2:push
-echo ""
-echo "=== Publish Complete ==="
-echo "Image: $FULL_IMAGE"
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:login
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+cat .konductor
 ```
 
-`runme run build:qcow2:publish`
+---
+
+### build:qcow2:promote
+
+Copy to public registry.
+
+```sh {"name":"build:qcow2:promote","excludeFromRunAll":"true","tag":"type:entry"}
+set -e
+SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+SRC_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+SRC_TAG="${CONTAINER_TAG:-latest-qcow2}"
+SRC_CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$SRC_REGISTRY"
+
+DST_REGISTRY="${PROMOTE_REGISTRY:-docker.io}"
+DST_IMAGE="${PROMOTE_IMAGE:-containercraft/konductor}"
+DST_TAG="${PROMOTE_TAG:-latest-qcow2}"
+
+[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
+
+# Read provenance for additional tags
+git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
+git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
+nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
+
+# Verify source exists
+skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" &>/dev/null \
+    || { echo "Error: Source not found. Run build:qcow2:publish first."; exit 1; }
+
+# Authenticate to destination
+if [[ "$DST_REGISTRY" == "docker.io" ]]; then
+    [ -n "$DOCKER_TOKEN" ] || { echo "Error: DOCKER_TOKEN not set"; exit 1; }
+    echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
+elif [[ "$DST_REGISTRY" == "ghcr.io" ]]; then
+    [ -n "$GITHUB_TOKEN" ] || { echo "Error: GITHUB_TOKEN not set"; exit 1; }
+    echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin
+fi
+
+# Build tag list
+TAGS=("$DST_TAG")
+if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
+    TAGS+=("git-${git_commit:0:7}")
+fi
+if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
+    TAGS+=("nix-${nix_drv:0:12}")
+fi
+
+# Copy with all tags
+for tag in "${TAGS[@]}"; do
+    skopeo copy --src-cert-dir "$SRC_CERT_DIR" \
+        docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" \
+        docker://"$DST_REGISTRY/$DST_IMAGE:$tag"
+done
+
+echo "Promoted: $DST_REGISTRY/$DST_IMAGE"
+printf "  %s\n" "${TAGS[@]}"
+skopeo inspect docker://"$DST_REGISTRY/$DST_IMAGE:$DST_TAG" | jq '{Digest, Created}'
+```
 
 ---
 
 ## Task Reference
 
 ```text
-Entry Points (user-facing):
-  build:qcow2              Show help / available tasks
+Entry Points:
+  build:qcow2              Show help
+  build:qcow2:rebase       Rebuild NixOS host from flake
   build:qcow2:clean        Reset build state
-  build:qcow2:image        Build QCOW2 (nix → VM configure → package)
-  build:qcow2:container    Package QCOW2 as containerDisk
-  build:qcow2:login        Authenticate to registry (Docker Hub / GHCR)
-  build:qcow2:push         Push container to registry
-  build:qcow2:start        Boot image for local development
+  build:qcow2:image        Build QCOW2
+  build:qcow2:container    Package as containerDisk
+  build:qcow2:login        Authenticate to registry
+  build:qcow2:push         Push with multi-tag
+  build:qcow2:publish      Full pipeline
+  build:qcow2:promote      Copy to public registry
+  build:qcow2:start        Boot for development
   build:qcow2:ssh          SSH into VM
-  build:qcow2:stop         Graceful shutdown
-  build:qcow2:publish      Full automation: image → container → login → push
+  build:qcow2:stop         Shutdown VM
 
-Pipeline Tasks (internal, run via --all):
-  _build:qcow2:preflight       Validate tools/env before build
-  _build:qcow2:env             Export shared environment variables
-  _build:qcow2:nix             Nix build QCOW2
+Pipeline Tasks (run via --all):
+  _build:qcow2:preflight       Validate environment
+  _build:qcow2:nix             Build NixOS closure + capture nix_drv
   _build:qcow2:cloudinit       Generate cloud-init ISO
   _build:qcow2:img:reset       Reset image to pristine
-  _build:qcow2:vm:boot         Boot VM with EFI
-  _build:qcow2:vm:wait         Wait for SSH ready
+  _build:qcow2:vm:boot         Boot VM
+  _build:qcow2:vm:wait         Wait for SSH
   _build:qcow2:vm:sync         Rsync source to VM
-  _build:qcow2:vm:gc           Garbage collect nix store
+  _build:qcow2:vm:rebuild      nixos-rebuild switch from flake (native build)
+  _build:qcow2:vm:provenance   Write /.konductor
+  _build:qcow2:vm:gc           Garbage collect
   _build:qcow2:vm:zero         Zero free space
   _build:qcow2:vm:halt         Shutdown VM
   _build:qcow2:img:clean       Clean credentials
   _build:qcow2:img:compress    ZSTD compress
   _build:qcow2:img:sparsify    Reclaim sparse space
   _build:qcow2:tmp:clean       Remove temp files
-  _build:qcow2:verify          Verify output
+  _build:qcow2:verify          Append post-seal fields
 
-Debug Tasks:
-  _build:qcow2:debug:log       View boot log
-  _build:qcow2:vm:kill         Force kill VM
-
-Configuration: .env.example (defaults) → .env (overrides)
-SSH: ssh localhost (devshell configures port 2222)
-Registry: docker.io/containercraft/konductor:latest-qcow2
+Debug:
+  _build:qcow2:debug:log     View boot log
+  _build:qcow2:vm:kill       Force kill VM
 ```
 
 ---
@@ -463,274 +514,102 @@ Registry: docker.io/containercraft/konductor:latest-qcow2
 
 ### _build:qcow2:preflight
 
-Validate all required tools and environment before build starts. Fails fast with clear errors.
+Validate environment.
 
 ```sh {"name":"_build:qcow2:preflight"}
 set -e
 ERRORS=0
 
-echo "=== Preflight Check ==="
-echo ""
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
 
-# --- Required Binaries ---
-echo "Checking binaries..."
-REQUIRED_BINS=(
-    # Core build tools
-    "nix:Build NixOS system closure"
-    "qemu-img:Create/convert QCOW2 images"
-    "qemu-system-x86_64:Boot VM with KVM"
-    "genisoimage:Create cloud-init ISO"
-    # Guestfs tools
-    "guestmount:Mount QCOW2 images"
-    "guestunmount:Unmount QCOW2 images"
-    "virt-sparsify:Sparsify final image"
-    # VM communication
-    "ssh:Connect to build VM"
-    "rsync:Sync files to VM"
-    "timeout:Wait operations"
-    "ss:Check port availability"
-    # Coreutils (often missing in nested runme)
-    "du:File size reporting"
-    "cut:Text processing"
-    "sha256sum:Checksum verification"
-    "grep:Text filtering"
-    "readlink:Resolve symlinks"
-    "id:Get user/group IDs"
-    "cat:Read files"
-    "mkdir:Create directories"
-    "rm:Remove files"
-    "cp:Copy files"
-    "chmod:Set permissions"
-    "chown:Set ownership"
-    "sync:Flush buffers"
-    "sleep:Delays"
-    "kill:Process signals"
-    "pkill:Kill by name"
-    "tail:View logs"
-    "date:Timestamps"
-)
-
-for entry in "${REQUIRED_BINS[@]}"; do
-    bin="${entry%%:*}"
-    desc="${entry#*:}"
-    if command -v "$bin" &>/dev/null; then
-        printf "  ✓ %-20s %s\n" "$bin" "$(command -v "$bin")"
-    else
-        printf "  ✗ %-20s MISSING - %s\n" "$bin" "$desc"
-        ((ERRORS++))
-    fi
+for cmd in $QCOW2_REQUIRED_BINS; do
+    command -v "$cmd" &>/dev/null && printf "✓ %s\n" "$cmd" || { printf "✗ %s\n" "$cmd"; ((ERRORS++)); }
 done
 
-# --- Optional Binaries (container build) ---
-echo ""
-echo "Checking optional binaries (container build)..."
-OPTIONAL_BINS=(
-    "docker:Build containerDisk"
-    "skopeo:Push to registry"
-    "jq:Parse JSON responses"
-)
-
-for entry in "${OPTIONAL_BINS[@]}"; do
-    bin="${entry%%:*}"
-    desc="${entry#*:}"
-    if command -v "$bin" &>/dev/null; then
-        printf "  ✓ %-20s %s\n" "$bin" "$(command -v "$bin")"
-    else
-        printf "  ⚠ %-20s MISSING - %s (optional)\n" "$bin" "$desc"
-    fi
+for var in $QCOW2_REQUIRED_FILE_VARS; do
+    val="${!var}"; [ -n "$val" ] && [ -f "$val" ] && printf "✓ %s\n" "$var" || { printf "✗ %s\n" "$var"; ((ERRORS++)); }
 done
 
-# --- Environment Variables ---
-echo ""
-echo "Checking environment variables..."
-if [ -n "$OVMF_CODE" ]; then
-    printf "  ✓ %-20s %s\n" "OVMF_CODE" "$OVMF_CODE"
-    if [ -f "$OVMF_CODE" ]; then
-        printf "    └─ file exists\n"
-    else
-        printf "    └─ ✗ FILE NOT FOUND\n"
-        ((ERRORS++))
-    fi
-else
-    printf "  ✗ %-20s NOT SET - EFI firmware path\n" "OVMF_CODE"
-    ((ERRORS++))
-fi
+for var in $QCOW2_REQUIRED_VARS; do
+    [ -n "${!var}" ] && printf "✓ %s\n" "$var" || { printf "✗ %s\n" "$var"; ((ERRORS++)); }
+done
 
-if [ -n "$OVMF_VARS" ]; then
-    printf "  ✓ %-20s %s\n" "OVMF_VARS" "$OVMF_VARS"
-    if [ -f "$OVMF_VARS" ]; then
-        printf "    └─ file exists\n"
-    else
-        printf "    └─ ✗ FILE NOT FOUND\n"
-        ((ERRORS++))
-    fi
-else
-    printf "  ✗ %-20s NOT SET - EFI vars template\n" "OVMF_VARS"
-    ((ERRORS++))
-fi
+SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
+ssh-keygen -l -f "$SSH_PUBKEY" &>/dev/null && printf "✓ %s\n" "$SSH_PUBKEY" || { printf "✗ %s\n" "$SSH_PUBKEY"; ((ERRORS++)); }
 
-if [ -n "$HOME" ]; then
-    printf "  ✓ %-20s %s\n" "HOME" "$HOME"
-else
-    printf "  ✗ %-20s NOT SET\n" "HOME"
-    ((ERRORS++))
-fi
+[ -r /dev/kvm ] && [ -w /dev/kvm ] && printf "✓ /dev/kvm\n" || { printf "✗ /dev/kvm\n"; ((ERRORS++)); }
 
-# --- Required Files ---
-echo ""
-echo "Checking required files..."
-SSH_KEY="$HOME/.ssh/id_ed25519.pub"
-if [ -f "$SSH_KEY" ]; then
-    printf "  ✓ %-20s exists\n" "SSH public key"
-else
-    printf "  ✗ %-20s NOT FOUND - %s\n" "SSH public key" "$SSH_KEY"
-    ((ERRORS++))
-fi
+DISK_AVAIL_GB=$(df -BG --output=avail . | tail -1 | tr -d ' G')
+[ "$DISK_AVAIL_GB" -ge "${QCOW2_MIN_DISK_GB:-100}" ] && printf "✓ disk %sGB\n" "$DISK_AVAIL_GB" || { printf "✗ disk %sGB\n" "$DISK_AVAIL_GB"; ((ERRORS++)); }
 
-# --- KVM Access ---
-echo ""
-echo "Checking KVM access..."
-if [ -e /dev/kvm ]; then
-    if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
-        printf "  ✓ %-20s accessible\n" "/dev/kvm"
-    else
-        printf "  ✗ %-20s no read/write permission\n" "/dev/kvm"
-        ((ERRORS++))
-    fi
-else
-    printf "  ✗ %-20s not found (KVM not available)\n" "/dev/kvm"
-    ((ERRORS++))
-fi
+MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+[ "$MEM_AVAIL_MB" -ge "${QCOW2_MIN_MEM_MB:-8192}" ] && printf "✓ memory %sMB\n" "$MEM_AVAIL_MB" || { printf "✗ memory %sMB\n" "$MEM_AVAIL_MB"; ((ERRORS++)); }
 
-# --- SSH Config ---
-echo ""
-echo "Checking SSH config..."
-if grep -q "Host localhost" "$HOME/.ssh/config" 2>/dev/null && grep -q "Port 2222" "$HOME/.ssh/config" 2>/dev/null; then
-    printf "  ✓ %-20s localhost:2222 configured\n" "SSH config"
-else
-    printf "  ⚠ %-20s localhost:2222 not found (devshell should configure)\n" "SSH config"
-fi
-
-# --- Port 2222 ---
-echo ""
-echo "Checking port 2222..."
-if ss -tlnp 2>/dev/null | grep -q ':2222 '; then
-    printf "  ⚠ %-20s IN USE (VM may be running)\n" "Port 2222"
-else
-    printf "  ✓ %-20s available\n" "Port 2222"
-fi
-
-# --- PATH diagnostics ---
-echo ""
-echo "PATH entries:"
-PATH_COUNT=$(echo "$PATH" | tr ':' '\n' | wc -l)
-echo "$PATH" | tr ':' '\n' | head -20 | while IFS= read -r p; do
-    if [ -d "$p" ]; then
-        printf "  ✓ %s\n" "$p"
-    else
-        printf "  ⚠ %s (not a directory)\n" "$p"
-    fi
-done || true
-[ "$PATH_COUNT" -gt 20 ] && echo "  ... (showing first 20 of $PATH_COUNT entries)"
-
-# --- Summary ---
-echo ""
-echo "=== Preflight Summary ==="
-if [ "$ERRORS" -eq 0 ]; then
-    echo "✓ All checks passed - ready to build"
-    exit 0
-else
-    echo "✗ $ERRORS error(s) found - fix before building"
-    echo ""
-    echo "Hint: Run 'direnv reload' or 'nix develop .#konductor' to ensure devshell is loaded"
-    exit 1
-fi
-```
-
----
-
-### _build:qcow2:env
-
-Display build environment variables. Static filename avoids session persistence issues.
-
-```sh {"name":"_build:qcow2:env"}
-# Static filename - no session persistence needed
-export QCOW2_OUTPUT="konductor.qcow2"
-export CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-export CONTAINER_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
-export CONTAINER_TAG="${CONTAINER_TAG:-latest-qcow2}"
-export FULL_IMAGE="${CONTAINER_REGISTRY}/${CONTAINER_IMAGE}:${CONTAINER_TAG}"
-
-echo "=== Build Environment ==="
-echo "QCOW2_OUTPUT: $QCOW2_OUTPUT"
-echo "FULL_IMAGE: $FULL_IMAGE"
+[ "$ERRORS" -eq 0 ] || { echo "$ERRORS error(s)"; exit 1; }
 ```
 
 ---
 
 ### _build:qcow2:nix
 
-Nix builds the NixOS system closure → `result/nixos.qcow2`.
+Build NixOS closure and capture nix_drv.
 
 ```sh {"name":"_build:qcow2:nix","tag":"requires:nix"}
 set -e
+if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
+    echo "SKIP_NIX_BUILD: reusing existing"
+    exit 0
+fi
+
+# Capture nix_drv before build (derivation hash is known from eval)
+NIX_DRV=$(nix path-info --derivation .#qcow2 2>/dev/null | head -1 | xargs basename | cut -d- -f1)
+echo "$NIX_DRV" > .nix_drv
+
 nix build .#qcow2 --no-warn-dirty
 
-# result/ is a symlink to read-only nix store
-# Create CoW overlay (stores only changed blocks, not full copy)
 BACKING_FILE="$(readlink -f result/nixos.qcow2)"
-rm -rf result.writable 2>/dev/null || true
-mkdir -p result.writable
+rm -rf result.writable && mkdir -p result.writable
 qemu-img create -f qcow2 -b "$BACKING_FILE" -F qcow2 result.writable/nixos.qcow2
-
-# Symlink result/ to overlay (tasks expect result/nixos.qcow2)
-rm -f result 2>/dev/null || true
-ln -sf result.writable result
-
-# Set ownership for current user (QEMU write access)
+rm -f result && ln -sf result.writable result
 chown -R "$(id -u):$(id -g)" result.writable/
-chmod -R u+rwX result.writable/
 ```
 
 ---
 
 ### _build:qcow2:cloudinit
 
-Generate ephemeral cloud-init ISO with SSH credentials.
+Generate cloud-init ISO.
 
 ```sh {"name":"_build:qcow2:cloudinit"}
 set -e
+[ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set"; exit 1; }
+[ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
 
-# Requires: nix develop .#konductor
-[ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set. Run: nix develop .#konductor"; exit 1; }
-[ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set. Run: nix develop .#konductor"; exit 1; }
-[ -f "$HOME/.ssh/id_ed25519.pub" ] || { echo "Error: ~/.ssh/id_ed25519.pub not found"; exit 1; }
+CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+mkdir -p "$CLOUD_INIT_DIR"
 
-mkdir -p /tmp/konductor-build-cloud-init
-BUILD_SSH_KEY=$(cat "$HOME/.ssh/id_ed25519.pub")
-BUILD_USER="$USER"
-BUILD_UID="$(id -u)"
+cp "$OVMF_VARS" "$CLOUD_INIT_DIR/OVMF_VARS.fd"
+chmod 644 "$CLOUD_INIT_DIR/OVMF_VARS.fd"
 
-cp "$OVMF_VARS" /tmp/konductor-build-cloud-init/OVMF_VARS.fd
-chmod 644 /tmp/konductor-build-cloud-init/OVMF_VARS.fd
-
-cat > /tmp/konductor-build-cloud-init/meta-data << EOF
+cat > "$CLOUD_INIT_DIR/meta-data" << EOF
 instance-id: konductor-$(date +%s)
 local-hostname: konductor
 EOF
 
-cat > /tmp/konductor-build-cloud-init/user-data << EOF
+SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
+[ -f "$SSH_PUBKEY" ] || { echo "Error: $SSH_PUBKEY not found"; exit 1; }
+
+cat > "$CLOUD_INIT_DIR/user-data" << EOF
 #cloud-config
-# All users in kc2 group (GID 1001) for shared directory access
 users:
-  - name: $BUILD_USER
-    uid: $BUILD_UID
+  - name: $USER
+    uid: $(id -u)
     groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
-      - $BUILD_SSH_KEY
+      - $(cat "$SSH_PUBKEY")
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -741,104 +620,230 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
-      - $BUILD_SSH_KEY
+      - $(cat "$SSH_PUBKEY")
 runcmd:
   - mkdir -p /workspace
   - mount -t 9p -o trans=virtio host /workspace || true
 EOF
 
-genisoimage -output /tmp/konductor-build-cloud-init/seed.iso \
+genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
     -volid cidata -joliet -rock -input-charset utf-8 \
-    /tmp/konductor-build-cloud-init/user-data /tmp/konductor-build-cloud-init/meta-data \
-    || { echo "Error: Failed to create cloud-init ISO"; exit 1; }
+    "$CLOUD_INIT_DIR/user-data" "$CLOUD_INIT_DIR/meta-data"
 ```
 
 ---
 
 ### _build:qcow2:img:reset
 
-Reset image to pristine state before first boot.
+Reset image to pristine state.
 
 ```sh {"name":"_build:qcow2:img:reset","tag":"requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
-GUESTMOUNT="$(which guestmount)"
-GUESTUNMOUNT="$(which guestunmount)"
-sudo mkdir -p /tmp/nixmount
-sudo "$GUESTMOUNT" -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
-trap 'sudo "$GUESTUNMOUNT" /tmp/nixmount 2>/dev/null || true' EXIT
-sudo rm -f /tmp/nixmount/etc/ssh/ssh_host_* /tmp/nixmount/etc/machine-id
-sudo rm -rf /tmp/nixmount/var/lib/cloud /tmp/nixmount/var/log/journal/*
-sudo "$GUESTUNMOUNT" /tmp/nixmount
+MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
+
+sudo mkdir -p "$MOUNT"
+sudo guestmount -a result/nixos.qcow2 -m /dev/sda2 "$MOUNT"
+trap 'sudo guestunmount "$MOUNT" 2>/dev/null || true; sudo rmdir "$MOUNT" 2>/dev/null || true' EXIT
+
+sudo rm -f "$MOUNT"/etc/ssh/ssh_host_* "$MOUNT"/etc/machine-id
+sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
+
+sudo guestunmount "$MOUNT"
 trap - EXIT
 sync && sleep 1
+sudo rmdir "$MOUNT" 2>/dev/null || true
 ```
 
 ---
 
 ### _build:qcow2:vm:boot
 
-Boot VM with EFI firmware and 9p workspace mount.
+Boot VM.
 
 ```sh {"name":"_build:qcow2:vm:boot","tag":"requires:kvm"}
 set -e
-ss -tlnp 2>/dev/null | grep -q ':2222 ' && { echo "Error: Port 2222 in use"; exit 1; }
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+
+ss -tlnp 2>/dev/null | awk -v p=":${QCOW2_SSH_PORT:-2222} " '$0 ~ p {exit 0} END {exit 1}' && { echo "Error: Port ${QCOW2_SSH_PORT:-2222} in use"; exit 1; }
+
+CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
+
 qemu-system-x86_64 \
-    -machine q35,accel=kvm \
-    -m 8192 \
+    -machine q35,accel=kvm,mem-merge=on \
+    -m "${QCOW2_VM_MEMORY:-4096}" \
     -cpu host \
-    -smp "$(nproc)" \
+    -smp "${QCOW2_VM_CPUS:-4}" \
+    -rtc base=utc,clock=host \
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
-    -drive if=pflash,format=raw,unit=1,file=/tmp/konductor-build-cloud-init/OVMF_VARS.fd \
-    -drive file=result/nixos.qcow2,if=virtio,format=qcow2 \
-    -drive file=/tmp/konductor-build-cloud-init/seed.iso,media=cdrom \
-    -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+    -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
+    -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
+    -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
+    -netdev user,id=net0,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22 \
     -device virtio-net-pci,netdev=net0 \
-    -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr \
+    -device virtio-rng-pci \
+    -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
     -daemonize \
-    -pidfile /tmp/konductor-build-vm.pid \
-    -serial file:/tmp/konductor-build-vm.log \
+    -pidfile "$PIDFILE" \
+    -serial file:"${QCOW2_LOGFILE:-build-vm.log}" \
     -display none
+
 sleep 1
-[ -f /tmp/konductor-build-vm.pid ] && kill -0 "$(cat /tmp/konductor-build-vm.pid)" 2>/dev/null \
-    || { echo "Error: QEMU failed to start. Check: tail /tmp/konductor-build-vm.log"; exit 1; }
+[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null \
+    || { echo "QEMU failed"; exit 1; }
 ```
 
 ---
 
 ### _build:qcow2:vm:wait
 
-Wait for VM SSH to become available.
+Wait for SSH.
 
 ```sh {"name":"_build:qcow2:vm:wait","tag":"duration:slow"}
-# SSH client config in /etc/ssh/ssh_config handles localhost:2222 + host key
-timeout 180 bash -c 'until ssh localhost true 2>/dev/null; do sleep 3; done' || { echo "Error: VM failed to boot within 3 minutes"; exit 1; }
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh localhost true 2>/dev/null; do sleep 3; done' \
+    || { echo "SSH timeout"; exit 1; }
 ```
 
 ---
 
 ### _build:qcow2:vm:sync
 
-Rsync source to `/opt/konductor`.
+Sync source to VM. Tries git clone first (preserves history), falls back to rsync.
+
+<!-- TODO: SSH key injection for private repository access
+  - Pass SSH private key via cloud-init user-data (from CI runner secrets)
+  - Write to /root/.ssh/id_ed25519 with proper permissions
+  - Add git host to known_hosts
+  - Enables authenticated git clone for private repos (git.braincraft.io)
+  - Key should be ephemeral (cleaned in img:clean phase)
+-->
 
 ```sh {"name":"_build:qcow2:vm:sync"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
-ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
-ssh localhost 'sudo rsync -a \
-    --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",".mise.toml.disabled",www,.venv,.git} \
-    /workspace/ /opt/konductor/'
-# Use kc2:kc2 (1001:1001) for consistent shared group ownership
+
+GIT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+ssh localhost 'sudo rm -rf /opt/konductor'
+
+CLONE_OK=false
+if [ -n "$GIT_REMOTE" ] && [ -n "$GIT_COMMIT" ]; then
+    # Try git clone (preserves history for verify:konductor tasks)
+    if ssh localhost "sudo git clone --no-checkout '$GIT_REMOTE' /opt/konductor 2>/dev/null" && \
+       ssh localhost "cd /opt/konductor && sudo git checkout '$GIT_COMMIT' 2>/dev/null"; then
+        CLONE_OK=true
+    else
+        ssh localhost 'sudo rm -rf /opt/konductor' 2>/dev/null || true
+    fi
+fi
+
+if [ "$CLONE_OK" = "false" ]; then
+    # Fallback: rsync with .git (if accessible locally)
+    ssh localhost 'sudo mkdir -p /opt/konductor'
+    ssh localhost 'sudo rsync -a \
+        --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",www,.venv} \
+        /workspace/ /opt/konductor/'
+fi
+
 ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
-ssh localhost 'cd /opt/konductor && sudo git init && sudo git gc --aggressive --prune=now'
+```
+
+---
+
+### _build:qcow2:vm:rebuild
+
+Run `nixos-rebuild switch` inside VM to build the devshell natively.
+
+This ensures:
+- Full Konductor environment is built natively inside the VM
+- All nix store paths are pre-cached for airgap use
+- The VM can reproduce itself from /opt/konductor
+
+```sh {"name":"_build:qcow2:vm:rebuild","tag":"duration:slow"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+set -e
+
+# Rebuild NixOS from the synced flake
+ssh localhost 'cd /opt/konductor && sudo nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+
+# Pre-build devshells to cache their closures
+# This ensures `nix develop` works offline
+ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
+ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
+ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
+
+echo "VM rebuilt from /opt/konductor flake"
+```
+
+---
+
+### _build:qcow2:vm:provenance
+
+Write `/.konductor` inside VM.
+
+```sh {"name":"_build:qcow2:vm:provenance"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+set -e
+
+# Gather provenance
+GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+GIT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "unknown")
+GIT_DIRTY=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+NIX_VERSION=$(nix --version 2>/dev/null | sed 's/nix (Nix) //' || echo "unknown")
+NIX_HASH=$(nix flake metadata --json 2>/dev/null | jq -r '.locked.narHash // "unknown"')
+NIX_DRV=$(cat .nix_drv 2>/dev/null || echo "unknown")
+FLAKE_LOCK_SHA=$(sha256sum flake.lock 2>/dev/null | cut -d' ' -f1 || echo "unknown")
+BUILD_DATE=$(date -Iseconds)
+BUILD_HOST=$(hostname)
+BUILD_USER="$USER"
+QEMU_VER=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //')
+OCI_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
+
+# Build tag list for provenance
+OCI_TAGS="[\"${CONTAINER_TAG:-latest-qcow2}\""
+[ "$GIT_DIRTY" = "0" ] && [ "$GIT_COMMIT" != "unknown" ] && OCI_TAGS+=", \"git-${GIT_COMMIT:0:7}\""
+[ "$NIX_DRV" != "unknown" ] && OCI_TAGS+=", \"nix-${NIX_DRV:0:12}\""
+OCI_TAGS+="]"
+
+# Write /.konductor inside VM
+ssh localhost "sudo tee /.konductor > /dev/null" << EOF
+[konductor]
+git_commit = "$GIT_COMMIT"
+git_branch = "$GIT_BRANCH"
+git_remote = "$GIT_REMOTE"
+git_dirty = $GIT_DIRTY
+nix_version = "$NIX_VERSION"
+nix_hash = "$NIX_HASH"
+nix_drv = "$NIX_DRV"
+flake_lock_sha256 = "$FLAKE_LOCK_SHA"
+build_date = "$BUILD_DATE"
+build_host = "$BUILD_HOST"
+build_user = "$BUILD_USER"
+qemu = "$QEMU_VER"
+strict = ${KONDUCTOR_STRICT:-false}
+oci_image = "$OCI_IMAGE"
+oci_tags = $OCI_TAGS
+EOF
+ssh localhost 'sudo chmod 644 /.konductor'
+
+# Copy to host
+ssh localhost 'cat /.konductor' > .konductor
+
+# Serial output handled by konductor-provenance.service (systemd)
 ```
 
 ---
 
 ### _build:qcow2:vm:gc
 
-Garbage collect nix store and clear caches.
+Garbage collect.
 
 ```sh {"name":"_build:qcow2:vm:gc"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 ssh localhost 'sudo nix-collect-garbage -d'
 ssh localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
@@ -849,10 +854,10 @@ ssh localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 
 ### _build:qcow2:vm:zero
 
-Zero free space for optimal compression.
+Zero free space.
 
 ```sh {"name":"_build:qcow2:vm:zero","tag":"duration:slow"}
-set -e
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
 ```
 
@@ -860,96 +865,109 @@ ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm 
 
 ### _build:qcow2:vm:halt
 
-Graceful VM shutdown.
+Shutdown VM.
 
 ```sh {"name":"_build:qcow2:vm:halt"}
-if [ -f /tmp/konductor-build-vm.pid ]; then
-    PID=$(cat /tmp/konductor-build-vm.pid)
-    if kill -0 "$PID" 2>/dev/null; then
-        ssh localhost 'sudo poweroff' 2>/dev/null || true
-        sleep 5
-        kill "$PID" 2>/dev/null || true
-    fi
-    rm -f /tmp/konductor-build-vm.pid
+PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
+[ -f "$PIDFILE" ] || exit 0
+
+PID=$(cat "$PIDFILE")
+if kill -0 "$PID" 2>/dev/null; then
+    ssh localhost 'sudo poweroff' 2>/dev/null || true
+    sleep 5
+    kill "$PID" 2>/dev/null || true
 fi
+rm -f "$PIDFILE"
 ```
 
 ---
 
 ### _build:qcow2:img:clean
 
-Clean credentials and build artifacts from final image.
+Clean credentials from image.
 
 ```sh {"name":"_build:qcow2:img:clean","tag":"requires:guestfs"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 export LIBGUESTFS_BACKEND=direct
-GUESTMOUNT="$(which guestmount)"
-GUESTUNMOUNT="$(which guestunmount)"
-sudo mkdir -p /tmp/nixmount
-sudo "$GUESTMOUNT" -a result/nixos.qcow2 -m /dev/sda2 /tmp/nixmount
-trap 'sudo "$GUESTUNMOUNT" /tmp/nixmount 2>/dev/null || true; sudo rmdir /tmp/nixmount 2>/dev/null || true' EXIT
-sudo rm -f /tmp/nixmount/etc/ssh/ssh_host_* /tmp/nixmount/etc/machine-id
-sudo rm -rf /tmp/nixmount/var/lib/cloud /tmp/nixmount/var/log/journal/*
-sudo rm -rf /tmp/nixmount/root/.ssh /tmp/nixmount/home/*/.ssh 2>/dev/null || true
-sudo rm -f /tmp/nixmount/root/.gitconfig /tmp/nixmount/home/*/.gitconfig 2>/dev/null || true
-sudo "$GUESTUNMOUNT" /tmp/nixmount
+MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
+
+sudo mkdir -p "$MOUNT"
+sudo guestmount -a result/nixos.qcow2 -m /dev/sda2 "$MOUNT"
+trap 'sudo guestunmount "$MOUNT" 2>/dev/null || true; sudo rmdir "$MOUNT" 2>/dev/null || true' EXIT
+
+sudo rm -f "$MOUNT"/etc/ssh/ssh_host_* "$MOUNT"/etc/machine-id
+sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
+sudo rm -rf "$MOUNT"/root/.ssh "$MOUNT"/home/*/.ssh 2>/dev/null || true
+sudo rm -f "$MOUNT"/root/.gitconfig "$MOUNT"/home/*/.gitconfig 2>/dev/null || true
+
+sudo guestunmount "$MOUNT"
 trap - EXIT
 sync && sleep 1
-sudo rmdir /tmp/nixmount 2>/dev/null || true
+sudo rmdir "$MOUNT" 2>/dev/null || true
 ```
 
 ---
 
 ### _build:qcow2:img:compress
 
-ZSTD compress QCOW2.
+ZSTD compress.
 
 ```sh {"name":"_build:qcow2:img:compress","tag":"duration:slow"}
 set -e
-QCOW2_OUTPUT="konductor.qcow2"
-qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 "${QCOW2_OUTPUT}.tmp"
+if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
+    cp result/nixos.qcow2 konductor.qcow2
+    exit 0
+fi
+qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
 ```
 
 ---
 
 ### _build:qcow2:img:sparsify
 
-Sparsify to reclaim zero-filled space.
+Sparsify image.
 
 ```sh {"name":"_build:qcow2:img:sparsify","tag":"duration:slow,requires:guestfs"}
 set -e
-QCOW2_OUTPUT="konductor.qcow2"
+if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
+    exit 0
+fi
 export LIBGUESTFS_BACKEND=direct
-VIRT_SPARSIFY="$(which virt-sparsify)"
-sudo -E "$VIRT_SPARSIFY" --compress --convert qcow2 -o compression_type=zstd "${QCOW2_OUTPUT}.tmp" "$QCOW2_OUTPUT"
-rm -f "${QCOW2_OUTPUT}.tmp"
+sudo -E virt-sparsify --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+rm -f konductor.qcow2.tmp
 ```
 
 ---
 
 ### _build:qcow2:tmp:clean
 
-Remove temporary build files.
+Remove temporary files.
 
 ```sh {"name":"_build:qcow2:tmp:clean"}
-rm -rf /tmp/konductor-build-cloud-init /tmp/konductor-build-vm.log
+rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+rm -f .nix_drv
 ```
 
 ---
 
 ### _build:qcow2:verify
 
-Verify build output with SHA256 checksum.
+Append post-seal fields to .konductor.
 
-```sh {"name":"_build:qcow2:verify","tag":"type:readonly","interactive":"false"}
+```sh {"name":"_build:qcow2:verify","tag":"type:readonly"}
 set -e
-QCOW2_OUTPUT="konductor.qcow2"
-[ -f "$QCOW2_OUTPUT" ] || { echo "Error: $QCOW2_OUTPUT not found"; exit 1; }
-echo "=== QCOW2 Build Complete ==="
-echo "FILE: $QCOW2_OUTPUT"
-echo "SIZE: $(du -h "$QCOW2_OUTPUT" | cut -f1)"
-echo "SHA256: $(sha256sum "$QCOW2_OUTPUT" | cut -d' ' -f1)"
-qemu-img info "$QCOW2_OUTPUT" | grep -E '^(file format|virtual size|disk size|cluster_size)'
+[ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
+[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
+
+IMAGE_SHA256=$(sha256sum konductor.qcow2 | cut -d' ' -f1)
+IMAGE_SIZE=$(ls -lh konductor.qcow2 | awk '{print $5}')
+cat >> .konductor << EOF
+image_sha256 = "$IMAGE_SHA256"
+image_size = "$IMAGE_SIZE"
+EOF
+
+cat .konductor
 ```
 
 ---
@@ -958,23 +976,19 @@ qemu-img info "$QCOW2_OUTPUT" | grep -E '^(file format|virtual size|disk size|cl
 
 ### _build:qcow2:debug:log
 
-View VM boot log.
+View boot log.
 
 ```sh {"name":"_build:qcow2:debug:log","excludeFromRunAll":"true","tag":"type:debug"}
-tail -100 /tmp/konductor-build-vm.log
+tail -100 "${QCOW2_LOGFILE:-build-vm.log}"
 ```
-
-`runme run _build:qcow2:debug:log`
 
 ---
 
 ### _build:qcow2:vm:kill
 
-Force kill stuck VM.
+Force kill VM.
 
 ```sh {"name":"_build:qcow2:vm:kill","excludeFromRunAll":"true","tag":"type:destructive"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
-rm -f /tmp/konductor-build-vm.pid
+rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 ```
-
-`runme run _build:qcow2:vm:kill`
