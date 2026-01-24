@@ -415,48 +415,5 @@ _:
       '';
     }
 
-    # =========================================================================
-    # EXPLORER AUTO-OPEN - IDE-like experience on wide terminals
-    # =========================================================================
-
-    # Open explorer when leaving dashboard (opening a file) on wide terminals
-    # This keeps dashboard centered, then shows explorer when working
-    {
-      event = "BufEnter";
-      callback.__raw = ''
-        function(event)
-          -- Skip if terminal is too narrow
-          if vim.o.columns < 120 then
-            return
-          end
-
-          -- Skip if already opened
-          if vim.g.konductor_explorer_opened then
-            return
-          end
-
-          -- Skip special buffers
-          local buftype = vim.bo[event.buf].buftype
-          local filetype = vim.bo[event.buf].filetype
-          local bufname = vim.api.nvim_buf_get_name(event.buf)
-
-          -- Only open for real file buffers (not dashboard, not empty)
-          if buftype ~= "" or filetype == "snacks_dashboard" or filetype == "" then
-            return
-          end
-          if bufname == "" or vim.fn.isdirectory(bufname) == 1 then
-            return
-          end
-
-          -- Open explorer without stealing focus from the file buffer
-          vim.g.konductor_explorer_opened = true
-          vim.defer_fn(function()
-            if vim.o.columns >= 120 then
-              Snacks.explorer({ focus = false })
-            end
-          end, 50)
-        end
-      '';
-    }
   ];
 }
