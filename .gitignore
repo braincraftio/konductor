@@ -21,6 +21,7 @@ core.[0-9]*
 .konductor
 .nix_drv
 *.meta
+*.bundle
 
 # =============================================================================
 # Language Runtimes & Dependencies

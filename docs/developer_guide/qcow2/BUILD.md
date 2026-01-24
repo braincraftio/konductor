@@ -43,7 +43,8 @@ The image includes:
 - IDE: Neovim, tmux
 - Self-hosting: Docker, QEMU, libvirt, Buildkit
 - Users: `kc2`, `kc2admin`, `runner`
-- Source: `/opt/konductor` (git history preserved for verification)
+- Source: `/opt/konductor/src/` (git history preserved for verification)
+- Archive: `/opt/konductor/k9-<commit>.tar.gz` (verifiable artifact)
 
 ---
 
@@ -272,15 +273,16 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  End-to-End: Build → Cluster → Trust → Push                                 │
+│  End-to-End: Build → Push → Validate → Promote                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  1. build:qcow2:image   Build QCOW2 (no cluster needed)                     │
+│  1. build:qcow2:image     Build QCOW2 (no cluster needed)                   │
 │  2. build:qcow2:container Package as containerDisk                          │
-│  3. cluster:up          Start Talos + deploy platform (projv-engprod)       │
-│  4. registry:trust      Install cluster CA for Docker/Skopeo                │
-│  5. registry:login      Authenticate to registry.docker.arpa                │
-│  6. build:qcow2:push    Push with git/nix/latest tags                       │
-│  7. registry:tags       Verify pushed tags                                  │
+│  3. cluster:up            Start Talos + deploy platform (projv-engprod)     │
+│  4. registry:trust        Install cluster CA for Docker/Skopeo              │
+│  5. registry:login        Authenticate to registry.docker.arpa              │
+│  6. build:qcow2:push      Push with git/nix/latest tags                     │
+│  7. build:qcow2:validate  Deploy to KubeVirt + SSH test                     │
+│  8. build:qcow2:promote   Copy to docker.io (after validation passes)       │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -307,7 +309,8 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 │  build:qcow2 (requires cluster)                                             │
 │    ├── :login                   Authenticate to registry                    │
 │    ├── :push                    Push with git/nix/latest tags               │
-│    └── :promote                 Copy to public registry (docker.io)         │
+│    ├── :validate                Deploy to KubeVirt + SSH test               │
+│    └── :promote                 Copy to public registry (after validation)  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  build:qcow2 (convenience)                                                  │
 │    ├── :publish                 Full pipeline: image → container → push     │
@@ -619,18 +622,35 @@ echo ""
 echo "▶ Phase 7: Verify pushed tags..."
 runme run --filename "$QCOW2_BUILD_FILE" registry:tags
 
+# Validate
+echo ""
+echo "▶ Phase 8: Deploy and validate in KubeVirt..."
+runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
+
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  ✓ Complete! Image pushed to registry.docker.arpa"
+echo "  ✓ Complete! Image validated and ready for promotion"
 echo "═══════════════════════════════════════════════════════════════════════════"
 cat .konductor
 ```
 
 ---
 
+### build:qcow2:validate
+
+Deploy to KubeVirt and validate before promotion.
+
+```sh {"name":"build:qcow2:validate","excludeFromRunAll":"true","tag":"type:entry,requires:k8s"}
+set -e
+mise run dev:k8s:konductor:up
+mise run dev:k8s:konductor:validate
+```
+
+---
+
 ### build:qcow2:promote
 
-Copy to public registry.
+Copy to public registry (requires validation).
 
 ```sh {"name":"build:qcow2:promote","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
@@ -706,10 +726,11 @@ Registry Setup:
   registry:list            List images in registry
   registry:tags            List tags for konductor image
 
-Push & Promote:
+Push & Validate:
   build:qcow2:login        Authenticate to registry (alias for registry:login)
   build:qcow2:push         Push with multi-tag (git/nix/latest)
-  build:qcow2:promote      Copy to public registry (docker.io/ghcr.io)
+  build:qcow2:validate     Deploy to KubeVirt and validate SSH
+  build:qcow2:promote      Copy to public registry (requires validation)
 
 Convenience:
   build:qcow2:publish      Full pipeline (image → container → login → push)
@@ -958,31 +979,37 @@ Sync source to VM. Tries git clone first (preserves history), falls back to rsyn
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
-GIT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
-GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+COMMIT=$(git rev-parse --short HEAD)
+BUNDLE="k9-${COMMIT}.bundle"
 
-ssh localhost 'sudo rm -rf /opt/konductor'
+ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 
-CLONE_OK=false
-if [ -n "$GIT_REMOTE" ] && [ -n "$GIT_COMMIT" ]; then
-    # Try git clone (preserves history for verify:konductor tasks)
-    if ssh localhost "sudo git clone --no-checkout '$GIT_REMOTE' /opt/konductor 2>/dev/null" && \
-       ssh localhost "cd /opt/konductor && sudo git checkout '$GIT_COMMIT' 2>/dev/null"; then
-        CLONE_OK=true
-    else
-        ssh localhost 'sudo rm -rf /opt/konductor' 2>/dev/null || true
-    fi
-fi
+# git bundle: portable repo with full history
+echo "Creating bundle ${BUNDLE}..."
+git bundle create "/tmp/${BUNDLE}" HEAD --all
 
-if [ "$CLONE_OK" = "false" ]; then
-    # Fallback: rsync with .git (if accessible locally)
-    ssh localhost 'sudo mkdir -p /opt/konductor'
-    ssh localhost 'sudo rsync -a \
-        --exclude={result,result.writable,.direnv,.env,.env.local,node_modules,__pycache__,.pytest_cache,.mypy_cache,.coverage,.devcontainer,.claude,.mcp.json,.vscode,.idea,"*.tmp","*.pyc","*.bak","*.log",".DS_Store","*.qcow2","*.qcow2.tmp",www,.venv} \
-        /workspace/ /opt/konductor/'
+# Transfer bundle
+echo "Transferring bundle..."
+scp "/tmp/${BUNDLE}" "localhost:/tmp/${BUNDLE}"
+ssh localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
+
+# Clone from bundle (creates clean repo with history)
+echo "Cloning to /opt/konductor/src/..."
+ssh localhost "git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh localhost "cd /opt/konductor/src && git checkout ${COMMIT}"
+
+# Verify clean state
+DIRTY=$(ssh localhost 'cd /opt/konductor/src && git status --porcelain' || true)
+if [ -n "$DIRTY" ]; then
+    echo "WARNING: Tree is dirty after sync"
+    echo "$DIRTY"
 fi
 
 ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
+rm -f "/tmp/${BUNDLE}"
+
+echo "✓ /opt/konductor/${BUNDLE} (bundle)"
+echo "✓ /opt/konductor/src/ (cloned)"
 ```
 
 ---
@@ -994,22 +1021,22 @@ Run `nixos-rebuild switch` inside VM to build the devshell natively.
 This ensures:
 - Full Konductor environment is built natively inside the VM
 - All nix store paths are pre-cached for airgap use
-- The VM can reproduce itself from /opt/konductor
+- The VM can reproduce itself from /opt/konductor/src
 
 ```sh {"name":"_build:qcow2:vm:rebuild","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
 # Rebuild NixOS from the synced flake
-ssh localhost 'cd /opt/konductor && sudo nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh localhost 'cd /opt/konductor/src && sudo nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures
 # This ensures `nix develop` works offline
-ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
-ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
-ssh localhost 'cd /opt/konductor && nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
+ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
+ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
+ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
 
-echo "VM rebuilt from /opt/konductor flake"
+echo "VM rebuilt from /opt/konductor/src flake"
 ```
 
 ---

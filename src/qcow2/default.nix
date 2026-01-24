@@ -1039,7 +1039,10 @@ let
       # See: Pulumi.optiplex-rook-ceph.yaml ceph_config_override
 
       # I/O scheduler: none for virtio-blk (Ceph handles its own scheduling)
+      # Serial console for hypervisor log capture (KubeVirt, libvirt)
       kernelParams = [
+        "console=tty0"
+        "console=ttyS0,115200"
         "elevator=none"
         "scsi_mod.use_blk_mq=1"
       ];
