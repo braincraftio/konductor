@@ -38,7 +38,9 @@ baseShell.overrideAttrs (old: {
     ++ packages.nodejsPackages
     ++ packages.rustPackages
     # Atuin shell history (includes bash-preexec)
-    ++ config.shell.atuin.packages;
+    ++ config.shell.atuin.packages
+    # Container tooling (docker with compose v2 plugin)
+    ++ (with pkgs; [ docker docker-compose docker-buildx ]);
 
   shellHook = old.shellHook + ''
     # SSH identity detection (dynamic, needs $HOME)
