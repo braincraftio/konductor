@@ -1149,7 +1149,7 @@ let
       description = "Set up Nix store overlay with host cache";
       wantedBy = [ "nix-daemon.service" ];
       before = [ "nix-daemon.service" ];
-      after = [ "nix-.host" "-store.mount" "nix-.rw-store.mount" ];
+      after = [ "local-fs.target" ];
       unitConfig = {
         ConditionPathIsMountPoint = "/nix/.host-store";
         DefaultDependencies = false;
