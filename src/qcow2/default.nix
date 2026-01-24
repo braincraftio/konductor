@@ -1124,7 +1124,6 @@ let
         "cache=loose"      # Aggressive caching for read-only mount
         "ro"
         "nofail"           # Don't fail boot if not available (production)
-        "x-systemd.automount"
         "x-systemd.device-timeout=5s"
       ];
       neededForBoot = false;  # Not required - graceful degradation
