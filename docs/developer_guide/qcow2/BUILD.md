@@ -939,6 +939,7 @@ qemu-system-x86_64 \
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
+    -virtfs local,path=/nix/store,mount_tag=nixstore,security_model=none,readonly=on \
     -daemonize \
     -pidfile "$PIDFILE" \
     -serial file:"${QCOW2_LOGFILE:-build-vm.log}" \

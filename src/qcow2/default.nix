@@ -1099,6 +1099,108 @@ let
       options = [ "umask=0077" ];
     };
 
+    # =====================================================================
+    # Host Nix Store Overlay (Build Acceleration)
+    # =====================================================================
+    # During QCOW2 build, the host's /nix/store is mounted via 9p virtfs.
+    # An overlay filesystem makes it writable while using host paths as cache.
+    # In production (no host mount), these mounts fail gracefully (nofail).
+    #
+    # Architecture:
+    #   /nix/.host-store (9p, ro) ─┐
+    #                              ├─► overlay ─► /nix/store (rw)
+    #   /nix/.rw-store (tmpfs)  ───┘
+    #
+    # This reduces build time by avoiding re-download of paths that exist
+    # on the build host. New/modified paths go to the tmpfs upper layer.
+
+    # Mount host's nix store read-only via 9p (only during build)
+    fileSystems."/nix/.host-store" = {
+      device = "nixstore";
+      fsType = "9p";
+      options = [
+        "trans=virtio"
+        "version=9p2000.L"
+        "cache=loose"      # Aggressive caching for read-only mount
+        "ro"
+        "nofail"           # Don't fail boot if not available (production)
+        "x-systemd.automount"
+        "x-systemd.device-timeout=5s"
+      ];
+      neededForBoot = false;  # Not required - graceful degradation
+    };
+
+    # Writable layer for overlay (tmpfs during build)
+    fileSystems."/nix/.rw-store" = {
+      device = "tmpfs";
+      fsType = "tmpfs";
+      options = [
+        "mode=0755"
+        "size=20G"         # Upper layer for new builds
+        "nofail"
+      ];
+      neededForBoot = false;
+    };
+
+    # Systemd service to set up nix store overlay when host store is available
+    # This runs early in boot, before nix-daemon, and only activates during
+    # QCOW2 build when the host's /nix/store is mounted via 9p virtfs.
+    systemd.services.nix-store-overlay = {
+      description = "Set up Nix store overlay with host cache";
+      wantedBy = [ "nix-daemon.service" ];
+      before = [ "nix-daemon.service" ];
+      after = [ "nix-.host" "-store.mount" "nix-.rw-store.mount" ];
+      unitConfig = {
+        ConditionPathIsMountPoint = "/nix/.host-store";
+        DefaultDependencies = false;
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = pkgs.writeShellScript "nix-store-overlay-setup" ''
+          set -euo pipefail
+
+          # Verify host store has content
+          if [ ! -d /nix/.host-store ] || [ -z "$(ls -A /nix/.host-store 2>/dev/null)" ]; then
+            echo "Host store not available or empty, using local store"
+            exit 0
+          fi
+
+          # Create overlay directories
+          mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
+
+          # Check if already mounted as overlay
+          if mount | grep -q "overlay on /nix/store"; then
+            echo "Overlay already mounted"
+            exit 0
+          fi
+
+          # Bind mount original store to preserve it
+          if [ ! -d /nix/.local-store ]; then
+            mkdir -p /nix/.local-store
+            mount --bind /nix/store /nix/.local-store
+          fi
+
+          # Mount overlay: host store (ro) + rw-store (rw) -> /nix/store
+          mount -t overlay overlay \
+            -o lowerdir=/nix/.host-store:/nix/.local-store,upperdir=/nix/.rw-store/upper,workdir=/nix/.rw-store/work \
+            /nix/store
+
+          echo "Nix store overlay activated with host cache"
+        '';
+        ExecStop = pkgs.writeShellScript "nix-store-overlay-teardown" ''
+          # Unmount overlay and restore local store
+          if mount | grep -q "overlay on /nix/store"; then
+            umount /nix/store || true
+            if [ -d /nix/.local-store ]; then
+              mount --bind /nix/.local-store /nix/store || true
+              umount /nix/.local-store || true
+            fi
+          fi
+        '';
+      };
+    };
+
     # Nix configuration
     nix = {
       settings = {
