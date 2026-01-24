@@ -995,8 +995,8 @@ ssh localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
 # Clone from bundle (creates clean repo with history)
 echo "Cloning to /opt/konductor/src/..."
-ssh localhost "git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh localhost "cd /opt/konductor/src && git checkout ${COMMIT}"
+ssh localhost "sudo git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh localhost "cd /opt/konductor/src && sudo git checkout ${COMMIT}"
 
 # Verify clean state
 DIRTY=$(ssh localhost 'cd /opt/konductor/src && git status --porcelain' || true)
