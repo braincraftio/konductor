@@ -676,42 +676,82 @@ Copy to public registry (requires validation).
 ```sh {"name":"build:qcow2:promote","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
 
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  build:qcow2:promote - Promote to Public Registry"
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+
 # Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
-[[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
+[[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
+echo "✓ WORKSPACE_ROOT=${WORKSPACE_ROOT}"
 
 # All paths constructed from WORKSPACE_ROOT
 PROVENANCE_FILE="${WORKSPACE_ROOT}/k9/.konductor"
+[ -f "$PROVENANCE_FILE" ] || { echo "✗ $PROVENANCE_FILE not found"; exit 1; }
+echo "✓ PROVENANCE_FILE=${PROVENANCE_FILE}"
 
+# Source registry (local Zot)
 SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 SRC_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 SRC_TAG="${CONTAINER_TAG:-latest-qcow2}"
-SRC_CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$SRC_REGISTRY"
+SRC_CERT_DIR="${HOME}/.config/containers/certs.d/${SRC_REGISTRY}"
+[ -d "$SRC_CERT_DIR" ] || { echo "✗ SRC_CERT_DIR not found: $SRC_CERT_DIR"; exit 1; }
+echo "✓ SRC_CERT_DIR=${SRC_CERT_DIR}"
 
+# Destination registry (public)
 DST_REGISTRY="${PROMOTE_REGISTRY:-docker.io}"
 DST_IMAGE="${PROMOTE_IMAGE:-containercraft/konductor}"
 DST_TAG="${PROMOTE_TAG:-latest-qcow2}"
+echo "✓ DST_REGISTRY=${DST_REGISTRY}"
 
-[ -f "$PROVENANCE_FILE" ] || { echo "Error: $PROVENANCE_FILE not found"; exit 1; }
+# Authentication preflight
+# Priority: DOCKER_TOKEN env var → existing ~/.docker/config.json
+echo ""
+echo "Authentication:"
+DEST_AUTH_FILE="${HOME}/.docker/config.json"
+if [[ "$DST_REGISTRY" == "docker.io" ]]; then
+    if [[ -n "${DOCKER_TOKEN:-}" ]]; then
+        echo "  Method: DOCKER_TOKEN environment variable"
+        echo "  User: ${DOCKER_USERNAME:-containercraft}"
+        echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin \
+            --compat-auth-file "$DEST_AUTH_FILE"
+        echo "✓ Authenticated to docker.io via DOCKER_TOKEN"
+    elif [[ -f "$DEST_AUTH_FILE" ]] && jq -e '.auths["https://index.docker.io/v1/"]' "$DEST_AUTH_FILE" &>/dev/null; then
+        echo "  Method: ${DEST_AUTH_FILE}"
+        echo "✓ Using existing docker.io credentials"
+    else
+        echo "✗ No authentication available for docker.io"
+        echo "  Set DOCKER_TOKEN or run: docker login docker.io"
+        exit 1
+    fi
+elif [[ "$DST_REGISTRY" == "ghcr.io" ]]; then
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        echo "  Method: GITHUB_TOKEN environment variable"
+        echo "  User: ${GITHUB_ACTOR:-github}"
+        echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin \
+            --compat-auth-file "$DEST_AUTH_FILE"
+        echo "✓ Authenticated to ghcr.io via GITHUB_TOKEN"
+    elif [[ -f "$DEST_AUTH_FILE" ]] && jq -e '.auths["ghcr.io"]' "$DEST_AUTH_FILE" &>/dev/null; then
+        echo "  Method: ${DEST_AUTH_FILE}"
+        echo "✓ Using existing ghcr.io credentials"
+    else
+        echo "✗ No authentication available for ghcr.io"
+        echo "  Set GITHUB_TOKEN or run: docker login ghcr.io"
+        exit 1
+    fi
+fi
+
+# Verify source exists
+echo ""
+echo "Source verification:"
+skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" &>/dev/null \
+    || { echo "✗ Source not found: $SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG"; exit 1; }
+echo "✓ Source exists: ${SRC_REGISTRY}/${SRC_IMAGE}:${SRC_TAG}"
 
 # Read provenance for additional tags
 git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' "$PROVENANCE_FILE")
 git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' "$PROVENANCE_FILE")
 nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' "$PROVENANCE_FILE")
-
-# Verify source exists
-skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" &>/dev/null \
-    || { echo "Error: Source not found. Run build:qcow2:publish first."; exit 1; }
-
-# Authenticate to destination
-# Priority: env var token → existing docker credentials
-DEST_AUTH_FILE="${HOME}/.docker/config.json"
-if [[ "$DST_REGISTRY" == "docker.io" ]] && [[ -n "$DOCKER_TOKEN" ]]; then
-    echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin \
-        --compat-auth-file "$DEST_AUTH_FILE"
-elif [[ "$DST_REGISTRY" == "ghcr.io" ]] && [[ -n "$GITHUB_TOKEN" ]]; then
-    echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin \
-        --compat-auth-file "$DEST_AUTH_FILE"
-fi
 
 # Build tag list
 TAGS=("$DST_TAG")
@@ -722,16 +762,24 @@ if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
     TAGS+=("nix-${nix_drv:0:12}")
 fi
 
-# Copy with all tags (uses existing docker creds from DEST_AUTH_FILE)
+echo ""
+echo "Tags to push:"
+printf "  %s\n" "${TAGS[@]}"
+echo ""
+
+# Copy with all tags
 for tag in "${TAGS[@]}"; do
-    skopeo copy --src-cert-dir "$SRC_CERT_DIR" --dest-authfile "$DEST_AUTH_FILE" \
+    echo "Copying ${DST_REGISTRY}/${DST_IMAGE}:${tag}..."
+    skopeo copy \
+        --src-cert-dir "$SRC_CERT_DIR" \
+        --dest-authfile "$DEST_AUTH_FILE" \
         docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" \
         docker://"$DST_REGISTRY/$DST_IMAGE:$tag"
 done
 
 echo "Promoted: $DST_REGISTRY/$DST_IMAGE"
 printf "  %s\n" "${TAGS[@]}"
-skopeo inspect docker://"$DST_REGISTRY/$DST_IMAGE:$DST_TAG" | jq '{Digest, Created}'
+skopeo inspect --no-creds docker://"$DST_REGISTRY/$DST_IMAGE:$DST_TAG" | jq '{Digest, Created}'
 ```
 
 ---
