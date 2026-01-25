@@ -675,6 +675,13 @@ Copy to public registry (requires validation).
 
 ```sh {"name":"build:qcow2:promote","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
+
+# Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
+[[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
+
+# All paths constructed from WORKSPACE_ROOT
+PROVENANCE_FILE="${WORKSPACE_ROOT}/k9/.konductor"
+
 SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 SRC_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 SRC_TAG="${CONTAINER_TAG:-latest-qcow2}"
@@ -684,24 +691,26 @@ DST_REGISTRY="${PROMOTE_REGISTRY:-docker.io}"
 DST_IMAGE="${PROMOTE_IMAGE:-containercraft/konductor}"
 DST_TAG="${PROMOTE_TAG:-latest-qcow2}"
 
-[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
+[ -f "$PROVENANCE_FILE" ] || { echo "Error: $PROVENANCE_FILE not found"; exit 1; }
 
 # Read provenance for additional tags
-git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
-git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
-nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
+git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' "$PROVENANCE_FILE")
+git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' "$PROVENANCE_FILE")
+nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' "$PROVENANCE_FILE")
 
 # Verify source exists
 skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" &>/dev/null \
     || { echo "Error: Source not found. Run build:qcow2:publish first."; exit 1; }
 
 # Authenticate to destination
-if [[ "$DST_REGISTRY" == "docker.io" ]]; then
-    [ -n "$DOCKER_TOKEN" ] || { echo "Error: DOCKER_TOKEN not set"; exit 1; }
-    echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
-elif [[ "$DST_REGISTRY" == "ghcr.io" ]]; then
-    [ -n "$GITHUB_TOKEN" ] || { echo "Error: GITHUB_TOKEN not set"; exit 1; }
-    echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin
+# Priority: env var token → existing docker credentials
+DEST_AUTH_FILE="${HOME}/.docker/config.json"
+if [[ "$DST_REGISTRY" == "docker.io" ]] && [[ -n "$DOCKER_TOKEN" ]]; then
+    echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin \
+        --compat-auth-file "$DEST_AUTH_FILE"
+elif [[ "$DST_REGISTRY" == "ghcr.io" ]] && [[ -n "$GITHUB_TOKEN" ]]; then
+    echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin \
+        --compat-auth-file "$DEST_AUTH_FILE"
 fi
 
 # Build tag list
@@ -713,9 +722,9 @@ if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
     TAGS+=("nix-${nix_drv:0:12}")
 fi
 
-# Copy with all tags
+# Copy with all tags (uses existing docker creds from DEST_AUTH_FILE)
 for tag in "${TAGS[@]}"; do
-    skopeo copy --src-cert-dir "$SRC_CERT_DIR" \
+    skopeo copy --src-cert-dir "$SRC_CERT_DIR" --dest-authfile "$DEST_AUTH_FILE" \
         docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" \
         docker://"$DST_REGISTRY/$DST_IMAGE:$tag"
 done
