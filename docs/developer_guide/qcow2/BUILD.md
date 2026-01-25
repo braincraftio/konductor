@@ -131,7 +131,7 @@ oci_digest = "sha256:abc123..."
 
 ## Cluster Infrastructure
 
-The QCOW2 build publishes to `registry.docker.arpa`, which runs on a local Talos Kubernetes cluster. These tasks invoke mise (which finds `projv-engprod/.mise.toml` via upward search) and use `WORKSPACE_ROOT` from the environment.
+The QCOW2 build publishes to `registry.docker.arpa`, which runs on a local Talos Kubernetes cluster. These tasks invoke mise (which finds `${WORKSPACE_ROOT}/.mise.toml` via upward search) and use `WORKSPACE_ROOT` from the environment.
 
 ### cluster:up
 
@@ -277,7 +277,7 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  1. build:qcow2:image     Build QCOW2 (no cluster needed)                   │
 │  2. build:qcow2:container Package as containerDisk                          │
-│  3. cluster:up            Start Talos + deploy platform (projv-engprod)     │
+│  3. cluster:up            Start Talos + deploy platform     │
 │  4. registry:trust        Install cluster CA for Docker/Skopeo              │
 │  5. registry:login        Authenticate to registry.docker.arpa              │
 │  6. build:qcow2:push      Push with git/nix/latest tags                     │
@@ -392,9 +392,9 @@ Build QCOW2: nix → VM configure → seal → verify.
 
 ```sh {"name":"build:qcow2:image","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:stop
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
-runme run --filename "$QCOW2_BUILD_FILE" --all
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:stop
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" --all
 ```
 
 ---
@@ -428,6 +428,27 @@ Authenticate to container registry.
 
 ```sh {"name":"build:qcow2:login","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
+
+# Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
+[[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
+
+# Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
+[ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found: $KUBECONFIG"; exit 1; }
+
+# Kubernetes context validation
+K8S_CONTEXT="${REGISTRY_K8S_CONTEXT:-admin@docker-dev}"
+echo ""
+echo "Kubernetes contexts:"
+kubectl config get-contexts
+echo ""
+echo "Kubernetes config:"
+kubectl config view
+echo ""
+kubectl config get-contexts "$K8S_CONTEXT" &>/dev/null || { echo "✗ context \"$K8S_CONTEXT\" does not exist"; exit 1; }
+printf "✓ Context %s available\n" "$K8S_CONTEXT"
+
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 
 if [[ "$REGISTRY" == "registry.docker.arpa" ]] || [[ "$REGISTRY" =~ ^registry\..+\.sslip\.io$ ]]; then
@@ -527,10 +548,10 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
 fi
 [ -f result/nixos.qcow2 ] || { echo "No image. Run build:qcow2:image first."; exit 1; }
 
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
-runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
-runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
-runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
 echo "VM ready: ssh localhost"
 ```
 
@@ -547,7 +568,7 @@ ssh localhost
 ### build:qcow2:stop
 
 ```sh {"name":"build:qcow2:stop","excludeFromRunAll":"true","tag":"type:entry"}
-runme run --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:halt
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:halt
 ```
 
 ---
@@ -558,11 +579,11 @@ Full pipeline: clean → image → container → login → push.
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:image
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:container
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:login
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:login
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
 cat .konductor
 ```
 
@@ -592,40 +613,40 @@ echo "════════════════════════�
 # Phase 1: Build (no cluster required)
 echo ""
 echo "▶ Phase 1: Build QCOW2 image..."
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
 
 echo ""
 echo "▶ Phase 2: Package as containerDisk..."
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
 
 # Phase 2: Cluster
 echo ""
 echo "▶ Phase 3: Start cluster and deploy platform..."
-runme run --filename "$QCOW2_BUILD_FILE" cluster:up
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" cluster:up
 
 # Phase 3: Registry setup
 echo ""
 echo "▶ Phase 4: Install cluster CA..."
-runme run --filename "$QCOW2_BUILD_FILE" registry:trust
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:trust
 
 echo ""
 echo "▶ Phase 5: Authenticate to registry..."
-runme run --filename "$QCOW2_BUILD_FILE" registry:login
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:login
 
 # Phase 4: Push
 echo ""
 echo "▶ Phase 6: Push to registry..."
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
 
 # Verify
 echo ""
 echo "▶ Phase 7: Verify pushed tags..."
-runme run --filename "$QCOW2_BUILD_FILE" registry:tags
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:tags
 
 # Validate
 echo ""
 echo "▶ Phase 8: Deploy and validate in KubeVirt..."
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -716,7 +737,7 @@ Build (no cluster required):
   build:qcow2:container    Package as containerDisk
 
 Cluster Management:
-  cluster:up               Start Talos + deploy platform (projv-engprod)
+  cluster:up               Start Talos + deploy platform
   cluster:down             Destroy cluster
   cluster:status           Check cluster and registry status
 
@@ -773,13 +794,34 @@ Validate environment.
 
 ```sh {"name":"_build:qcow2:preflight"}
 set -e
+
+# Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
+[[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
+
+# Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
+
 ERRORS=0
 
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
 
 for cmd in $QCOW2_REQUIRED_BINS; do
-    command -v "$cmd" &>/dev/null && printf "✓ %s\n" "$cmd" || { printf "✗ %s\n" "$cmd"; ((ERRORS++)); }
+    if command -v "$cmd" &>/dev/null; then
+        path=$(command -v "$cmd")
+        printf "✓ %-20s %s\n" "$cmd" "$path"
+    else
+        printf "✗ %s\n" "$cmd"
+        ((ERRORS++))
+    fi
 done
+
+# Print versions for critical tools
+echo ""
+echo "Versions:"
+printf "  qemu:  %s\n" "$(qemu-system-x86_64 --version | head -1)"
+printf "  nix:   %s\n" "$(nix --version)"
+printf "  docker: %s\n" "$(docker --version)"
 
 for var in $QCOW2_REQUIRED_FILE_VARS; do
     val="${!var}"; [ -n "$val" ] && [ -f "$val" ] && printf "✓ %s\n" "$var" || { printf "✗ %s\n" "$var"; ((ERRORS++)); }
