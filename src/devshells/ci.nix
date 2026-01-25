@@ -12,8 +12,8 @@
 #   - Forgejo runner and CLI
 #   - Nix tools (cachix)
 #
-# Usage in Konductor VM:
-#   nix develop github:containercraft/konductor#ci
+# Usage in Konductor VM (uses local bundled source):
+#   nix develop /opt/konductor/src#ci
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix

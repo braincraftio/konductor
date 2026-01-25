@@ -407,12 +407,14 @@ let
           # Copy shell configs from /etc/skel if missing (first login setup)
           # Use -L to dereference symlinks (nix store files are read-only)
           # Note: .gitconfig is NOT copied - git uses /etc/gitconfig (system level)
-          if [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ]; then
-            cp -L /etc/skel/.bashrc "$HOME/"
-            cp -L /etc/skel/.bash_profile "$HOME/" 2>/dev/null || true
-            cp -L /etc/skel/.inputrc "$HOME/" 2>/dev/null || true
+          # Check each file independently so partial setups get completed
+          [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ] && cp -L /etc/skel/.bashrc "$HOME/"
+          [ ! -f "$HOME/.bash_profile" ] && [ -f /etc/skel/.bash_profile ] && cp -L /etc/skel/.bash_profile "$HOME/"
+          [ ! -f "$HOME/.inputrc" ] && [ -f /etc/skel/.inputrc ] && cp -L /etc/skel/.inputrc "$HOME/"
+          [ ! -f "$HOME/.envrc" ] && [ -f /etc/skel/.envrc ] && cp -L /etc/skel/.envrc "$HOME/"
+          if [ ! -f "$HOME/.config/starship.toml" ] && [ -f /etc/skel/.config/starship.toml ]; then
             mkdir -p "$HOME/.config"
-            cp -L /etc/skel/.config/starship.toml "$HOME/.config/" 2>/dev/null || true
+            cp -L /etc/skel/.config/starship.toml "$HOME/.config/"
           fi
           # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
 
@@ -440,6 +442,17 @@ let
 
           # Tmux configuration
           ${programs.tmux.shellHook}
+
+          # Starship prompt (initialize here for first login, also in .bashrc for subshells)
+          # Skip on non-interactive or dumb terminals
+          if command -v starship >/dev/null 2>&1 && [ -t 0 ] && [[ "''${TERM:-dumb}" != "dumb" ]]; then
+            eval "$(starship init bash)"
+          fi
+
+          # Direnv (initialize here for first login, also in .bashrc for subshells)
+          if command -v direnv >/dev/null 2>&1; then
+            eval "$(direnv hook bash)"
+          fi
         '';
       };
 
@@ -543,6 +556,7 @@ let
           description = "Mount 9p workspace from host";
           after = [ "local-fs.target" ];
           wantedBy = [ "multi-user.target" ];
+          path = with pkgs; [ util-linux coreutils ];
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
@@ -634,10 +648,11 @@ let
                 echo "⚠ git_dirty=$GIT_DIRTY (built from dirty tree)"
               fi
 
-              # If /opt/konductor exists, verify against it
+              # If /opt/konductor/src exists, verify against it
+              # Source is at /opt/konductor/src/ (bundled via git-bundle in Dockerfile.qcow2)
               VERIFIED=""
-              if [ -d /opt/konductor ] && [ -d /opt/konductor/.git ]; then
-                cd /opt/konductor
+              if [ -d /opt/konductor/src ] && [ -d /opt/konductor/src/.git ]; then
+                cd /opt/konductor/src
 
                 # Verify git_commit
                 EXPECTED="$GIT_COMMIT"
@@ -980,9 +995,14 @@ let
           # Live restore: reduces veth churn, helps with systemd-networkd
           live-restore = true;
 
-          # Explicit address pool (standardized across all environments)
+          # Explicit address pool - uses 172.20.0.0/16 to avoid conflicts with:
+          # - 10.5.0.0/24: Cilium L2 LoadBalancer pool (host docker-dev bridge)
+          # - 10.0.2.0/24: KubeVirt pod network (masquerade)
+          # - 10.96.0.0/12: Kubernetes service CIDR
+          # - 10.244.0.0/16: Kubernetes pod CIDR
+          # - 172.17.0.0/16: Default Docker bridge
           default-address-pools = [
-            { base = "10.5.0.0/24"; size = 24; }
+            { base = "172.20.0.0/16"; size = 24; }
           ];
         };
 
@@ -1115,6 +1135,8 @@ let
     # on the build host. New/modified paths go to the tmpfs upper layer.
 
     # Mount host's nix store read-only via 9p (only during build)
+    # Uses automount to avoid "failed" status when virtfs device doesn't exist
+    # The mount only triggers when /nix/.host-store is accessed
     fileSystems."/nix/.host-store" = {
       device = "nixstore";
       fsType = "9p";
@@ -1124,6 +1146,9 @@ let
         "cache=loose"      # Aggressive caching for read-only mount
         "ro"
         "nofail"           # Don't fail boot if not available (production)
+        "noauto"           # Don't mount at boot (prevents failed unit)
+        "x-systemd.automount"  # Mount on access
+        "x-systemd.idle-timeout=60"  # Unmount after 60s idle
         "x-systemd.device-timeout=5s"
       ];
       neededForBoot = false;  # Not required - graceful degradation
@@ -1144,13 +1169,14 @@ let
     # Systemd service to set up nix store overlay when host store is available
     # This runs early in boot, before nix-daemon, and only activates during
     # QCOW2 build when the host's /nix/store is mounted via 9p virtfs.
+    # Note: No ConditionPathIsMountPoint since we use automount - the script
+    # checks availability by accessing the path (triggering automount if device exists)
     systemd.services.nix-store-overlay = {
       description = "Set up Nix store overlay with host cache";
       wantedBy = [ "nix-daemon.service" ];
       before = [ "nix-daemon.service" ];
-      after = [ "local-fs.target" ];
+      after = [ "local-fs.target" "nix-.host\\x2dstore.automount" ];
       unitConfig = {
-        ConditionPathIsMountPoint = "/nix/.host-store";
         DefaultDependencies = false;
       };
       serviceConfig = {
@@ -1226,17 +1252,17 @@ let
           "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         ];
       };
-      # Pre-configured flake registry for updates/customization
-      # All tools pre-installed - this registry is for advanced use
+      # Pre-configured flake registry - local source for zero network dependency
+      # The bundled /opt/konductor/src has the full Nix store cache from build
+      # This enables offline operation and provenance-attested builds
       registry.konductor = {
         from = {
           type = "indirect";
           id = "konductor";
         };
         to = {
-          type = "github";
-          owner = "braincraftio";
-          repo = "konductor";
+          type = "path";
+          path = "/opt/konductor/src";
         };
       };
     };
