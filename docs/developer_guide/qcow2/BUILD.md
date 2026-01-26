@@ -729,12 +729,14 @@ TOKEN=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
 
 if [ -z "$TOKEN" ]; then
   # User doesn't exist - create with admin privileges and access token
+  # Password from FORGEJO_RUNNER_PASSWORD env var or default admin123
+  RUNNER_PASSWORD="${FORGEJO_RUNNER_PASSWORD:-admin123}"
   echo "  Creating $REPO_OWNER user..."
   CREATE_OUTPUT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
     forgejo admin user create \
       --username "$REPO_OWNER" \
       --email "${REPO_OWNER}@localhost" \
-      --password "$(openssl rand -hex 16)" \
+      --password "$RUNNER_PASSWORD" \
       --admin \
       --must-change-password=false \
       --access-token \
@@ -745,7 +747,7 @@ if [ -z "$TOKEN" ]; then
 fi
 
 [ -n "$TOKEN" ] || { echo "✗ Failed to provision credentials"; exit 1; }
-echo "✓ Credentials provisioned: ${REPO_OWNER} (token: ${TOKEN_NAME})"
+echo "✓ Credentials provisioned: ${REPO_OWNER}:${RUNNER_PASSWORD:-admin123} (token: ${TOKEN_NAME})"
 
 echo ""
 echo "▶ Phase 2: Create test repository..."
