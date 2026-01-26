@@ -94,6 +94,45 @@ jobs:
           echo "  OVMF EFI Firmware (QCOW2_REQUIRED_FILE_VARS)"
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
+
+          # Debug: Show how we're being invoked
+          echo "Debug: Shell invocation"
+          echo "  \$0: $0"
+          echo "  \$SHELL: ${SHELL:-<not set>}"
+          echo "  \$BASH_VERSION: ${BASH_VERSION:-<not set>}"
+          echo ""
+
+          # Debug: Check PAM environment file
+          echo "Debug: /etc/environment"
+          cat /etc/environment 2>/dev/null || echo "  (file not found)"
+          echo ""
+
+          # Debug: Check NixOS session variables
+          echo "Debug: /etc/session-variables (NixOS PAM)"
+          cat /etc/session-variables 2>/dev/null || echo "  (file not found)"
+          echo ""
+
+          # Debug: Check profile.d scripts
+          echo "Debug: /etc/profile.d/*.sh"
+          ls -la /etc/profile.d/*.sh 2>/dev/null || echo "  (no scripts)"
+          echo ""
+
+          # Debug: Grep for OVMF in various locations
+          echo "Debug: Searching for OVMF in environment files..."
+          grep -r "OVMF" /etc/environment /etc/profile.d/ /etc/session-variables 2>/dev/null || echo "  (not found in config files)"
+          echo ""
+
+          # Debug: Find OVMF files in nix store
+          echo "Debug: OVMF files in /nix/store"
+          find /nix/store -maxdepth 2 -name "OVMF*" -type d 2>/dev/null | head -5 || echo "  (searching...)"
+          ls /nix/store/*OVMF*/FV/ 2>/dev/null | head -10 || echo "  (no OVMF.fd packages found)"
+          echo ""
+
+          # Debug: Full environment dump (filtered)
+          echo "Debug: Environment variables containing 'OVMF' or 'ovmf':"
+          env | grep -i ovmf || echo "  (none)"
+          echo ""
+
           ERRORS=0
 
           # OVMF_CODE
@@ -102,6 +141,12 @@ jobs:
             ls -lh "$OVMF_CODE"
           else
             printf "✗ OVMF_CODE='%s' (not set or file missing)\n" "${OVMF_CODE:-}"
+            # Fallback: try to find it
+            FOUND_OVMF=$(find /nix/store -maxdepth 3 -name "OVMF_CODE.fd" 2>/dev/null | head -1)
+            if [ -n "$FOUND_OVMF" ]; then
+              echo "  Found: $FOUND_OVMF"
+              echo "  Hint: Add to sessionVariables in default.nix"
+            fi
             ((ERRORS++))
           fi
           echo ""
@@ -112,6 +157,10 @@ jobs:
             ls -lh "$OVMF_VARS"
           else
             printf "✗ OVMF_VARS='%s' (not set or file missing)\n" "${OVMF_VARS:-}"
+            FOUND_VARS=$(find /nix/store -maxdepth 3 -name "OVMF_VARS.fd" 2>/dev/null | head -1)
+            if [ -n "$FOUND_VARS" ]; then
+              echo "  Found: $FOUND_VARS"
+            fi
             ((ERRORS++))
           fi
           echo ""
