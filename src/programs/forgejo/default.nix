@@ -3,7 +3,7 @@
 #
 # Provides:
 #   - forgejo-server: Self-hosted git forge server
-#   - forgejo-runner: CI/CD runner (act-based)
+#   - forgejo-runner: CI/CD runner (act-based, forked with flat_workspace_mode)
 #   - forgejo-cli: Command-line interface for Forgejo API
 #
 # Usage:
@@ -15,8 +15,19 @@
 let
   # Forgejo packages from nixpkgs
   forgejoServer = pkgs.forgejo; # v13.x - current stable
-  forgejoRunner = pkgs.forgejo-runner; # v11.x - act-based runner
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
+
+  # Forked runner with flat_workspace_mode support
+  # Source: git.braincraft.io/BrainCraft/runner
+  # Feature: container.flat_workspace_mode changes /workspace/owner/repo to /workspace/repo
+  forgejoRunnerSrc = pkgs.fetchzip {
+    url = "https://git.braincraft.io/BrainCraft/runner/archive/8379dcf7e1830b3a95added0aa408d1377d54883.tar.gz";
+    hash = "sha256-yHxBcpkg45vTXt57YVUaiFg7icx9/dtXl/mXvPxgCIo=";
+  };
+  forgejoRunner = pkgs.forgejo-runner.overrideAttrs (oldAttrs: {
+    src = forgejoRunnerSrc;
+    vendorHash = "sha256-fvSiEIE4XSJ8Ot4Tcmt8chD11fHVsECD2/8xrgIKhJs=";
+  });
 
 in
 {
