@@ -275,7 +275,7 @@ jobs:
           # Docker daemon
           if docker info &>/dev/null; then
             echo "✓ Docker daemon running"
-            docker info | grep -E "Server Version|Storage Driver|Operating System"
+            docker info | rg "Server Version|Storage Driver|Operating System"
           else
             echo "✗ Docker daemon not responding"
             exit 1
