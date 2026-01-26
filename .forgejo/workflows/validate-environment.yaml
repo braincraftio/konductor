@@ -40,6 +40,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Rebuild System from Flake
+        env:
+          WORKSPACE_ROOT: /workspace
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  NixOS Rebuild (apply latest flake configuration)"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "PWD: $(pwd)"
+          echo "WORKSPACE_ROOT: ${WORKSPACE_ROOT}"
+          echo ""
+          echo "Workspace structure (include_server_host: /workspace/<host>/<owner>/<repo>):"
+          tree -L 3 "${WORKSPACE_ROOT}" 2>/dev/null || ls -la "${WORKSPACE_ROOT}"
+          echo ""
+          echo "Git (WORKSPACE_ROOT):"
+          git -C "${WORKSPACE_ROOT}" log --oneline -n 5 2>/dev/null || echo "  (not a git repo)"
+          git -C "${WORKSPACE_ROOT}" rev-parse HEAD 2>/dev/null || true
+          git -C "${WORKSPACE_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || true
+          git -C "${WORKSPACE_ROOT}" status --porcelain 2>/dev/null || true
+          echo ""
+          echo "Git (k9):"
+          git log --oneline -n 5
+          git rev-parse HEAD
+          git rev-parse --abbrev-ref HEAD
+          git status --porcelain
+          echo ""
+          echo "Rebuilding system to pick up latest configuration..."
+          sudo nixos-rebuild switch --flake .#konductor
+          echo ""
+          echo "✓ System rebuilt successfully"
+
       - name: Validate Required Binaries
         run: |
           echo "═══════════════════════════════════════════════════════════════════"

@@ -17,14 +17,15 @@ let
   forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
-  # Forked runner with include_server_host support
+  # Forked runner with include_server_host and workspace isolation
   # Source: git.braincraft.io/BrainCraft/runner
-  # Feature: container.include_server_host prepends server hostname to workspace path
-  #          Default: /workspace/owner/repo
-  #          Enabled: /workspace/git.example.com/owner/repo
+  # Features:
+  #   - container.include_server_host: prepends server hostname to workspace path
+  #   - container.workspace_repo: clones workspace repo for tooling inheritance
+  #   - Collision isolation via /workspace/<random>/<host>/<owner>/<repo>
   forgejoRunnerSrc = pkgs.fetchzip {
-    url = "https://git.braincraft.io/BrainCraft/runner/archive/d97b4afd9f104b414d96547bde0cd79b19f4e766.tar.gz";
-    hash = "sha256-S7v0dFlIewtlLMOu6qeafOfudNoKoCwNdw9U/XCjrls=";
+    url = "https://git.braincraft.io/BrainCraft/runner/archive/3ba312766bf60c1e960aefb36c57cc7447920ef7.tar.gz";
+    hash = "sha256-CIrZj/g1866mtQjqQB1ditCzA5USMYeYJ7RvaDmXUAs=";
   };
   forgejoRunner = pkgs.forgejo-runner.overrideAttrs (oldAttrs: {
     src = forgejoRunnerSrc;

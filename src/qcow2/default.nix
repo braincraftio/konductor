@@ -942,6 +942,13 @@ let
               "HOME=/home/runner"
               "PATH=/run/current-system/sw/bin"
               "DOCKER_HOST=unix:///var/run/docker.sock"
+              # OVMF EFI firmware for QEMU (required for QCOW2 builds)
+              "OVMF_CODE=${pkgs.OVMF.fd}/FV/OVMF_CODE.fd"
+              "OVMF_VARS=${pkgs.OVMF.fd}/FV/OVMF_VARS.fd"
+              # Build tools
+              "DOCKER_BUILDKIT=1"
+              # CI marker
+              "CI=true"
             ];
             ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
             Restart = "always";
