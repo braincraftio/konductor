@@ -940,7 +940,7 @@ let
             WorkingDirectory = "/home/runner";
             Environment = [
               "HOME=/home/runner"
-              "PATH=/run/current-system/sw/bin"
+              "PATH=/run/wrappers/bin:/run/current-system/sw/bin"
               "DOCKER_HOST=unix:///var/run/docker.sock"
               # OVMF EFI firmware for QEMU (required for QCOW2 builds)
               "OVMF_CODE=${pkgs.OVMF.fd}/FV/OVMF_CODE.fd"
