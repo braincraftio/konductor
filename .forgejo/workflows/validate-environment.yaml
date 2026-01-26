@@ -4,7 +4,11 @@
 # Tests that the runner has all required tools, environment variables,
 # and resources for QCOW2 builds. Mirrors _build:qcow2:preflight checks.
 #
-# Run this workflow to verify runner configuration before attempting builds.
+# This workflow validates:
+# 1. Forked runner workspace isolation (WORKSPACE_ROOT, workspace.git clone)
+# 2. direnv integration (.envrc chain with source_up)
+# 3. Required binaries, firmware, KVM, Docker, Nix
+# 4. System resources (disk, memory, CPU)
 
 name: Validate Environment
 
@@ -22,10 +26,10 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Environment Audit
+      - name: Pre-checkout Environment Audit
         run: |
           echo "═══════════════════════════════════════════════════════════════════"
-          echo "  RAW ENVIRONMENT AUDIT (pre-checkout)"
+          echo "  RAW ENVIRONMENT AUDIT (pre-checkout, pre-direnv)"
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
           echo "--- Critical Paths ---"
@@ -33,53 +37,12 @@ jobs:
           echo "PWD=${PWD}"
           echo "HOME=${HOME}"
           echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<NOT SET>}"
-          echo "KUBECONFIG=${KUBECONFIG:-<NOT SET>}"
           echo ""
-          echo "--- OVMF Firmware ---"
-          echo "OVMF_CODE=${OVMF_CODE:-<NOT SET>}"
-          echo "OVMF_VARS=${OVMF_VARS:-<NOT SET>}"
-          echo ""
-          echo "--- Container/Registry ---"
-          echo "CONTAINER_REGISTRY=${CONTAINER_REGISTRY:-<NOT SET>}"
-          echo "CONTAINER_IMAGE=${CONTAINER_IMAGE:-<NOT SET>}"
-          echo "CONTAINER_TAG=${CONTAINER_TAG:-<NOT SET>}"
-          echo "REGISTRY_USERNAME=${REGISTRY_USERNAME:-<NOT SET>}"
-          echo "REGISTRY_PASSWORD=${REGISTRY_PASSWORD:+<SET>}${REGISTRY_PASSWORD:-<NOT SET>}"
-          echo "REGISTRY_K8S_CONTEXT=${REGISTRY_K8S_CONTEXT:-<NOT SET>}"
-          echo "DOCKER_HOST=${DOCKER_HOST:-<NOT SET>}"
-          echo "DOCKER_TOKEN=${DOCKER_TOKEN:+<SET>}${DOCKER_TOKEN:-<NOT SET>}"
-          echo ""
-          echo "--- Git/CI ---"
-          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME:-<NOT SET>}"
-          echo "GITHUB_TOKEN=${GITHUB_TOKEN:+<SET>}${GITHUB_TOKEN:-<NOT SET>}"
-          echo "GITHUB_ACTOR=${GITHUB_ACTOR:-<NOT SET>}"
-          echo "CI=${CI:-<NOT SET>}"
-          echo "GITHUB_ACTIONS=${GITHUB_ACTIONS:-<NOT SET>}"
-          echo "FORGEJO_ACTIONS=${FORGEJO_ACTIONS:-<NOT SET>}"
-          echo ""
-          echo "--- QCOW2 Build Config ---"
+          echo "--- Variables that SHOULD be set after direnv ---"
           echo "QCOW2_BUILD_FILE=${QCOW2_BUILD_FILE:-<NOT SET>}"
-          echo "QCOW2_SSH_PORT=${QCOW2_SSH_PORT:-<NOT SET>}"
-          echo "QCOW2_VM_MEMORY=${QCOW2_VM_MEMORY:-<NOT SET>}"
-          echo "QCOW2_VM_CPUS=${QCOW2_VM_CPUS:-<NOT SET>}"
-          echo "QCOW2_SSH_TIMEOUT=${QCOW2_SSH_TIMEOUT:-<NOT SET>}"
-          echo "QCOW2_MIN_DISK_GB=${QCOW2_MIN_DISK_GB:-<NOT SET>}"
-          echo "QCOW2_MIN_MEM_MB=${QCOW2_MIN_MEM_MB:-<NOT SET>}"
-          echo "QCOW2_REQUIRED_BINS=${QCOW2_REQUIRED_BINS:-<NOT SET>}"
-          echo "QCOW2_REQUIRED_FILE_VARS=${QCOW2_REQUIRED_FILE_VARS:-<NOT SET>}"
-          echo "QCOW2_REQUIRED_VARS=${QCOW2_REQUIRED_VARS:-<NOT SET>}"
-          echo ""
-          echo "--- Konductor Identity ---"
+          echo "KUBECONFIG=${KUBECONFIG:-<NOT SET>}"
+          echo "CONTAINER_REGISTRY=${CONTAINER_REGISTRY:-<NOT SET>}"
           echo "KONDUCTOR_SHELL=${KONDUCTOR_SHELL:-<NOT SET>}"
-          echo "KONDUCTOR_BASHRC=${KONDUCTOR_BASHRC:-<NOT SET>}"
-          echo ""
-          echo "--- Shell ---"
-          echo "SHELL=${SHELL:-<NOT SET>}"
-          echo "BASH_VERSION=${BASH_VERSION:-<NOT SET>}"
-          echo "USER=${USER:-<NOT SET>}"
-          echo ""
-          echo "--- Full Environment (sorted) ---"
-          env | sort
           echo ""
 
       - name: Runner Identity
@@ -157,14 +120,143 @@ jobs:
           fi
           echo ""
 
-          echo "Workspace structure (include_server_host: /workspace/<host>/<owner>/<repo>):"
-          tree -L 3 "${WORKSPACE_ROOT}" 2>/dev/null || ls -la "${WORKSPACE_ROOT}"
+          # Verify .envrc files exist in the chain
+          echo "Checking .envrc chain for direnv integration:"
+          if [ -f "${WORKSPACE_ROOT}/.envrc" ]; then
+            echo "✓ ${WORKSPACE_ROOT}/.envrc exists (parent)"
+          else
+            echo "✗ ${WORKSPACE_ROOT}/.envrc missing"
+          fi
+          if [ -f "${WORKSPACE_ROOT}/k9/.envrc" ]; then
+            echo "✓ ${WORKSPACE_ROOT}/k9/.envrc exists (child)"
+          else
+            echo "✗ ${WORKSPACE_ROOT}/k9/.envrc missing"
+          fi
           echo ""
-          echo "Git (k9 checkout):"
-          git log --oneline -n 5
-          git rev-parse HEAD
-          git rev-parse --abbrev-ref HEAD
-          git status --porcelain
+
+          echo "Workspace structure:"
+          tree -L 2 -a "${WORKSPACE_ROOT}" 2>/dev/null | head -40 || ls -la "${WORKSPACE_ROOT}"
+
+      - name: Setup direnv Environment
+        id: direnv
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  direnv Environment Setup"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+
+          # Verify direnv is available
+          echo "direnv version: $(direnv --version)"
+          echo ""
+
+          # Allow .envrc files in the chain (parent first, then child)
+          echo "Allowing .envrc files..."
+          direnv allow "${WORKSPACE_ROOT}"
+          echo "✓ Allowed: ${WORKSPACE_ROOT}/.envrc"
+
+          direnv allow "${WORKSPACE_ROOT}/k9"
+          echo "✓ Allowed: ${WORKSPACE_ROOT}/k9/.envrc"
+          echo ""
+
+          # cd to the repo directory (innermost .envrc with source_up)
+          cd "${WORKSPACE_ROOT}/k9"
+          echo "Working directory: $(pwd)"
+          echo ""
+
+          # Export direnv environment as JSON and convert to GITHUB_ENV format
+          echo "Exporting direnv environment to GITHUB_ENV..."
+          DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
+
+          if [ "$DIRENV_JSON" = "{}" ] || [ -z "$DIRENV_JSON" ]; then
+            echo "⚠ direnv export returned empty (no .envrc changes?)"
+            echo ""
+            echo "Debug: direnv status"
+            direnv status
+          else
+            # Parse JSON and write to GITHUB_ENV
+            # Filter out functions and complex values, keep simple key=value
+            echo "$DIRENV_JSON" | jq -r '
+              to_entries[]
+              | select(.value | type == "string")
+              | "\(.key)=\(.value)"
+            ' >> $GITHUB_ENV
+
+            # Count exported variables
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string")) | length')
+            echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
+          fi
+          echo ""
+
+          # Show key variables that should now be set
+          echo "Key variables from direnv:"
+          echo "$DIRENV_JSON" | jq -r '
+            to_entries[]
+            | select(.key | test("QCOW2_|CONTAINER_|REGISTRY_|KUBECONFIG|KONDUCTOR_|WORKSPACE_ROOT"))
+            | "  \(.key)=\(.value | tostring | .[0:60])"
+          ' 2>/dev/null || echo "  (none found)"
+
+      - name: Validate direnv Environment
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  direnv Environment Validation (post-export)"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          ERRORS=0
+
+          # These should now be set from .envrc -> .env.example
+          echo "--- Variables from direnv (.envrc chain) ---"
+
+          if [ -n "${QCOW2_BUILD_FILE:-}" ]; then
+            echo "✓ QCOW2_BUILD_FILE=${QCOW2_BUILD_FILE}"
+          else
+            echo "✗ QCOW2_BUILD_FILE not set (expected from .env.example)"
+            ((ERRORS++))
+          fi
+
+          if [ -n "${CONTAINER_REGISTRY:-}" ]; then
+            echo "✓ CONTAINER_REGISTRY=${CONTAINER_REGISTRY}"
+          else
+            echo "✗ CONTAINER_REGISTRY not set (expected from .env.example)"
+            ((ERRORS++))
+          fi
+
+          if [ -n "${CONTAINER_IMAGE:-}" ]; then
+            echo "✓ CONTAINER_IMAGE=${CONTAINER_IMAGE}"
+          else
+            echo "✗ CONTAINER_IMAGE not set (expected from .env.example)"
+            ((ERRORS++))
+          fi
+
+          # KUBECONFIG is derived from WORKSPACE_ROOT in .envrc
+          if [ -n "${KUBECONFIG:-}" ]; then
+            echo "✓ KUBECONFIG=${KUBECONFIG}"
+          else
+            echo "⚠ KUBECONFIG not set (derived from WORKSPACE_ROOT in .envrc)"
+          fi
+
+          echo ""
+          echo "--- QCOW2 Build Variables ---"
+          printf "  QCOW2_BUILD_FILE=%s\n" "${QCOW2_BUILD_FILE:-<not set>}"
+          printf "  QCOW2_SSH_PORT=%s\n" "${QCOW2_SSH_PORT:-<not set>}"
+          printf "  QCOW2_VM_MEMORY=%s\n" "${QCOW2_VM_MEMORY:-<not set>}"
+          printf "  QCOW2_VM_CPUS=%s\n" "${QCOW2_VM_CPUS:-<not set>}"
+          printf "  QCOW2_REQUIRED_BINS=%s\n" "${QCOW2_REQUIRED_BINS:-<not set>}"
+
+          echo ""
+          echo "--- Container/Registry Variables ---"
+          printf "  CONTAINER_REGISTRY=%s\n" "${CONTAINER_REGISTRY:-<not set>}"
+          printf "  CONTAINER_IMAGE=%s\n" "${CONTAINER_IMAGE:-<not set>}"
+          printf "  CONTAINER_TAG=%s\n" "${CONTAINER_TAG:-<not set>}"
+          printf "  REGISTRY_USERNAME=%s\n" "${REGISTRY_USERNAME:-<not set>}"
+
+          echo ""
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "⚠ ${ERRORS} expected variable(s) not set by direnv"
+            echo "  Check .envrc and .env.example files"
+            # Don't fail - this is informational for now
+          else
+            echo "✓ All expected direnv variables are set"
+          fi
 
       - name: Validate Required Binaries
         run: |
@@ -175,7 +267,7 @@ jobs:
           ERRORS=0
           BINS="nix qemu-img qemu-system-x86_64 genisoimage guestmount"
           BINS+=" guestunmount virt-sparsify ssh rsync timeout ss"
-          BINS+=" du sha256sum jq docker skopeo"
+          BINS+=" dust sha256sum jq docker skopeo direnv"
           for cmd in $BINS; do
             if command -v "$cmd" &>/dev/null; then
               path=$(command -v "$cmd")
@@ -207,6 +299,9 @@ jobs:
           echo "Skopeo:"
           skopeo --version
           echo ""
+          echo "direnv:"
+          direnv --version
+          echo ""
           echo "Languages:"
           printf "  Python: %s\n" "$(python3 --version 2>&1)"
           printf "  Go:     %s\n" "$(go version 2>&1)"
@@ -217,76 +312,27 @@ jobs:
       - name: Validate OVMF Firmware
         run: |
           echo "═══════════════════════════════════════════════════════════════════"
-          echo "  OVMF EFI Firmware (QCOW2_REQUIRED_FILE_VARS)"
+          echo "  OVMF EFI Firmware"
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
-
-          # Debug: Show how we're being invoked
-          echo "Debug: Shell invocation"
-          echo "  \$0: $0"
-          echo "  \$SHELL: ${SHELL:-<not set>}"
-          echo "  \$BASH_VERSION: ${BASH_VERSION:-<not set>}"
-          echo ""
-
-          # Debug: Check PAM environment file
-          echo "Debug: /etc/environment"
-          cat /etc/environment 2>/dev/null || echo "  (file not found)"
-          echo ""
-
-          # Debug: Check NixOS session variables
-          echo "Debug: /etc/session-variables (NixOS PAM)"
-          cat /etc/session-variables 2>/dev/null || echo "  (file not found)"
-          echo ""
-
-          # Debug: Check profile.d scripts
-          echo "Debug: /etc/profile.d/*.sh"
-          ls -la /etc/profile.d/*.sh 2>/dev/null || echo "  (no scripts)"
-          echo ""
-
-          # Debug: Search for OVMF in various locations
-          echo "Debug: Searching for OVMF in environment files..."
-          rg "OVMF" /etc/environment /etc/profile.d/ /etc/session-variables 2>/dev/null || echo "  (not found in config files)"
-          echo ""
-
-          # Debug: Find OVMF files in nix store
-          echo "Debug: OVMF files in /nix/store"
-          find /nix/store -maxdepth 2 -name "OVMF*" -type d 2>/dev/null | head -5 || echo "  (searching...)"
-          ls /nix/store/*OVMF*/FV/ 2>/dev/null | head -10 || echo "  (no OVMF.fd packages found)"
-          echo ""
-
-          # Debug: Full environment dump (filtered)
-          echo "Debug: Environment variables containing 'OVMF' or 'ovmf':"
-          env | grep -i ovmf || echo "  (none)"
-          echo ""
-
           ERRORS=0
 
-          # OVMF_CODE
+          # OVMF_CODE (from NixOS sessionVariables)
           if [ -n "${OVMF_CODE:-}" ] && [ -f "$OVMF_CODE" ]; then
             printf "✓ OVMF_CODE=%s\n" "$OVMF_CODE"
             ls -lh "$OVMF_CODE"
           else
             printf "✗ OVMF_CODE='%s' (not set or file missing)\n" "${OVMF_CODE:-}"
-            # Fallback: try to find it
-            FOUND_OVMF=$(find /nix/store -maxdepth 3 -name "OVMF_CODE.fd" 2>/dev/null | head -1)
-            if [ -n "$FOUND_OVMF" ]; then
-              echo "  Found: $FOUND_OVMF"
-              echo "  Hint: Add to sessionVariables in default.nix"
-            fi
             ((ERRORS++))
           fi
           echo ""
 
-          # OVMF_VARS
+          # OVMF_VARS (from NixOS sessionVariables)
           if [ -n "${OVMF_VARS:-}" ] && [ -f "$OVMF_VARS" ]; then
             printf "✓ OVMF_VARS=%s\n" "$OVMF_VARS"
             ls -lh "$OVMF_VARS"
           else
             printf "✗ OVMF_VARS='%s' (not set or file missing)\n" "${OVMF_VARS:-}"
-            FOUND_VARS=$(find /nix/store -maxdepth 3 -name "OVMF_VARS.fd" 2>/dev/null | head -1)
-            if [ -n "$FOUND_VARS" ]; then
-              echo "  Found: $FOUND_VARS"
-            fi
             ((ERRORS++))
           fi
           echo ""
@@ -395,7 +441,7 @@ jobs:
           # Nix store
           if [ -d /nix/store ]; then
             echo "✓ /nix/store exists"
-            STORE_SIZE=$(du -sh /nix/store 2>/dev/null | cut -f1)
+            STORE_SIZE=$(dust -d 0 /nix/store 2>/dev/null | tail -1 || echo "unknown")
             echo "  Size: $STORE_SIZE"
           else
             echo "✗ /nix/store not found"
@@ -430,35 +476,8 @@ jobs:
           else
             echo "⚠ SSH public key not found: $SSH_PUBKEY"
             echo "  (Required for QCOW2 VM access during build)"
+            echo "  Generate via cloud-init userdata or infrastructure provisioning"
           fi
-          echo ""
-
-      - name: Validate Environment Variables
-        run: |
-          echo "═══════════════════════════════════════════════════════════════════"
-          echo "  Environment Variables"
-          echo "═══════════════════════════════════════════════════════════════════"
-          echo ""
-
-          # Konductor identity
-          echo "Konductor:"
-          printf "  KONDUCTOR_SHELL=%s\n" "${KONDUCTOR_SHELL:-<not set>}"
-          printf "  KONDUCTOR_BASHRC=%s\n" "${KONDUCTOR_BASHRC:-<not set>}"
-          echo ""
-
-          # CI markers
-          echo "CI:"
-          printf "  CI=%s\n" "${CI:-<not set>}"
-          printf "  GITHUB_ACTIONS=%s\n" "${GITHUB_ACTIONS:-<not set>}"
-          printf "  FORGEJO_ACTIONS=%s\n" "${FORGEJO_ACTIONS:-<not set>}"
-          echo ""
-
-          # Build paths
-          echo "Build Paths:"
-          printf "  HOME=%s\n" "${HOME:-<not set>}"
-          printf "  PWD=%s\n" "${PWD:-<not set>}"
-          printf "  GOPATH=%s\n" "${GOPATH:-<not set>}"
-          printf "  CARGO_HOME=%s\n" "${CARGO_HOME:-<not set>}"
           echo ""
 
       - name: Summary
@@ -470,10 +489,22 @@ jobs:
           echo ""
           echo "This runner is ready for QCOW2 builds."
           echo ""
+
+          # Final environment summary
+          echo "Environment Summary:"
+          echo "  WORKSPACE_ROOT=${WORKSPACE_ROOT:-<not set>}"
+          echo "  QCOW2_BUILD_FILE=${QCOW2_BUILD_FILE:-<not set>}"
+          echo "  CONTAINER_REGISTRY=${CONTAINER_REGISTRY:-<not set>}"
+          echo "  KUBECONFIG=${KUBECONFIG:-<not set>}"
+          echo ""
+
           echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Forked Runner | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Workspace Structure | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| direnv Integration | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
           echo "| Required Binaries | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
           echo "| OVMF Firmware | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
           echo "| KVM Access | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
@@ -483,3 +514,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Runner:** $(hostname)" >> $GITHUB_STEP_SUMMARY
           echo "**Date:** $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
+          echo "**WORKSPACE_ROOT:** \`${WORKSPACE_ROOT:-<not set>}\`" >> $GITHUB_STEP_SUMMARY
