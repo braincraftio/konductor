@@ -1,0 +1,310 @@
+---
+# Validate Konductor CI Environment
+#
+# Tests that the runner has all required tools, environment variables,
+# and resources for QCOW2 builds. Mirrors _build:qcow2:preflight checks.
+#
+# Run this workflow to verify runner configuration before attempting builds.
+
+name: Validate Environment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: CI Environment Validation
+    runs-on: konductor
+    timeout-minutes: 10
+
+    steps:
+      - name: Runner Identity
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Konductor CI Environment Validation"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "Runner:"
+          echo "  Hostname: $(hostname)"
+          echo "  User: $(whoami)"
+          echo "  UID: $(id -u)"
+          echo "  Groups: $(groups)"
+          echo "  Date: $(date -Iseconds)"
+          echo "  Kernel: $(uname -r)"
+          echo ""
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Required Binaries
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Required Binaries (QCOW2_REQUIRED_BINS)"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          ERRORS=0
+          BINS="nix qemu-img qemu-system-x86_64 genisoimage guestmount"
+          BINS+=" guestunmount virt-sparsify ssh rsync timeout ss"
+          BINS+=" du sha256sum jq docker skopeo"
+          for cmd in $BINS; do
+            if command -v "$cmd" &>/dev/null; then
+              path=$(command -v "$cmd")
+              printf "✓ %-25s %s\n" "$cmd" "$path"
+            else
+              printf "✗ %-25s NOT FOUND\n" "$cmd"
+              ((ERRORS++))
+            fi
+          done
+          echo ""
+          [ "$ERRORS" -eq 0 ] || { echo "ERROR: $ERRORS required binary(s) missing"; exit 1; }
+          echo "All required binaries present"
+
+      - name: Validate CI Tool Versions
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Tool Versions"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "Nix:"
+          nix --version
+          echo ""
+          echo "QEMU:"
+          qemu-system-x86_64 --version | head -3
+          echo ""
+          echo "Docker:"
+          docker --version
+          echo ""
+          echo "Skopeo:"
+          skopeo --version
+          echo ""
+          echo "Languages:"
+          printf "  Python: %s\n" "$(python3 --version 2>&1)"
+          printf "  Go:     %s\n" "$(go version 2>&1)"
+          printf "  Node:   %s\n" "$(node --version 2>&1)"
+          printf "  Rust:   %s\n" "$(rustc --version 2>&1)"
+          echo ""
+
+      - name: Validate OVMF Firmware
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  OVMF EFI Firmware (QCOW2_REQUIRED_FILE_VARS)"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          ERRORS=0
+
+          # OVMF_CODE
+          if [ -n "${OVMF_CODE:-}" ] && [ -f "$OVMF_CODE" ]; then
+            printf "✓ OVMF_CODE=%s\n" "$OVMF_CODE"
+            ls -lh "$OVMF_CODE"
+          else
+            printf "✗ OVMF_CODE='%s' (not set or file missing)\n" "${OVMF_CODE:-}"
+            ((ERRORS++))
+          fi
+          echo ""
+
+          # OVMF_VARS
+          if [ -n "${OVMF_VARS:-}" ] && [ -f "$OVMF_VARS" ]; then
+            printf "✓ OVMF_VARS=%s\n" "$OVMF_VARS"
+            ls -lh "$OVMF_VARS"
+          else
+            printf "✗ OVMF_VARS='%s' (not set or file missing)\n" "${OVMF_VARS:-}"
+            ((ERRORS++))
+          fi
+          echo ""
+          [ "$ERRORS" -eq 0 ] || { echo "ERROR: OVMF firmware not configured"; exit 1; }
+
+      - name: Validate KVM Access
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  KVM Virtualization"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          if [ -c /dev/kvm ]; then
+            echo "✓ /dev/kvm exists"
+            ls -la /dev/kvm
+            if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+              echo "✓ /dev/kvm readable and writable"
+            else
+              echo "✗ /dev/kvm not accessible (check group membership)"
+              exit 1
+            fi
+          else
+            echo "✗ /dev/kvm not found (nested virtualization not enabled?)"
+            exit 1
+          fi
+          echo ""
+
+      - name: Validate System Resources
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  System Resources"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          ERRORS=0
+          MIN_DISK_GB=100
+          MIN_MEM_MB=8192
+
+          # Disk space
+          DISK_AVAIL_GB=$(df -BG --output=avail . | tail -1 | tr -d ' G')
+          if [ "$DISK_AVAIL_GB" -ge "$MIN_DISK_GB" ]; then
+            printf "✓ Disk: %sGB available (minimum: %sGB)\n" "$DISK_AVAIL_GB" "$MIN_DISK_GB"
+          else
+            printf "✗ Disk: %sGB available (minimum: %sGB)\n" "$DISK_AVAIL_GB" "$MIN_DISK_GB"
+            ((ERRORS++))
+          fi
+
+          # Memory
+          MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+          MEM_TOTAL_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+          if [ "$MEM_AVAIL_MB" -ge "$MIN_MEM_MB" ]; then
+            printf "✓ Memory: %sMB available / %sMB total (min: %sMB)\n" \
+              "$MEM_AVAIL_MB" "$MEM_TOTAL_MB" "$MIN_MEM_MB"
+          else
+            printf "✗ Memory: %sMB available / %sMB total (min: %sMB)\n" \
+              "$MEM_AVAIL_MB" "$MEM_TOTAL_MB" "$MIN_MEM_MB"
+            ((ERRORS++))
+          fi
+
+          # CPUs
+          CPUS=$(nproc)
+          printf "✓ CPUs: %s\n" "$CPUS"
+          echo ""
+
+          echo "Disk usage:"
+          df -h / /nix 2>/dev/null || df -h /
+          echo ""
+
+          [ "$ERRORS" -eq 0 ] || { echo "ERROR: Insufficient system resources"; exit 1; }
+
+      - name: Validate Docker
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Docker Runtime"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+
+          # Docker socket
+          if [ -S "${DOCKER_HOST#unix://}" ] || [ -S /var/run/docker.sock ]; then
+            echo "✓ Docker socket accessible"
+          else
+            echo "✗ Docker socket not found"
+            exit 1
+          fi
+
+          # Docker daemon
+          if docker info &>/dev/null; then
+            echo "✓ Docker daemon running"
+            docker info | grep -E "Server Version|Storage Driver|Operating System"
+          else
+            echo "✗ Docker daemon not responding"
+            exit 1
+          fi
+          echo ""
+
+          # Test container execution
+          echo "Testing container execution..."
+          docker run --rm alpine:latest echo "✓ Container execution works"
+          echo ""
+
+      - name: Validate Nix
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Nix Build System"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+
+          # Nix store
+          if [ -d /nix/store ]; then
+            echo "✓ /nix/store exists"
+            STORE_SIZE=$(du -sh /nix/store 2>/dev/null | cut -f1)
+            echo "  Size: $STORE_SIZE"
+          else
+            echo "✗ /nix/store not found"
+            exit 1
+          fi
+          echo ""
+
+          # Flake evaluation
+          echo "Testing flake evaluation..."
+          nix flake metadata --json | jq -r '"✓ Flake: \(.description // "no description")"'
+          echo ""
+
+          # Show available devshells
+          echo "Available devShells:"
+          nix flake show --json 2>/dev/null | jq -r '.devShells."x86_64-linux" | keys[]' | while read shell; do
+            echo "  - $shell"
+          done
+          echo ""
+
+      - name: Validate SSH
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  SSH Configuration"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+
+          # SSH key
+          SSH_PUBKEY="${HOME}/.ssh/id_ed25519.pub"
+          if [ -f "$SSH_PUBKEY" ]; then
+            echo "✓ SSH public key: $SSH_PUBKEY"
+            ssh-keygen -l -f "$SSH_PUBKEY"
+          else
+            echo "⚠ SSH public key not found: $SSH_PUBKEY"
+            echo "  (Required for QCOW2 VM access during build)"
+          fi
+          echo ""
+
+      - name: Validate Environment Variables
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Environment Variables"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+
+          # Konductor identity
+          echo "Konductor:"
+          printf "  KONDUCTOR_SHELL=%s\n" "${KONDUCTOR_SHELL:-<not set>}"
+          printf "  KONDUCTOR_BASHRC=%s\n" "${KONDUCTOR_BASHRC:-<not set>}"
+          echo ""
+
+          # CI markers
+          echo "CI:"
+          printf "  CI=%s\n" "${CI:-<not set>}"
+          printf "  GITHUB_ACTIONS=%s\n" "${GITHUB_ACTIONS:-<not set>}"
+          printf "  FORGEJO_ACTIONS=%s\n" "${FORGEJO_ACTIONS:-<not set>}"
+          echo ""
+
+          # Build paths
+          echo "Build Paths:"
+          printf "  HOME=%s\n" "${HOME:-<not set>}"
+          printf "  PWD=%s\n" "${PWD:-<not set>}"
+          printf "  GOPATH=%s\n" "${GOPATH:-<not set>}"
+          printf "  CARGO_HOME=%s\n" "${CARGO_HOME:-<not set>}"
+          echo ""
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  ✅ All Environment Checks Passed"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "This runner is ready for QCOW2 builds."
+          echo ""
+          echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Required Binaries | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| OVMF Firmware | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| KVM Access | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| System Resources | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Runtime | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Nix Build System | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Runner:** $(hostname)" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
