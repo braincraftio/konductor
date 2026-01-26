@@ -43,6 +43,8 @@ jobs:
       - name: Rebuild System from Flake
         env:
           WORKSPACE_ROOT: /workspace
+          GIT_PAGER: cat
+          PAGER: cat
         run: |
           echo "═══════════════════════════════════════════════════════════════════"
           echo "  NixOS Rebuild (apply latest flake configuration)"
@@ -66,7 +68,7 @@ jobs:
           git rev-parse --abbrev-ref HEAD
           git status --porcelain
           echo ""
-          echo "Rebuilding system to pick up latest configuration..."
+          echo "▶ Running: sudo nixos-rebuild switch --flake .#konductor"
           sudo nixos-rebuild switch --flake .#konductor
           echo ""
           echo "✓ System rebuilt successfully"
