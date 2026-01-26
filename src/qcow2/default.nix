@@ -60,7 +60,10 @@ let
     home.file.".bash_profile".text = shellContent.bashProfileContent;
     home.file.".inputrc".text = shellContent.inputrcContent;
     home.file.".config/starship.toml".text = config.shell.starship.configContent;
-    home.file.".config/atuin/config.toml".text = config.shell.atuin.configContent;
+    home.file.".config/atuin/config.toml" = {
+      text = config.shell.atuin.configContent;
+      force = true;  # Overwrite existing atuin config
+    };
     home.file.".envrc".text = ''
       # Konductor VM - all packages pre-installed system-wide
       # This .envrc is for project-specific env vars only
