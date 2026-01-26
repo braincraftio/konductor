@@ -40,29 +40,60 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rebuild System from Flake
+      - name: Validate Forked Runner
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  Forked Runner Validation"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "Runner version:"
+          forgejo-runner --version
+          RUNNER_VERSION=$(forgejo-runner --version 2>&1)
+          if echo "$RUNNER_VERSION" | rg -q "braincraft"; then
+            echo "✓ Running forked runner with workspace features"
+          else
+            echo "✗ Not running forked runner (expected 'braincraft' in version)"
+            echo "  Got: $RUNNER_VERSION"
+            exit 1
+          fi
+
+      - name: Validate Workspace Structure
         env:
           WORKSPACE_ROOT: /workspace
           GIT_PAGER: cat
           PAGER: cat
         run: |
           echo "═══════════════════════════════════════════════════════════════════"
-          echo "  NixOS Rebuild (apply latest flake configuration)"
+          echo "  Workspace Structure (include_server_host feature)"
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
           echo "PWD: $(pwd)"
           echo "WORKSPACE_ROOT: ${WORKSPACE_ROOT}"
           echo ""
+
+          # Critical: WORKSPACE_ROOT must be a git repo (workspace cloning feature)
+          echo "Validating workspace repo clone..."
+          if git -C "${WORKSPACE_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
+            echo "✓ WORKSPACE_ROOT is a git repo (workspace cloning working)"
+            echo ""
+            echo "Workspace repo:"
+            git -C "${WORKSPACE_ROOT}" remote -v
+            git -C "${WORKSPACE_ROOT}" log --oneline -n 3
+          else
+            echo "✗ WORKSPACE_ROOT is not a git repo"
+            echo "  The forked runner should clone the workspace repo to WORKSPACE_ROOT"
+            echo "  Check runner config: container.include_server_host and container.workspace_repo"
+            echo ""
+            echo "Current WORKSPACE_ROOT contents:"
+            ls -la "${WORKSPACE_ROOT}" 2>/dev/null || echo "  (directory not found)"
+            exit 1
+          fi
+          echo ""
+
           echo "Workspace structure (include_server_host: /workspace/<host>/<owner>/<repo>):"
           tree -L 3 "${WORKSPACE_ROOT}" 2>/dev/null || ls -la "${WORKSPACE_ROOT}"
           echo ""
-          echo "Git (WORKSPACE_ROOT):"
-          git -C "${WORKSPACE_ROOT}" log --oneline -n 5 2>/dev/null || echo "  (not a git repo)"
-          git -C "${WORKSPACE_ROOT}" rev-parse HEAD 2>/dev/null || true
-          git -C "${WORKSPACE_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || true
-          git -C "${WORKSPACE_ROOT}" status --porcelain 2>/dev/null || true
-          echo ""
-          echo "Git (k9):"
+          echo "Git (k9 checkout):"
           git log --oneline -n 5
           git rev-parse HEAD
           git rev-parse --abbrev-ref HEAD
@@ -145,9 +176,9 @@ jobs:
           ls -la /etc/profile.d/*.sh 2>/dev/null || echo "  (no scripts)"
           echo ""
 
-          # Debug: Grep for OVMF in various locations
+          # Debug: Search for OVMF in various locations
           echo "Debug: Searching for OVMF in environment files..."
-          grep -r "OVMF" /etc/environment /etc/profile.d/ /etc/session-variables 2>/dev/null || echo "  (not found in config files)"
+          rg "OVMF" /etc/environment /etc/profile.d/ /etc/session-variables 2>/dev/null || echo "  (not found in config files)"
           echo ""
 
           # Debug: Find OVMF files in nix store

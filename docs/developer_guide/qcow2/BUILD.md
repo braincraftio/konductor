@@ -741,7 +741,7 @@ if [ -z "$TOKEN" ]; then
       --access-token-name "$TOKEN_NAME" \
       --access-token-scopes "all" 2>&1)
   # Extract token from output (last line contains the token)
-  TOKEN=$(echo "$CREATE_OUTPUT" | grep -oE '[a-f0-9]{40}$' | tail -1)
+  TOKEN=$(echo "$CREATE_OUTPUT" | rg -o '[a-f0-9]{40}$' | tail -1)
 fi
 
 [ -n "$TOKEN" ] || { echo "✗ Failed to provision credentials"; exit 1; }
