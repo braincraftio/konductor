@@ -80,6 +80,18 @@ rec {
   idePackages = ide.packages;
 
   # ===========================================================================
+  # CI PACKAGES (runner user default environment)
+  # ===========================================================================
+  # All tools needed for CI/CD - used by:
+  #   - src/devshells/ci.nix (CI devshell)
+  #   - src/qcow2/default.nix (users.users.runner.packages)
+  ciPackages = default
+    ++ pythonPackages
+    ++ goPackages
+    ++ nodejsPackages
+    ++ rustPackages;
+
+  # ===========================================================================
   # KONDUCTOR SELF-HOSTING (added in konductor shell)
   # ===========================================================================
 

@@ -29,21 +29,13 @@ baseShell.overrideAttrs (old: {
   name = "ci";
 
   # Everything needed for CI/CD:
-  # - Base packages (core, network, cli, linters, formatters)
-  # - All language toolchains
+  # - packages.ciPackages: base + all languages (shared with runner user)
   # - Forgejo runner and CLI
   # - Container and VM build tools (from konductor packages)
   # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
-  nativeBuildInputs = old.nativeBuildInputs
-    # All languages from packages.nix
-    ++ packages.pythonPackages
-    ++ packages.goPackages
-    ++ packages.nodejsPackages
-    ++ packages.rustPackages
-    # Forgejo runner + CLI
+  nativeBuildInputs = packages.ciPackages
     ++ programs.forgejo.runnerPackages
     ++ programs.forgejo.cliPackages
-    # Self-hosting: container + VM build tools
     ++ konductor.packages;
 
   shellHook = ''

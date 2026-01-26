@@ -232,6 +232,12 @@ let
           "libvirtd"
           "kvm"
         ];
+        # CI toolchain in runner's user profile (/nix/var/nix/profiles/per-user/runner)
+        # Defense in depth: packages available even if systemPackages changes
+        packages = devshellPackages.ciPackages
+          ++ programs.forgejo.runnerPackages
+          ++ programs.forgejo.cliPackages
+          ++ konductor.packages;
       };
     };
 
@@ -281,6 +287,22 @@ let
     programs = {
       # Disable command-not-found (requires nixpkgs channel)
       command-not-found.enable = false;
+
+      # Bash shell configuration
+      bash = {
+        # Shell initialization (all bash shells)
+        shellInit = ''
+          # Language tool paths (complements profile.d/konductor-env.sh)
+          export PATH="''${GOPATH:-$HOME/go}/bin:''${CARGO_HOME:-$HOME/.cargo}/bin:''${PNPM_HOME:-$HOME/.local/share/pnpm}:$PATH"
+        '';
+        # Interactive shell initialization
+        interactiveShellInit = ''
+          # Source Konductor bashrc for aliases if available
+          if [ -n "$KONDUCTOR_BASHRC" ] && [ -f "$KONDUCTOR_BASHRC" ]; then
+            source "$KONDUCTOR_BASHRC"
+          fi
+        '';
+      };
 
       # Direnv for automatic flake loading with trusted paths
       direnv = {
@@ -366,6 +388,20 @@ let
     environment = {
       # Don't include default packages (nano, perl, rsync, strace)
       defaultPackages = lib.mkForce [ ];
+
+      # Session variables (PAM-level - available to all contexts including systemd services)
+      # Uses @{HOME} syntax for PAM variable expansion
+      sessionVariables = {
+        # CI environment marker
+        CI = "true";
+        # Hermetic bash configuration (from devshell)
+        KONDUCTOR_BASHRC = config.shell.bash.env.KONDUCTOR_BASHRC;
+        KONDUCTOR_INPUTRC = config.shell.bash.env.KONDUCTOR_INPUTRC;
+        # Language paths (PAM @{HOME} expansion)
+        GOPATH = "@{HOME}/go";
+        CARGO_HOME = "@{HOME}/.cargo";
+        PNPM_HOME = "@{HOME}/.local/share/pnpm";
+      };
 
       # /etc/skel - Shell Configuration (copied to new user home dirs)
       # Same shell experience as devshell and OCI container
