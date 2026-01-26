@@ -789,28 +789,36 @@ RUN_ID="none"
 sleep 3  # Give Forgejo time to queue the run
 
 while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
-  # Forgejo Actions API: workflow_runs array, status field, id field
+  # Forgejo Actions API: filter by workflow_id to check the correct workflow
   # Status values: waiting, running, success, failure, cancelled, skipped, blocked
   RUN_JSON=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
     wget -qO- \
       --header="Authorization: token $TOKEN" \
-      "http://localhost:3000/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?limit=1" 2>/dev/null) || true
+      "http://localhost:3000/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs" 2>/dev/null) || true
 
   if [ -n "$RUN_JSON" ] && [ "$RUN_JSON" != "null" ]; then
-    # API returns oldest first, so get the last element for most recent run
-    STATUS=$(echo "$RUN_JSON" | jq -r '.workflow_runs[-1].status // "unknown"')
-    RUN_ID=$(echo "$RUN_JSON" | jq -r '.workflow_runs[-1].id // "none"')
+    # Filter by workflow_id, sort by id, get latest run for our specific workflow
+    RUN_LINE=$(echo "$RUN_JSON" | jq -r ".workflow_runs[] | select(.workflow_id == \"$WORKFLOW\") | \"\(.id) \(.status) \(.html_url)\"" | sort -n | tail -1)
 
-    echo "  Run #${RUN_ID}: status=${STATUS} (${ELAPSED}s)"
+    if [ -n "$RUN_LINE" ]; then
+      RUN_ID=$(echo "$RUN_LINE" | cut -d' ' -f1)
+      STATUS=$(echo "$RUN_LINE" | cut -d' ' -f2)
+      RUN_URL=$(echo "$RUN_LINE" | cut -d' ' -f3)
 
-    # Terminal states: success, failure, cancelled, skipped
-    case "$STATUS" in
-      success|failure|cancelled|skipped)
-        break
-        ;;
-    esac
+      echo "  Run #${RUN_ID}: status=${STATUS} (${ELAPSED}s)"
+      echo "  URL: ${RUN_URL}"
+
+      # Terminal states: success, failure, cancelled, skipped
+      case "$STATUS" in
+        success|failure|cancelled|skipped)
+          break
+          ;;
+      esac
+    else
+      echo "  Waiting for ${WORKFLOW} to start... (${ELAPSED}s)"
+    fi
   else
-    echo "  Waiting for workflow to start... (${ELAPSED}s)"
+    echo "  Waiting for workflow API... (${ELAPSED}s)"
   fi
 
   sleep "$POLL_INTERVAL"
@@ -818,26 +826,26 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
 done
 
 echo ""
-echo "▶ Phase 6: Verify workflow result..."
+echo "▶ Phase 6: Verify ${WORKFLOW} result..."
 case "$STATUS" in
   success)
-    echo "✓ Workflow completed successfully"
-    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    echo "✓ ${WORKFLOW} completed successfully"
+    echo "  ${RUN_URL}"
     ;;
   failure)
-    echo "✗ Workflow failed"
-    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    echo "✗ ${WORKFLOW} FAILED"
+    echo "  ${RUN_URL}"
     git remote remove runner-test 2>/dev/null || true
     exit 1
     ;;
   cancelled|skipped)
-    echo "✗ Workflow ${STATUS}"
-    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    echo "✗ ${WORKFLOW} ${STATUS}"
+    echo "  ${RUN_URL}"
     git remote remove runner-test 2>/dev/null || true
     exit 1
     ;;
   *)
-    echo "✗ Workflow did not complete within ${MAX_WAIT}s (status=${STATUS})"
+    echo "✗ ${WORKFLOW} did not complete within ${MAX_WAIT}s (status=${STATUS})"
     echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions"
     git remote remove runner-test 2>/dev/null || true
     exit 1
