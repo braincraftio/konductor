@@ -13,6 +13,7 @@
   # When updating nixos.channel in versions.nix, also update:
   #   - nixpkgs.url branch below
   #   - nixvim.url branch below (must match nixpkgs)
+  #   - home-manager.url branch below (must match nixpkgs)
   # ===========================================================================
   inputs = {
     # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
@@ -59,6 +60,13 @@
       # url = "https://flakehub.com/f/nix-community/nixvim/*";
       # url = "https://flakehub.com/f/nix-community/nixvim/0.1.805";
       url = "github:nix-community/nixvim/nixos-25.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Home Manager for declarative user home directory management
+    # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
+    home-manager = {
+      url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -194,7 +202,7 @@
             inherit (nixpkgs) lib;
           };
           qcow2 = import ./src/qcow2 {
-            inherit pkgs system versions programs;
+            inherit pkgs inputs system versions programs;
             inherit (nixpkgs) lib;
             inherit (inputs) nixos-generators;
           };

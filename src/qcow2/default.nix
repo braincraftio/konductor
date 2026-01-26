@@ -17,6 +17,7 @@
   pkgs,
   lib,
   nixos-generators,
+  inputs,
   system,
   versions,
   programs,
@@ -51,11 +52,31 @@ let
   # PKI module for VM identity and certificate chain of trust
   pkiModule = import ../modules/pki.nix;
 
+  # Common home-manager configuration for built-in users
+  # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
+  homeManagerUserConfig = {
+    home.file.".bashrc".text = shellContent.bashrcContentStandalone;
+    home.file.".bash_profile".text = shellContent.bashProfileContent;
+    home.file.".inputrc".text = shellContent.inputrcContent;
+    home.file.".config/starship.toml".text = config.shell.starship.configContent;
+    home.file.".envrc".text = ''
+      # Konductor VM - all packages pre-installed system-wide
+      # This .envrc is for project-specific env vars only
+      dotenv_if_exists .env
+      dotenv_if_exists "$HOME/.env"
+    '';
+    home.stateVersion = versions.nixos.stateVersion;
+  };
+
   # Shared NixOS configuration module for both qcow2 image and nixos-rebuild
   # This allows live updates to running VMs via: nixos-rebuild switch --flake .#konductor
   konductorModule = {
-    # Import the konductor mount service template and PKI module
-    imports = [ mountService pkiModule ];
+    # Import the konductor mount service template, PKI module, and home-manager
+    imports = [
+      mountService
+      pkiModule
+      inputs.home-manager.nixosModules.home-manager
+    ];
 
     # Basic system configuration
     # stateVersion from src/lib/versions.nix nixos.stateVersion
@@ -197,12 +218,19 @@ let
 
     # Users
     # All users in 'kc2' group (GID 1001) for shared directory access
+    # Group must be defined BEFORE users reference it in extraGroups
+    users.groups.kc2 = {
+      gid = 1001;
+      members = [ "kc2" "kc2admin" "runner" ];
+    };
+
     users.users = {
       kc2 = {
         isNormalUser = true;
         inherit (users.kc2) uid home;
         description = users.kc2.gecos;
         extraGroups = [
+          "kc2"
           "docker"
           "libvirtd"
           "kvm"
@@ -238,6 +266,21 @@ let
           ++ programs.forgejo.runnerPackages
           ++ programs.forgejo.cliPackages
           ++ konductor.packages;
+      };
+    };
+
+    # =====================================================================
+    # Home Manager - Built-in User Home Directory Provisioning
+    # =====================================================================
+    # Declaratively provisions shell configs for built-in users at build time.
+    # Dynamic users (cloud-init) still use /etc/skel via profile.d scripts.
+    home-manager = {
+      useGlobalPkgs = true;
+      useUserPackages = true;
+      users = {
+        kc2 = homeManagerUserConfig;
+        kc2admin = homeManagerUserConfig;
+        runner = homeManagerUserConfig;
       };
     };
 
