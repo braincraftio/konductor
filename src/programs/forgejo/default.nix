@@ -25,10 +25,27 @@ let
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
   # Forked runner from flake input (auto-updated via nix flake update)
-  forgejoRunner = pkgs.forgejo-runner.overrideAttrs (oldAttrs: {
+  # Use buildGoModule directly to ensure our forked source is used
+  # overrideAttrs doesn't reliably propagate src changes for buildGoModule
+  forgejoRunner = pkgs.buildGoModule {
+    pname = "forgejo-runner";
+    version = "12.5.3-braincraft";
     src = inputs.forgejo-runner-src;
-    vendorHash = "sha256-fvSiEIE4XSJ8Ot4Tcmt8chD11fHVsECD2/8xrgIKhJs=";
-  });
+    vendorHash = "sha256-zowZvsjg9k5XO12pip1SbOz3KXXqxFfnLF+y4cf8WOQ=";
+    proxyVendor = true; # Fetch deps via Go proxy, ignore stale vendor/
+    subPackages = [ "." ];
+    ldflags = [
+      "-s"
+      "-w"
+      "-X" "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v12.5.3-braincraft"
+    ];
+    nativeBuildInputs = [ pkgs.git ];
+    doCheck = false;
+    # Binary builds as "runner" from directory name; rename to expected "forgejo-runner"
+    postInstall = ''
+      mv $out/bin/runner $out/bin/forgejo-runner
+    '';
+  };
 
 in
 {

@@ -718,15 +718,34 @@ WORKFLOW="validate-environment.yaml"
 command -v kubectl >/dev/null || { echo "✗ kubectl not found"; exit 1; }
 kubectl get -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" >/dev/null || { echo "✗ Forgejo deployment not found"; exit 1; }
 
-echo "▶ Phase 1: Generate Forgejo access token..."
+echo "▶ Phase 1: Provision Forgejo credentials..."
+# Try to generate token for existing user first (fast path)
 TOKEN=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
   forgejo admin user generate-access-token \
     --username "$REPO_OWNER" \
     --token-name "$TOKEN_NAME" \
     --scopes "all" \
-    --raw)
-[ -n "$TOKEN" ] || { echo "✗ Failed to generate token"; exit 1; }
-echo "✓ Token generated: ${TOKEN_NAME}"
+    --raw 2>/dev/null) || true
+
+if [ -z "$TOKEN" ]; then
+  # User doesn't exist - create with admin privileges and access token
+  echo "  Creating $REPO_OWNER user..."
+  CREATE_OUTPUT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+    forgejo admin user create \
+      --username "$REPO_OWNER" \
+      --email "${REPO_OWNER}@localhost" \
+      --password "$(openssl rand -hex 16)" \
+      --admin \
+      --must-change-password=false \
+      --access-token \
+      --access-token-name "$TOKEN_NAME" \
+      --access-token-scopes "all" 2>&1)
+  # Extract token from output (last line contains the token)
+  TOKEN=$(echo "$CREATE_OUTPUT" | grep -oE '[a-f0-9]{40}$' | tail -1)
+fi
+
+[ -n "$TOKEN" ] || { echo "✗ Failed to provision credentials"; exit 1; }
+echo "✓ Credentials provisioned: ${REPO_OWNER} (token: ${TOKEN_NAME})"
 
 echo ""
 echo "▶ Phase 2: Create test repository..."
