@@ -609,13 +609,15 @@ echo "════════════════════════�
 echo "  build:qcow2:all - Complete End-to-End Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
-echo "  1. build:qcow2:image     Build QCOW2 (nix → VM configure → seal)"
-echo "  2. build:qcow2:container Package as containerDisk"
-echo "  3. cluster:up            Start Talos + deploy platform"
-echo "  4. registry:trust        Install cluster CA for Docker/Skopeo"
-echo "  5. registry:login        Authenticate to registry"
-echo "  6. build:qcow2:push      Push with git/nix/latest tags"
-echo "  7. registry:tags         Verify pushed tags"
+echo "  1. build:qcow2:image       Build QCOW2 (nix → VM configure → seal)"
+echo "  2. build:qcow2:container   Package as containerDisk"
+echo "  3. cluster:up              Start Talos + deploy platform"
+echo "  4. registry:trust          Install cluster CA for Docker/Skopeo"
+echo "  5. registry:login          Authenticate to registry"
+echo "  6. build:qcow2:push        Push with git/nix/latest tags"
+echo "  7. registry:tags           Verify pushed tags"
+echo "  8. build:qcow2:validate    Deploy VM to KubeVirt + SSH test"
+echo "  9. build:qcow2:runner-test Push to Forgejo + verify workflow"
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
@@ -657,6 +659,11 @@ echo ""
 echo "▶ Phase 8: Deploy and validate in KubeVirt..."
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
 
+# Runner test
+echo ""
+echo "▶ Phase 9: Test Forgejo runner workflow..."
+runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:runner-test
+
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  ✓ Complete! Image validated and ready for promotion"
@@ -674,6 +681,155 @@ Deploy to KubeVirt and validate before promotion.
 set -e
 mise run dev:k8s:konductor:up
 mise run dev:k8s:konductor:validate
+```
+
+---
+
+### build:qcow2:runner-test
+
+Test Forgejo runner by pushing to local git server and validating workflow execution.
+
+```sh {"name":"build:qcow2:runner-test","excludeFromRunAll":"true","tag":"type:entry,requires:k8s"}
+set -eo pipefail
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  build:qcow2:runner-test - Validate Forgejo Runner"
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+
+# Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
+[[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
+
+# Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+[ -f "$KUBECONFIG" ] || { echo "✗ KUBECONFIG not found: $KUBECONFIG"; exit 1; }
+echo "✓ KUBECONFIG=${KUBECONFIG}"
+
+# Configuration
+FORGEJO_NS="forgejo"
+FORGEJO_DEPLOY="deployment/forgejo-deployment"
+REPO_NAME="k9"
+REPO_OWNER="siteadmin"
+TOKEN_NAME="ci-runner-test-$(date +%s)"
+BRANCH="${GITHUB_REF_NAME:-main}"
+WORKFLOW="validate-environment.yaml"
+
+# Verify kubectl access
+command -v kubectl >/dev/null || { echo "✗ kubectl not found"; exit 1; }
+kubectl get -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" >/dev/null || { echo "✗ Forgejo deployment not found"; exit 1; }
+
+echo "▶ Phase 1: Generate Forgejo access token..."
+TOKEN=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+  forgejo admin user generate-access-token \
+    --username "$REPO_OWNER" \
+    --token-name "$TOKEN_NAME" \
+    --scopes "all" \
+    --raw)
+[ -n "$TOKEN" ] || { echo "✗ Failed to generate token"; exit 1; }
+echo "✓ Token generated: ${TOKEN_NAME}"
+
+echo ""
+echo "▶ Phase 2: Create test repository..."
+# Create repo (409 Conflict means it exists, which is fine)
+CREATE_RESULT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+  wget -qO- \
+    --header="Authorization: token $TOKEN" \
+    --header="Content-Type: application/json" \
+    --post-data="{\"name\":\"$REPO_NAME\",\"private\":false,\"auto_init\":false}" \
+    "http://localhost:3000/api/v1/user/repos" 2>&1) || true
+echo "✓ Repository: ${REPO_OWNER}/${REPO_NAME}"
+
+echo ""
+echo "▶ Phase 3: Push to Forgejo..."
+REMOTE_URL="https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/${REPO_NAME}.git"
+git remote remove runner-test 2>/dev/null || true
+git remote add runner-test "$REMOTE_URL"
+GIT_SSL_NO_VERIFY=1 git push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+echo "✓ Pushed to ${REPO_OWNER}/${REPO_NAME}:${BRANCH}"
+
+echo ""
+echo "▶ Phase 4: Trigger workflow via dispatch..."
+# Use workflow_dispatch for reliable triggering
+kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+  wget -qO- --post-data='{"ref":"'"$BRANCH"'"}' \
+    --header="Authorization: token $TOKEN" \
+    --header="Content-Type: application/json" \
+    "http://localhost:3000/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW}/dispatches" 2>&1 || true
+echo "✓ Workflow dispatch sent"
+
+echo ""
+echo "▶ Phase 5: Wait for workflow completion..."
+MAX_WAIT=120
+POLL_INTERVAL=5
+ELAPSED=0
+STATUS="unknown"
+RUN_ID="none"
+
+sleep 3  # Give Forgejo time to queue the run
+
+while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+  # Forgejo Actions API: workflow_runs array, status field, id field
+  # Status values: waiting, running, success, failure, cancelled, skipped, blocked
+  RUN_JSON=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+    wget -qO- \
+      --header="Authorization: token $TOKEN" \
+      "http://localhost:3000/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?limit=1" 2>/dev/null) || true
+
+  if [ -n "$RUN_JSON" ] && [ "$RUN_JSON" != "null" ]; then
+    # API returns oldest first, so get the last element for most recent run
+    STATUS=$(echo "$RUN_JSON" | jq -r '.workflow_runs[-1].status // "unknown"')
+    RUN_ID=$(echo "$RUN_JSON" | jq -r '.workflow_runs[-1].id // "none"')
+
+    echo "  Run #${RUN_ID}: status=${STATUS} (${ELAPSED}s)"
+
+    # Terminal states: success, failure, cancelled, skipped
+    case "$STATUS" in
+      success|failure|cancelled|skipped)
+        break
+        ;;
+    esac
+  else
+    echo "  Waiting for workflow to start... (${ELAPSED}s)"
+  fi
+
+  sleep "$POLL_INTERVAL"
+  ELAPSED=$((ELAPSED + POLL_INTERVAL))
+done
+
+echo ""
+echo "▶ Phase 6: Verify workflow result..."
+case "$STATUS" in
+  success)
+    echo "✓ Workflow completed successfully"
+    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    ;;
+  failure)
+    echo "✗ Workflow failed"
+    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    git remote remove runner-test 2>/dev/null || true
+    exit 1
+    ;;
+  cancelled|skipped)
+    echo "✗ Workflow ${STATUS}"
+    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}"
+    git remote remove runner-test 2>/dev/null || true
+    exit 1
+    ;;
+  *)
+    echo "✗ Workflow did not complete within ${MAX_WAIT}s (status=${STATUS})"
+    echo "  https://git.docker.arpa/${REPO_OWNER}/${REPO_NAME}/actions"
+    git remote remove runner-test 2>/dev/null || true
+    exit 1
+    ;;
+esac
+
+# Cleanup
+git remote remove runner-test 2>/dev/null || true
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  ✅ Runner validation passed"
+echo "═══════════════════════════════════════════════════════════════════════════"
 ```
 
 ---
@@ -817,6 +973,7 @@ Push & Validate:
   build:qcow2:login        Authenticate to registry (alias for registry:login)
   build:qcow2:push         Push with multi-tag (git/nix/latest)
   build:qcow2:validate     Deploy to KubeVirt and validate SSH
+  build:qcow2:runner-test  Push to Forgejo and verify workflow execution
   build:qcow2:promote      Copy to public registry (requires validation)
 
 Convenience:

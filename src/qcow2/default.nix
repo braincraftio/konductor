@@ -401,6 +401,11 @@ let
         GOPATH = "@{HOME}/go";
         CARGO_HOME = "@{HOME}/.cargo";
         PNPM_HOME = "@{HOME}/.local/share/pnpm";
+        # OVMF EFI firmware paths for QEMU (from konductor.env)
+        OVMF_CODE = "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd";
+        OVMF_VARS = "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd";
+        # Docker buildkit
+        DOCKER_BUILDKIT = "1";
       };
 
       # /etc/skel - Shell Configuration (copied to new user home dirs)
