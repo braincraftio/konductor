@@ -3,32 +3,30 @@
 #
 # Provides:
 #   - forgejo-server: Self-hosted git forge server
-#   - forgejo-runner: CI/CD runner (forked with include_server_host)
+#   - forgejo-runner: CI/CD runner (forked with workspace isolation)
 #   - forgejo-cli: Command-line interface for Forgejo API
 #
 # Usage:
 #   CI runners: Include in ci devshell for self-hosted CI/CD
 #   Development: forgejo-cli for API interactions
+#
+# Runner Fork Features (git.braincraft.io/BrainCraft/runner):
+#   - container.include_server_host: prepends server hostname to workspace path
+#   - container.workspace_repo: clones workspace repo for tooling inheritance
+#   - Collision isolation via /workspace/<random>/<host>/<owner>/<repo>
+#
+# Update runner: nix flake update forgejo-runner-src
 
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 
 let
   # Forgejo packages from nixpkgs
   forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
-  # Forked runner with include_server_host and workspace isolation
-  # Source: git.braincraft.io/BrainCraft/runner
-  # Features:
-  #   - container.include_server_host: prepends server hostname to workspace path
-  #   - container.workspace_repo: clones workspace repo for tooling inheritance
-  #   - Collision isolation via /workspace/<random>/<host>/<owner>/<repo>
-  forgejoRunnerSrc = pkgs.fetchzip {
-    url = "https://git.braincraft.io/BrainCraft/runner/archive/3ba312766bf60c1e960aefb36c57cc7447920ef7.tar.gz";
-    hash = "sha256-CIrZj/g1866mtQjqQB1ditCzA5USMYeYJ7RvaDmXUAs=";
-  };
+  # Forked runner from flake input (auto-updated via nix flake update)
   forgejoRunner = pkgs.forgejo-runner.overrideAttrs (oldAttrs: {
-    src = forgejoRunnerSrc;
+    src = inputs.forgejo-runner-src;
     vendorHash = "sha256-fvSiEIE4XSJ8Ot4Tcmt8chD11fHVsECD2/8xrgIKhJs=";
   });
 

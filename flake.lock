@@ -57,6 +57,22 @@
         "type": "github"
       }
     },
+    "forgejo-runner-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1769414564,
+        "narHash": "sha256-CIrZj/g1866mtQjqQB1ditCzA5USMYeYJ7RvaDmXUAs=",
+        "ref": "refs/heads/main",
+        "rev": "3ba312766bf60c1e960aefb36c57cc7447920ef7",
+        "revCount": 2206,
+        "type": "git",
+        "url": "https://git.braincraft.io/BrainCraft/runner"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://git.braincraft.io/BrainCraft/runner"
+      }
+    },
     "ixx": {
       "inputs": {
         "flake-utils": [
@@ -223,6 +239,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "forgejo-runner-src": "forgejo-runner-src",
         "nix2container": "nix2container",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",

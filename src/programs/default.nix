@@ -15,5 +15,5 @@
 {
   neovim = import ./neovim { inherit pkgs lib inputs; };
   tmux = import ./tmux { inherit pkgs lib; };
-  forgejo = import ./forgejo { inherit pkgs lib; };
+  forgejo = import ./forgejo { inherit pkgs lib inputs; };
 }

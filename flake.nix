@@ -61,6 +61,14 @@
       url = "github:nix-community/nixvim/nixos-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Forked Forgejo runner with workspace isolation
+    # Source: git.braincraft.io/BrainCraft/runner
+    # Update: nix flake update forgejo-runner-src
+    forgejo-runner-src = {
+      url = "git+https://git.braincraft.io/BrainCraft/runner";
+      flake = false;
+    };
   };
 
   nixConfig = {
