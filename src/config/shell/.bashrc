@@ -11,7 +11,8 @@
 # ===========================================================================
 # Source user's bashrc first to get their base settings
 # Konductor aliases defined below will override any conflicts
-if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ]; then
+# Skip for non-interactive shells (runme, scripts) to avoid brew/starship errors
+if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ] && [[ $- == *i* ]]; then
   export KONDUCTOR_BASHRC_SOURCED=1
   source "$HOME/.bashrc"
 fi

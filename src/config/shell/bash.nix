@@ -59,6 +59,15 @@ in
   # Raw content for injection into shellHooks
   bashrcContent = builtins.readFile ./.bashrc;
 
+  # Environment variables for runme/automation
+  # BASH_ENV: bash sources this for non-interactive shells (runme uses bash -c)
+  # KONDUCTOR_BASHRC: explicit path for scripts that need to source manually
+  env = {
+    BASH_ENV = "${bashrcFile}/.bashrc";
+    KONDUCTOR_BASHRC = "${bashrcFile}/.bashrc";
+    KONDUCTOR_INPUTRC = "${inputrcFile}/.inputrc";
+  };
+
   meta = {
     description = "Bash shell with Konductor configuration";
     configurable = true;

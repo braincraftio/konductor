@@ -81,5 +81,5 @@ in
     ]);
 
   shellHook = "";
-  env = if hasConfig then config.shell.atuin.env else { };
+  env = if hasConfig then config.shell.bash.env // config.shell.atuin.env else { };
 }
