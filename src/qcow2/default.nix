@@ -54,11 +54,13 @@ let
 
   # Common home-manager configuration for built-in users
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
+  # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
-    home.file.".bashrc".text = shellContent.bashrcContentStandalone;
+    home.file.".bashrc".text = config.shell.bash.bashrcContent;
     home.file.".bash_profile".text = shellContent.bashProfileContent;
     home.file.".inputrc".text = shellContent.inputrcContent;
     home.file.".config/starship.toml".text = config.shell.starship.configContent;
+    home.file.".config/atuin/config.toml".text = config.shell.atuin.configContent;
     home.file.".envrc".text = ''
       # Konductor VM - all packages pre-installed system-wide
       # This .envrc is for project-specific env vars only
@@ -440,6 +442,9 @@ let
         # Hermetic bash configuration (from devshell)
         KONDUCTOR_BASHRC = config.shell.bash.env.KONDUCTOR_BASHRC;
         KONDUCTOR_INPUTRC = config.shell.bash.env.KONDUCTOR_INPUTRC;
+        # Atuin shell history (config + bash-preexec for hooks)
+        ATUIN_CONFIG_DIR = config.shell.atuin.env.ATUIN_CONFIG_DIR;
+        KONDUCTOR_PREEXEC_PATH = config.shell.atuin.env.KONDUCTOR_PREEXEC_PATH;
         # Language paths (PAM @{HOME} expansion)
         GOPATH = "@{HOME}/go";
         CARGO_HOME = "@{HOME}/.cargo";
@@ -453,12 +458,14 @@ let
 
       # /etc/skel - Shell Configuration (copied to new user home dirs)
       # Same shell experience as devshell and OCI container
+      # Uses canonical config from src/config/shell/ (SSOT)
       etc = {
-        "skel/.bashrc".text = shellContent.bashrcContentStandalone;
+        "skel/.bashrc".text = config.shell.bash.bashrcContent;
         "skel/.bash_profile".text = shellContent.bashProfileContent;
         "skel/.inputrc".text = shellContent.inputrcContent;
         # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
         "skel/.config/starship.toml".text = config.shell.starship.configContent;
+        "skel/.config/atuin/config.toml".text = config.shell.atuin.configContent;
 
         # /etc/skel/.envrc - for project .env files only (packages pre-installed)
         "skel/.envrc".text = ''
