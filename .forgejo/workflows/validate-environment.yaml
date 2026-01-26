@@ -67,11 +67,6 @@ jobs:
           git rev-parse HEAD
           git rev-parse --abbrev-ref HEAD
           git status --porcelain
-          echo ""
-          echo "▶ Running: sudo nixos-rebuild switch --flake .#konductor"
-          sudo nixos-rebuild switch --flake .#konductor
-          echo ""
-          echo "✓ System rebuilt successfully"
 
       - name: Validate Required Binaries
         run: |
