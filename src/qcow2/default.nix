@@ -902,7 +902,7 @@ let
               "PATH=/run/current-system/sw/bin"
               "DOCKER_HOST=unix:///var/run/docker.sock"
             ];
-            ExecStart = "${pkgs.forgejo-runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
+            ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
             Restart = "always";
             RestartSec = 10;
           };

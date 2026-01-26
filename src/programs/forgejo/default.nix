@@ -3,7 +3,7 @@
 #
 # Provides:
 #   - forgejo-server: Self-hosted git forge server
-#   - forgejo-runner: CI/CD runner (act-based, forked with flat_workspace_mode)
+#   - forgejo-runner: CI/CD runner (forked with include_server_host)
 #   - forgejo-cli: Command-line interface for Forgejo API
 #
 # Usage:
@@ -17,12 +17,14 @@ let
   forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
-  # Forked runner with flat_workspace_mode support
+  # Forked runner with include_server_host support
   # Source: git.braincraft.io/BrainCraft/runner
-  # Feature: container.flat_workspace_mode changes /workspace/owner/repo to /workspace/repo
+  # Feature: container.include_server_host prepends server hostname to workspace path
+  #          Default: /workspace/owner/repo
+  #          Enabled: /workspace/git.example.com/owner/repo
   forgejoRunnerSrc = pkgs.fetchzip {
-    url = "https://git.braincraft.io/BrainCraft/runner/archive/8379dcf7e1830b3a95added0aa408d1377d54883.tar.gz";
-    hash = "sha256-yHxBcpkg45vTXt57YVUaiFg7icx9/dtXl/mXvPxgCIo=";
+    url = "https://git.braincraft.io/BrainCraft/runner/archive/d97b4afd9f104b414d96547bde0cd79b19f4e766.tar.gz";
+    hash = "sha256-S7v0dFlIewtlLMOu6qeafOfudNoKoCwNdw9U/XCjrls=";
   };
   forgejoRunner = pkgs.forgejo-runner.overrideAttrs (oldAttrs: {
     src = forgejoRunnerSrc;
@@ -31,6 +33,11 @@ let
 
 in
 {
+  # Direct package exports (for systemd services, etc.)
+  runner = forgejoRunner;
+  server = forgejoServer;
+  cli = forgejoCli;
+
   # Full package set (server + runner + cli)
   packages = [
     forgejoServer
