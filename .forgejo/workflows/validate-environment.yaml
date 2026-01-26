@@ -22,6 +22,66 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Environment Audit
+        run: |
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  RAW ENVIRONMENT AUDIT (pre-checkout)"
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "--- Critical Paths ---"
+          echo "WORKSPACE_ROOT=${WORKSPACE_ROOT:-<NOT SET>}"
+          echo "PWD=${PWD}"
+          echo "HOME=${HOME}"
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<NOT SET>}"
+          echo "KUBECONFIG=${KUBECONFIG:-<NOT SET>}"
+          echo ""
+          echo "--- OVMF Firmware ---"
+          echo "OVMF_CODE=${OVMF_CODE:-<NOT SET>}"
+          echo "OVMF_VARS=${OVMF_VARS:-<NOT SET>}"
+          echo ""
+          echo "--- Container/Registry ---"
+          echo "CONTAINER_REGISTRY=${CONTAINER_REGISTRY:-<NOT SET>}"
+          echo "CONTAINER_IMAGE=${CONTAINER_IMAGE:-<NOT SET>}"
+          echo "CONTAINER_TAG=${CONTAINER_TAG:-<NOT SET>}"
+          echo "REGISTRY_USERNAME=${REGISTRY_USERNAME:-<NOT SET>}"
+          echo "REGISTRY_PASSWORD=${REGISTRY_PASSWORD:+<SET>}${REGISTRY_PASSWORD:-<NOT SET>}"
+          echo "REGISTRY_K8S_CONTEXT=${REGISTRY_K8S_CONTEXT:-<NOT SET>}"
+          echo "DOCKER_HOST=${DOCKER_HOST:-<NOT SET>}"
+          echo "DOCKER_TOKEN=${DOCKER_TOKEN:+<SET>}${DOCKER_TOKEN:-<NOT SET>}"
+          echo ""
+          echo "--- Git/CI ---"
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME:-<NOT SET>}"
+          echo "GITHUB_TOKEN=${GITHUB_TOKEN:+<SET>}${GITHUB_TOKEN:-<NOT SET>}"
+          echo "GITHUB_ACTOR=${GITHUB_ACTOR:-<NOT SET>}"
+          echo "CI=${CI:-<NOT SET>}"
+          echo "GITHUB_ACTIONS=${GITHUB_ACTIONS:-<NOT SET>}"
+          echo "FORGEJO_ACTIONS=${FORGEJO_ACTIONS:-<NOT SET>}"
+          echo ""
+          echo "--- QCOW2 Build Config ---"
+          echo "QCOW2_BUILD_FILE=${QCOW2_BUILD_FILE:-<NOT SET>}"
+          echo "QCOW2_SSH_PORT=${QCOW2_SSH_PORT:-<NOT SET>}"
+          echo "QCOW2_VM_MEMORY=${QCOW2_VM_MEMORY:-<NOT SET>}"
+          echo "QCOW2_VM_CPUS=${QCOW2_VM_CPUS:-<NOT SET>}"
+          echo "QCOW2_SSH_TIMEOUT=${QCOW2_SSH_TIMEOUT:-<NOT SET>}"
+          echo "QCOW2_MIN_DISK_GB=${QCOW2_MIN_DISK_GB:-<NOT SET>}"
+          echo "QCOW2_MIN_MEM_MB=${QCOW2_MIN_MEM_MB:-<NOT SET>}"
+          echo "QCOW2_REQUIRED_BINS=${QCOW2_REQUIRED_BINS:-<NOT SET>}"
+          echo "QCOW2_REQUIRED_FILE_VARS=${QCOW2_REQUIRED_FILE_VARS:-<NOT SET>}"
+          echo "QCOW2_REQUIRED_VARS=${QCOW2_REQUIRED_VARS:-<NOT SET>}"
+          echo ""
+          echo "--- Konductor Identity ---"
+          echo "KONDUCTOR_SHELL=${KONDUCTOR_SHELL:-<NOT SET>}"
+          echo "KONDUCTOR_BASHRC=${KONDUCTOR_BASHRC:-<NOT SET>}"
+          echo ""
+          echo "--- Shell ---"
+          echo "SHELL=${SHELL:-<NOT SET>}"
+          echo "BASH_VERSION=${BASH_VERSION:-<NOT SET>}"
+          echo "USER=${USER:-<NOT SET>}"
+          echo ""
+          echo "--- Full Environment (sorted) ---"
+          env | sort
+          echo ""
+
       - name: Runner Identity
         run: |
           echo "═══════════════════════════════════════════════════════════════════"
@@ -59,7 +119,6 @@ jobs:
 
       - name: Validate Workspace Structure
         env:
-          WORKSPACE_ROOT: /workspace
           GIT_PAGER: cat
           PAGER: cat
         run: |
@@ -68,8 +127,16 @@ jobs:
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
           echo "PWD: $(pwd)"
-          echo "WORKSPACE_ROOT: ${WORKSPACE_ROOT}"
+          echo "WORKSPACE_ROOT: ${WORKSPACE_ROOT:-<NOT SET>}"
           echo ""
+
+          # WORKSPACE_ROOT must be set by the runner
+          if [ -z "${WORKSPACE_ROOT:-}" ]; then
+            echo "✗ WORKSPACE_ROOT not set"
+            echo "  The forked runner should set WORKSPACE_ROOT to the org directory"
+            echo "  Check runner config: container.include_server_host and container.workspace_repo"
+            exit 1
+          fi
 
           # Critical: WORKSPACE_ROOT must be a git repo (workspace cloning feature)
           echo "Validating workspace repo clone..."
