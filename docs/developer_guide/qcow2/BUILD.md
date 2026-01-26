@@ -204,7 +204,7 @@ kubectl --context "$K8S_CONTEXT" \
 echo "✓ CA installed: $DOCKER_CERT_DIR/ca.crt"
 
 # Skopeo/Podman cert directory
-CONTAINERS_CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+CONTAINERS_CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 mkdir -p "$CONTAINERS_CERT_DIR"
 kubectl --context "$K8S_CONTEXT" \
     get secret gateway-tls-https -n envoy-gateway-system \
@@ -223,15 +223,15 @@ set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 USERNAME="${REGISTRY_USERNAME:-admin}"
 PASSWORD="${REGISTRY_PASSWORD:-admin}"
-CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
 # Docker login
 echo "$PASSWORD" | docker login "$REGISTRY" -u "$USERNAME" --password-stdin
 
-# Skopeo login (writes to ~/.docker/config.json for compat)
+# Skopeo login (writes to ${WORKSPACE_ROOT}/.docker/config.json for compat)
 echo "$PASSWORD" | skopeo login "$REGISTRY" \
     --username "$USERNAME" --password-stdin \
-    --cert-dir "$CERT_DIR" --compat-auth-file ~/.docker/config.json
+    --cert-dir "$CERT_DIR" --compat-auth-file ${WORKSPACE_ROOT}/.docker/config.json
 
 echo "✓ Logged in to $REGISTRY"
 ```
@@ -461,25 +461,25 @@ printf "✓ Context %s available\n" "$K8S_CONTEXT"
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 
 if [[ "$REGISTRY" == "registry.docker.arpa" ]] || [[ "$REGISTRY" =~ ^registry\..+\.sslip\.io$ ]]; then
-    if jq -e ".auths[\"$REGISTRY\"]" ~/.docker/config.json &>/dev/null 2>&1; then
+    if jq -e ".auths[\"$REGISTRY\"]" ${WORKSPACE_ROOT}/.docker/config.json &>/dev/null 2>&1; then
         exit 0
     fi
-    CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+    CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
     mkdir -p "$CERT_DIR"
     kubectl --context "${REGISTRY_K8S_CONTEXT:-admin@docker-dev}" \
         get secret gateway-tls-https -n envoy-gateway-system \
         -o jsonpath='{.data.ca\.crt}' | base64 -d > "$CERT_DIR/ca.crt"
-    echo "$REGISTRY_PASSWORD" | skopeo login "$REGISTRY" \
+    echo "${REGISTRY_PASSWORD:-admin}" | skopeo login "$REGISTRY" \
         --username "${REGISTRY_USERNAME:-admin}" --password-stdin \
-        --cert-dir "$CERT_DIR" --compat-auth-file ~/.docker/config.json
+        --cert-dir "$CERT_DIR" --compat-auth-file ${WORKSPACE_ROOT}/.docker/config.json
 elif [[ "$REGISTRY" == "docker.io" ]]; then
-    if jq -e '.auths["https://index.docker.io/v1/"]' ~/.docker/config.json &>/dev/null 2>&1; then
+    if jq -e '.auths["https://index.docker.io/v1/"]' ${WORKSPACE_ROOT}/.docker/config.json &>/dev/null 2>&1; then
         exit 0
     fi
     [ -n "$DOCKER_TOKEN" ] || { echo "Error: DOCKER_TOKEN not set"; exit 1; }
     echo "$DOCKER_TOKEN" | docker login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin
 elif [[ "$REGISTRY" == "ghcr.io" ]]; then
-    if jq -e '.auths["ghcr.io"]' ~/.docker/config.json &>/dev/null 2>&1; then
+    if jq -e '.auths["ghcr.io"]' ${WORKSPACE_ROOT}/.docker/config.json &>/dev/null 2>&1; then
         exit 0
     fi
     [ -n "$GITHUB_TOKEN" ] || { echo "Error: GITHUB_TOKEN not set"; exit 1; }
@@ -500,7 +500,7 @@ set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
-CERT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/certs.d/$REGISTRY"
+CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
 
@@ -750,8 +750,8 @@ fi
 echo "✓ Credentials provisioned: ${REPO_OWNER}:${RUNNER_PASSWORD:-admin123} (token: ${TOKEN_NAME})"
 
 echo ""
-echo "▶ Phase 2: Create test repository..."
-# Create repo (409 Conflict means it exists, which is fine)
+echo "▶ Phase 2: Create repositories..."
+# Create main test repo (409 Conflict means it exists, which is fine)
 CREATE_RESULT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
   wget -qO- \
     --header="Authorization: token $TOKEN" \
@@ -760,16 +760,41 @@ CREATE_RESULT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
     "http://localhost:3000/api/v1/user/repos" 2>&1) || true
 echo "✓ Repository: ${REPO_OWNER}/${REPO_NAME}"
 
+# Create workspace repo for forked runner enterprise pattern
+# The runner auto-derives workspace URL as <server>/<org>/workspace.git
+# and clones it before the main repo for tooling inheritance
+WORKSPACE_RESULT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+  wget -qO- \
+    --header="Authorization: token $TOKEN" \
+    --header="Content-Type: application/json" \
+    --post-data="{\"name\":\"workspace\",\"private\":false,\"auto_init\":false,\"default_branch\":\"main\",\"description\":\"Shared tooling for CI workspace pattern\"}" \
+    "http://localhost:3000/api/v1/user/repos" 2>&1) || true
+echo "✓ Repository: ${REPO_OWNER}/workspace"
+
 echo ""
-echo "▶ Phase 3: Push to Forgejo..."
+echo "▶ Phase 3: Push workspace repo..."
+# Push parent workspace repo (contains mise.toml, .envrc, shared tooling)
+# Use cluster CA from registry trust setup (same Envoy Gateway for git.docker.arpa)
+GIT_CA_CERT="${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt"
+[ -f "$GIT_CA_CERT" ] || { echo "✗ CA cert not found: $GIT_CA_CERT (run registry:trust first)"; exit 1; }
+
+WORKSPACE_REMOTE_URL="https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/workspace.git"
+git -C .. remote remove runner-test 2>/dev/null || true
+git -C .. remote add runner-test "$WORKSPACE_REMOTE_URL"
+GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+git -C .. remote remove runner-test 2>/dev/null || true
+echo "✓ Pushed workspace to ${REPO_OWNER}/workspace:${BRANCH}"
+
+echo ""
+echo "▶ Phase 4: Push k9 repo..."
 REMOTE_URL="https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/${REPO_NAME}.git"
 git remote remove runner-test 2>/dev/null || true
 git remote add runner-test "$REMOTE_URL"
-GIT_SSL_NO_VERIFY=1 git push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+GIT_SSL_CAINFO="$GIT_CA_CERT" git push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
 echo "✓ Pushed to ${REPO_OWNER}/${REPO_NAME}:${BRANCH}"
 
 echo ""
-echo "▶ Phase 4: Trigger workflow via dispatch..."
+echo "▶ Phase 5: Trigger workflow via dispatch..."
 # Use workflow_dispatch for reliable triggering
 kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
   wget -qO- --post-data='{"ref":"'"$BRANCH"'"}' \
@@ -779,7 +804,7 @@ kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
 echo "✓ Workflow dispatch sent"
 
 echo ""
-echo "▶ Phase 5: Wait for workflow completion..."
+echo "▶ Phase 6: Wait for workflow completion..."
 MAX_WAIT=120
 POLL_INTERVAL=5
 ELAPSED=0
@@ -826,7 +851,7 @@ while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
 done
 
 echo ""
-echo "▶ Phase 6: Verify ${WORKFLOW} result..."
+echo "▶ Phase 7: Verify ${WORKFLOW} result..."
 case "$STATUS" in
   success)
     echo "✓ ${WORKFLOW} completed successfully"
@@ -888,7 +913,7 @@ echo "✓ PROVENANCE_FILE=${PROVENANCE_FILE}"
 SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 SRC_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 SRC_TAG="${CONTAINER_TAG:-latest-qcow2}"
-SRC_CERT_DIR="${HOME}/.config/containers/certs.d/${SRC_REGISTRY}"
+SRC_CERT_DIR="${WORKSPACE_ROOT}/.certs/${SRC_REGISTRY}"
 [ -d "$SRC_CERT_DIR" ] || { echo "✗ SRC_CERT_DIR not found: $SRC_CERT_DIR"; exit 1; }
 echo "✓ SRC_CERT_DIR=${SRC_CERT_DIR}"
 
@@ -899,10 +924,10 @@ DST_TAG="${PROMOTE_TAG:-latest-qcow2}"
 echo "✓ DST_REGISTRY=${DST_REGISTRY}"
 
 # Authentication preflight
-# Priority: DOCKER_TOKEN env var → existing ~/.docker/config.json
+# Priority: DOCKER_TOKEN env var → existing ${WORKSPACE_ROOT}/.docker/config.json
 echo ""
 echo "Authentication:"
-DEST_AUTH_FILE="${HOME}/.docker/config.json"
+DEST_AUTH_FILE="${WORKSPACE_ROOT}/.docker/config.json"
 if [[ "$DST_REGISTRY" == "docker.io" ]]; then
     if [[ -n "${DOCKER_TOKEN:-}" ]]; then
         echo "  Method: DOCKER_TOKEN environment variable"
@@ -1109,6 +1134,10 @@ if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
     exit 0
 fi
+
+# Update forked forgejo-runner to latest commit
+echo "Updating forgejo-runner-src flake input..."
+nix flake update forgejo-runner-src --no-warn-dirty
 
 # Capture nix_drv before build (derivation hash is known from eval)
 NIX_DRV=$(nix path-info --derivation .#qcow2 2>/dev/null | head -1 | xargs basename | cut -d- -f1)
