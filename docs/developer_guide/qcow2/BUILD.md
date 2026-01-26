@@ -179,6 +179,15 @@ Install cluster CA certificate for Docker daemon.
 
 ```sh {"name":"registry:trust","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
 set -e
+
+# Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
+[[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
+
+# Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
+[ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found: $KUBECONFIG"; exit 1; }
+
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 K8S_CONTEXT="${REGISTRY_K8S_CONTEXT:-admin@docker-dev}"
 
