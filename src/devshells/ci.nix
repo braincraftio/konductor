@@ -33,9 +33,10 @@ baseShell.overrideAttrs (old: {
   # - Forgejo runner and CLI
   # - Container and VM build tools (from konductor packages)
   # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  # ciPackages includes cli.nix which has forgejo-cli and tea
+  # runnerPackages adds forgejo-runner binary for CI jobs
   nativeBuildInputs = packages.ciPackages
     ++ programs.forgejo.runnerPackages
-    ++ programs.forgejo.cliPackages
     ++ konductor.packages;
 
   shellHook = ''
@@ -85,7 +86,7 @@ baseShell.overrideAttrs (old: {
     echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
     echo ""
     echo "CI Tools:"
-    echo "  forgejo-runner, fj (forgejo-cli)"
+    echo "  forgejo-runner, fj (forgejo-cli), tea (gitea-cli)"
     echo "  docker, docker-compose, buildkit, skopeo, crane"
     echo "  qemu, libvirt, virt-sparsify, OVMF"
     echo ""

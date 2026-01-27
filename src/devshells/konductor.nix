@@ -45,9 +45,9 @@ baseShell.overrideAttrs (old: {
     ++ packages.rustPackages
     # Atuin shell history (local-only by default, sync via ATUIN_SYNC=true)
     ++ config.shell.atuin.packages
-    # Forgejo runner + CLI (CI/CD tools)
-    ++ programs.forgejo.runnerPackages
-    ++ programs.forgejo.cliPackages
+    # Note: forgejo-cli and tea are in cli.nix (inherited via base shell)
+    # forgejo-runner is NOT included here - it runs as a systemd service
+    # and including it would cause service restarts during devshell rebuilds
     # Self-hosting: container + VM build tools
     ++ konductor.packages
     # C++ stdlib for Python grpc (used by Pulumi)
@@ -119,8 +119,8 @@ baseShell.overrideAttrs (old: {
     echo "  docker, docker-compose, buildkit, skopeo, crane"
     echo "  qemu, libvirt, virt-manager, virt-sparsify, OVMF"
     echo ""
-    echo "CI/CD Tools:"
-    echo "  forgejo-runner, fj (forgejo-cli)"
+    echo "Git Forge CLIs:"
+    echo "  fj (forgejo-cli), tea (gitea-cli), gh (github-cli)"
     echo ""
     echo "Commands:  mise run help"
     echo ""

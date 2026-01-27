@@ -42,6 +42,8 @@ in
       yq-go # YAML processor
       sqlite # SQLite for snacks.picker frecency
       gh # GitHub CLI
+      tea # Gitea CLI
+      forgejo-cli # Forgejo CLI
       gnugrep # GNU grep
       ripgrep # Fast grep (rg)
       fd # Fast find
