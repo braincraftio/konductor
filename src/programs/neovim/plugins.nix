@@ -321,7 +321,7 @@ in
         options = {
           diagnostics = "nvim_lsp";
           always_show_bufferline = true;
-          separator_style = "slant";
+          separator_style = "thin";
           # Offset for explorer without duplicate text (explorer has its own title)
           offsets = [
             {

@@ -1,30 +1,28 @@
-# src/programs/tmux/default.nix
+# k9/src/programs/tmux/default.nix
 # Tmux configuration with catppuccin theme and productivity plugins
-# Design: Cohesive lavender theme, seamless neovim integration, fzf-powered workflows
+#
+# V2: Complete rewrite based on DeepWiki research across 8 upstream repositories
+# - NixOS/nixpkgs, catppuccin/tmux, tmux/tmux, christoomey/vim-tmux-navigator
+# - tmux-plugins/tmux-resurrect, tmux-plugins/tmux-sensible, laktak/extrakto, tmux-plugins/tmux-yank
+#
+# Design Principles:
+# - Hermetic Nix store paths for reproducibility
+# - Collision-free keybindings (research-validated)
+# - Seamless Neovim integration via vim-tmux-navigator
+# - Session persistence for 12+ hour development sessions
+# - Catppuccin Frappe theme with mauve accent
 
 { pkgs, lib, ... }:
 
 let
+  # ===========================================================================
+  # SHARED CONFIGURATION (SSOT)
+  # ===========================================================================
 
-  # Inputrc for readline in tmux bash
-  inputrc = pkgs.writeText "konductor-tmux-inputrc" ''
-    set enable-keypad on
-    set input-meta on
-    set output-meta on
-    set convert-meta off
-    "\e[A": previous-history
-    "\e[B": next-history
-    "\e[C": forward-char
-    "\e[D": backward-char
-    "\e[H": beginning-of-line
-    "\e[F": end-of-line
-    "\e[3~": delete-char
-    set completion-ignore-case on
-    set show-all-if-ambiguous on
-    set colored-stats on
-  '';
+  # Import shared readline configuration (eliminates duplicate inputrc)
+  readline = import ../../lib/readline.nix { inherit pkgs; };
 
-  # Bashrc for tmux shells
+  # Bashrc for tmux shells - sources bash-completion then user's bashrc
   tmuxBashrc = pkgs.writeText "konductor-tmux-bashrc" ''
     if [ -f ${pkgs.bash-completion}/share/bash-completion/bash_completion ]; then
       . ${pkgs.bash-completion}/share/bash-completion/bash_completion
@@ -34,114 +32,320 @@ let
     fi
   '';
 
-  # Complete tmux configuration
+  # ===========================================================================
+  # KEYBINDING REFERENCE (for help system)
+  # ===========================================================================
+
+  keybindingReference = pkgs.writeText "konductor-tmux-keys.txt" ''
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                         KONDUCTOR TMUX KEYBINDINGS                           ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+
+    PREFIX: Ctrl-a (C-a)
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ NAVIGATION (seamless with Neovim)                                            │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ C-h         Move to pane left          (works in Neovim too)                 │
+    │ C-j         Move to pane down          (works in Neovim too)                 │
+    │ C-k         Move to pane up            (works in Neovim too)                 │
+    │ C-l         Move to pane right         (works in Neovim too)                 │
+    │ C-\         Previous pane              (last active pane)                    │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ SPLITS                                                                       │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + |   Horizontal split (panes side by side)                           │
+    │ prefix + \   Horizontal split (alternate)                                    │
+    │ prefix + -   Vertical split (panes stacked)                                  │
+    │ prefix + _   Vertical split (alternate)                                      │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ RESIZE (repeatable - hold prefix)                                            │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + H   Resize left 5 cells                                             │
+    │ prefix + J   Resize down 5 cells                                             │
+    │ prefix + K   Resize up 5 cells                                               │
+    │ prefix + L   Resize right 5 cells                                            │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ WINDOWS                                                                      │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + Tab Last window (toggle)                                            │
+    │ Alt-H        Previous window                                                 │
+    │ Alt-L        Next window                                                     │
+    │ Alt-1..9     Jump to window 1-9                                              │
+    │ prefix + c   New window                                                      │
+    │ prefix + ,   Rename window                                                   │
+    │ prefix + &   Kill window (confirm)                                           │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ PANE MANAGEMENT & NESTED TMUX                                                │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + b   Send Ctrl-b to inner tmux (activates inner's command mode)      │
+    │ prefix + C-b Same as above (C-a C-b is intuitive)                            │
+    │ prefix + B   Break pane to new window                                        │
+    │ prefix + j   Join pane from another window                                   │
+    │ prefix + S   Toggle pane synchronization                                     │
+    │ prefix + z   Toggle pane zoom                                                │
+    │ prefix + x   Kill pane (confirm)                                             │
+    │ prefix + {   Swap pane up                                                    │
+    │ prefix + }   Swap pane down                                                  │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ COPY MODE (prefix + [ to enter)                                              │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ v           Begin selection                                                  │
+    │ V           Select line                                                      │
+    │ C-v         Rectangle selection                                              │
+    │ y           Yank to clipboard                                                │
+    │ Escape      Cancel/exit                                                      │
+    │ /           Search forward                                                   │
+    │ ?           Search backward                                                  │
+    │ n           Next match                                                       │
+    │ N           Previous match                                                   │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ PLUGINS                                                                      │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + e   Extrakto (fuzzy extract text from pane)                         │
+    │ prefix + F   tmux-fzf (fuzzy session/window/pane picker)                     │
+    │ prefix + C-s Save session (resurrect)                                        │
+    │ prefix + C-r Restore session (resurrect)                                     │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ UTILITY                                                                      │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ prefix + r   Reload configuration                                            │
+    │ prefix + ?   Show this help                                                  │
+    │ prefix + t   Show clock                                                      │
+    │ prefix + :   Command prompt                                                  │
+    │ F12          Toggle outer tmux OFF/ON (status bar grays when off)            │
+    │              When OFF: all keys pass to inner tmux (SSH, nested sessions)    │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ NESTED TMUX PATTERN                                                          │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ Outer tmux: prefix = C-a (this session)                                      │
+    │ Inner tmux: prefix = C-b (default, SSH remote, containers)                   │
+    │                                                                              │
+    │ To use inner tmux:                                                           │
+    │   Option 1: C-a b  or  C-a C-b  (sends C-b to activate inner's commands)     │
+    │   Option 2: F12 (disables outer, all keys go to inner, F12 again to restore) │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ STATUS BAR ICONS                                                             │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ Normal (Nerd Font):    Session    Directory    Time    Host            │
+    │ ASCII fallback:        [S] Session  [D] Directory  [T] Time  [H] Host        │
+    │                                                                              │
+    │ Set KONDUCTOR_ASCII_MODE=1 for terminals without Nerd Font support.          │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+    Theme: Catppuccin Frappe (mauve accent)
+    Press 'q' to close this help.
+  '';
+
+  # ===========================================================================
+  # TMUX CONFIGURATION
+  # ===========================================================================
+
   tmuxConfig = pkgs.writeText "konductor-tmux.conf" ''
     # =========================================================================
     # TERMINAL SETTINGS
     # =========================================================================
+    # Override sensible's screen-256color with tmux-256color for better support
     set -g default-terminal "tmux-256color"
     set -g default-shell "${pkgs.bash}/bin/bash"
     set -g default-command "${pkgs.bash}/bin/bash --rcfile ${tmuxBashrc} -i"
+
+    # Research: sensible sets history-limit to 50000, we match for explicitness
     set -g history-limit 50000
 
-    # Indexing starts at 1 (not 0)
+    # Indexing starts at 1 (keyboard layout alignment - 1 is left of 2)
     set -g base-index 1
     setw -g pane-base-index 1
 
-    # Vi mode
+    # Vi mode for copy-mode (muscle memory with Neovim)
     setw -g mode-keys vi
 
     # Mouse support
     set -g mouse on
 
-    # No escape delay (critical for neovim)
+    # Research: escape-time 0 is CRITICAL for Neovim (sensible also sets this)
+    # Explicit for documentation - eliminates escape sequence delay
     set -g escape-time 0
 
-    # Prefix key: Ctrl-a (more ergonomic than Ctrl-b)
+    # Prefix key: Ctrl-a (home row, less pinky strain than Ctrl-b)
     set -g prefix C-a
     bind C-a send-prefix
-    bind-key b send-keys C-b
 
-    # Inputrc environment
-    set-environment -g INPUTRC "${inputrc}"
+    # Inputrc environment for readline (uses shared SSOT)
+    set-environment -g INPUTRC "${readline.path}"
     set -g update-environment "INPUTRC"
 
     # =========================================================================
     # TRUE COLOR SUPPORT
     # =========================================================================
-    set -ga terminal-overrides ",xterm-256color:RGB"
+    # Research: Complete terminal coverage from DeepWiki analysis
+
+    # terminal-features: Named capabilities (tmux 3.2+)
     set -as terminal-features ",xterm*:RGB"
+    set -as terminal-features ",tmux*:RGB"
+    set -as terminal-features ",alacritty:RGB"
+    set -as terminal-features ",kitty:RGB"
+    set -as terminal-features ",ghostty:RGB"
+    set -as terminal-features ",foot:RGB"
+    set -as terminal-features ",wezterm:RGB"
+
+    # terminal-overrides: Individual terminfo overrides (broader compatibility)
+    set -ga terminal-overrides ",xterm-256color:RGB"
     set -ag terminal-overrides ",alacritty:RGB"
     set -ag terminal-overrides ",kitty:RGB"
     set -ag terminal-overrides ",ghostty:RGB"
+    set -ag terminal-overrides ",iTerm.app*:RGB"
+    set -ag terminal-overrides ",iTerm2*:RGB"
+    set -ag terminal-overrides ",foot*:RGB"
+    set -ag terminal-overrides ",wezterm*:RGB"
+    set -ag terminal-overrides ",*256col*:RGB"
 
     # =========================================================================
     # WINDOW & PANE BEHAVIOR
     # =========================================================================
+    # Research: focus-events is event-driven since tmux 3.3, consistent ordering
+    # Required for Neovim FocusGained/FocusLost autocmds (autoread, etc.)
     set -g focus-events on
+
     setw -g aggressive-resize on
     set -g status-interval 5
     set -g renumber-windows on
     set -g status-position top
 
-    # Activity monitoring (disabled - less visual noise)
+    # Activity monitoring disabled (less visual noise for focused development)
     setw -g monitor-activity off
     set -g visual-activity off
     set -g visual-bell off
 
     # =========================================================================
-    # KEY BINDINGS
+    # CLIPBOARD INTEGRATION
     # =========================================================================
-    # Reload configuration
+    # Research: OSC 52 + external tools (tmux-yank) coexist well
+    # set-clipboard 'on': Accept OSC 52 sequences AND set terminal clipboard
+    set -s set-clipboard on
+    set -g allow-passthrough on
+    set -as terminal-features ',xterm*:clipboard'
+
+    # =========================================================================
+    # KEY BINDINGS - COLLISION-FREE (Research-validated)
+    # =========================================================================
+    # Principles:
+    # 1. Lowercase for non-destructive actions
+    # 2. Uppercase/Shift for destructive or alternate actions
+    # 3. No binding conflicts between core and plugins
+
+    # -------------------------------------------------------------------------
+    # Configuration Management
+    # -------------------------------------------------------------------------
+    # Reload config with feedback
     bind r run-shell 'tmux source-file "$KONDUCTOR_TMUX_CONF" && tmux display-message "Config reloaded!"'
 
-    # Split panes (| and - are intuitive)
+    # Help: Show keybinding reference
+    bind ? display-popup -E -w 80 -h 40 'cat "$KONDUCTOR_TMUX_KEYS"'
+
+    # -------------------------------------------------------------------------
+    # Splits - Intuitive visual mnemonics
+    # -------------------------------------------------------------------------
     unbind '"'
     unbind %
-    bind '|' split-window -h -c "#{pane_current_path}"
-    bind '\' split-window -h -c "#{pane_current_path}"
-    bind - split-window -v -c "#{pane_current_path}"
+    bind '|' split-window -h -c "#{pane_current_path}"  # Vertical line = horizontal split
+    bind '\' split-window -h -c "#{pane_current_path}"  # Same (easier to type)
+    bind '-' split-window -v -c "#{pane_current_path}"  # Horizontal line = vertical split
+    bind '_' split-window -v -c "#{pane_current_path}"  # Same with shift
 
-    # Pane resizing (vim-style with repeat)
+    # -------------------------------------------------------------------------
+    # Pane Resizing - Vim-style HJKL with repeat
+    # -------------------------------------------------------------------------
     bind -r H resize-pane -L 5
     bind -r J resize-pane -D 5
     bind -r K resize-pane -U 5
     bind -r L resize-pane -R 5
 
-    # Window navigation
-    bind Tab last-window
-    bind -n M-H previous-window
-    bind -n M-L next-window
+    # -------------------------------------------------------------------------
+    # Window Navigation
+    # -------------------------------------------------------------------------
+    bind Tab last-window                  # Quick toggle to last window
+    bind -n M-H previous-window           # Alt-Shift-H: previous
+    bind -n M-L next-window               # Alt-Shift-L: next
+
+    # Alt-1 through Alt-9 for direct window access
+    bind -n M-1 select-window -t 1
+    bind -n M-2 select-window -t 2
+    bind -n M-3 select-window -t 3
+    bind -n M-4 select-window -t 4
+    bind -n M-5 select-window -t 5
+    bind -n M-6 select-window -t 6
+    bind -n M-7 select-window -t 7
+    bind -n M-8 select-window -t 8
+    bind -n M-9 select-window -t 9
+
+    # -------------------------------------------------------------------------
+    # Pane Management & Nested Tmux Support
+    # -------------------------------------------------------------------------
+    # Nested tmux pattern: Outer uses C-a prefix, Inner uses C-b (default)
+    # C-a b   -> sends C-b to inner tmux (activates inner's command mode)
+    # C-a C-b -> same, more intuitive for users expecting C-b behavior
+    bind b send-keys C-b                  # Send literal Ctrl-b to inner tmux
+    bind C-b send-keys C-b                # Same (C-a C-b is intuitive)
+    bind B break-pane                     # Break pane to new window (shift=destructive)
+    bind j command-prompt -p "Join pane from:" "join-pane -s '%%'"
 
     # Pane synchronization toggle
     bind S set-window-option synchronize-panes\; display-message "Sync #{?pane_synchronized,ON,OFF}"
 
-    # Pane management
-    bind b break-pane
-    bind j command-prompt -p "Join pane from:" "join-pane -s '%%'"
-
-    # =========================================================================
-    # CLIPBOARD INTEGRATION (enhanced by tmux-yank plugin)
-    # =========================================================================
-    set -s set-clipboard on
-    set -g allow-passthrough on
-    set -as terminal-features ',xterm*:clipboard'
-
-    # Vi copy mode bindings (tmux-yank enhances these)
+    # -------------------------------------------------------------------------
+    # Copy Mode - Vim-aligned
+    # -------------------------------------------------------------------------
     bind-key -T copy-mode-vi 'v' send-keys -X begin-selection
+    bind-key -T copy-mode-vi 'V' send-keys -X select-line
     bind-key -T copy-mode-vi 'C-v' send-keys -X rectangle-toggle \; send -X begin-selection
     bind-key -T copy-mode-vi Escape send-keys -X cancel
 
+    # Search bindings (vim-like incremental search)
+    bind-key -T copy-mode-vi '/' command-prompt -i -p "search down" "send -X search-forward-incremental \"%%%\""
+    bind-key -T copy-mode-vi '?' command-prompt -i -p "search up" "send -X search-backward-incremental \"%%%\""
+
     # =========================================================================
-    # CATPPUCCIN THEME - Rounded style (pill-shaped separators)
+    # CATPPUCCIN THEME - Frappe with Mauve Accent
     # =========================================================================
     # IMPORTANT: All @catppuccin options must be set BEFORE run-shell
+    # Research: catppuccin 2.1.3 API is stable for @catppuccin_* options
+    #
+    # ASCII FALLBACK MODE:
+    # Set KONDUCTOR_ASCII_MODE=1 for terminals without Nerd Font support.
+    # This switches to ASCII icons and basic separators.
+
     set -g @catppuccin_flavor 'frappe'
 
     # -------------------------------------------------------------------------
-    # Window Tabs - Slanted style
+    # Window Tabs - Rounded pill style (modern macOS/PopOS aesthetic)
     # -------------------------------------------------------------------------
-    set -g @catppuccin_window_status_style "slanted"
+    # CRITICAL: Must use run-shell (blocking) NOT if-shell (async)!
+    # if-shell runs asynchronously - catppuccin loads BEFORE if-shell completes.
+    # run-shell blocks until the command finishes, ensuring options are set first.
+    #
+    # Rounded style:  (U+E0B6) left,  (U+E0B4) right
+    # ASCII mode: use "basic" style + parentheses separators
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_window_status_style "basic"; else tmux set -g @catppuccin_window_status_style "rounded"; fi'
+
     set -g @catppuccin_window_number_position "left"
     set -g @catppuccin_window_text " #W"
     set -g @catppuccin_window_number "#I"
@@ -154,13 +358,16 @@ let
     set -g @catppuccin_window_current_text_color "#{@thm_surface_0}"
 
     # -------------------------------------------------------------------------
-    # Status Modules - Mauve theme with slanted separators
+    # Status Modules - Rounded pill separators (consistent with window style)
     # -------------------------------------------------------------------------
-    # U+E0BC = \ backslash (flips color orientation)
-    set -g @catppuccin_status_left_separator ""
-    set -g @catppuccin_status_middle_separator ""
-    set -g @catppuccin_status_right_separator ""
-    set -g @catppuccin_status_connect_separator "no"
+    # CRITICAL: Using run-shell (blocking) for the same reason as window style.
+    # Status modules DON'T have a "style" option - must set separators explicitly.
+    # connect_separator "yes" = backgrounds blend for continuous pill shape
+    # Glyphs:  (U+E0B6) left rounded,  (U+E0B4) right rounded
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_status_left_separator "("; else tmux set -g @catppuccin_status_left_separator ""; fi'
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_status_middle_separator "|"; else tmux set -g @catppuccin_status_middle_separator ""; fi'
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_status_right_separator ")"; else tmux set -g @catppuccin_status_right_separator ""; fi'
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_status_connect_separator "no"; else tmux set -g @catppuccin_status_connect_separator "no"; fi'
 
     # Module colors - ALL mauve for cohesive purple look
     set -g @catppuccin_session_color "#{@thm_mauve}"
@@ -168,29 +375,36 @@ let
     set -g @catppuccin_date_time_color "#{@thm_mauve}"
     set -g @catppuccin_host_color "#{@thm_mauve}"
 
+    # -------------------------------------------------------------------------
+    # MODULE ICONS - ASCII fallback for non-Nerd-Font terminals
+    # -------------------------------------------------------------------------
+    # Using run-shell with printf for Unicode escapes (Nix strings lose glyphs)
+    # ASCII mode: [S] [D] [T] [H]
+    # Normal mode: Nerd Font icons (U+F120=terminal, U+F07B=folder, U+F017=clock, U+F233=server)
+
     # SESSION MODULE - dark text on mauve
-    set -g @catppuccin_session_icon "󰆍"
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_session_icon "[S]"; else tmux set -g @catppuccin_session_icon ""; fi'
     set -g @catppuccin_session_text " #S"
     set -g @catppuccin_status_session_icon_fg "#{@thm_crust}"
     set -g @catppuccin_status_session_text_fg "#{@thm_crust}"
     set -g @catppuccin_status_session_text_bg "#{@thm_mauve}"
 
     # DIRECTORY MODULE - dark text on mauve
-    set -g @catppuccin_directory_icon "󰉋"
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_directory_icon "[D]"; else tmux set -g @catppuccin_directory_icon ""; fi'
     set -g @catppuccin_directory_text " #{b:pane_current_path}"
     set -g @catppuccin_status_directory_icon_fg "#{@thm_crust}"
     set -g @catppuccin_status_directory_text_fg "#{@thm_crust}"
     set -g @catppuccin_status_directory_text_bg "#{@thm_mauve}"
 
     # DATE/TIME MODULE - dark text on mauve
-    set -g @catppuccin_date_time_icon "󰥔"
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_date_time_icon "[T]"; else tmux set -g @catppuccin_date_time_icon ""; fi'
     set -g @catppuccin_date_time_text " %I:%M"
     set -g @catppuccin_status_date_time_icon_fg "#{@thm_crust}"
     set -g @catppuccin_status_date_time_text_fg "#{@thm_crust}"
     set -g @catppuccin_status_date_time_text_bg "#{@thm_mauve}"
 
     # HOST MODULE (SSH) - dark text on mauve
-    set -g @catppuccin_host_icon "󰒋"
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_host_icon "[H]"; else tmux set -g @catppuccin_host_icon ""; fi'
     set -g @catppuccin_host_text " #H"
     set -g @catppuccin_status_host_icon_fg "#{@thm_crust}"
     set -g @catppuccin_status_host_text_fg "#{@thm_crust}"
@@ -203,52 +417,83 @@ let
     set -g @catppuccin_pane_active_border_style "fg=#{@thm_mauve}"
 
     # =========================================================================
-    # PLUGIN CONFIGURATION (before loading)
+    # PLUGIN CONFIGURATION (must precede plugin loading)
     # =========================================================================
 
-    # vim-tmux-navigator: Smart pane switching with awareness of Vim splits
-    # Use Ctrl+hjkl to navigate between tmux panes AND neovim splits seamlessly
+    # -------------------------------------------------------------------------
+    # vim-tmux-navigator: Seamless Neovim/tmux navigation
+    # -------------------------------------------------------------------------
+    # Research: is_vim pattern handles nvim, vim, vi, vimdiff, view, gvim, lvim, vimx, fzf
     set -g @vim_navigator_mapping_left "C-h"
     set -g @vim_navigator_mapping_right "C-l"
     set -g @vim_navigator_mapping_up "C-k"
     set -g @vim_navigator_mapping_down "C-j"
     set -g @vim_navigator_mapping_prev "C-\\"
 
-    # extrakto: Fuzzy find and insert text from terminal
-    # prefix + tab to activate
-    set -g @extrakto_key "tab"
+    # -------------------------------------------------------------------------
+    # extrakto: Fuzzy text extraction
+    # -------------------------------------------------------------------------
+    # FIXED: Changed from "tab" to "e" to avoid prefix+Tab collision
+    # Mnemonic: 'e' for extract
+    set -g @extrakto_key "e"
     set -g @extrakto_split_size "15"
     set -g @extrakto_clip_tool "auto"
     set -g @extrakto_fzf_tool "${pkgs.fzf}/bin/fzf"
+    set -g @extrakto_fzf_layout "reverse"
+    set -g @extrakto_filter_order "word line path url quote"
 
-    # tmux-fzf: Use fzf for tmux management
-    # prefix + F to activate
+    # -------------------------------------------------------------------------
+    # tmux-fzf: Fuzzy session/window management
+    # -------------------------------------------------------------------------
     TMUX_FZF_LAUNCH_KEY="F"
     set -g @tmux-fzf-launch-key "F"
 
-    # yank: Enhanced clipboard support
+    # -------------------------------------------------------------------------
+    # tmux-yank: Enhanced clipboard
+    # -------------------------------------------------------------------------
+    # Research: @yank_selection for keyboard, @yank_selection_mouse for mouse
     set -g @yank_selection 'clipboard'
     set -g @yank_selection_mouse 'clipboard'
+    set -g @yank_with_mouse 'on'
+
+    # -------------------------------------------------------------------------
+    # tmux-resurrect: Session persistence
+    # -------------------------------------------------------------------------
+    # Research: @resurrect-strategy-nvim 'session' integrates with :mksession
+    set -g @resurrect-capture-pane-contents 'on'
+    set -g @resurrect-strategy-nvim 'session'
+    set -g @resurrect-processes 'nvim vim ssh "~rails server" "~npm start"'
+
+    # -------------------------------------------------------------------------
+    # tmux-continuum: Automatic session saving
+    # -------------------------------------------------------------------------
+    # Research: 15 minute interval is recommended balance
+    set -g @continuum-restore 'on'
+    set -g @continuum-save-interval '15'
 
     # =========================================================================
     # LOAD PLUGINS
     # =========================================================================
-    # Order matters: sensible first, then theme, then functionality plugins
+    # Order: sensible -> theme -> navigation -> clipboard -> productivity -> persistence
 
-    # Core
+    # Core (sets baseline defaults - respects our explicit settings)
     run-shell ${pkgs.tmuxPlugins.sensible}/share/tmux-plugins/sensible/sensible.tmux
 
-    # Theme
+    # Theme (must be after sensible, before status bar layout)
     run-shell ${pkgs.tmuxPlugins.catppuccin}/share/tmux-plugins/catppuccin/catppuccin.tmux
 
     # Neovim Integration
     run-shell ${pkgs.tmuxPlugins.vim-tmux-navigator}/share/tmux-plugins/vim-tmux-navigator/vim-tmux-navigator.tmux
     run-shell ${pkgs.tmuxPlugins.vim-tmux-focus-events}/share/tmux-plugins/vim-tmux-focus-events/focus-events.tmux
 
-    # Productivity
+    # Clipboard & Productivity
     run-shell ${pkgs.tmuxPlugins.yank}/share/tmux-plugins/yank/yank.tmux
     run-shell ${pkgs.tmuxPlugins.extrakto}/share/tmux-plugins/extrakto/extrakto.tmux
     run-shell ${pkgs.tmuxPlugins.tmux-fzf}/share/tmux-plugins/tmux-fzf/main.tmux
+
+    # Session Persistence (resurrect MUST be before continuum)
+    run-shell ${pkgs.tmuxPlugins.resurrect}/share/tmux-plugins/resurrect/resurrect.tmux
+    run-shell ${pkgs.tmuxPlugins.continuum}/share/tmux-plugins/continuum/continuum.tmux
 
     # =========================================================================
     # STATUS BAR LAYOUT (must be AFTER catppuccin loads)
@@ -281,15 +526,24 @@ let
     # =========================================================================
     # NESTED TMUX SUPPORT (F12 toggle)
     # =========================================================================
+    # F12 disables outer tmux, grays status bar, allows inner tmux to receive keys
+    # Research: Use hardcoded colors (catppuccin frappe grays) - theme variables
+    # don't expand reliably in bind context
+    #
+    # Frappe palette reference:
+    #   surface0: #414559, surface1: #51576d
+    #   overlay0: #737994, overlay1: #838ba7
+    #   crust: #232634, text: #c6d0f5
+
     bind -T root F12 \
         set prefix None \;\
         set key-table off \;\
-        set status-style "fg=#{@thm_overlay_0},bg=#{@thm_surface_0}" \;\
-        set window-status-current-style "fg=#{@thm_crust},bg=#{@thm_overlay_1}" \;\
-        if -F '#{pane_in_mode}' 'send-keys -X cancel' \;\
+        set status-style "fg=#737994,bg=#414559" \;\
+        set window-status-current-style "fg=#c6d0f5,bg=#51576d" \;\
         refresh-client -S \;\
         display-message "Outer tmux OFF - F12 to restore"
 
+    # F12 again re-enables outer tmux
     bind -T off F12 \
         set -u prefix \;\
         set -u key-table \;\
@@ -298,38 +552,63 @@ let
         refresh-client -S \;\
         display-message "Outer tmux ON"
 
-    # Load local overrides if present
+    # =========================================================================
+    # DISCOVERABILITY
+    # =========================================================================
+    # Note: Removed session-created hook because it shows "(null):0:" prefix
+    # when the session name isn't set yet. Users can press prefix + ? for help.
+    # The status bar modules are self-documenting.
+
+    # =========================================================================
+    # LOCAL OVERRIDES
+    # =========================================================================
+    # Users can customize in ~/.config/tmux/konductor-local.conf
     if-shell '[ -f ~/.config/tmux/konductor-local.conf ]' \
       'source-file ~/.config/tmux/konductor-local.conf'
   '';
 
-  # Wrapped tmux binary that uses our config
+  # ===========================================================================
+  # WRAPPED TMUX BINARY
+  # ===========================================================================
+  # Improved bypass detection: checks ALL arguments for -f, not just $1
+  # Handles: tmux -L mysocket -f config.conf
+
   tmuxWrapped = pkgs.writeShellScriptBin "tmux" ''
-    if [ "$1" = "-f" ]; then
-      exec ${pkgs.tmux}/bin/tmux "$@"
-    else
-      exec ${pkgs.tmux}/bin/tmux -f ${tmuxConfig} "$@"
-    fi
+    # Check if ANY argument is -f (not just $1)
+    for arg in "$@"; do
+      if [ "$arg" = "-f" ]; then
+        exec ${pkgs.tmux}/bin/tmux "$@"
+      fi
+    done
+    exec ${pkgs.tmux}/bin/tmux -f ${tmuxConfig} "$@"
   '';
 
 in
 {
-  # Package list including wrapped tmux and all plugins
+  # ===========================================================================
+  # MODULE EXPORTS
+  # ===========================================================================
+
+  # Package list including wrapped tmux, plugins, and dependencies
   packages = [
     tmuxWrapped
     pkgs.tmuxp
 
-    # Tmux Plugins
-    pkgs.tmuxPlugins.sensible          # Sensible defaults
-    pkgs.tmuxPlugins.catppuccin        # Theme
-    pkgs.tmuxPlugins.vim-tmux-navigator # Seamless nvim/tmux navigation
-    pkgs.tmuxPlugins.vim-tmux-focus-events # FocusGained/Lost for neovim
-    pkgs.tmuxPlugins.yank              # Enhanced clipboard
-    pkgs.tmuxPlugins.extrakto          # Fzf text extraction
-    pkgs.tmuxPlugins.tmux-fzf          # Fzf for tmux management
+    # Core Plugins
+    pkgs.tmuxPlugins.sensible
+    pkgs.tmuxPlugins.catppuccin
+    pkgs.tmuxPlugins.vim-tmux-navigator
+    pkgs.tmuxPlugins.vim-tmux-focus-events
+    pkgs.tmuxPlugins.yank
+    pkgs.tmuxPlugins.extrakto
+    pkgs.tmuxPlugins.tmux-fzf
+
+    # Session Persistence
+    pkgs.tmuxPlugins.resurrect
+    pkgs.tmuxPlugins.continuum
 
     # Dependencies
-    pkgs.fzf                           # Required by extrakto and tmux-fzf
+    pkgs.fzf
   ] ++ lib.optionals pkgs.stdenv.isLinux [
     pkgs.xsel
     pkgs.wl-clipboard
@@ -337,11 +616,15 @@ in
     pkgs.reattach-to-user-namespace
   ];
 
-  # No shell hook needed - config path set via env attribute
+  # No shell hook needed - all config is static Nix store paths
   shellHook = "";
 
-  # Environment variables (static nix paths)
+  # Environment variables
   env = {
     KONDUCTOR_TMUX_CONF = "${tmuxConfig}";
+    KONDUCTOR_TMUX_KEYS = "${keybindingReference}";
   };
+
+  # Expose config for validation checks
+  config = tmuxConfig;
 }

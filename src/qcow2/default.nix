@@ -601,6 +601,8 @@ let
           # Konductor
           KONDUCTOR_SHELL = "konductor";
         }
+        # Tmux configuration paths (for config reload and help)
+        // programs.tmux.env
         # Konductor self-hosting env (OVMF_CODE, OVMF_VARS, etc.)
         // (konductor.env pkgs)
       );

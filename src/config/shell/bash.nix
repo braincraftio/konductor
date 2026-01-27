@@ -14,26 +14,14 @@ let
     text = builtins.readFile ./.bashrc;
   };
 
-  # Inputrc for readline configuration
+  # Import shared readline configuration (SSOT - eliminates duplicate definitions)
+  readline = import ../../lib/readline.nix { inherit pkgs; };
+
+  # Inputrc with destination path for this module's usage pattern
   inputrcFile = pkgs.writeTextFile {
     name = "konductor-inputrc";
     destination = "/.inputrc";
-    text = ''
-      set enable-keypad on
-      set input-meta on
-      set output-meta on
-      set convert-meta off
-      "\e[A": previous-history
-      "\e[B": next-history
-      "\e[C": forward-char
-      "\e[D": backward-char
-      "\e[H": beginning-of-line
-      "\e[F": end-of-line
-      "\e[3~": delete-char
-      set completion-ignore-case on
-      set show-all-if-ambiguous on
-      set colored-stats on
-    '';
+    text = readline.content;
   };
 
 in

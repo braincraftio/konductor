@@ -350,6 +350,9 @@ in
         "EDITOR=${env.EDITOR}"
         "VISUAL=${env.VISUAL}"
         "PAGER=${env.PAGER}"
+        # Tmux configuration paths (for config reload and help)
+        "KONDUCTOR_TMUX_CONF=${programs.tmux.env.KONDUCTOR_TMUX_CONF}"
+        "KONDUCTOR_TMUX_KEYS=${programs.tmux.env.KONDUCTOR_TMUX_KEYS}"
       ];
       WorkingDir = "/workspace";
       User = "${toString users.kc2.uid}:${toString users.kc2.gid}";
