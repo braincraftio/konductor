@@ -1,36 +1,56 @@
 # src/config/tree/default.nix
-# Hermetic wrapper for tree with optimized defaults
+# Hermetic wrapper for eza --tree with optimized defaults
 #
-# Leverages tree's native --gitignore and --gitfile flags for filtering.
-# Default depth 6, colorized, directories first, pruned empty dirs.
+# Leverages eza's --git-ignore and -I flags for filtering.
+# Default depth 6, colorized, directories first, icons.
 #
 # Usage:
-#   tree                    # Current dir, depth 6, gitignore + treeignore
+#   tree                    # Current dir, depth 6, gitignore + treeignore filtering
 #   tree -L 2               # Override depth
 #   tree src/               # Specific path
-#   tree --no-gitignore     # Disable .gitignore filtering (keeps treeignore)
-#   tree --no-filter        # Disable all filtering
+#   tree -a                 # Show hidden files (eza native, passed through)
+#   tree --raw              # Escape hatch: raw eza --tree, no Konductor defaults
+#   tree --raw -a -L 10     # Raw mode with custom eza flags
 #
 # Filtering layers:
-#   1. --gitignore respects project .gitignore (node_modules, build/, etc.)
-#   2. --gitfile adds .treeignore patterns (lock files, IDE configs, etc.)
+#   1. --git-ignore respects project .gitignore
+#   2. -I adds .treeignore patterns (lock files, IDE configs, etc.)
 
 { pkgs, ... }:
 
 let
-  # Treeignore file in nix store for hermeticity
-  treeignoreFile = pkgs.writeText "treeignore" (builtins.readFile ./.treeignore);
+  # Read and parse .treeignore patterns
+  ignorePatterns = builtins.readFile ./.treeignore;
+
+  # Filter comments and empty lines, convert to pipe-separated string
+  patternLines = builtins.filter (line:
+    line != "" &&
+    !(pkgs.lib.hasPrefix "#" line) &&
+    !(pkgs.lib.hasPrefix " " line)
+  ) (pkgs.lib.splitString "\n" ignorePatterns);
+
+  # Join with | for eza -I flag
+  # - Remove trailing slashes for eza compatibility
+  # - Prefix with **/ to match anywhere in tree (eza globs are anchored)
+  excludePattern = builtins.concatStringsSep "|" (
+    map (p:
+      let clean = pkgs.lib.removeSuffix "/" p;
+      in if pkgs.lib.hasPrefix "*" clean then clean else "**/${clean}"
+    ) patternLines
+  );
+
+  # Treeignore file in nix store for reference
+  treeignoreFile = pkgs.writeText "treeignore" ignorePatterns;
 in
 {
   # Wrapped version with optimized defaults
   package = pkgs.writeShellApplication {
     name = "tree";
-    runtimeInputs = [ pkgs.tree ];
+    runtimeInputs = [ pkgs.eza ];
     text = ''
       # Parse arguments to detect user overrides
       DEPTH_SET=false
-      NO_FILTER=false
-      NO_GITIGNORE=false
+      RAW_MODE=false
       ARGS=()
 
       while [[ $# -gt 0 ]]; do
@@ -43,11 +63,9 @@ in
               shift
             fi
             ;;
-          --no-filter|--no-exclude|--all)
-            NO_FILTER=true
-            ;;
-          --no-gitignore)
-            NO_GITIGNORE=true
+          --raw|--no-filter)
+            # Escape hatch: disable all Konductor defaults, raw eza passthrough
+            RAW_MODE=true
             ;;
           *)
             ARGS+=("$1")
@@ -56,44 +74,48 @@ in
         shift
       done
 
-      # Build command
-      CMD=(command tree)
+      if [[ "$RAW_MODE" == true ]]; then
+        # Raw mode: just eza --tree with user args, no Konductor defaults
+        exec eza --tree "''${ARGS[@]}"
+      fi
 
-      # Visual defaults: color, type indicators, dirs first, prune empty
-      CMD+=(-C -F --dirsfirst --prune)
+      # Build command with Konductor defaults
+      CMD=(eza --tree)
+
+      # Visual defaults: color, icons, dirs first
+      CMD+=(--color=always --icons=always --group-directories-first)
 
       # Default depth 6 unless user specified -L
       if [[ "$DEPTH_SET" == false ]]; then
         CMD+=(-L 6)
       fi
 
-      # Filtering: gitignore + treeignore unless disabled
-      if [[ "$NO_FILTER" == false ]]; then
-        if [[ "$NO_GITIGNORE" == false ]]; then
-          CMD+=(--gitignore)
-        fi
-        CMD+=(--gitfile="${treeignoreFile}")
-      fi
+      # Filtering: gitignore + treeignore
+      CMD+=(--git-ignore)
+      CMD+=(-I '${excludePattern}')
 
       exec "''${CMD[@]}" "''${ARGS[@]}"
     '';
   };
 
-  # Unwrapped version - standard tree
-  unwrapped = pkgs.tree;
+  # Unwrapped eza for direct access
+  unwrapped = pkgs.eza;
 
   # Treeignore file path - for reference/copying to projects
   inherit treeignoreFile;
 
+  # The exclude pattern string - for debugging
+  inherit excludePattern;
+
   # Metadata
   meta = {
-    description = "Tree with gitignore-aware filtering and optimized defaults";
+    description = "eza --tree with gitignore-aware filtering and optimized defaults";
     configurable = true;
     defaults = {
       depth = 6;
       colorize = true;
+      icons = true;
       directoriesFirst = true;
-      pruneEmpty = true;
       useGitignore = true;
     };
   };

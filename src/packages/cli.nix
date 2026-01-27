@@ -20,6 +20,7 @@ let
         config.shell.git.package # Git with forced Konductor gitconfig
         config.shell.ssh.package # SSH with KONDUCTOR_SSH_CONFIG support
         config.shell.starship.package # Starship with Konductor theme
+        config.tree.package # Tree with gitignore-aware filtering
         # Note: bash.package is not included here - it's used via shellHook/bashrcContent
       ]
       ++ config.shell.atuin.packages # Atuin + bash-preexec for shell history
@@ -28,6 +29,7 @@ let
         pkgs.git
         pkgs.openssh
         pkgs.starship
+        pkgs.tree
         pkgs.atuin
         pkgs.bash-preexec
       ];
