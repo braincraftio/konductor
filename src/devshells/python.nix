@@ -17,9 +17,9 @@ baseShell.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ packages.pythonPackages;
 
   shellHook = old.shellHook + ''
-    # Auto-activate venv if present (dynamic, checks filesystem)
-    if [ -d .venv ]; then
-      source .venv/bin/activate 2>/dev/null || true
+    # Python: activate SSOT venv from UV_PROJECT_ENVIRONMENT (set in .envrc/.env.example)
+    if [ -n "$UV_PROJECT_ENVIRONMENT" ] && [ -d "$UV_PROJECT_ENVIRONMENT" ]; then
+      source "$UV_PROJECT_ENVIRONMENT/bin/activate" 2>/dev/null || true
     fi
 
     echo "Python ${langs.python.display} ready"

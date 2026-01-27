@@ -602,9 +602,9 @@ let
           # Update PATH with language bin directories
           export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
-          # Python venv activation (if exists in current directory)
-          if [ -d .venv ]; then
-            source .venv/bin/activate 2>/dev/null || true
+          # Python: activate SSOT venv from UV_PROJECT_ENVIRONMENT (set in .envrc/.env.example)
+          if [ -n "$UV_PROJECT_ENVIRONMENT" ] && [ -d "$UV_PROJECT_ENVIRONMENT" ]; then
+            source "$UV_PROJECT_ENVIRONMENT/bin/activate" 2>/dev/null || true
           fi
 
           # Neovim configuration
