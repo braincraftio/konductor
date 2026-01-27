@@ -471,15 +471,13 @@ jobs:
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
 
-          # SSH key
           SSH_PUBKEY="${HOME}/.ssh/id_ed25519.pub"
           if [ -f "$SSH_PUBKEY" ]; then
             echo "✓ SSH public key: $SSH_PUBKEY"
             ssh-keygen -l -f "$SSH_PUBKEY"
           else
-            echo "⚠ SSH public key not found: $SSH_PUBKEY"
-            echo "  (Required for QCOW2 VM access during build)"
-            echo "  Generate via cloud-init userdata or infrastructure provisioning"
+            echo "✗ SSH public key not found: $SSH_PUBKEY"
+            exit 1
           fi
           echo ""
 
