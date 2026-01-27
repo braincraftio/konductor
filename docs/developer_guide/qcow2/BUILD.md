@@ -719,18 +719,23 @@ command -v kubectl >/dev/null || { echo "✗ kubectl not found"; exit 1; }
 kubectl get -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" >/dev/null || { echo "✗ Forgejo deployment not found"; exit 1; }
 
 echo "▶ Phase 1: Provision Forgejo credentials..."
-# Try to generate token for existing user first (fast path)
-TOKEN=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+RUNNER_PASSWORD="${FORGEJO_RUNNER_PASSWORD:-admin123}"
+
+# Idempotent credential provisioning - errors shown for debugging
+# 1. Try to generate token for existing user
+# 2. If user doesn't exist, create user with token
+# 3. If user exists, generate token
+
+echo "  Attempting token generation for existing user..."
+TOKEN_OUTPUT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
   forgejo admin user generate-access-token \
     --username "$REPO_OWNER" \
     --token-name "$TOKEN_NAME" \
     --scopes "all" \
-    --raw 2>/dev/null) || true
+    --raw 2>&1) && TOKEN="$TOKEN_OUTPUT" || true
 
 if [ -z "$TOKEN" ]; then
-  # User doesn't exist - create with admin privileges and access token
-  # Password from FORGEJO_RUNNER_PASSWORD env var or default admin123
-  RUNNER_PASSWORD="${FORGEJO_RUNNER_PASSWORD:-admin123}"
+  echo "  Token generation failed: $TOKEN_OUTPUT"
   echo "  Creating $REPO_OWNER user..."
   CREATE_OUTPUT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
     forgejo admin user create \
@@ -741,13 +746,30 @@ if [ -z "$TOKEN" ]; then
       --must-change-password=false \
       --access-token \
       --access-token-name "$TOKEN_NAME" \
-      --access-token-scopes "all" 2>&1)
-  # Extract token from output (last line contains the token)
+      --access-token-scopes "all" 2>&1) || true
+  echo "  Create output: $CREATE_OUTPUT"
+  # Extract token from create output (40 hex chars at end of line)
   TOKEN=$(echo "$CREATE_OUTPUT" | rg -o '[a-f0-9]{40}$' | tail -1)
+
+  # If user already existed, generate a new token
+  if [ -z "$TOKEN" ] && echo "$CREATE_OUTPUT" | grep -q "already exists"; then
+    RETRY_TOKEN_NAME="${TOKEN_NAME}-$(date +%s)"
+    echo "  User exists, generating token with name: $RETRY_TOKEN_NAME"
+    TOKEN_OUTPUT=$(kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
+      forgejo admin user generate-access-token \
+        --username "$REPO_OWNER" \
+        --token-name "$RETRY_TOKEN_NAME" \
+        --scopes "all" \
+        --raw 2>&1) && TOKEN="$TOKEN_OUTPUT" || echo "  Retry failed: $TOKEN_OUTPUT"
+  fi
 fi
 
-[ -n "$TOKEN" ] || { echo "✗ Failed to provision credentials"; exit 1; }
-echo "✓ Credentials provisioned: ${REPO_OWNER}:${RUNNER_PASSWORD:-admin123} (token: ${TOKEN_NAME})"
+if [ -z "$TOKEN" ]; then
+  echo "✗ Failed to provision credentials"
+  echo "  Debug: FORGEJO_NS=$FORGEJO_NS FORGEJO_DEPLOY=$FORGEJO_DEPLOY REPO_OWNER=$REPO_OWNER"
+  exit 1
+fi
+echo "✓ Credentials provisioned: ${REPO_OWNER}:${RUNNER_PASSWORD} (token: ${TOKEN_NAME})"
 
 echo ""
 echo "▶ Phase 2: Create repositories..."
@@ -805,7 +827,7 @@ echo "✓ Workflow dispatch sent"
 
 echo ""
 echo "▶ Phase 6: Wait for workflow completion..."
-MAX_WAIT=120
+MAX_WAIT=300
 POLL_INTERVAL=5
 ELAPSED=0
 STATUS="unknown"

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# .forgejo/envrc - Repository-level policy enforcement
+# Executed by forgejo-runner after actions/checkout completes
+# Exit non-zero to fail the job immediately (when enforcing)
+set -euo pipefail
+
+# Enforcement mode: warn (default) or strict
+ENFORCE="${FORGEJO_ENVRC_ENFORCE:-warn}"
+
+echo "=== Repository Policy Enforcement (mode: ${ENFORCE}) ==="
+
+REPO_VALID=true
+REPO_ERRORS=()
+
+# Check 1: Workspace policy should have run first
+if [[ "${WORKSPACE_PROVENANCE_VALID:-}" == "true" ]]; then
+    echo "[PASS] Workspace provenance inherited"
+elif [[ -n "${WORKSPACE_PROVENANCE_VALID:-}" ]]; then
+    REPO_ERRORS+=("Workspace provenance failed upstream")
+    REPO_VALID=false
+else
+    echo "[SKIP] Workspace policy not executed (WORKSPACE_PROVENANCE_VALID unset)"
+fi
+
+# Check 2: Repository has expected structure
+if [[ -f flake.nix ]]; then
+    echo "[PASS] Nix flake detected"
+else
+    REPO_ERRORS+=("flake.nix not found")
+    REPO_VALID=false
+fi
+
+# Report errors
+for err in "${REPO_ERRORS[@]:-}"; do
+    [[ -n "$err" ]] && echo "[${ENFORCE^^}] $err"
+done
+
+# Export validation state
+export REPO_POLICY_VALID="$REPO_VALID"
+export REPO_POLICY_ENFORCE="$ENFORCE"
+export REPO_POLICY_DATE="$(date -Iseconds)"
+
+# Enforce policy
+if [[ "$REPO_VALID" != "true" ]]; then
+    if [[ "$ENFORCE" == "strict" ]]; then
+        echo "=== Repository Policy: FAILED (strict mode) ==="
+        exit 1
+    else
+        echo "=== Repository Policy: WARN (non-blocking) ==="
+    fi
+else
+    echo "=== Repository Policy: PASSED ==="
+fi
