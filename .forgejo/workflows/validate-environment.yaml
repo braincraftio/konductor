@@ -174,15 +174,18 @@ jobs:
             direnv status
           else
             # Parse JSON and write to GITHUB_ENV
-            # Filter out functions and complex values, keep simple key=value
+            # Filter: strings only, no newlines, no shell code patterns
+            # Use heredoc syntax for safety with special characters
             echo "$DIRENV_JSON" | jq -r '
               to_entries[]
               | select(.value | type == "string")
-              | "\(.key)=\(.value)"
+              | select(.value | contains("\n") | not)
+              | select(.value | test("^\\s*(echo|if|then|else|fi|for|while|do|done|case|esac|function)\\s") | not)
+              | "\(.key)<<EOF\n\(.value)\nEOF"
             ' >> $GITHUB_ENV
 
             # Count exported variables
-            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string")) | length')
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
             echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
           fi
           echo ""
