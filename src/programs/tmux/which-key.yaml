@@ -1,0 +1,221 @@
+# Konductor tmux-which-key configuration
+# Provides which-key style keybinding discovery popup
+# Trigger: prefix + Space
+#
+# Style: Catppuccin Frappe with mauve accent
+# Layout: Matches Konductor's existing keybindings
+
+command_alias_start_index: 200
+
+keybindings:
+  prefix_table: Space
+
+title:
+  style: align=centre,bold
+  prefix: Konductor
+  prefix_style: fg=#ca9ee6,align=centre,bold
+
+position:
+  x: C
+  y: C
+
+custom_variables: []
+
+macros:
+  - name: reload-config
+    commands:
+      - source-file "$KONDUCTOR_TMUX_CONF"
+      - display-message "Config reloaded"
+
+items:
+  # Quick actions
+  - name: Command prompt
+    key: ":"
+    command: command-prompt
+
+  - name: Last window
+    key: Tab
+    command: last-window
+
+  - name: Last pane
+    key: "`"
+    command: last-pane
+
+  - separator: true
+
+  # Splits
+  - name: +Splits
+    key: s
+    menu:
+      - name: Horizontal
+        key: "|"
+        command: split-window -h
+      - name: Vertical
+        key: "-"
+        command: split-window -v
+
+  # Windows
+  - name: +Windows
+    key: w
+    menu:
+      - name: Last
+        key: Tab
+        command: last-window
+      - name: Previous
+        key: p
+        command: previous-window
+      - name: Next
+        key: n
+        command: next-window
+      - name: Choose
+        key: w
+        command: choose-tree -Zw
+      - separator: true
+      - name: New
+        key: c
+        command: new-window
+      - name: Rename
+        key: ","
+        command: command-prompt -p "Rename:" "rename-window '%%'"
+      - name: Kill
+        key: X
+        command: kill-window
+
+  # Panes
+  - name: +Panes
+    key: p
+    menu:
+      - name: Last
+        key: "`"
+        command: last-pane
+      - name: Choose
+        key: p
+        command: display-panes -d 0
+      - separator: true
+      - name: Left
+        key: h
+        command: select-pane -L
+      - name: Down
+        key: j
+        command: select-pane -D
+      - name: Up
+        key: k
+        command: select-pane -U
+      - name: Right
+        key: l
+        command: select-pane -R
+      - separator: true
+      - name: Zoom toggle
+        key: z
+        command: resize-pane -Z
+      - name: +Resize
+        key: r
+        menu:
+          - name: Left
+            key: h
+            command: resize-pane -L 5
+            transient: true
+          - name: Down
+            key: j
+            command: resize-pane -D 5
+            transient: true
+          - name: Up
+            key: k
+            command: resize-pane -U 5
+            transient: true
+          - name: Right
+            key: l
+            command: resize-pane -R 5
+            transient: true
+      - separator: true
+      - name: Break to window
+        key: B
+        command: break-pane
+      - name: Sync toggle
+        key: S
+        command: set synchronize-panes
+      - name: Kill
+        key: x
+        command: kill-pane
+
+  # Sessions
+  - name: +Sessions
+    key: S
+    menu:
+      - name: Choose
+        key: s
+        command: choose-tree -Zs
+      - name: New
+        key: N
+        command: new-session
+      - name: Rename
+        key: r
+        command: command-prompt -p "Rename:" "rename-session '%%'"
+      - name: Detach
+        key: d
+        command: detach-client
+      - separator: true
+      - name: Save (C-s outside menu)
+        key: C-s
+        command: display-message "Use prefix C-s directly"
+      - name: Restore (C-r outside menu)
+        key: C-r
+        command: display-message "Use prefix C-r directly"
+
+  # Copy mode
+  - name: +Copy
+    key: c
+    menu:
+      - name: Enter copy mode
+        key: "["
+        command: copy-mode
+      - name: Paste buffer
+        key: "]"
+        command: paste-buffer
+      - name: Choose buffer
+        key: b
+        command: choose-buffer -Z
+      - name: List buffers
+        key: "#"
+        command: list-buffers
+
+  # Plugins
+  - name: +Plugins
+    key: P
+    menu:
+      - name: Extrakto (prefix e)
+        key: e
+        command: display-message "Use prefix e directly"
+      - name: Fzf (prefix F)
+        key: F
+        command: display-message "Use prefix F directly"
+
+  - separator: true
+
+  # Nested tmux
+  - name: +Nested tmux
+    key: n
+    menu:
+      - name: Send C-b to inner
+        key: b
+        command: send-keys C-b
+      - name: Press F12 to toggle
+        key: F12
+        command: display-message "Use F12 key directly"
+
+  # Utility
+  - name: Reload config
+    key: r
+    macro: reload-config
+
+  - name: Show clock
+    key: t
+    command: clock-mode
+
+  - name: Show messages
+    key: "~"
+    command: show-messages
+
+  - name: List all keys
+    key: "?"
+    command: list-keys -N

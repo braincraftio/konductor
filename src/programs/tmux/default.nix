@@ -22,6 +22,36 @@ let
   # Import shared readline configuration (eliminates duplicate inputrc)
   readline = import ../../lib/readline.nix { inherit pkgs; };
 
+  # ===========================================================================
+  # TMUX-WHICH-KEY (keybinding discovery popup)
+  # ===========================================================================
+  # Build the which-key init.tmux from our YAML config
+  # Trigger: prefix + Space shows available keybindings
+
+  whichKeyConfig = ./which-key.yaml;
+
+  # Pre-build init.tmux at Nix build time (hermetic, no runtime YAML processing)
+  # build.py takes positional arguments: config_file output_file
+  # Note: build.py imports `from pyyaml.lib import yaml` - need to copy the pyyaml directory
+  #
+  # Upstream build.py hardcodes verbose `display -p` startup messages with no
+  # config option to disable. Since init.tmux is our generated artifact (not
+  # upstream code), we strip these from the output as a build post-process step.
+  whichKeyBuilt = pkgs.runCommand "konductor-tmux-which-key" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p $out
+    cp ${whichKeyConfig} $out/config.yaml
+    cp ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/build.py $out/
+    cp -rL ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/pyyaml $out/
+    cd $out
+    python3 build.py config.yaml init.tmux
+
+    # Strip verbose startup messages from generated output
+    # (upstream hardcodes these in build.py template with no disable option)
+    sed -i '/^display -p/d' init.tmux
+  '';
+
   # Bashrc for tmux shells - sources bash-completion then user's bashrc
   tmuxBashrc = pkgs.writeText "konductor-tmux-bashrc" ''
     if [ -f ${pkgs.bash-completion}/share/bash-completion/bash_completion ]; then
@@ -495,6 +525,11 @@ let
     run-shell ${pkgs.tmuxPlugins.resurrect}/share/tmux-plugins/resurrect/resurrect.tmux
     run-shell ${pkgs.tmuxPlugins.continuum}/share/tmux-plugins/continuum/continuum.tmux
 
+    # Which-key (keybinding discovery - prefix + Space)
+    # Unbind default next-layout to free Space for which-key
+    unbind Space
+    source-file ${whichKeyBuilt}/init.tmux
+
     # =========================================================================
     # STATUS BAR LAYOUT (must be AFTER catppuccin loads)
     # =========================================================================
@@ -570,17 +605,46 @@ let
   # ===========================================================================
   # WRAPPED TMUX BINARY
   # ===========================================================================
-  # Improved bypass detection: checks ALL arguments for -f, not just $1
-  # Handles: tmux -L mysocket -f config.conf
+  # Smart session management using native tmux flags:
+  # - Default session name: "k9"
+  # - `tmux` (no args) → attach to k9 or create it (via new-session -A)
+  # - `tmux <command>` → pass through with our config
+  # - `tmux -f custom.conf` → bypass our config entirely
+  #
+  # Key insight from man page: new-session -A behaves like attach-session
+  # if the session already exists, eliminating manual has-session checks.
+  #
+  # Per tmux(1): "the shortest unambiguous form of a command is accepted"
+  # So we detect ANY non-flag argument as a potential command/shortcut.
 
   tmuxWrapped = pkgs.writeShellScriptBin "tmux" ''
-    # Check if ANY argument is -f (not just $1)
+    TMUX_BIN="${pkgs.tmux}/bin/tmux"
+    TMUX_CONF="${tmuxConfig}"
+    SESSION_NAME="k9"
+
+    # Check if ANY argument is -f (bypass our config entirely)
     for arg in "$@"; do
       if [ "$arg" = "-f" ]; then
-        exec ${pkgs.tmux}/bin/tmux "$@"
+        exec "$TMUX_BIN" "$@"
       fi
     done
-    exec ${pkgs.tmux}/bin/tmux -f ${tmuxConfig} "$@"
+
+    # Check if ANY argument is a non-flag (potential command or shortcut)
+    # tmux accepts shortest unambiguous command prefixes (e.g., "att" for attach)
+    # so we can't enumerate all possibilities - just detect non-flag args
+    for arg in "$@"; do
+      case "$arg" in
+        -*) ;; # Flag argument, keep checking
+        *)
+          # Non-flag argument found - pass through as potential command
+          exec "$TMUX_BIN" -f "$TMUX_CONF" "$@"
+          ;;
+      esac
+    done
+
+    # Only flags or no args: use default k9 session with attach-or-create
+    # -A flag: attach to session if it exists, otherwise create it
+    exec "$TMUX_BIN" -f "$TMUX_CONF" "$@" new-session -A -s "$SESSION_NAME"
   '';
 
 in
@@ -606,6 +670,9 @@ in
     # Session Persistence
     pkgs.tmuxPlugins.resurrect
     pkgs.tmuxPlugins.continuum
+
+    # Keybinding Discovery
+    pkgs.tmuxPlugins.tmux-which-key
 
     # Dependencies
     pkgs.fzf

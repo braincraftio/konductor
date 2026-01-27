@@ -44,12 +44,26 @@ pkgs.stdenv.mkDerivation {
 
     # Create wrapper scripts for each alias
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: command: ''
-      cat > $out/bin/${name} << 'WRAPPER'
+      command cat > $out/bin/${name} << 'WRAPPER'
     #!/usr/bin/env bash
     exec ${command} "$@"
     WRAPPER
       chmod +x $out/bin/${name}
     '') aliases)}
+
+    # Smart cat wrapper: bat when interactive (TTY), real cat when piped
+    # This prevents ANSI escape codes from breaking piped output
+    command cat > $out/bin/cat << CATWRAPPER
+    #!/usr/bin/env bash
+    if [ -t 1 ]; then
+      # stdout is a TTY - use bat with decorations
+      exec ${pkgs.bat}/bin/bat --paging=never "\$@"
+    else
+      # stdout is piped - use plain cat
+      exec ${pkgs.coreutils}/bin/cat "\$@"
+    fi
+    CATWRAPPER
+    chmod +x $out/bin/cat
 
     # Generate completions for kubectl wrapper (k)
     # kubectl completion bash generates the full completion script

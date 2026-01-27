@@ -10,7 +10,7 @@
   ll = "eza -la --git";
   la = "eza -la";
   l = "eza -l";
-  cat = "bat --paging=never";
+  # cat - handled specially in alias-wrappers.nix (uses bat when interactive, real cat when piped)
   find = "fd";
   top = "btm";
   du = "dust";
