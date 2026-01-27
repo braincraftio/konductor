@@ -173,10 +173,19 @@ let
     └──────────────────────────────────────────────────────────────────────────────┘
 
     ┌──────────────────────────────────────────────────────────────────────────────┐
-    │ STATUS BAR ICONS                                                             │
+    │ STATUS BAR MODULES                                                           │
     ├──────────────────────────────────────────────────────────────────────────────┤
-    │ Normal (Nerd Font):    Session    Directory    Time    Host            │
-    │ ASCII fallback:        [S] Session  [D] Directory  [T] Time  [H] Host        │
+    │ Left:   Session name (mauve)                                                │
+    │ Right:  Git branch (green) → K8s context (blue) → AWS profile (peach)       │
+    │         → Directory (mauve) → Time (mauve) → Host (SSH only)                │
+    │                                                                              │
+    │ Ambient modules only appear when active:                                     │
+    │   Git:  Shows when in a git repository                                      │
+    │   K8s:  Shows when kubectl is configured (context:namespace)                │
+    │   AWS:  Shows when AWS_PROFILE is set                                       │
+    ├──────────────────────────────────────────────────────────────────────────────┤
+    │ Normal (Nerd Font):  Git ☸ K8s  AWS   Dir   Time   Host             │
+    │ ASCII fallback:      [GIT] [K8S] [AWS] [D] [T] [H]                          │
     │                                                                              │
     │ Set KONDUCTOR_ASCII_MODE=1 for terminals without Nerd Font support.          │
     └──────────────────────────────────────────────────────────────────────────────┘
@@ -440,6 +449,49 @@ let
     set -g @catppuccin_status_host_text_fg "#{@thm_crust}"
     set -g @catppuccin_status_host_text_bg "#{@thm_mauve}"
 
+    # =========================================================================
+    # CUSTOM MODULES - Slow-Churn Ambient Awareness
+    # =========================================================================
+    # These modules show context that rarely changes during a session:
+    # - Kubernetes context/namespace (when KUBECONFIG set)
+    # - Git branch (when in git repo)
+    # - Cloud profile (when AWS_PROFILE set)
+    #
+    # Philosophy: Removed from starship prompt (fast-churn, per-command),
+    # placed here in tmux status bar (slow-churn, 5-second refresh).
+    #
+    # Custom modules use catppuccin's module system:
+    # 1. Define icon/color/text BEFORE catppuccin.tmux loads
+    # 2. Source status_module.conf AFTER catppuccin.tmux to create module
+    # 3. Use #{E:@catppuccin_status_MODULE} in status-right
+    #
+    # Research: #(command) output is cached per status-interval (5s)
+
+    # -------------------------------------------------------------------------
+    # KUBERNETES MODULE - blue accent (k8s branding)
+    # -------------------------------------------------------------------------
+    # Shows context:namespace (hides namespace if "default")
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_kube_icon "[K8S]"; else tmux set -g @catppuccin_kube_icon "☸"; fi'
+    set -g @catppuccin_kube_color "#{@thm_blue}"
+    # Smart display: context:namespace, or just context if namespace is "default"
+    set -g @catppuccin_kube_text " #(kubectl config current-context 2>/dev/null)"
+
+    # -------------------------------------------------------------------------
+    # GIT BRANCH MODULE - green accent (git branding)
+    # -------------------------------------------------------------------------
+    # Shows branch name (truncated to 20 chars)
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_git_icon "[GIT]"; else tmux set -g @catppuccin_git_icon "󰊢"; fi'
+    set -g @catppuccin_git_color "#{@thm_green}"
+    set -g @catppuccin_git_text " #(cd \"#{pane_current_path}\" && git branch --show-current 2>/dev/null | head -c20)"
+
+    # -------------------------------------------------------------------------
+    # AWS PROFILE MODULE - peach/orange accent (AWS branding)
+    # -------------------------------------------------------------------------
+    # Shows AWS_PROFILE when set
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_aws_icon "[AWS]"; else tmux set -g @catppuccin_aws_icon "󰸏"; fi'
+    set -g @catppuccin_aws_color "#{@thm_peach}"
+    set -g @catppuccin_aws_text " #(echo $AWS_PROFILE)"
+
     # -------------------------------------------------------------------------
     # Pane Borders
     # -------------------------------------------------------------------------
@@ -512,6 +564,15 @@ let
     # Theme (must be after sensible, before status bar layout)
     run-shell ${pkgs.tmuxPlugins.catppuccin}/share/tmux-plugins/catppuccin/catppuccin.tmux
 
+    # Create custom status modules (MUST be after catppuccin.tmux loads)
+    # Each module requires setting MODULE_NAME then sourcing status_module.conf
+    %hidden MODULE_NAME="kube"
+    source ${pkgs.tmuxPlugins.catppuccin}/share/tmux-plugins/catppuccin/utils/status_module.conf
+    %hidden MODULE_NAME="git"
+    source ${pkgs.tmuxPlugins.catppuccin}/share/tmux-plugins/catppuccin/utils/status_module.conf
+    %hidden MODULE_NAME="aws"
+    source ${pkgs.tmuxPlugins.catppuccin}/share/tmux-plugins/catppuccin/utils/status_module.conf
+
     # Neovim Integration
     run-shell ${pkgs.tmuxPlugins.vim-tmux-navigator}/share/tmux-plugins/vim-tmux-navigator/vim-tmux-navigator.tmux
     run-shell ${pkgs.tmuxPlugins.vim-tmux-focus-events}/share/tmux-plugins/vim-tmux-focus-events/focus-events.tmux
@@ -540,8 +601,10 @@ let
     # Left: session module
     set -g status-left '#{E:@catppuccin_status_session}'
 
-    # Right: directory + time
-    set -g status-right '#{E:@catppuccin_status_directory}#{E:@catppuccin_status_date_time}'
+    # Right: ambient context + directory + time
+    # Order: git -> kube -> aws -> directory -> time
+    # Custom modules only render when their #(command) returns content
+    set -g status-right '#{E:@catppuccin_status_git}#{E:@catppuccin_status_kube}#{E:@catppuccin_status_aws}#{E:@catppuccin_status_directory}#{E:@catppuccin_status_date_time}'
 
     # SSH: add hostname, move bar to bottom for nested tmux visibility
     if-shell 'test -n "$SSH_CLIENT"' {

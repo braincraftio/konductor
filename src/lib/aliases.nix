@@ -34,4 +34,6 @@
   # Task Automation
   # ===========================================================================
   mr = "mise run";
+  rr = "runme run";
+  rl = "runme beta list";
 }

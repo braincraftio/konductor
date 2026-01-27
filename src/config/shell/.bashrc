@@ -36,54 +36,22 @@ shopt -s globstar 2>/dev/null || true
 shopt -s cdspell 2>/dev/null || true
 
 # ===========================================================================
-# Modern CLI Replacements
-# ===========================================================================
-alias ll='eza -la --git'
-alias la='eza -la'
-alias l='eza -l'
-alias cat='bat --paging=never'
-alias find='fd'
-alias top='btm'
-alias du='dust'
-alias tree='eza --tree'
-
-# ===========================================================================
-# Safe Defaults
+# Safe Defaults (not provided by alias-wrappers.nix)
 # ===========================================================================
 alias rm='rm -i'
 alias cp='cp -i'
 alias mv='mv -i'
 
 # ===========================================================================
-# Editor Shortcuts
-# ===========================================================================
-alias vi='nvim'
-alias vim='nvim'
-
-# ===========================================================================
-# Git Shortcuts
+# Shortcuts (not provided by alias-wrappers.nix)
 # ===========================================================================
 alias gs='git status'
 alias gd='git diff'
 alias gl='git log --oneline -20'
-alias lg='lazygit'
 
-# ===========================================================================
-# Kubernetes
-# ===========================================================================
-alias k='kubecolor'
-# Inherit kubectl completions for k alias
-if command -v kubectl >/dev/null 2>&1; then
-  source <(kubectl completion bash)
-  complete -o default -F __start_kubectl k
-fi
-
-# ===========================================================================
-# Task Automation
-# ===========================================================================
-alias mr='mise run'
-alias rr='runme run'
-alias rl='runme beta list'
+# Note: All standard aliases (ll, la, l, cat, find, top, du, tree, vi, vim, lg, k, mr, rr, rl)
+# are provided as wrapper scripts by src/lib/alias-wrappers.nix with completions.
+# This ensures hermetic behavior and special handling (e.g., cat with TTY detection).
 
 # ===========================================================================
 # Prompt (Starship)
