@@ -487,34 +487,45 @@ jobs:
         run: |
           echo ""
           echo "═══════════════════════════════════════════════════════════════════"
-          echo "  ✅ All Environment Checks Passed"
+          echo "  VALIDATION SUMMARY"
           echo "═══════════════════════════════════════════════════════════════════"
           echo ""
-          echo "This runner is ready for QCOW2 builds."
+          echo "┌─────────────────────────┬──────────┐"
+          echo "│ Check                   │ Status   │"
+          echo "├─────────────────────────┼──────────┤"
+          echo "│ Forked Runner           │ ✅ Pass  │"
+          echo "│ Workspace Structure     │ ✅ Pass  │"
+          echo "│ direnv Integration      │ ✅ Pass  │"
+          echo "│ Required Binaries       │ ✅ Pass  │"
+          echo "│ OVMF Firmware           │ ✅ Pass  │"
+          echo "│ KVM Access              │ ✅ Pass  │"
+          echo "│ System Resources        │ ✅ Pass  │"
+          echo "│ Docker Runtime          │ ✅ Pass  │"
+          echo "│ Nix Build System        │ ✅ Pass  │"
+          echo "│ SSH Configuration       │ ✅ Pass  │"
+          echo "└─────────────────────────┴──────────┘"
+          echo ""
+          echo "Runner:         $(hostname)"
+          echo "Date:           $(date -Iseconds)"
+          echo "WORKSPACE_ROOT: ${WORKSPACE_ROOT:-<not set>}"
           echo ""
 
-          # Final environment summary
-          echo "Environment Summary:"
-          echo "  WORKSPACE_ROOT=${WORKSPACE_ROOT:-<not set>}"
-          echo "  QCOW2_BUILD_FILE=${QCOW2_BUILD_FILE:-<not set>}"
-          echo "  CONTAINER_REGISTRY=${CONTAINER_REGISTRY:-<not set>}"
-          echo "  KUBECONFIG=${KUBECONFIG:-<not set>}"
-          echo ""
+          # Konductor provenance
+          if [[ -f /.konductor ]]; then
+            echo "--- Konductor Provenance (/.konductor) ---"
+            cat /.konductor
+            echo "-------------------------------------------"
+            echo ""
+          fi
 
-          echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Forked Runner | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| Workspace Structure | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| direnv Integration | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| Required Binaries | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| OVMF Firmware | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| KVM Access | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| System Resources | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker Runtime | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "| Nix Build System | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Runner:** $(hostname)" >> $GITHUB_STEP_SUMMARY
-          echo "**Date:** $(date -Iseconds)" >> $GITHUB_STEP_SUMMARY
-          echo "**WORKSPACE_ROOT:** \`${WORKSPACE_ROOT:-<not set>}\`" >> $GITHUB_STEP_SUMMARY
+          # Konductor service status
+          if systemctl is-active --quiet konductor.service 2>/dev/null; then
+            echo "--- Konductor Service Status ---"
+            systemctl status konductor.service --no-pager 2>/dev/null | head -15
+            echo "--------------------------------"
+            echo ""
+          fi
+
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "  ✅ All Environment Checks Passed - Ready for QCOW2 builds"
+          echo "═══════════════════════════════════════════════════════════════════"
