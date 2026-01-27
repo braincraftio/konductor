@@ -1,0 +1,44 @@
+# .treeignore - patterns to hide from tree output for visibility
+# Used via: tree --gitfile=.treeignore (additive to --gitignore)
+# These are often TRACKED files that clutter tree visibility
+
+# Lock files (tracked but verbose/noisy)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+Cargo.lock
+go.sum
+uv.lock
+poetry.lock
+Pipfile.lock
+composer.lock
+Gemfile.lock
+flake.lock
+
+# IDE/Editor (often in global gitignore, not project .gitignore)
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+
+# AI assistants (often in global gitignore)
+.claude/
+.gemini/
+.cursor/
+.copilot/
+.aider*/
+
+# Nix build artifacts
+.direnv/
+result
+result-*
+
+# Dev tool caches (may not be in all .gitignores)
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+.cache/
+.turbo/
