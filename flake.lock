@@ -60,11 +60,11 @@
     "forgejo-runner-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1769483676,
-        "narHash": "sha256-k+77PV+3yh74Q7EZZjWJvjVTff+UYFa/SjswskRxFU8=",
+        "lastModified": 1769484755,
+        "narHash": "sha256-m6s7EL3x1oDbJmOZ1yATmP3l8ZQHt7Tr0ATt1sT+f8I=",
         "ref": "refs/heads/main",
-        "rev": "dcf0e0500ede6b910b952037a06880a801f5036c",
-        "revCount": 2209,
+        "rev": "84e3c2e162fd70c51cfa2f4710b429e0f802afc5",
+        "revCount": 2210,
         "type": "git",
         "url": "https://git.braincraft.io/BrainCraft/runner"
       },
