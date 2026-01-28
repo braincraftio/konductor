@@ -84,9 +84,11 @@ baseShell.overrideAttrs (old: {
     # Update PATH (depends on dynamic vars above)
     export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
-    echo "Full polyglot ready"
-    echo "  Python ${langs.python.display} | Go ${langs.go.display}"
-    echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
+    if [ -z "''${KONDUCTOR_SKIP_BANNER:-}" ]; then
+      echo "Full polyglot ready"
+      echo "  Python ${langs.python.display} | Go ${langs.go.display}"
+      echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
+    fi
 
     # Clean up shellHook from env output
     unset shellHook

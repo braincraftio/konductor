@@ -76,25 +76,27 @@ baseShell.overrideAttrs (old: {
     # Konductor self-hosting shell hook
     ${konductor.shellHook}
 
-    echo ""
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║                 Konductor CI/CD Shell                        ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
-    echo ""
-    echo "Languages:"
-    echo "  Python ${langs.python.display} | Go ${langs.go.display}"
-    echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
-    echo ""
-    echo "CI Tools:"
-    echo "  forgejo-runner, fj (forgejo-cli), tea (gitea-cli)"
-    echo "  docker, docker-compose, buildkit, skopeo, crane"
-    echo "  qemu, libvirt, virt-sparsify, OVMF"
-    echo ""
-    echo "Build Commands:"
-    echo "  nix build .#qcow2         # Build QCOW2 image"
-    echo "  nix build .#oci           # Build OCI container"
-    echo "  nix flake check           # Run all checks"
-    echo ""
+    if [ -z "''${KONDUCTOR_QUIET:-}" ]; then
+      echo ""
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║                 Konductor CI/CD Shell                        ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      echo "Languages:"
+      echo "  Python ${langs.python.display} | Go ${langs.go.display}"
+      echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
+      echo ""
+      echo "CI Tools:"
+      echo "  forgejo-runner, fj (forgejo-cli), tea (gitea-cli)"
+      echo "  docker, docker-compose, buildkit, skopeo, crane"
+      echo "  qemu, libvirt, virt-sparsify, OVMF"
+      echo ""
+      echo "Build Commands:"
+      echo "  nix build .#qcow2         # Build QCOW2 image"
+      echo "  nix build .#oci           # Build OCI container"
+      echo "  nix flake check           # Run all checks"
+      echo ""
+    fi
 
     # Clean up shellHook from env output
     unset shellHook

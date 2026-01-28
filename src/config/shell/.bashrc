@@ -7,6 +7,24 @@
 # - neovim terminals (via wrapped bash)
 
 # ===========================================================================
+# IDE Agent Terminal Guard
+# ===========================================================================
+# Skip interactive hooks for Windsurf/Cursor/VS Code agent terminals.
+# These agents spawn terminals to run commands but the interactive hooks
+# (starship, atuin, direnv) prevent clean shell exit, causing agent hangs.
+# The agent-shell wrapper handles OSC 633 sequences for command completion.
+#
+# TRACING: Log to /tmp/konductor-bashrc.trace for debugging
+_trace_bashrc() { echo "[$(date '+%H:%M:%S.%3N')] [bashrc] $*" >> /tmp/konductor-bashrc.trace; }
+_trace_bashrc "=== .bashrc sourced: WINDSURF_CASCADE_TERMINAL=${WINDSURF_CASCADE_TERMINAL:-<unset>} ==="
+
+if [[ -n "${WINDSURF_CASCADE_TERMINAL:-}" ]]; then
+  _trace_bashrc "GUARD TRIGGERED: Skipping interactive hooks, returning early"
+  return 0 2>/dev/null || exit 0
+fi
+_trace_bashrc "GUARD PASSED: Loading interactive hooks (starship, atuin, direnv)"
+
+# ===========================================================================
 # User Bashrc (FIRST - so Konductor aliases take precedence)
 # ===========================================================================
 # Source user's bashrc first to get their base settings
@@ -78,6 +96,8 @@ fi
 # ===========================================================================
 # Direnv
 # ===========================================================================
+# Silence direnv logging for IDE agents (must be set before hook)
+export DIRENV_LOG_FORMAT="${DIRENV_LOG_FORMAT:-}"
 # Skip direnv hook if already inside a nix shell to prevent double-loading
 if command -v direnv >/dev/null 2>&1 && [ -z "$IN_NIX_SHELL" ]; then
   eval "$(direnv hook bash)"

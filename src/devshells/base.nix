@@ -22,6 +22,21 @@ pkgs.mkShell {
   packages = packages.default;
 
   shellHook = ''
+    # =========================================================================
+    # IDE Agent Terminal Guard (MUST BE FIRST)
+    # =========================================================================
+    # Skip all shellHook setup for Windsurf/Cursor/VS Code agent terminals.
+    # These agents spawn terminals to run commands but the interactive hooks
+    # prevent clean shell exit, causing agent hangs waiting for OSC 633 sequences.
+    # Tracing: check /tmp/devshell-hook.trace after commands
+    _trace_hook() { echo "[$(date '+%H:%M:%S.%3N')] [shellHook] $*" >> /tmp/devshell-hook.trace; }
+    _trace_hook "=== shellHook starting: WINDSURF_CASCADE_TERMINAL=''${WINDSURF_CASCADE_TERMINAL:-<unset>} ==="
+    if [[ -n "''${WINDSURF_CASCADE_TERMINAL:-}" ]]; then
+      _trace_hook "GUARD TRIGGERED: Skipping shellHook, returning early"
+      return 0 2>/dev/null || true
+    fi
+    _trace_hook "GUARD PASSED: Running full shellHook"
+
     # KONDUCTOR_SHELL and name set via env attribute
 
     # Source bash-completion for programmable completions
