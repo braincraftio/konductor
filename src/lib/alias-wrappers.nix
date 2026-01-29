@@ -64,6 +64,26 @@ pkgs.stdenv.mkDerivation {
     CATWRAPPER
     chmod +x $out/bin/cat
 
+    # Smart grep wrapper: use ripgrep with GNU grep flag compatibility
+    # Strips -E (extended regex) since rg uses extended regex by default
+    # Strips -G (basic regex) since rg doesn't support it (falls back gracefully)
+    # Maps -F to --fixed-strings, -P to --pcre2
+    command cat > $out/bin/grep << GREPWRAPPER
+    #!/usr/bin/env bash
+    args=()
+    for arg in "\$@"; do
+      case "\$arg" in
+        -E|--extended-regexp) ;; # rg uses extended regex by default
+        -G|--basic-regexp) ;;    # unsupported, silently ignore
+        -F|--fixed-strings) args+=("--fixed-strings") ;;
+        -P|--perl-regexp) args+=("--pcre2") ;;
+        *) args+=("\$arg") ;;
+      esac
+    done
+    exec ${pkgs.ripgrep}/bin/rg "\''${args[@]}"
+    GREPWRAPPER
+    chmod +x $out/bin/grep
+
     # Generate completions for kubectl wrapper (k)
     # kubectl completion bash generates the full completion script
     kubectl completion bash > k-completion.bash
