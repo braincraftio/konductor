@@ -25,15 +25,19 @@ fi
 _trace_bashrc "GUARD PASSED: Loading interactive hooks (starship, atuin, direnv)"
 
 # ===========================================================================
-# User Bashrc (FIRST - so Konductor aliases take precedence)
+# User Bashrc
 # ===========================================================================
-# Source user's bashrc first to get their base settings
-# Konductor aliases defined below will override any conflicts
+# Source user's bashrc to get their base settings
 # Skip for non-interactive shells (runme, scripts) to avoid brew/starship errors
 if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ] && [[ $- == *i* ]]; then
   export KONDUCTOR_BASHRC_SOURCED=1
   source "$HOME/.bashrc"
 fi
+
+# Clear aliases that conflict with wrapper scripts in PATH
+# Wrapper scripts provide TTY-aware behavior (bat for interactive, plain for pipes)
+unalias cat 2>/dev/null || true
+unalias grep 2>/dev/null || true
 
 # ===========================================================================
 # History Settings
