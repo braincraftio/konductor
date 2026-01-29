@@ -51,15 +51,14 @@ pkgs.stdenv.mkDerivation {
       chmod +x $out/bin/${name}
     '') aliases)}
 
-    # Smart cat wrapper: bat when interactive (TTY), real cat when piped
-    # This prevents ANSI escape codes from breaking piped output
+    # Smart cat wrapper: bat for interactive file viewing, plain cat otherwise
+    # Use bat only when BOTH stdin and stdout are TTYs (interactive terminal)
+    # Use plain cat for: heredocs, pipes, command substitution, redirects
     command cat > $out/bin/cat << CATWRAPPER
     #!/usr/bin/env bash
-    if [ -t 1 ]; then
-      # stdout is a TTY - use bat with decorations
+    if [ -t 0 ] && [ -t 1 ]; then
       exec ${pkgs.bat}/bin/bat --paging=never "\$@"
     else
-      # stdout is piped - use plain cat
       exec ${pkgs.coreutils}/bin/cat "\$@"
     fi
     CATWRAPPER
