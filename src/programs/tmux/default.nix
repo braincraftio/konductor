@@ -22,6 +22,9 @@ let
   # Import shared readline configuration (eliminates duplicate inputrc)
   readline = import ../../lib/readline.nix { inherit pkgs; };
 
+  # Import SSOT bashrc content (same as devshells, qcow2, OCI)
+  bashrcContent = builtins.readFile ../../config/shell/.bashrc;
+
   # ===========================================================================
   # TMUX-WHICH-KEY (keybinding discovery popup)
   # ===========================================================================
@@ -52,14 +55,28 @@ let
     sed -i '/^display -p/d' init.tmux
   '';
 
-  # Bashrc for tmux shells - sources bash-completion then user's bashrc
+  # Bashrc for tmux shells - SSOT with devshells, qcow2, OCI
+  # Sources bash-completion first, then the hermetic Konductor bashrc
+  # Note: The SSOT bashrc handles user's ~/.bashrc sourcing internally
   tmuxBashrc = pkgs.writeText "konductor-tmux-bashrc" ''
+    # Bash completion (must be first for tab completion to work)
     if [ -f ${pkgs.bash-completion}/share/bash-completion/bash_completion ]; then
       . ${pkgs.bash-completion}/share/bash-completion/bash_completion
     fi
-    if [ -f ~/.bashrc ]; then
-      . ~/.bashrc
+
+    # Source direnv directly to get current environment from .envrc
+    # This ensures tmux shells have KUBECONFIG, TALOSCONFIG, etc. regardless
+    # of what environment the tmux server was started with.
+    # Note: We use 'direnv export bash' (not the hook) because:
+    # 1. The hook is skipped when IN_NIX_SHELL is set (see .bashrc:102)
+    # 2. We want the environment NOW, not on directory change
+    if command -v direnv >/dev/null 2>&1; then
+      eval "$(direnv export bash 2>/dev/null)"
     fi
+
+    # SSOT Konductor bashrc (same as devshells, qcow2, OCI)
+    # This includes: history, shell options, aliases, starship, atuin, direnv hook
+    ${bashrcContent}
   '';
 
   # ===========================================================================
@@ -230,7 +247,10 @@ let
 
     # Inputrc environment for readline (uses shared SSOT)
     set-environment -g INPUTRC "${readline.path}"
-    set -g update-environment "INPUTRC"
+
+    # Note: We don't use update-environment for KUBECONFIG etc. because it requires
+    # hardcoding variable names. Instead, tmux shells source direnv directly in
+    # tmuxBashrc to get the current environment from .envrc.
 
     # =========================================================================
     # TRUE COLOR SUPPORT
@@ -471,7 +491,7 @@ let
     # KUBERNETES MODULE - blue accent (k8s branding)
     # -------------------------------------------------------------------------
     # Shows context:namespace (hides namespace if "default")
-    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_kube_icon "[K8S]"; else tmux set -g @catppuccin_kube_icon "☸"; fi'
+    run-shell 'if [ -n "$KONDUCTOR_ASCII_MODE" ]; then tmux set -g @catppuccin_kube_icon "[K8S] "; else tmux set -g @catppuccin_kube_icon "☸ "; fi'
     set -g @catppuccin_kube_color "#{@thm_blue}"
     # Smart display: context:namespace, or just context if namespace is "default"
     set -g @catppuccin_kube_text " #(kubectl config current-context 2>/dev/null)"
