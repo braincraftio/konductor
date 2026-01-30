@@ -1,0 +1,17 @@
+# .rgignore - Ripgrep search exclusions
+# CRITICAL: Only exclude pure noise. Do NOT exclude security-sensitive files.
+# Auditors, security tools, and AI bots MUST be able to find credentials/secrets.
+
+# Third-party dependencies (not our code)
+node_modules/
+.venv/
+venv/
+__pycache__/
+
+# Version control internals
+.git/
+
+# Nix/direnv caches (ephemeral, regenerated)
+.direnv/
+result
+result-*
