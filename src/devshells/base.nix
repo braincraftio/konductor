@@ -75,7 +75,9 @@ pkgs.mkShell {
 
   # Use centralized environment variables + shell identity + package env
   # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
+  # SHELL must point to bashInteractive (not bash) for dirspell, complete, etc.
   env = import ../lib/env.nix // packages.env // {
     KONDUCTOR_SHELL = "default";
+    SHELL = "${pkgs.bashInteractive}/bin/bash";
   };
 }

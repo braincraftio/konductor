@@ -29,9 +29,15 @@ _trace_bashrc "GUARD PASSED: Loading interactive hooks (starship, atuin, direnv)
 # ===========================================================================
 # Source user's bashrc to get their base settings
 # Skip for non-interactive shells (runme, scripts) to avoid brew/starship errors
+# Skip if bash is too old (macOS ships bash 3.2, modern features need 4.0+)
+# User's bashrc may use shopt dirspell, complete, etc. which require bash 4+
 if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ] && [[ $- == *i* ]]; then
-  export KONDUCTOR_BASHRC_SOURCED=1
-  source "$HOME/.bashrc"
+  if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+    export KONDUCTOR_BASHRC_SOURCED=1
+    source "$HOME/.bashrc"
+  else
+    _trace_bashrc "SKIP: User .bashrc requires bash 4+, current: ${BASH_VERSION}"
+  fi
 fi
 
 # Clear aliases that conflict with wrapper scripts in PATH
