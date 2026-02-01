@@ -949,35 +949,88 @@ echo "✓ DST_REGISTRY=${DST_REGISTRY}"
 # Priority: DOCKER_TOKEN env var → existing ${WORKSPACE_ROOT}/.docker/config.json
 echo ""
 echo "Authentication:"
-DEST_AUTH_FILE="${WORKSPACE_ROOT}/.docker/config.json"
+# Check multiple auth file locations in priority order:
+# 1. WORKSPACE_ROOT/.docker/config.json (CI/workspace-scoped)
+# 2. ~/.docker/config.json (user default from docker login)
+AUTH_LOCATIONS=("${WORKSPACE_ROOT}/.docker/config.json" "${HOME}/.docker/config.json")
+
+# Helper: check if file has credentials for a registry
+has_docker_io_creds() {
+    local f="$1"
+    [[ -f "$f" ]] && (
+        jq -e '.auths["https://index.docker.io/v1/"]' "$f" &>/dev/null ||
+        jq -e '.auths["docker.io"]' "$f" &>/dev/null ||
+        jq -e '.auths["registry-1.docker.io"]' "$f" &>/dev/null
+    )
+}
+has_ghcr_creds() {
+    local f="$1"
+    [[ -f "$f" ]] && jq -e '.auths["ghcr.io"]' "$f" &>/dev/null
+}
+
+# Find auth file with credentials for target registry
+DEST_AUTH_FILE=""
+echo "  Checking auth file locations for ${DST_REGISTRY}:"
+for auth_file in "${AUTH_LOCATIONS[@]}"; do
+    if [[ ! -f "$auth_file" ]]; then
+        echo "    - $auth_file (not found)"
+        continue
+    fi
+    auths=$(jq -r '.auths | keys | join(", ")' "$auth_file" 2>/dev/null || echo "none")
+    if [[ "$DST_REGISTRY" == "docker.io" ]] && has_docker_io_creds "$auth_file"; then
+        echo "    ✓ $auth_file (has docker.io creds)"
+        DEST_AUTH_FILE="$auth_file"
+        break
+    elif [[ "$DST_REGISTRY" == "ghcr.io" ]] && has_ghcr_creds "$auth_file"; then
+        echo "    ✓ $auth_file (has ghcr.io creds)"
+        DEST_AUTH_FILE="$auth_file"
+        break
+    else
+        echo "    - $auth_file (auths: $auths)"
+    fi
+done
+
+if [[ -z "$DEST_AUTH_FILE" ]]; then
+    echo "    (no matching credentials found)"
+    DEST_AUTH_FILE="${WORKSPACE_ROOT}/.docker/config.json"
+fi
+
 if [[ "$DST_REGISTRY" == "docker.io" ]]; then
+    echo "  DOCKER_TOKEN: ${DOCKER_TOKEN:+set (${#DOCKER_TOKEN} chars)}${DOCKER_TOKEN:-not set}"
     if [[ -n "${DOCKER_TOKEN:-}" ]]; then
         echo "  Method: DOCKER_TOKEN environment variable"
         echo "  User: ${DOCKER_USERNAME:-containercraft}"
+        mkdir -p "$(dirname "$DEST_AUTH_FILE")"
         echo "$DOCKER_TOKEN" | skopeo login docker.io -u "${DOCKER_USERNAME:-containercraft}" --password-stdin \
             --compat-auth-file "$DEST_AUTH_FILE"
         echo "✓ Authenticated to docker.io via DOCKER_TOKEN"
-    elif [[ -f "$DEST_AUTH_FILE" ]] && jq -e '.auths["https://index.docker.io/v1/"]' "$DEST_AUTH_FILE" &>/dev/null; then
+    elif has_docker_io_creds "$DEST_AUTH_FILE"; then
         echo "  Method: ${DEST_AUTH_FILE}"
         echo "✓ Using existing docker.io credentials"
     else
         echo "✗ No authentication available for docker.io"
-        echo "  Set DOCKER_TOKEN or run: docker login docker.io"
+        echo "  Set DOCKER_TOKEN env var, or authenticate with:"
+        echo "    docker login docker.io"
+        echo "    skopeo login docker.io -u <username> --authfile ~/.docker/config.json"
         exit 1
     fi
 elif [[ "$DST_REGISTRY" == "ghcr.io" ]]; then
+    echo "  GITHUB_TOKEN: ${GITHUB_TOKEN:+set (${#GITHUB_TOKEN} chars)}${GITHUB_TOKEN:-not set}"
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
         echo "  Method: GITHUB_TOKEN environment variable"
         echo "  User: ${GITHUB_ACTOR:-github}"
+        mkdir -p "$(dirname "$DEST_AUTH_FILE")"
         echo "$GITHUB_TOKEN" | skopeo login ghcr.io -u "${GITHUB_ACTOR:-github}" --password-stdin \
             --compat-auth-file "$DEST_AUTH_FILE"
         echo "✓ Authenticated to ghcr.io via GITHUB_TOKEN"
-    elif [[ -f "$DEST_AUTH_FILE" ]] && jq -e '.auths["ghcr.io"]' "$DEST_AUTH_FILE" &>/dev/null; then
+    elif has_ghcr_creds "$DEST_AUTH_FILE"; then
         echo "  Method: ${DEST_AUTH_FILE}"
         echo "✓ Using existing ghcr.io credentials"
     else
         echo "✗ No authentication available for ghcr.io"
-        echo "  Set GITHUB_TOKEN or run: docker login ghcr.io"
+        echo "  Set GITHUB_TOKEN env var, or authenticate with:"
+        echo "    docker login ghcr.io"
+        echo "    skopeo login ghcr.io -u <username> --authfile ~/.docker/config.json"
         exit 1
     fi
 fi
