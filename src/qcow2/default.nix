@@ -1348,9 +1348,20 @@ let
           #
           # Instead, check for virtio 9p devices by scanning mount_tag files.
           # Each virtio 9p device exposes its tag in /sys/bus/virtio/devices/*/mount_tag
-          VIRTIO_9P_DEVICES=$(${pkgs.findutils}/bin/find /sys/bus/virtio/devices -name 'mount_tag' -exec ${pkgs.coreutils}/bin/cat {} \; 2>/dev/null || true)
+          #
+          # Wait up to 10 seconds for virtio devices to enumerate (boot timing)
+          FOUND_NIXSTORE=0
+          for i in $(${pkgs.coreutils}/bin/seq 1 10); do
+            VIRTIO_9P_DEVICES=$(${pkgs.findutils}/bin/find /sys/bus/virtio/devices -name 'mount_tag' -exec ${pkgs.coreutils}/bin/cat {} \; 2>/dev/null || true)
+            if echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
+              FOUND_NIXSTORE=1
+              echo "Found 9p device 'nixstore' after ''${i}s"
+              break
+            fi
+            ${pkgs.coreutils}/bin/sleep 1
+          done
 
-          if ! echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
+          if [ "$FOUND_NIXSTORE" -eq 0 ]; then
             echo "9p device 'nixstore' not available (production mode), using local store"
             exit 0
           fi
