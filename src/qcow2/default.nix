@@ -1042,12 +1042,16 @@ let
         dnssec = "false";
       };
 
-      # Cloud-init for dynamic configuration
+      # =========================================================================
+      # Cloud-init Configuration
+      # =========================================================================
+      # Override NixOS defaults to remove deprecated/broken modules.
+      # See: nixos/modules/services/system/cloud-init.nix for defaults
       cloud-init = {
         enable = true;
         network.enable = true;
         settings = {
-          # Configure NixOS distro helper paths
+          # System identification for cloud-init
           system_info = {
             distro = "nixos";
             paths = {
@@ -1055,6 +1059,55 @@ let
               run_dir = "/run/cloud-init";
             };
           };
+
+          # Init stage modules (run during cloud-init init)
+          # Removed: "migrator" - module no longer exists in cloud-init 25.x
+          cloud_init_modules = [
+            "seed_random"
+            "bootcmd"
+            "write_files"
+            "growpart"
+            "resizefs"
+            "disk_setup"
+            "mounts"
+            "set_hostname"
+            "update_hostname"
+            "update_etc_hosts"
+            "ca_certs"
+            "rsyslog"
+            "users_groups"
+            "ssh"
+          ];
+
+          # Config stage modules (run during cloud-init config)
+          cloud_config_modules = [
+            "ssh_import_id"
+            "locale"
+            "set_passwords"
+            "grub_dpkg"
+            "apt_pipelining"
+            "apt_configure"
+            "ntp"
+            "timezone"
+            "disable_ec2_metadata"
+            "runcmd"
+          ];
+
+          # Final stage modules (run during cloud-init final)
+          # Removed: "rightscale_userdata" - module no longer exists
+          # Removed: "keys_to_console" - helper path broken on NixOS
+          cloud_final_modules = [
+            "package_update_upgrade_install"
+            "scripts_vendor"
+            "scripts_per_once"
+            "scripts_per_boot"
+            "scripts_per_instance"
+            "scripts_user"
+            "ssh_authkey_fingerprints"
+            "phone_home"
+            "final_message"
+            "power_state_change"
+          ];
         };
       };
 
@@ -1288,9 +1341,25 @@ let
         ExecStart = pkgs.writeShellScript "nix-store-overlay-setup" ''
           set -euo pipefail
 
-          # Verify host store has content
-          if [ ! -d /nix/.host-store ] || [ -z "$(ls -A /nix/.host-store 2>/dev/null)" ]; then
-            echo "Host store not available or empty, using local store"
+          # =====================================================================
+          # Check for 9p device BEFORE triggering automount
+          # =====================================================================
+          # The /nix/.host-store mount is configured with x-systemd.automount,
+          # which triggers on directory access. Checking the directory existence
+          # would trigger the automount and cause kernel errors if no 9p device.
+          #
+          # Instead, check for virtio 9p devices by scanning mount_tag files.
+          # Each virtio 9p device exposes its tag in /sys/bus/virtio/devices/*/mount_tag
+          VIRTIO_9P_DEVICES=$(${pkgs.findutils}/bin/find /sys/bus/virtio/devices -name 'mount_tag' -exec ${pkgs.coreutils}/bin/cat {} \; 2>/dev/null || true)
+
+          if ! echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
+            echo "9p device 'nixstore' not available (production mode), using local store"
+            exit 0
+          fi
+
+          # Device exists, now safe to check host store content (will trigger automount)
+          if [ ! -d /nix/.host-store ] || [ -z "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
+            echo "Host store mounted but empty, using local store"
             exit 0
           fi
 
