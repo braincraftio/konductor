@@ -1080,16 +1080,14 @@ let
           ];
 
           # Config stage modules (run during cloud-init config)
+          # NixOS-compatible only - removed Debian-specific and unimplemented modules:
+          # - locale: throws NotImplementedError on NixOS
+          # - grub_dpkg, apt_pipelining, apt_configure: Debian-only
+          # - ssh_import_id: not verified on NixOS distro
           cloud_config_modules = [
-            "ssh_import_id"
-            "locale"
             "set_passwords"
-            "grub_dpkg"
-            "apt_pipelining"
-            "apt_configure"
             "ntp"
             "timezone"
-            "disable_ec2_metadata"
             "runcmd"
           ];
 

@@ -7,12 +7,12 @@
 #   Components:
 #     fstype = e4 (ext4), iso (iso9660), xfs, auto
 #     user   = owner username OR "root"
-#     mode   = 3-digit octal permissions
+#     mode   = 3-4 digit octal permissions (e.g., 775, 2775 for setgid)
 #     path   = mount point with "/" encoded as "." and abbreviations:
 #              h = home, m = mnt, w = workspace, u = $OWNER
 #
 #   Path Encoding (to fit 20 char limit):
-#     h.u       → /home/$OWNER (e.g., /home/usrbinkat)
+#     h.u       → /home/$OWNER (e.g., /home/kc2admin)
 #     m.kube    → /mnt/kube
 #     w         → /workspace
 #
@@ -23,8 +23,8 @@
 #       /workspace/github.com/user/repo/
 #
 #   Examples (all use kc2 group GID 1001 for shared access):
-#     e4-usrbinkat-775-w          → ext4, root:kc2, 775, /workspace
-#     e4-alice-700-h.u       → ext4, alice:kc2, 700, /home/alice
+#     e4-kc2-2775-w          → ext4, kc2:kc2, 2775 (setgid), /workspace
+#     e4-kc2admin-700-h.u    → ext4, kc2admin:kc2, 700, /home/kc2admin
 #     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /mnt/kube
 #
 # The systemd unit parses and expands the serial string into mount instructions.
@@ -34,7 +34,7 @@
 {
   # udev rules to auto-start konductor-mount@ services for matching virtio disks
   # Matches serial IDs with pattern: <fstype>-<user>-<mode>-<path>
-  # e.g., e4-usrbinkat-775-w, iso-root-755-m.kube
+  # e.g., e4-kc2-2775-w, iso-root-755-m.kube
   services.udev.extraRules = ''
     # Auto-start konductor-mount@ for virtio disks with convention-based serials
     # Pattern: (e4|iso|xfs|auto)-<user>-<mode>-<path>
@@ -86,7 +86,7 @@
         if [ -z "$FSTYPE_CODE" ] || [ -z "$OWNER" ] || [ -z "$MODE" ] || [ -z "$PATH_ENCODED" ]; then
           echo "ERROR: Invalid serial format: $SERIAL"
           echo "Expected: <fstype>-<user>-<mode>-<path>"
-          echo "Example: e4-alice-700-h.alice"
+          echo "Example: e4-kc2admin-700-h.u"
           exit 1
         fi
 
@@ -123,9 +123,9 @@
           MOUNT_POINT="/$MOUNT_POINT"
         fi
 
-        # Validate mode is 3-digit octal
-        if ! [[ "$MODE" =~ ^[0-7]{3}$ ]]; then
-          echo "ERROR: Invalid mode: $MODE (must be 3-digit octal)"
+        # Validate mode is 3-4 digit octal (4-digit for setuid/setgid/sticky)
+        if ! [[ "$MODE" =~ ^[0-7]{3,4}$ ]]; then
+          echo "ERROR: Invalid mode: $MODE (must be 3-4 digit octal, e.g., 775 or 2775)"
           exit 1
         fi
 
