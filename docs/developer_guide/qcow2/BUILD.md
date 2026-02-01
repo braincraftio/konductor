@@ -184,12 +184,12 @@ set -e
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
 
 # Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 [ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found: $KUBECONFIG"; exit 1; }
 
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-K8S_CONTEXT="${REGISTRY_K8S_CONTEXT:-admin@docker-dev}"
+K8S_CONTEXT="${KUBECTL_CONTEXT:-admin@docker-dev-host}"
 
 # Docker daemon cert directory
 DOCKER_CERT_DIR="/etc/docker/certs.d/$REGISTRY"
@@ -442,12 +442,12 @@ set -e
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
 
 # Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 [ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found: $KUBECONFIG"; exit 1; }
 
 # Kubernetes context validation
-K8S_CONTEXT="${REGISTRY_K8S_CONTEXT:-admin@docker-dev}"
+K8S_CONTEXT="${KUBECTL_CONTEXT:-admin@docker-dev-host}"
 echo ""
 echo "Kubernetes contexts:"
 kubectl config get-contexts
@@ -466,7 +466,7 @@ if [[ "$REGISTRY" == "registry.docker.arpa" ]] || [[ "$REGISTRY" =~ ^registry\..
     fi
     CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
     mkdir -p "$CERT_DIR"
-    kubectl --context "${REGISTRY_K8S_CONTEXT:-admin@docker-dev}" \
+    kubectl --context "${KUBECTL_CONTEXT:-admin@docker-dev-host}" \
         get secret gateway-tls-https -n envoy-gateway-system \
         -o jsonpath='{.data.ca\.crt}' | base64 -d > "$CERT_DIR/ca.crt"
     echo "${REGISTRY_PASSWORD:-admin}" | skopeo login "$REGISTRY" \
@@ -701,7 +701,7 @@ echo ""
 [[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
 
 # Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 [ -f "$KUBECONFIG" ] || { echo "✗ KUBECONFIG not found: $KUBECONFIG"; exit 1; }
 echo "✓ KUBECONFIG=${KUBECONFIG}"
 
@@ -1098,7 +1098,7 @@ set -e
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
 
 # Derive KUBECONFIG from WORKSPACE_ROOT (runme doesn't inherit KUBECONFIG correctly)
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/docker-dev/generated/kubeconfig"
+export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 
 ERRORS=0
