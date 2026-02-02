@@ -40,7 +40,7 @@ baseShell.overrideAttrs (old: {
     # Atuin shell history (includes bash-preexec)
     ++ config.shell.atuin.packages
     # Container tooling (docker with compose v2 plugin)
-    ++ (with pkgs; [ docker docker-compose docker-buildx ]);
+    ++ (with pkgs; [ docker docker-compose docker-buildx skopeo ]);
 
   shellHook = old.shellHook + ''
     # SSH identity detection (dynamic, needs $HOME)
