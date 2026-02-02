@@ -14,7 +14,9 @@
   find = "fd";
   top = "btm";
   du = "dust";
-  tree = "eza --tree";
+  # tree: ignore dev noise but show ops data (cache, logs, configs)
+  # Patterns: bytecode, venvs, node_modules, tool caches, build outputs, IDE dirs
+  tree = "eza --tree --group-directories-first --icons -I '__pycache__|.git|node_modules|.venv|venv|.pytest_cache|.mypy_cache|.ruff_cache|.direnv|.DS_Store|*.pyc|.coverage|.tox|.nox|target|.cargo|.go|dist|build|.astro|.playwright|*.egg-info|.eggs|htmlcov|.hypothesis|__pypackages__|.pixi|.lycheecache|.idea|result|result-*|.nix-profile|.nix-gcroots'";
 
   # ===========================================================================
   # Editor Shortcuts
