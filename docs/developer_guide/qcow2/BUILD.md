@@ -27,12 +27,12 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 
 ## Output
 
-| Artifact | Description |
-|----------|-------------|
-| `konductor.qcow2` | ZSTD-compressed QCOW2 (~4GB) |
-| `registry.docker.arpa/.../konductor:latest-qcow2` | KubeVirt containerDisk |
-| `registry.docker.arpa/.../konductor:git-<commit>` | Git commit tag |
-| `registry.docker.arpa/.../konductor:nix-<drv>` | Nix derivation tag |
+| Artifact                                          | Description                  |
+| ------------------------------------------------- | ---------------------------- |
+| `konductor.qcow2`                                 | ZSTD-compressed QCOW2 (~4GB) |
+| `registry.docker.arpa/.../konductor:latest-qcow2` | KubeVirt containerDisk       |
+| `registry.docker.arpa/.../konductor:git-<commit>` | Git commit tag               |
+| `registry.docker.arpa/.../konductor:nix-<drv>`    | Nix derivation tag           |
 
 The image includes:
 
@@ -78,19 +78,19 @@ SOURCE ────► NIX ────► BUILD ────► SEAL ───�
 
 ### Deterministic Identifiers
 
-| ID | Example | Reproducible | Use |
-|----|---------|--------------|-----|
-| `git-<7>` | `git-b7c2ab9` | Yes (if !dirty) | OCI tag, source trace |
-| `nix-<12>` | `nix-ish8abfw47k7` | Yes | OCI tag, build ID |
-| `sha-<12>` | `sha-def456abc123` | Yes | Content verification |
+| ID         | Example            | Reproducible    | Use                   |
+| ---------- | ------------------ | --------------- | --------------------- |
+| `git-<7>`  | `git-b7c2ab9`      | Yes (if !dirty) | OCI tag, source trace |
+| `nix-<12>` | `nix-ish8abfw47k7` | Yes             | OCI tag, build ID     |
+| `sha-<12>` | `sha-def456abc123` | Yes             | Content verification  |
 
 ### Locations
 
-| Location | Contents |
-|----------|----------|
-| `/.konductor` (inside VM) | git, nix, build, oci_image, oci_tags |
+| Location                    | Contents                                     |
+| --------------------------- | -------------------------------------------- |
+| `/.konductor` (inside VM)   | git, nix, build, oci_image, oci_tags         |
 | `/disk/.konductor` (in OCI) | above + image_sha256, image_size, oci_digest |
-| `/disk/build.log` (in OCI) | Serial console capture |
+| `/disk/build.log` (in OCI)  | Serial console capture                       |
 
 ### Self-Pull from Running VM
 
@@ -131,7 +131,9 @@ oci_digest = "sha256:abc123..."
 
 ## Cluster Infrastructure
 
-The QCOW2 build publishes to `registry.docker.arpa`, which runs on a local Talos Kubernetes cluster. These tasks invoke mise (which finds `${WORKSPACE_ROOT}/.mise.toml` via upward search) and use `WORKSPACE_ROOT` from the environment.
+The QCOW2 build publishes to `registry.docker.arpa`, which runs on a local Talos Kubernetes cluster.
+These tasks invoke mise (which finds `${WORKSPACE_ROOT}/.mise.toml` via upward search) and use
+`WORKSPACE_ROOT` from the environment.
 
 ### cluster:up
 
@@ -263,16 +265,16 @@ curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
 
 All prerequisites are provided by `nix develop .#konductor` (devshell).
 
-| Tool | Purpose |
-|------|---------|
-| `nix` | Build NixOS system closure |
-| `qemu-system-x86_64` | Run build VM with KVM acceleration |
-| `OVMF` | EFI firmware (`$OVMF_CODE`, `$OVMF_VARS`) |
-| `guestfs-tools` | Mount and optimize QCOW2 images |
-| `genisoimage` | Create cloud-init ISO |
-| `docker` | Build containerDisk image |
-| `skopeo` | Push to registry with multi-tag |
-| SSH | `ssh localhost` → port 2222 |
+| Tool                 | Purpose                                   |
+| -------------------- | ----------------------------------------- |
+| `nix`                | Build NixOS system closure                |
+| `qemu-system-x86_64` | Run build VM with KVM acceleration        |
+| `OVMF`               | EFI firmware (`$OVMF_CODE`, `$OVMF_VARS`) |
+| `guestfs-tools`      | Mount and optimize QCOW2 images           |
+| `genisoimage`        | Create cloud-init ISO                     |
+| `docker`             | Build containerDisk image                 |
+| `skopeo`             | Push to registry with multi-tag           |
+| SSH                  | `ssh localhost` → port 2222               |
 
 ---
 
@@ -1140,7 +1142,7 @@ Debug:
 
 ## Pipeline Tasks
 
-### _build:qcow2:preflight
+### \_build:qcow2:preflight
 
 Validate environment.
 
@@ -1199,7 +1201,7 @@ MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 
 ---
 
-### _build:qcow2:nix
+### \_build:qcow2:nix
 
 Build NixOS closure and capture nix_drv.
 
@@ -1229,7 +1231,7 @@ chown -R "$(id -u):$(id -g)" result.writable/
 
 ---
 
-### _build:qcow2:cloudinit
+### \_build:qcow2:cloudinit
 
 Generate cloud-init ISO.
 
@@ -1286,7 +1288,7 @@ genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
 
 ---
 
-### _build:qcow2:img:reset
+### \_build:qcow2:img:reset
 
 Reset image to pristine state.
 
@@ -1310,7 +1312,7 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ---
 
-### _build:qcow2:vm:boot
+### \_build:qcow2:vm:boot
 
 Boot VM.
 
@@ -1350,7 +1352,7 @@ sleep 1
 
 ---
 
-### _build:qcow2:vm:wait
+### \_build:qcow2:vm:wait
 
 Wait for SSH.
 
@@ -1362,7 +1364,7 @@ timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh localhost true 2>/dev/nul
 
 ---
 
-### _build:qcow2:vm:sync
+### \_build:qcow2:vm:sync
 
 Sync source to VM. Tries git clone first (preserves history), falls back to rsync.
 
@@ -1413,11 +1415,12 @@ echo "✓ /opt/konductor/src/ (cloned)"
 
 ---
 
-### _build:qcow2:vm:rebuild
+### \_build:qcow2:vm:rebuild
 
 Run `nixos-rebuild switch` inside VM to build the devshell natively.
 
 This ensures:
+
 - Full Konductor environment is built natively inside the VM
 - All nix store paths are pre-cached for airgap use
 - The VM can reproduce itself from /opt/konductor/src
@@ -1440,7 +1443,7 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 ---
 
-### _build:qcow2:vm:provenance
+### \_build:qcow2:vm:provenance
 
 Write `/.konductor` inside VM.
 
@@ -1498,7 +1501,7 @@ ssh localhost 'cat /.konductor' > .konductor
 
 ---
 
-### _build:qcow2:vm:gc
+### \_build:qcow2:vm:gc
 
 Garbage collect.
 
@@ -1512,7 +1515,7 @@ ssh localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 
 ---
 
-### _build:qcow2:vm:zero
+### \_build:qcow2:vm:zero
 
 Zero free space.
 
@@ -1523,7 +1526,7 @@ ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm 
 
 ---
 
-### _build:qcow2:vm:halt
+### \_build:qcow2:vm:halt
 
 Shutdown VM.
 
@@ -1542,7 +1545,7 @@ rm -f "$PIDFILE"
 
 ---
 
-### _build:qcow2:img:clean
+### \_build:qcow2:img:clean
 
 Clean credentials from image.
 
@@ -1569,7 +1572,7 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ---
 
-### _build:qcow2:img:compress
+### \_build:qcow2:img:compress
 
 ZSTD compress.
 
@@ -1584,7 +1587,7 @@ qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/ni
 
 ---
 
-### _build:qcow2:img:sparsify
+### \_build:qcow2:img:sparsify
 
 Sparsify image.
 
@@ -1600,7 +1603,7 @@ rm -f konductor.qcow2.tmp
 
 ---
 
-### _build:qcow2:tmp:clean
+### \_build:qcow2:tmp:clean
 
 Remove temporary files.
 
@@ -1611,7 +1614,7 @@ rm -f .nix_drv
 
 ---
 
-### _build:qcow2:verify
+### \_build:qcow2:verify
 
 Append post-seal fields to .konductor.
 
@@ -1634,7 +1637,7 @@ cat .konductor
 
 ## Debug Tools
 
-### _build:qcow2:debug:log
+### \_build:qcow2:debug:log
 
 View boot log.
 
@@ -1644,7 +1647,7 @@ tail -100 "${QCOW2_LOGFILE:-build-vm.log}"
 
 ---
 
-### _build:qcow2:vm:kill
+### \_build:qcow2:vm:kill
 
 Force kill VM.
 
