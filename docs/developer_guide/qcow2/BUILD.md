@@ -559,7 +559,11 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
 fi
 [ -f result/nixos.qcow2 ] || { echo "No image. Run build:qcow2:image first."; exit 1; }
 
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+# Clean VM runtime state only (not the image)
+(pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
+rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
+sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
@@ -1269,6 +1273,8 @@ users:
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     lock_passwd: true
+    ssh_authorized_keys:
+      - $(cat "$SSH_PUBKEY")
   - name: kc2admin
     groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -1277,8 +1283,9 @@ users:
     ssh_authorized_keys:
       - $(cat "$SSH_PUBKEY")
 runcmd:
-  - mkdir -p /workspace
-  - mount -t 9p -o trans=virtio host /workspace || true
+  # NOTE: /workspace mount is handled by systemd konductor-mount service
+  # Do NOT add mount commands here - causes "already mounted" errors
+  - echo "cloud-init runcmd complete" > /dev/ttyS0
 EOF
 
 genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
@@ -1331,6 +1338,7 @@ qemu-system-x86_64 \
     -cpu host \
     -smp "${QCOW2_VM_CPUS:-4}" \
     -rtc base=utc,clock=host \
+    -boot order=c,menu=off \
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
     -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \

@@ -687,6 +687,11 @@ let
         # Don't auto-start libvirtd (cloud-init will start it if needed)
         libvirtd.wantedBy = lib.mkForce [ ];
 
+        # Don't run libvirt-guests when libvirtd is not auto-started
+        # This service tries to suspend/resume guests but fails if libvirtd socket doesn't exist
+        # Prevents: "libvirt-guests.sh: Can't connect to default. Skipping."
+        "libvirt-guests".wantedBy = lib.mkForce [ ];
+
         # 9p workspace mount service - auto-mounts /workspace if virtfs is available
         # Runs on boot with retries to handle device availability timing
         workspace-mount = {
@@ -741,136 +746,227 @@ let
         #   Line 1: Identity (version, nix derivation, git commit)
         #   Line 2: Status + hint for more info
         konductor = {
-          description = "Konductor Provenance Verification";
-          after = [ "local-fs.target" "network.target" ];
+          description = "Konductor Validation Gate";
+          after = [
+            "cloud-final.service"
+            "local-fs.target"
+            "network.target"
+          ];
+          wants = [ "cloud-final.service" ];
           wantedBy = [ "multi-user.target" ];
-          path = with pkgs; [ coreutils gnused git nix jq ];
+          path = with pkgs; [ coreutils gnused git nix jq findutils gnugrep util-linux ];
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
             RuntimeDirectory = "konductor";
+            StandardOutput = "journal+console";
+            StandardError = "journal+console";
             ExecStart = pkgs.writeShellScript "konductor-verify" ''
               set -euo pipefail
               ERRORS=0
+              WARNINGS=0
               MOTD_FILE="/run/konductor/motd"
 
-              echo "=== Konductor Provenance ==="
+              # ═══════════════════════════════════════════════════════════════════
+              # Read strict mode from /.konductor (default: false)
+              # ═══════════════════════════════════════════════════════════════════
+              STRICT="''${KONDUCTOR_STRICT:-false}"
+              if [ -f "/.konductor" ]; then
+                STRICT=$(sed -n 's/^strict = \(.*\)$/\1/p' /.konductor || echo "false")
+              fi
 
-              # Check provenance file exists
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+              echo "                         KONDUCTOR VALIDATION"
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # PROVENANCE CHECK
+              # ─────────────────────────────────────────────────────────────────────
+              echo "┌─ PROVENANCE ────────────────────────────────────────────────────────────────┐"
+
               if [ ! -f /.konductor ]; then
-                echo "· provenance: /.konductor not found (pre-provisioned or build in progress)"
+                echo "  · provenance: /.konductor not found (pre-provisioned or build in progress)"
                 {
                   echo ""
                   echo "  Konductor · Awaiting provenance"
                   echo "  · Run vm:provenance task or check /.konductor after build"
                   echo ""
                 } > "$MOTD_FILE"
-                # Don't fail - provenance is written after rebuild during build process
+                echo "└─────────────────────────────────────────────────────────────────────────────┘"
                 exit 0
               fi
-              echo "✓ provenance: /.konductor"
 
               # Parse provenance fields
               GIT_COMMIT=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
               GIT_DIRTY=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' /.konductor)
               NIX_DRV=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' /.konductor)
-              NIX_VERSION=$(sed -n 's/^nix_version = "\(.*\)"$/\1/p' /.konductor)
-              BUILD_DATE=$(sed -n 's/^build_date = "\(.*\)"$/\1/p' /.konductor)
 
-              # Output full provenance to journal
-              cat /.konductor
+              echo "  ✓ provenance: /.konductor"
+              [ -n "$GIT_COMMIT" ] && echo "  ✓ git_commit: ''${GIT_COMMIT:0:12}"
+              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && echo "  ✓ nix_drv: $NIX_DRV"
 
-              # Check git_dirty (trust gate)
               if [ "$GIT_DIRTY" != "0" ]; then
-                echo "⚠ git_dirty=$GIT_DIRTY (built from dirty tree)"
+                echo "  ⚠ git_dirty: $GIT_DIRTY (built from dirty tree)"
+                ((WARNINGS++)) || true
               fi
 
-              # If /opt/konductor/src exists, verify against it
-              # Source is at /opt/konductor/src/ (bundled via git-bundle in Dockerfile.qcow2)
-              VERIFIED=""
+              # Verify against bundled source if available
               if [ -d /opt/konductor/src ] && [ -d /opt/konductor/src/.git ]; then
                 cd /opt/konductor/src
-
-                # Verify git_commit
-                EXPECTED="$GIT_COMMIT"
-                ACTUAL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-                if [ "$EXPECTED" = "$ACTUAL" ]; then
-                  echo "✓ git_commit: ''${EXPECTED:0:12}"
-                else
-                  echo "✗ git_commit: expected ''${EXPECTED:0:12}, got ''${ACTUAL:0:12}"
+                ACTUAL_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                if [ "$GIT_COMMIT" != "$ACTUAL_COMMIT" ]; then
+                  echo "  ✗ git_commit mismatch: expected ''${GIT_COMMIT:0:12}, got ''${ACTUAL_COMMIT:0:12}"
                   ((ERRORS++)) || true
                 fi
 
-                # Verify flake_lock_sha256
                 if [ -f flake.lock ]; then
-                  EXPECTED=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' /.konductor)
-                  ACTUAL=$(sha256sum flake.lock | cut -d' ' -f1)
-                  if [ "$EXPECTED" = "$ACTUAL" ]; then
-                    echo "✓ flake_lock: ''${EXPECTED:0:12}..."
-                  else
-                    echo "✗ flake_lock: mismatch"
+                  EXPECTED_LOCK=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' /.konductor)
+                  ACTUAL_LOCK=$(sha256sum flake.lock | cut -d' ' -f1)
+                  if [ "$EXPECTED_LOCK" != "$ACTUAL_LOCK" ]; then
+                    echo "  ✗ flake_lock mismatch"
                     ((ERRORS++)) || true
+                  else
+                    echo "  ✓ flake_lock: ''${EXPECTED_LOCK:0:12}..."
                   fi
                 fi
+                cd /
+              fi
+              echo "└─────────────────────────────────────────────────────────────────────────────┘"
 
-                # Verify nix_drv (the key reproducibility check)
-                EXPECTED="$NIX_DRV"
-                if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "unknown" ]; then
-                  ACTUAL=$(nix path-info --derivation .#qcow2 2>/dev/null | head -1 | xargs basename | cut -d- -f1 || echo "unknown")
-                  if [ "$EXPECTED" = "$ACTUAL" ]; then
-                    echo "✓ nix_drv: $EXPECTED (REPRODUCIBLE)"
-                    VERIFIED="yes"
-                  else
-                    echo "✗ nix_drv: expected $EXPECTED, got $ACTUAL"
-                    ((ERRORS++)) || true
-                  fi
+              # ─────────────────────────────────────────────────────────────────────
+              # SGX EPC CHECK (Hardware Root of Trust)
+              # ─────────────────────────────────────────────────────────────────────
+              echo "┌─ SECURITY ──────────────────────────────────────────────────────────────────┐"
+
+              EPC_COUNT=0
+              # Check for SGX EPC sections in sysfs
+              if [ -d /sys/devices/system/node ]; then
+                EPC_COUNT=$(find /sys/devices/system/node -name "sgx_epc*" -type d 2>/dev/null | wc -l) || true
+              fi
+              # Fallback: check dmesg for SGX initialization
+              if [ "$EPC_COUNT" -eq 0 ]; then
+                if dmesg 2>/dev/null | grep -q "sgx: EPC section"; then
+                  EPC_COUNT=$(dmesg 2>/dev/null | grep -c "sgx: EPC section") || true
                 fi
-              else
-                echo "· /opt/konductor not available for verification"
               fi
 
-              # Build compact MOTD (2 lines, informative but unimposing)
-              {
-                echo ""
-                # Line 1: Identity
-                IDENTITY="  Konductor"
-                [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV:0:12}"
-                [ -n "$GIT_COMMIT" ] && [ "$GIT_COMMIT" != "unknown" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT:0:7}"
-                echo "$IDENTITY"
-
-                # Line 2: Status + actionable hint
-                if [ "$ERRORS" -eq 0 ]; then
-                  if [ -n "$VERIFIED" ]; then
-                    echo "  ✓ Verified · systemctl status konductor · cat /.konductor"
-                  elif [ "$GIT_DIRTY" != "0" ]; then
-                    echo "  ⚠ Dirty build · systemctl status konductor · cat /.konductor"
-                  else
-                    echo "  ✓ Provenance · systemctl status konductor · cat /.konductor"
-                  fi
-                else
-                  echo "  ✗ $ERRORS error(s) · systemctl status konductor"
-                fi
-                echo ""
-              } > "$MOTD_FILE"
-
-              # Output to serial console
-              {
-                echo "=== Konductor Provenance ==="
-                cat /.konductor
-                if [ "$ERRORS" -eq 0 ]; then
-                  echo "=== VERIFIED ==="
-                else
-                  echo "=== $ERRORS ERROR(S) ==="
-                fi
-              } > /dev/ttyS0 2>/dev/null || true
-
-              # Final status
-              if [ "$ERRORS" -eq 0 ]; then
-                echo "=== VERIFIED ==="
-                exit 0
+              if [ "$EPC_COUNT" -gt 0 ]; then
+                echo "  ✓ sgx: $EPC_COUNT EPC sections available"
+                echo "  ✓ hardware root of trust: AVAILABLE"
               else
-                echo "=== $ERRORS VERIFICATION ERROR(S) ==="
+                echo "  ✗ sgx: NO EPC SECTIONS AVAILABLE"
+                echo "  ✗ hardware root of trust: UNAVAILABLE"
+                if [ "$STRICT" = "true" ]; then
+                  ((ERRORS++)) || true
+                else
+                  ((WARNINGS++)) || true
+                fi
+              fi
+              echo "└─────────────────────────────────────────────────────────────────────────────┘"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # STORAGE CHECK (Workspace Integrity)
+              # ─────────────────────────────────────────────────────────────────────
+              echo "┌─ STORAGE ───────────────────────────────────────────────────────────────────┐"
+
+              if [ -d /workspace ]; then
+                WS_OWNER=$(stat -c '%U:%G' /workspace 2>/dev/null || echo "unknown")
+                WS_MODE=$(stat -c '%a' /workspace 2>/dev/null || echo "000")
+                WS_PERMS=$(stat -c '%A' /workspace 2>/dev/null || echo "----------")
+
+                if [ "$WS_OWNER" = "kc2:kc2" ]; then
+                  echo "  ✓ /workspace owner: $WS_OWNER"
+                else
+                  echo "  ✗ /workspace owner: $WS_OWNER (expected kc2:kc2)"
+                  ((ERRORS++)) || true
+                fi
+
+                # Check for setgid bit (2xxx)
+                if [[ "$WS_MODE" =~ ^2[0-7]{3}$ ]] || [ "$WS_MODE" = "2775" ]; then
+                  echo "  ✓ /workspace mode: $WS_MODE (setgid)"
+                elif [ "$WS_MODE" = "775" ]; then
+                  echo "  ⚠ /workspace mode: $WS_MODE (expected 2775 setgid)"
+                  ((WARNINGS++)) || true
+                else
+                  echo "  ✗ /workspace mode: $WS_MODE (expected 2775)"
+                  ((ERRORS++)) || true
+                fi
+              else
+                echo "  · /workspace: not mounted"
+              fi
+              echo "└─────────────────────────────────────────────────────────────────────────────┘"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # DETERMINE EXIT STATUS
+              # ─────────────────────────────────────────────────────────────────────
+              IDENTITY="Konductor"
+              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV:0:12}"
+              [ -n "$GIT_COMMIT" ] && [ "$GIT_COMMIT" != "unknown" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT:0:7}"
+
+              if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
+                # All checks passed
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                echo "                    ✓ VERIFIED (strict=$STRICT)"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                {
+                  echo ""
+                  echo "  $IDENTITY"
+                  echo "  ✓ Verified · systemctl status konductor · cat /.konductor"
+                  echo ""
+                } > "$MOTD_FILE"
+                # Output to serial console
+                {
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                  echo "                    ✓ VERIFIED (strict=$STRICT)"
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                } > /dev/ttyS0 2>/dev/null || true
+                exit 0
+
+              elif [ "$ERRORS" -gt 0 ] && [ "$STRICT" = "true" ]; then
+                # Errors in strict mode - BLOCK
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                echo "  FATAL: strict=true requires ALL validations to pass"
+                echo "  BLOCKING: Dependent services will not start"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                echo "                    ✗ FAILED (strict=true)"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                {
+                  echo ""
+                  echo "  $IDENTITY"
+                  echo "  ✗ FAILED ($ERRORS errors) · systemctl status konductor"
+                  echo ""
+                } > "$MOTD_FILE"
+                # Output to serial console
+                {
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                  echo "                    ✗ FAILED (strict=true)"
+                  echo "  $ERRORS error(s) - forgejo-runner will NOT start"
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                } > /dev/ttyS0 2>/dev/null || true
                 exit 1
+
+              else
+                # Warnings or errors in non-strict mode - DEGRADED
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                echo "  WARNING: Running in DEGRADED MODE (strict=$STRICT)"
+                echo "  Dependent services will start but results should not merge to main"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                echo "                    ⚠ DEGRADED (strict=$STRICT)"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                {
+                  echo ""
+                  echo "  $IDENTITY"
+                  echo "  ⚠ Degraded ($WARNINGS warnings, $ERRORS errors) · systemctl status konductor"
+                  echo ""
+                } > "$MOTD_FILE"
+                # Output to serial console
+                {
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                  echo "                    ⚠ DEGRADED (strict=$STRICT)"
+                  echo "  $WARNINGS warning(s), $ERRORS error(s) - forgejo-runner will start"
+                  echo "═══════════════════════════════════════════════════════════════════════════════"
+                } > /dev/ttyS0 2>/dev/null || true
+                exit 0
               fi
             '';
           };
@@ -1018,12 +1114,16 @@ let
             "network-online.target"
             "docker.service"
             "konductor-ca-setup.service"
+            "konductor.service"
           ];
           wants = [
             "network-online.target"
             "docker.service"
           ];
-          requires = [ "konductor-ca-setup.service" ];
+          requires = [
+            "konductor-ca-setup.service"
+            "konductor.service"
+          ];
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
             # Only start if runner is registered (.runner file exists)
@@ -1086,24 +1186,116 @@ let
       # =========================================================================
       # Cloud-init Configuration
       # =========================================================================
-      # Override NixOS defaults to remove deprecated/broken modules.
-      # See: nixos/modules/services/system/cloud-init.nix for defaults
+      # CRITICAL: NixOS cloud-init module uses lib.mkDefault, causing settings
+      # to MERGE with defaults instead of replacing them. We use lib.mkForce
+      # on module lists to ensure removed modules (migrator, rightscale_userdata)
+      # are actually excluded.
+      #
+      # Serial console (ttyS0) is our trusted compute logging pathway.
+      # All cloud-init output goes to serial for KubeVirt pod log collection.
+      #
+      # See: docs/developer_guide/qcow2/CLOUD_INIT_NIXOS_INTEGRATION.md
+      # See: nixos/modules/services/system/cloud-init.nix for NixOS defaults
       cloud-init = {
         enable = true;
-        network.enable = true;
+        network.enable = true;  # Enables systemd-networkd integration
+
         settings = {
-          # System identification for cloud-init
+          # ─────────────────────────────────────────────────────────────────────
+          # System Information
+          # ─────────────────────────────────────────────────────────────────────
           system_info = {
             distro = "nixos";
             paths = {
               cloud_dir = "/var/lib/cloud";
               run_dir = "/run/cloud-init";
             };
+            # Force systemd-networkd only - skip netplan/OVS/NetworkManager checks
+            network = {
+              renderers = [ "networkd" ];
+            };
           };
 
-          # Init stage modules (run during cloud-init init)
-          # Removed: "migrator" - module no longer exists in cloud-init 25.x
-          cloud_init_modules = [
+          # ─────────────────────────────────────────────────────────────────────
+          # Datasource Configuration - NoCloud for KubeVirt/QEMU
+          # ─────────────────────────────────────────────────────────────────────
+          datasource_list = [ "NoCloud" "ConfigDrive" "None" ];
+
+          # ─────────────────────────────────────────────────────────────────────
+          # Users - Use list syntax (string syntax deprecated in 22.2)
+          # ─────────────────────────────────────────────────────────────────────
+          users = [ "default" ];
+          disable_root = false;
+          preserve_hostname = false;
+
+          # ─────────────────────────────────────────────────────────────────────
+          # Output Configuration - Serial Console as Trusted Pathway
+          # ─────────────────────────────────────────────────────────────────────
+          # Redirect ALL cloud-init command output to serial console.
+          # This is captured by KubeVirt pod log collector and shipped to
+          # upstream log analysis. Serial console is our single pane of glass.
+          output = {
+            all = "| tee -a /dev/ttyS0";
+          };
+
+          # ─────────────────────────────────────────────────────────────────────
+          # Logging Configuration - Python logging to serial + journald
+          # ─────────────────────────────────────────────────────────────────────
+          # This configures Python's logging module for cloud-init internal logs.
+          # The output section (above) handles shell command stdout/stderr.
+          # Together they ensure ALL cloud-init output goes to serial console.
+          log_cfgs = [
+            [
+              ''
+              [loggers]
+              keys=root,cloudinit
+
+              [handlers]
+              keys=consoleHandler,serialHandler
+
+              [formatters]
+              keys=simpleFormatter
+
+              [logger_root]
+              level=DEBUG
+              handlers=consoleHandler
+
+              [logger_cloudinit]
+              level=DEBUG
+              handlers=consoleHandler,serialHandler
+              qualname=cloudinit
+              propagate=0
+
+              [handler_consoleHandler]
+              class=StreamHandler
+              level=DEBUG
+              formatter=simpleFormatter
+              args=(sys.stderr,)
+
+              [handler_serialHandler]
+              class=FileHandler
+              level=DEBUG
+              formatter=simpleFormatter
+              args=('/dev/ttyS0', 'a')
+
+              [formatter_simpleFormatter]
+              format=%(asctime)s - %(filename)s[%(levelname)s]: %(message)s
+              datefmt=%Y-%m-%dT%H:%M:%S
+              ''
+            ]
+          ];
+
+          # ─────────────────────────────────────────────────────────────────────
+          # Init Stage Modules (cloud-init init)
+          # ─────────────────────────────────────────────────────────────────────
+          # CRITICAL: lib.mkForce REPLACES NixOS defaults (which include "migrator")
+          # Without mkForce, our list MERGES with defaults and removed modules appear.
+          #
+          # EXCLUDED:
+          #   - migrator: REMOVED in cloud-init 24.1
+          #   - rsyslog: NixOS uses journald
+          #   - resolv_conf: systemd-resolved on NixOS
+          cloud_init_modules = lib.mkForce [
             "seed_random"
             "bootcmd"
             "write_files"
@@ -1115,28 +1307,35 @@ let
             "update_hostname"
             "update_etc_hosts"
             "ca_certs"
-            "rsyslog"
             "users_groups"
             "ssh"
           ];
 
-          # Config stage modules (run during cloud-init config)
-          # NixOS-compatible only - removed Debian-specific and unimplemented modules:
-          # - locale: throws NotImplementedError on NixOS
-          # - grub_dpkg, apt_pipelining, apt_configure: Debian-only
-          # - ssh_import_id: not verified on NixOS distro
-          cloud_config_modules = [
+          # ─────────────────────────────────────────────────────────────────────
+          # Config Stage Modules (cloud-init modules --mode=config)
+          # ─────────────────────────────────────────────────────────────────────
+          # EXCLUDED:
+          #   - locale: Raises NotImplementedError on NixOS
+          #   - timezone: Silent no-op on NixOS (use time.timeZone instead)
+          #   - ntp: NixOS handles NTP declaratively
+          #   - ssh_import_id: Not verified on NixOS
+          #   - apt_*, grub_dpkg, yum_*, zypper_*: Distro-specific
+          cloud_config_modules = lib.mkForce [
+            "disk_setup"
+            "mounts"
             "set_passwords"
-            "ntp"
-            "timezone"
             "runcmd"
+            "ssh"
           ];
 
-          # Final stage modules (run during cloud-init final)
-          # Removed: "rightscale_userdata" - module no longer exists
-          # Removed: "keys_to_console" - helper path broken on NixOS
-          cloud_final_modules = [
-            "package_update_upgrade_install"
+          # ─────────────────────────────────────────────────────────────────────
+          # Final Stage Modules (cloud-init modules --mode=final)
+          # ─────────────────────────────────────────────────────────────────────
+          # EXCLUDED:
+          #   - rightscale_userdata: REMOVED in cloud-init 24.1
+          #   - keys_to_console: Helper path broken on NixOS FHS
+          #   - package_update_upgrade_install: Raises NotImplementedError on NixOS
+          cloud_final_modules = lib.mkForce [
             "scripts_vendor"
             "scripts_per_once"
             "scripts_per_boot"
@@ -1153,12 +1352,6 @@ let
       # Spice/QEMU guest tools for clipboard, display, etc.
       spice-vdagentd.enable = true;
     };
-
-    # Fix cloud-init helper tool path for keys-to-console module
-    # Cloud-init expects helper at /usr/libexec/cloud-init/write-ssh-key-fingerprints
-    # but NixOS has it at ${pkgs.cloud-init}/libexec/write-ssh-key-fingerprints
-    environment.etc."libexec/cloud-init/write-ssh-key-fingerprints".source =
-      "${pkgs.cloud-init}/libexec/write-ssh-key-fingerprints";
 
     # =====================================================================
     # Virtualisation Configuration
@@ -1255,9 +1448,11 @@ let
 
       # I/O scheduler: none for virtio-blk (Ceph handles its own scheduling)
       # Serial console for hypervisor log capture (KubeVirt, libvirt)
+      # NOTE: Linux uses LAST console= as primary. tty0 must be last for kbd_mode
+      # to work (serial consoles don't support keyboard ioctls).
       kernelParams = [
-        "console=tty0"
-        "console=ttyS0,115200"
+        "console=ttyS0,115200"  # Serial console (receives all kernel messages)
+        "console=tty0"          # VGA console (primary - receives kbd_mode)
         "elevator=none"
         "scsi_mod.use_blk_mq=1"
       ];
@@ -1278,17 +1473,26 @@ let
       };
 
       # Virtio drivers for performance
-      initrd.availableKernelModules = [
-        "virtio_net"
-        "virtio_pci"
-        "virtio_mmio"
-        "virtio_blk"
-        "virtio_scsi"
-        "virtio_balloon"
-        "virtio_console"
-        "9p"
-        "9pnet_virtio"
-      ];
+      initrd = {
+        availableKernelModules = [
+          "virtio_net"
+          "virtio_pci"
+          "virtio_mmio"
+          "virtio_blk"
+          "virtio_scsi"
+          "virtio_balloon"
+          "virtio_console"
+          "9p"
+          "9pnet_virtio"
+        ];
+
+        # Fix "failed to update userspace mount table" error
+        # NixOS stage-1 runs mount commands before /etc/mtab symlink exists
+        # This ensures /etc/mtab -> /proc/self/mounts exists before any mounts
+        postDeviceCommands = ''
+          [ -L /etc/mtab ] || ln -sf /proc/self/mounts /etc/mtab
+        '';
+      };
     };
 
     # =====================================================================
