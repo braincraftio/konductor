@@ -50,6 +50,8 @@ baseShell.overrideAttrs (old: {
     # and including it would cause service restarts during devshell rebuilds
     # Self-hosting: container + VM build tools
     ++ konductor.packages
+    # ttyd web terminal with Catppuccin Frappé theme
+    ++ programs.ttyd.packages
     # C++ stdlib for Python grpc (used by Pulumi)
     ++ [ pkgs.stdenv.cc.cc.lib ];
 

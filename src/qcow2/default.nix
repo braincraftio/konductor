@@ -81,6 +81,8 @@ let
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
+      ../modules/ttyd.nix         # Web terminal (production)
+      ../modules/ghostty-web.nix  # Web terminal (experimental, gated)
     ];
 
     # Basic system configuration
@@ -191,6 +193,43 @@ let
       # Hypervisor CA paths (set via cloud-init or volume mount)
       # hypervisorCaPath = /etc/konductor/hypervisor-ca.crt;
       # hypervisorKeyPath = /etc/konductor/hypervisor-ca.key;
+    };
+
+    # =====================================================================
+    # Web Terminal (ttyd)
+    # =====================================================================
+    # Production web terminal with Catppuccin Frappé theme and embedded
+    # Nerd Fonts. Works in airgapped environments (no CDN dependencies).
+    #
+    # Disabled by default - enable via cloud-init or systemctl:
+    #   runcmd:
+    #     - systemctl enable --now konductor-ttyd
+    #
+    # Access: http://<hostname>:7681 (direct) or via Envoy Gateway
+    services.konductor-ttyd = {
+      enable = false;
+      port = 7681;
+      user = "kc2";
+      workingDirectory = "/workspace";
+      maxClients = 10;
+    };
+
+    # =====================================================================
+    # Ghostty Web Terminal (Experimental)
+    # =====================================================================
+    # Alternative web terminal using ghostty WASM. Under active development.
+    # Requires CDN access for fonts (not airgap-compatible yet).
+    #
+    # Enable via cloud-init:
+    #   runcmd:
+    #     - systemctl enable --now ghostty-web
+    services.ghostty-web = {
+      enable = false;
+      port = 7682;  # Different port to avoid conflict with ttyd
+      user = "kc2";
+      workingDirectory = "/workspace";
+      maxSessions = 10;
+      idleTimeout = 1800;
     };
 
     # =====================================================================
@@ -564,6 +603,8 @@ let
         ++ programs.neovim.packages
         ++ programs.tmux.packages
         ++ devshellPackages.idePackages
+        # Web terminal (ttyd with Catppuccin theme)
+        ++ programs.ttyd.packages
         # Self-hosting tools (docker, qemu, libvirt, etc.)
         ++ konductor.packages
         # Forgejo CI/CD tools (runner + cli)
