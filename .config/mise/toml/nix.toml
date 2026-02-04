@@ -454,9 +454,8 @@ write_files:
     permissions: '0440'
 
 runcmd:
-  # Mount 9p workspace first (if virtfs device exists)
-  - mkdir -p /workspace
-  - mount -t 9p -o trans=virtio host /workspace || true
+  # NOTE: /workspace mount is handled by systemd konductor-mount service
+  # Do NOT add mount commands here - causes "already mounted" errors
   # Start services
   - systemctl start docker
   - systemctl start libvirtd
@@ -485,14 +484,13 @@ write_files:
     permissions: '0440'
 
 runcmd:
+  # NOTE: /workspace mount is handled by systemd konductor-mount service
+  # Do NOT add mount commands here - causes "already mounted" errors
   # Pre-build devshell closure (full path required - runcmd has minimal PATH)
   - /run/current-system/sw/bin/nix build "konductor#devShells.\$(uname -m)-linux.konductor" --no-link --refresh || true
   # Start services after devshell is ready
   - systemctl start docker
   - systemctl start libvirtd
-  # Mount 9p workspace if virtfs device exists (runs last to ensure device is ready)
-  - mkdir -p /workspace
-  - mount -t 9p -o trans=virtio host /workspace || true
 USERDATA
 fi
 
@@ -624,6 +622,7 @@ qemu-system-x86_64 \
     -m 8192 \
     -cpu host \
     -smp 4 \
+    -boot order=c,menu=off \
     -drive file="${MISE_PROJECT_ROOT}/result/nixos.qcow2,if=virtio,format=qcow2" \
     -drive file="${CLOUD_INIT_DIR}/seed.iso,media=cdrom" \
     -netdev user,id=net0,hostfwd=tcp::2222-:22 \
@@ -741,6 +740,7 @@ exec qemu-system-x86_64 \
     -m 8192 \
     -cpu host \
     -smp 4 \
+    -boot order=c,menu=off \
     -drive file="${MISE_PROJECT_ROOT}/result/nixos.qcow2,if=virtio,format=qcow2" \
     -drive file="${CLOUD_INIT_DIR}/seed.iso,media=cdrom" \
     -netdev user,id=net0,hostfwd=tcp::2222-:22 \
