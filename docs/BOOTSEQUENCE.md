@@ -162,7 +162,7 @@ This document defines the systemd service ordering, dependency chain, and valida
 │     │   ├─ [PROVENANCE] flake_lock_sha256 matches                           │
 │     │   ├─ [PROVENANCE] nix_drv reproducible                                │
 │     │   ├─ [SECURITY]   SGX EPC sections available                          │
-│     │   ├─ [STORAGE]    /workspace owner kc2:kc2                            │
+│     │   ├─ [STORAGE]    /workspace group kc2                            │
 │     │   ├─ [STORAGE]    /workspace mode 2775                                │
 │     │   ├─ [STORAGE]    /workspace writable by kc2, kc2admin, runner        │
 │     │   └─ [SERVICES]   Required services healthy                           │
@@ -304,10 +304,10 @@ The `konductor.service` exit code is the sole mechanism for controlling downstre
 │ STORAGE CHECKS (Workspace Integrity)                                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  workspace_owner                                                            │
+│  workspace_group                                                            │
 │  ├─ Source: stat /workspace                                                 │
-│  ├─ Expected: kc2:kc2 (UID 1001, GID 1001)                                  │
-│  └─ Failure: Workspace ownership incorrect                                  │
+│  ├─ Expected: group kc2 (GID 1001)                                          │
+│  └─ Failure: Workspace group incorrect                                      │
 │                                                                             │
 │  workspace_mode                                                             │
 │  ├─ Source: stat /workspace                                                 │
@@ -358,7 +358,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
   ✓ hardware root of trust: AVAILABLE
 └─────────────────────────────────────────────────────────────────────────────┘
 ┌─ STORAGE ───────────────────────────────────────────────────────────────────┐
-  ✓ /workspace owner: kc2:kc2
+  ✓ /workspace group: kc2
   ✓ /workspace mode: 2775
   ✓ /workspace writable: kc2, kc2admin, runner
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -387,7 +387,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
   ✗ hardware root of trust: UNAVAILABLE
 └─────────────────────────────────────────────────────────────────────────────┘
 ┌─ STORAGE ───────────────────────────────────────────────────────────────────┐
-  ✗ /workspace owner: runner:kc2 (expected kc2:kc2)
+  ✗ /workspace group: users (expected kc2)
   ✗ /workspace mode: 775 (expected 2775)
   ✓ /workspace writable: kc2, kc2admin, runner
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -406,7 +406,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
   RESOLUTION:
     - Ensure host has SGX enabled in BIOS
     - Ensure QEMU is configured with SGX passthrough
-    - Fix workspace ownership: chown kc2:kc2 /workspace && chmod 2775 /workspace
+    - Fix workspace group: chgrp kc2 /workspace && chmod 2775 /workspace
 ═══════════════════════════════════════════════════════════════════════════════
                     ✗ FAILED (strict=true)
 ═══════════════════════════════════════════════════════════════════════════════
@@ -428,7 +428,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
   ⚠ hardware root of trust: UNAVAILABLE (software-only attestation)
 └─────────────────────────────────────────────────────────────────────────────┘
 ┌─ STORAGE ───────────────────────────────────────────────────────────────────┐
-  ✓ /workspace owner: kc2:kc2
+  ✓ /workspace group: kc2
   ✓ /workspace mode: 2775
   ✓ /workspace writable: kc2, kc2admin, runner
 └─────────────────────────────────────────────────────────────────────────────┘

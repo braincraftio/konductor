@@ -687,10 +687,9 @@ let
         # Don't auto-start libvirtd (cloud-init will start it if needed)
         libvirtd.wantedBy = lib.mkForce [ ];
 
-        # Don't run libvirt-guests when libvirtd is not auto-started
-        # This service tries to suspend/resume guests but fails if libvirtd socket doesn't exist
-        # Prevents: "libvirt-guests.sh: Can't connect to default. Skipping."
-        "libvirt-guests".wantedBy = lib.mkForce [ ];
+        # Mask libvirt-guests - it tries to suspend/resume guests but libvirtd isn't auto-started
+        # wantedBy=[] only prevents auto-start; enable=false masks it completely (symlink to /dev/null)
+        "libvirt-guests".enable = false;
 
         # 9p workspace mount service - auto-mounts /workspace if virtfs is available
         # Runs on boot with retries to handle device availability timing
@@ -854,11 +853,13 @@ let
                 echo "  ✓ sgx: $EPC_COUNT EPC sections available"
                 echo "  ✓ hardware root of trust: AVAILABLE"
               else
-                echo "  ✗ sgx: NO EPC SECTIONS AVAILABLE"
-                echo "  ✗ hardware root of trust: UNAVAILABLE"
                 if [ "$STRICT" = "true" ]; then
+                  echo "  ✗ sgx: NO EPC SECTIONS AVAILABLE"
+                  echo "  ✗ hardware root of trust: UNAVAILABLE"
                   ((ERRORS++)) || true
                 else
+                  echo "  ⚠ sgx: NO EPC SECTIONS AVAILABLE"
+                  echo "  ⚠ hardware root of trust: UNAVAILABLE"
                   ((WARNINGS++)) || true
                 fi
               fi
@@ -870,14 +871,13 @@ let
               echo "┌─ STORAGE ───────────────────────────────────────────────────────────────────┐"
 
               if [ -d /workspace ]; then
-                WS_OWNER=$(stat -c '%U:%G' /workspace 2>/dev/null || echo "unknown")
+                WS_GROUP=$(stat -c '%G' /workspace 2>/dev/null || echo "unknown")
                 WS_MODE=$(stat -c '%a' /workspace 2>/dev/null || echo "000")
-                WS_PERMS=$(stat -c '%A' /workspace 2>/dev/null || echo "----------")
 
-                if [ "$WS_OWNER" = "kc2:kc2" ]; then
-                  echo "  ✓ /workspace owner: $WS_OWNER"
+                if [ "$WS_GROUP" = "kc2" ]; then
+                  echo "  ✓ /workspace group: $WS_GROUP"
                 else
-                  echo "  ✗ /workspace owner: $WS_OWNER (expected kc2:kc2)"
+                  echo "  ✗ /workspace group: $WS_GROUP (expected kc2)"
                   ((ERRORS++)) || true
                 fi
 
