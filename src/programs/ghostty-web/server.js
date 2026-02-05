@@ -4,7 +4,7 @@
 
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, normalize, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { WebSocketServer } from 'ws';
 import pty from 'node-pty';
@@ -67,6 +67,31 @@ const MIME_TYPES = {
 
 const STATIC_DIR = process.env.GHOSTTY_WEB_STATIC || join(import.meta.dirname, 'static');
 const WASM_PATH = process.env.GHOSTTY_WEB_WASM || join(STATIC_DIR, 'ghostty-vt.wasm');
+
+// Resolve absolute path for comparison (handles symlinks in /nix/store)
+const STATIC_DIR_RESOLVED = resolve(STATIC_DIR);
+
+// =============================================================================
+// PATH TRAVERSAL PROTECTION
+// =============================================================================
+// Validates that requested path resolves within STATIC_DIR.
+// Prevents directory traversal attacks (../, encoded variants, symlink escapes).
+
+function resolveSafePath(requestedPath) {
+  // Normalize to handle encoded characters and redundant separators
+  const normalized = normalize(requestedPath);
+
+  // Join with static dir and resolve to absolute path
+  const resolved = resolve(STATIC_DIR, '.' + normalized);
+
+  // Verify resolved path is within STATIC_DIR (prefix check)
+  // The '/' suffix check prevents /static-evil matching /static
+  if (!resolved.startsWith(STATIC_DIR_RESOLVED + '/') && resolved !== STATIC_DIR_RESOLVED) {
+    return null; // Traversal attempt
+  }
+
+  return resolved;
+}
 
 // =============================================================================
 // SESSION MANAGEMENT
@@ -171,15 +196,18 @@ const httpServer = createServer((req, res) => {
     return;
   }
 
-  // Static files
-  if (pathname === '/' || pathname === '/index.html') {
-    serveFile(join(STATIC_DIR, 'index.html'), res);
+  // Static files - validate path is within STATIC_DIR
+  const resolvedPath = resolveSafePath(pathname === '/' ? '/index.html' : pathname);
+
+  if (resolvedPath === null) {
+    // Path traversal attempt detected
+    console.warn(`[ghostty-web] Path traversal blocked: ${pathname}`);
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden');
     return;
   }
 
-  // Other static assets
-  const safePath = pathname.replace(/\.\./g, '');
-  serveFile(join(STATIC_DIR, safePath), res);
+  serveFile(resolvedPath, res);
 });
 
 // =============================================================================
