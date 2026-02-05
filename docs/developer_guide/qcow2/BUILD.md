@@ -403,8 +403,6 @@ Build QCOW2: nix → VM configure → seal → verify.
 
 ```sh {"name":"build:qcow2:image","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:stop
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" --all
 ```
 
@@ -615,7 +613,7 @@ echo "════════════════════════�
 echo "  build:qcow2:all - Complete End-to-End Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
-echo "  1. build:qcow2:image       Build QCOW2 (nix → VM configure → seal)"
+echo "  1. build:qcow2:image       Build QCOW2 (preflight resets + validates)"
 echo "  2. build:qcow2:container   Package as containerDisk"
 echo "  3. cluster:up              Start Talos + deploy platform"
 echo "  4. registry:trust          Install cluster CA for Docker/Skopeo"
@@ -627,7 +625,6 @@ echo "  9. build:qcow2:runner-test Push to Forgejo + verify workflow"
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
-# Phase 1: Build (no cluster required)
 echo ""
 echo "▶ Phase 1: Build QCOW2 image..."
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
@@ -1162,7 +1159,46 @@ printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 
 ERRORS=0
 
+# ─────────────────────────────────────────────────────────────────────
+# RESET (clean slate before build)
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Reset:"
+mise run dev:k8s:compose:reset
 runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+
+# ─────────────────────────────────────────────────────────────────────
+# VALIDATE CLEAN STATE
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Clean state validation:"
+
+# Check no stale build artifacts exist
+[ ! -e result ] && printf "✓ no result/\n" || { printf "✗ stale result/ exists\n"; ((ERRORS++)); }
+[ ! -e result.writable ] && printf "✓ no result.writable/\n" || { printf "✗ stale result.writable/ exists\n"; ((ERRORS++)); }
+[ ! -e konductor.qcow2 ] && printf "✓ no konductor.qcow2\n" || { printf "✗ stale konductor.qcow2 exists\n"; ((ERRORS++)); }
+[ ! -e .konductor ] && printf "✓ no .konductor\n" || { printf "✗ stale .konductor exists\n"; ((ERRORS++)); }
+
+# Check no VMs running (reset should have cleaned these)
+if [ -f "$KUBECONFIG" ] && kubectl cluster-info &>/dev/null; then
+    # If KubeVirt CRD doesn't exist, that's clean (no VMs possible)
+    if ! kubectl get crd virtualmachineinstances.kubevirt.io &>/dev/null; then
+        printf "✓ KubeVirt not installed (clean state)\n"
+    else
+        VMI_COUNT=$(kubectl get vmi -A --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        if [ "${VMI_COUNT:-0}" -eq 0 ]; then
+            printf "✓ no VMs running\n"
+        else
+            printf "✗ %s stale VM(s) running\n" "$VMI_COUNT"
+            ((ERRORS++))
+        fi
+    fi
+else
+    printf "✗ cluster not reachable after reset\n"; ((ERRORS++))
+fi
+
+echo ""
+echo "Environment validation:"
 
 for cmd in $QCOW2_REQUIRED_BINS; do
     if command -v "$cmd" &>/dev/null; then

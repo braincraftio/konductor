@@ -7,24 +7,6 @@
 # - neovim terminals (via wrapped bash)
 
 # ===========================================================================
-# IDE Agent Terminal Guard
-# ===========================================================================
-# Skip interactive hooks for Windsurf/Cursor/VS Code agent terminals.
-# These agents spawn terminals to run commands but the interactive hooks
-# (starship, atuin, direnv) prevent clean shell exit, causing agent hangs.
-# The agent-shell wrapper handles OSC 633 sequences for command completion.
-#
-# TRACING: Log to /tmp/konductor-bashrc.trace for debugging
-_trace_bashrc() { echo "[$(date '+%H:%M:%S.%3N')] [bashrc] $*" >> /tmp/konductor-bashrc.trace; }
-_trace_bashrc "=== .bashrc sourced: WINDSURF_CASCADE_TERMINAL=${WINDSURF_CASCADE_TERMINAL:-<unset>} ==="
-
-if [[ -n "${WINDSURF_CASCADE_TERMINAL:-}" ]]; then
-  _trace_bashrc "GUARD TRIGGERED: Skipping interactive hooks, returning early"
-  return 0 2>/dev/null || exit 0
-fi
-_trace_bashrc "GUARD PASSED: Loading interactive hooks (starship, atuin, direnv)"
-
-# ===========================================================================
 # User Bashrc
 # ===========================================================================
 # Source user's bashrc to get their base settings
