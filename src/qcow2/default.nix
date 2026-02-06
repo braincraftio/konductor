@@ -88,6 +88,22 @@ let
     # Basic system configuration
     # stateVersion from src/lib/versions.nix nixos.stateVersion
     system.stateVersion = versions.nixos.stateVersion;
+
+    # =====================================================================
+    # /etc Overlay Filesystem (Runtime Mutability)
+    # =====================================================================
+    # Enable overlay filesystem for /etc to allow runtime modifications.
+    # This is REQUIRED for cloud-init to write to /etc/hosts at deploy time
+    # for static host entries (e.g., proxy hostname bootstrap before DNS).
+    #
+    # With mutable overlay (the default when enabled):
+    # - cloud-init can append to /etc/hosts via runcmd
+    # - Modifications persist in /.rw-etc/upper
+    # - Changes survive reboots but NOT nixos-rebuild
+    #
+    # Requires kernel >= 6.6 (we use linuxPackages_latest)
+    # See: https://nixos.wiki/wiki/Etc_overlay
+    system.etc.overlay.enable = true;
     networking = {
       hostName = "konductor";
       useNetworkd = true;
@@ -979,11 +995,18 @@ let
         # =====================================================================
         # Proxy Configuration (Cloud-init Runtime)
         # =====================================================================
-        # Applies proxy settings from cloud-init before nix-daemon starts.
+        # Applies proxy settings from cloud-init to system services.
         # Cloud-init writes /etc/konductor/proxy.env, this service creates
-        # a systemd drop-in for nix-daemon to read it.
+        # systemd drop-ins for services that need proxy configuration:
+        #   - nix-daemon: For nix builds and cache fetches
+        #   - docker: For pulling container images
         #
-        # Usage: Cloud-init user-data writes proxy.env file:
+        # CRITICAL ORDERING:
+        #   - MUST run AFTER cloud-final.service (when write_files completes)
+        #   - MUST run BEFORE nix-daemon/docker to configure them on first boot
+        #   - Explicitly restarts services to handle case where they started early
+        #
+        # Usage: Cloud-init user-data (or Pulumi KonductorProxySpec) writes:
         #   write_files:
         #     - path: /etc/konductor/proxy.env
         #       content: |
@@ -994,35 +1017,55 @@ let
         #         no_proxy=localhost,127.0.0.1,10.0.0.0/8
         #         NO_PROXY=localhost,127.0.0.1,10.0.0.0/8
         konductor-proxy-setup = {
-          description = "Configure proxy for nix-daemon from cloud-init";
-          before = [ "nix-daemon.service" ];
-          wantedBy = [ "nix-daemon.service" ];
+          description = "Configure proxy for system services from cloud-init";
+          # Wait for cloud-init to complete (when proxy.env is written)
+          after = [ "cloud-final.service" ];
+          requires = [ "cloud-final.service" ];
+          # Start before these services (for ordering on subsequent boots)
+          before = [ "nix-daemon.service" "docker.service" ];
+          # Activate via multi-user target (not wantedBy the services themselves)
+          wantedBy = [ "multi-user.target" ];
           unitConfig = {
             ConditionPathExists = "/etc/konductor/proxy.env";
           };
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
-            ExecStart = pkgs.writeShellScript "setup-nix-proxy" ''
+            ExecStart = pkgs.writeShellScript "setup-system-proxy" ''
               set -euo pipefail
               PROXY_ENV="/etc/konductor/proxy.env"
-              DROPIN_DIR="/run/systemd/system/nix-daemon.service.d"
 
-              echo "Configuring nix-daemon proxy from $PROXY_ENV"
+              echo "Configuring system proxy from $PROXY_ENV"
 
-              # Create drop-in directory
-              mkdir -p "$DROPIN_DIR"
-
-              # Create drop-in that loads the proxy environment file
-              cat > "$DROPIN_DIR/proxy.conf" << EOF
+              # Configure nix-daemon proxy
+              NIX_DROPIN_DIR="/run/systemd/system/nix-daemon.service.d"
+              mkdir -p "$NIX_DROPIN_DIR"
+              cat > "$NIX_DROPIN_DIR/proxy.conf" << EOF
               [Service]
               EnvironmentFile=$PROXY_ENV
               EOF
+              echo "  ✓ nix-daemon proxy drop-in created"
 
-              # Reload systemd to pick up the drop-in
+              # Configure Docker daemon proxy
+              DOCKER_DROPIN_DIR="/run/systemd/system/docker.service.d"
+              mkdir -p "$DOCKER_DROPIN_DIR"
+              cat > "$DOCKER_DROPIN_DIR/proxy.conf" << EOF
+              [Service]
+              EnvironmentFile=$PROXY_ENV
+              EOF
+              echo "  ✓ docker proxy drop-in created"
+
+              # Reload systemd to pick up the drop-ins
               systemctl daemon-reload
+              echo "  ✓ systemd daemon reloaded"
 
-              echo "Proxy configuration applied to nix-daemon"
+              # Restart services to apply proxy settings
+              # (handles case where they started before cloud-init completed)
+              echo "Restarting services to apply proxy configuration..."
+              systemctl restart nix-daemon.service || echo "  ⚠ nix-daemon restart failed (may not be running)"
+              systemctl restart docker.service || echo "  ⚠ docker restart failed (may not be running)"
+
+              echo "Proxy configuration applied to system services"
             '';
           };
         };
@@ -1045,7 +1088,9 @@ let
         konductor-ca-setup = {
           description = "Configure CA trust from cloud-init cluster CA";
           before = [ "forgejo-runner.service" ];
-          after = [ "cloud-init.service" ];
+          # Wait for cloud-final.service (when write_files completes)
+          after = [ "cloud-final.service" ];
+          requires = [ "cloud-final.service" ];
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
             ConditionPathExists = "/etc/konductor/cluster-ca.crt";
@@ -1481,6 +1526,11 @@ let
 
       # Virtio drivers for performance
       initrd = {
+        # Enable systemd in initrd for /etc overlay support
+        # Required for system.etc.overlay.enable to work reliably
+        # See: nixos/tests/activation/etc-overlay-mutable.nix
+        systemd.enable = true;
+
         availableKernelModules = [
           "virtio_net"
           "virtio_pci"
@@ -1492,13 +1542,8 @@ let
           "9p"
           "9pnet_virtio"
         ];
-
-        # Fix "failed to update userspace mount table" error
-        # NixOS stage-1 runs mount commands before /etc/mtab symlink exists
-        # This ensures /etc/mtab -> /proc/self/mounts exists before any mounts
-        postDeviceCommands = ''
-          [ -L /etc/mtab ] || ln -sf /proc/self/mounts /etc/mtab
-        '';
+        # NOTE: /etc/mtab symlink is handled automatically by systemd initrd
+        # (previously used postDeviceCommands which is incompatible with systemd initrd)
       };
     };
 
