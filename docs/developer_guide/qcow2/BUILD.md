@@ -321,6 +321,7 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 │    ├── :login                   Authenticate to registry                    │
 │    ├── :push                    Push with git/nix/latest tags               │
 │    ├── :validate                Deploy to KubeVirt + SSH test               │
+│    ├── :validate-services       Test web terminals (non-blocking)           │
 │    └── :promote                 Copy to public registry (after validation)  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  build:qcow2 (convenience)                                                  │
@@ -684,6 +685,86 @@ Deploy to KubeVirt and validate before promotion.
 set -e
 mise run dev:k8s:konductor:up
 mise run dev:k8s:konductor:validate
+```
+
+---
+
+### build:qcow2:validate-services
+
+Validate web terminal services are responding (non-blocking).
+
+Uses `virtctl port-forward` to test ttyd and ghostty-web endpoints.
+This is informational - failures generate warnings but don't block the pipeline.
+
+```sh {"name":"build:qcow2:validate-services","excludeFromRunAll":"true","tag":"type:entry,requires:k8s"}
+set -eo pipefail
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  build:qcow2:validate-services - Web Terminal Health Check"
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+echo "  Services:"
+echo "    ttyd readonly     (7681) - xterm.js terminal"
+echo "    ghostty-web readonly (7682) - ghostty WASM terminal"
+echo "    ttyd writable     (7683) - xterm.js terminal (rw)"
+echo "    ghostty-web writable (7684) - ghostty WASM terminal (rw)"
+echo ""
+echo "  Note: This check is non-blocking. Failures are warnings only."
+echo ""
+
+NAMESPACE="konductor"
+VMI="vmi/konductor"
+WARNINGS=0
+
+# Service definitions: name:port:expected_content
+SERVICES=(
+    "ttyd:7681:<!DOCTYPE html>"
+    "ghostty-web:7682:<!DOCTYPE html>"
+    "ttyd-rw:7683:<!DOCTYPE html>"
+    "ghostty-web-rw:7684:<!DOCTYPE html>"
+)
+
+for svc in "${SERVICES[@]}"; do
+    IFS=':' read -r name port expected <<< "$svc"
+    echo "▶ Testing ${name} (port ${port})..."
+
+    # Start port-forward in background
+    virtctl port-forward --namespace="$NAMESPACE" "$VMI" "${port}:${port}" &
+    PF_PID=$!
+    sleep 2
+
+    # Test with curl
+    if curl -sf --max-time 5 "http://localhost:${port}/" 2>/dev/null | grep -q "$expected"; then
+        echo "  ✓ ${name}: responding with expected content"
+    else
+        echo "  ⚠ ${name}: not responding or unexpected content"
+        ((WARNINGS++)) || true
+    fi
+
+    # Cleanup port-forward
+    kill $PF_PID 2>/dev/null || true
+    wait $PF_PID 2>/dev/null || true
+done
+
+echo ""
+if [ "$WARNINGS" -eq 0 ]; then
+    echo "✅ All services responding"
+else
+    echo "⚠ ${WARNINGS} service(s) not responding (non-blocking)"
+    echo "  Services may still be starting. Manual verification:"
+    echo ""
+    echo "  # Port forward all services:"
+    echo "  virtctl port-forward -n konductor vmi/konductor 7681:7681 7682:7682 7683:7683 7684:7684"
+    echo ""
+    echo "  # Then access:"
+    echo "  http://localhost:7681  # ttyd readonly"
+    echo "  http://localhost:7682  # ghostty-web readonly"
+    echo "  http://localhost:7683  # ttyd writable"
+    echo "  http://localhost:7684  # ghostty-web writable"
+fi
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
 ```
 
 ---
@@ -1102,11 +1183,12 @@ Registry Setup:
   registry:tags            List tags for konductor image
 
 Push & Validate:
-  build:qcow2:login        Authenticate to registry (alias for registry:login)
-  build:qcow2:push         Push with multi-tag (git/nix/latest)
-  build:qcow2:validate     Deploy to KubeVirt and validate SSH
-  build:qcow2:runner-test  Push to Forgejo and verify workflow execution
-  build:qcow2:promote      Copy to public registry (requires validation)
+  build:qcow2:login             Authenticate to registry (alias for registry:login)
+  build:qcow2:push              Push with multi-tag (git/nix/latest)
+  build:qcow2:validate          Deploy to KubeVirt and validate SSH
+  build:qcow2:validate-services Test web terminals via port-forward (non-blocking)
+  build:qcow2:runner-test       Push to Forgejo and verify workflow execution
+  build:qcow2:promote           Copy to public registry (requires validation)
 
 Convenience:
   build:qcow2:publish      Full pipeline (image → container → login → push)
