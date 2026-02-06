@@ -145,6 +145,28 @@ in
       default = true;
       description = "Whether to open the firewall port for ttyd.";
     };
+
+    enableSSL = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable SSL/TLS using VM's wildcard certificate.
+        Requires konductor.pki module (generates certs on boot).
+        Certificate paths: /etc/konductor/pki/vm/wildcard.{crt,key}
+      '';
+    };
+
+    sslCertPath = lib.mkOption {
+      type = lib.types.path;
+      default = "/etc/konductor/pki/vm/wildcard.crt";
+      description = "Path to SSL certificate (PEM format).";
+    };
+
+    sslKeyPath = lib.mkOption {
+      type = lib.types.path;
+      default = "/etc/konductor/pki/vm/wildcard.key";
+      description = "Path to SSL private key (PEM format).";
+    };
   };
 
   # ===========================================================================
@@ -159,12 +181,21 @@ in
       description = "Konductor ttyd Web Terminal Service";
       documentation = [ "https://github.com/tsl0922/ttyd" ];
 
-      after = [ "network.target" ];
+      after = [ "network.target" ] ++ lib.optional cfg.enableSSL "konductor.service";
       wants = [ "network.target" ];
+      requires = lib.optional cfg.enableSSL "konductor.service";
 
       # IMPORTANT: Empty wantedBy means service does NOT start at boot.
-      # Enable via cloud-init or manually: systemctl enable --now konductor-ttyd
+      # Started via cloud-init bootcmd when enabled in stack config
       wantedBy = [ ];
+
+      # Wait for SSL certificates to exist before starting (when SSL enabled)
+      unitConfig = lib.mkIf cfg.enableSSL {
+        ConditionPathExists = [
+          cfg.sslCertPath
+          cfg.sslKeyPath
+        ];
+      };
 
       environment = {
         HOME = "/home/${cfg.user}";
@@ -191,6 +222,13 @@ in
             # User-provided client options
             extraOpts = lib.mapAttrsToList (k: v: "-t ${k}=${v}") cfg.clientOptions;
 
+            # SSL flags (when enabled)
+            sslFlags = lib.optionals cfg.enableSSL [
+              "--ssl"
+              "--ssl-cert ${cfg.sslCertPath}"
+              "--ssl-key ${cfg.sslKeyPath}"
+            ];
+
             # Optional flags
             optionalFlags = lib.optional (cfg.basePath != null) "--base-path ${cfg.basePath}"
               ++ lib.optional cfg.enableIPv6 "--ipv6"
@@ -207,7 +245,7 @@ in
             "--cwd ${toString cfg.workingDirectory}"
             "--max-clients ${toString cfg.maxClients}"
             "--terminal-type ${cfg.terminalType}"
-          ] ++ optionalFlags ++ themeOpts ++ extraOpts ++ shellCmd);
+          ] ++ sslFlags ++ optionalFlags ++ themeOpts ++ extraOpts ++ shellCmd);
 
         Restart = "always";
         RestartSec = 5;

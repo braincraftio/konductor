@@ -129,8 +129,8 @@
           exit 1
         fi
 
-        # Determine group based on filesystem type and owner
-        # All shared paths use kc2 group (GID 1001) - baked-in least-privilege group
+        # Determine group based on filesystem type, owner, and path type
+        # Defense in depth: private paths use user's primary group, shared paths use kc2
         if [ "$FS_TYPE" = "iso9660" ]; then
           # ISO9660 is always root:root (read-only secret volumes)
           GROUP="root"
@@ -140,10 +140,6 @@
           GROUP="kc2"
           FS_OPTS="defaults,nofail"
         else
-          # User-owned paths use <user>:kc2
-          GROUP="kc2"
-          FS_OPTS="defaults,nofail"
-
           # Verify user exists
           if ! ${pkgs.coreutils}/bin/id "$OWNER" &>/dev/null; then
             echo "ERROR: User '$OWNER' does not exist"
@@ -153,6 +149,21 @@
             echo "      uid: XXXX"
             echo "      groups: kc2"
             exit 1
+          fi
+
+          # Determine group based on path type (security boundaries)
+          # DEFAULT: Private (user's primary group) - deny by default
+          # EXPLICIT: /workspace uses kc2 group for collaboration
+          if [ "$MOUNT_POINT" = "/workspace" ]; then
+            # Workspace - explicitly shared with kc2 group for multi-user collaboration
+            GROUP="kc2"
+            FS_OPTS="defaults,nofail"
+            echo "Shared workspace detected: using $OWNER:kc2"
+          else
+            # Everything else is private - use user's primary group (defense in depth)
+            GROUP=$(${pkgs.coreutils}/bin/id -gn "$OWNER")
+            FS_OPTS="defaults,nofail"
+            echo "Private path detected: using $OWNER:$GROUP"
           fi
         fi
 

@@ -190,9 +190,10 @@ let
       # Domain defaults to {hostname}.arpa (konductor.arpa)
       # Override with: konductor.pki.domain = "myvm.example.com";
 
-      # Hypervisor CA paths (set via cloud-init or volume mount)
-      # hypervisorCaPath = /etc/konductor/hypervisor-ca.crt;
-      # hypervisorKeyPath = /etc/konductor/hypervisor-ca.key;
+      # Hypervisor CA paths (mounted from parent cluster at /mnt/pki)
+      # Vertical PKI: parent cluster CA signs VM wildcard cert
+      hypervisorCaPath = "/mnt/pki/ca.crt";
+      hypervisorKeyPath = "/mnt/pki/tls.key";
     };
 
     # =====================================================================
@@ -205,13 +206,16 @@ let
     #   runcmd:
     #     - systemctl enable --now konductor-ttyd
     #
-    # Access: http://<hostname>:7681 (direct) or via Envoy Gateway
+    # Access: https://<hostname>:7681 (SSL enabled) or via Envoy Gateway
     services.konductor-ttyd = {
-      enable = false;
+      enable = false;  # Started via cloud-init when configured
       port = 7681;
       user = "kc2";
       workingDirectory = "/workspace";
       maxClients = 10;
+      enableSSL = true;  # Uses /etc/konductor/pki/vm/wildcard.{crt,key}
+      sslCertPath = "/etc/konductor/pki/vm/wildcard.crt";
+      sslKeyPath = "/etc/konductor/pki/vm/wildcard.key";
     };
 
     # =====================================================================
@@ -1224,7 +1228,10 @@ let
           # ─────────────────────────────────────────────────────────────────────
           # Users - Use list syntax (string syntax deprecated in 22.2)
           # ─────────────────────────────────────────────────────────────────────
-          users = [ "default" ];
+          # Empty list prevents automatic default user creation at UID 1000
+          # Allows cloud-init userdata to create explicit users dynamically
+          # Preserves UID 1000 for runtime user creation from userdata
+          users = [ ];
           disable_root = false;
           preserve_hostname = false;
 

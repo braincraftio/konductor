@@ -206,17 +206,47 @@ in {
               -config "$PKI_DIR/wildcard.cnf" \
               -out "$PKI_DIR/wildcard.csr"
 
-            # Sign wildcard certificate with CA
-            ${pkgs.openssl}/bin/openssl x509 -req \
-              -in "$PKI_DIR/wildcard.csr" \
-              -CA "$PKI_DIR/ca.crt" \
-              -CAkey "$PKI_DIR/ca.key" \
-              -CAcreateserial \
-              -out "$PKI_DIR/wildcard.crt" \
-              -days "$CERT_DAYS" \
-              -sha256 \
-              -extfile "$PKI_DIR/wildcard.cnf" \
-              -extensions v3_req
+            # Sign wildcard certificate
+            # Use hypervisor CA if mounted (vertical PKI), otherwise use VM CA
+            ${if (cfg.hypervisorCaPath != null && cfg.hypervisorKeyPath != null) then ''
+              if [ -f "${toString cfg.hypervisorCaPath}" ] && [ -f "${toString cfg.hypervisorKeyPath}" ]; then
+                echo "Signing wildcard cert with hypervisor CA (vertical PKI)"
+                ${pkgs.openssl}/bin/openssl x509 -req \
+                  -in "$PKI_DIR/wildcard.csr" \
+                  -CA "${toString cfg.hypervisorCaPath}" \
+                  -CAkey "${toString cfg.hypervisorKeyPath}" \
+                  -CAcreateserial \
+                  -out "$PKI_DIR/wildcard.crt" \
+                  -days "$CERT_DAYS" \
+                  -sha256 \
+                  -extfile "$PKI_DIR/wildcard.cnf" \
+                  -extensions v3_req
+              else
+                echo "Hypervisor CA configured but not available, using VM CA (self-signed)"
+                ${pkgs.openssl}/bin/openssl x509 -req \
+                  -in "$PKI_DIR/wildcard.csr" \
+                  -CA "$PKI_DIR/ca.crt" \
+                  -CAkey "$PKI_DIR/ca.key" \
+                  -CAcreateserial \
+                  -out "$PKI_DIR/wildcard.crt" \
+                  -days "$CERT_DAYS" \
+                  -sha256 \
+                  -extfile "$PKI_DIR/wildcard.cnf" \
+                  -extensions v3_req
+              fi
+            '' else ''
+              echo "Using VM CA (self-signed)"
+              ${pkgs.openssl}/bin/openssl x509 -req \
+                -in "$PKI_DIR/wildcard.csr" \
+                -CA "$PKI_DIR/ca.crt" \
+                -CAkey "$PKI_DIR/ca.key" \
+                -CAcreateserial \
+                -out "$PKI_DIR/wildcard.crt" \
+                -days "$CERT_DAYS" \
+                -sha256 \
+                -extfile "$PKI_DIR/wildcard.cnf" \
+                -extensions v3_req
+            ''}
             chmod 644 "$PKI_DIR/wildcard.crt"
 
             # Cleanup CSR and config (not needed after signing)
