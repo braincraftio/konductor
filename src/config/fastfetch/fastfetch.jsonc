@@ -1,0 +1,234 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  // Konductor fastfetch configuration
+  // Comprehensive system enumeration for build logs and serial console output
+  // No logo - optimized for text-based logging and aggregation
+
+  "logo": {
+    "type": "none"
+  },
+
+  "display": {
+    "separator": ": ",
+    "color": {
+      "keys": "blue",
+      "title": "cyan"
+    }
+  },
+
+  "modules": [
+    // Header
+    {
+      "type": "title",
+      "format": "{user-name}@{host-name}"
+    },
+    {
+      "type": "separator",
+      "string": "─"
+    },
+
+    // Operating System
+    {
+      "type": "os",
+      "key": "OS"
+    },
+    {
+      "type": "kernel",
+      "key": "Kernel"
+    },
+    {
+      "type": "uptime",
+      "key": "Uptime"
+    },
+    {
+      "type": "datetime",
+      "key": "DateTime",
+      "format": "{1}-{4}-{11} {14}:{18}:{20} {22}"
+    },
+
+    // Hardware Platform
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "host",
+      "key": "Host"
+    },
+    {
+      "type": "chassis",
+      "key": "Chassis"
+    },
+    {
+      "type": "bios",
+      "key": "BIOS"
+    },
+    {
+      "type": "board",
+      "key": "Board"
+    },
+
+    // CPU
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "cpu",
+      "key": "CPU"
+    },
+    {
+      "type": "cpucache",
+      "key": "CPU Cache"
+    },
+    {
+      "type": "cpuusage",
+      "key": "CPU Usage"
+    },
+    {
+      "type": "loadavg",
+      "key": "Load Avg"
+    },
+
+    // Memory
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "memory",
+      "key": "Memory"
+    },
+    {
+      "type": "physicalmemory",
+      "key": "Physical Memory"
+    },
+    {
+      "type": "swap",
+      "key": "Swap"
+    },
+
+    // Storage
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "disk",
+      "key": "Disk",
+      "folders": "/"
+    },
+    {
+      "type": "disk",
+      "key": "Disk (/workspace)",
+      "folders": "/workspace"
+    },
+    {
+      "type": "disk",
+      "key": "Disk (/nix)",
+      "folders": "/nix"
+    },
+    {
+      "type": "physicaldisk",
+      "key": "Physical Disk"
+    },
+
+    // GPU (if present)
+    {
+      "type": "gpu",
+      "key": "GPU"
+    },
+
+    // Network
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "localip",
+      "key": "Local IP",
+      "showIpv4": true,
+      "showIpv6": true,
+      "showMac": true,
+      "showLoop": false
+    },
+    {
+      "type": "dns",
+      "key": "DNS"
+    },
+
+    // System Info
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "initsystem",
+      "key": "Init System"
+    },
+    {
+      "type": "processes",
+      "key": "Processes"
+    },
+    {
+      "type": "users",
+      "key": "Users"
+    },
+    {
+      "type": "locale",
+      "key": "Locale"
+    },
+
+    // Shell & Terminal
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "shell",
+      "key": "Shell"
+    },
+    {
+      "type": "terminal",
+      "key": "Terminal"
+    },
+    {
+      "type": "terminalsize",
+      "key": "Terminal Size"
+    },
+    {
+      "type": "editor",
+      "key": "Editor"
+    },
+
+    // Packages & Software
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "packages",
+      "key": "Packages"
+    },
+
+    // Security
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "tpm",
+      "key": "TPM"
+    },
+
+    // Fastfetch Version
+    {
+      "type": "separator",
+      "string": "─"
+    },
+    {
+      "type": "version",
+      "key": "Fastfetch"
+    }
+  ]
+}

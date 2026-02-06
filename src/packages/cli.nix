@@ -31,11 +31,15 @@ let
         pkgs.atuin
         pkgs.bash-preexec
       ];
+
+  # System info tools: ff wrapper for hermetic fastfetch config
+  systemInfoTools = if hasConfig then [ config.fastfetch.package ] else [ ];
 in
 
 {
   packages =
     shellTools
+    ++ systemInfoTools
     ++ (with pkgs; [
       bash-completion # Bash programmable completion
       jq # JSON processor
