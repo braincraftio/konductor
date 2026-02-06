@@ -1232,6 +1232,9 @@ Validate environment.
 ```sh {"name":"_build:qcow2:preflight"}
 set -e
 
+# Build host system state
+ff
+
 # Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
 
@@ -1621,6 +1624,9 @@ ssh localhost 'sudo chmod 644 /.konductor'
 
 # Copy to host
 ssh localhost 'cat /.konductor' > .konductor
+
+# Display comprehensive system state (ff = hermetic fastfetch wrapper)
+ssh localhost 'ff'
 
 # Serial output handled by konductor-provenance.service (systemd)
 ```
