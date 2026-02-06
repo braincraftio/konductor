@@ -1207,12 +1207,13 @@ let
 
     # Services configuration
     services = {
-      # SSH for VM access
+      # SSH for VM access (key-only, no password fallback)
       openssh = {
         enable = true;
         settings = {
           PermitRootLogin = "yes";
-          PasswordAuthentication = true;
+          PasswordAuthentication = false;
+          KbdInteractiveAuthentication = false;
         };
       };
 

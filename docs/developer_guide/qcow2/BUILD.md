@@ -699,6 +699,15 @@ This is informational - failures generate warnings but don't block the pipeline.
 ```sh {"name":"build:qcow2:validate-services","excludeFromRunAll":"true","tag":"type:entry,requires:k8s"}
 set -eo pipefail
 
+# Cleanup stale port-forward processes from previous interrupted runs
+pkill -f "virtctl port-forward.*konductor" 2>/dev/null || true
+
+# Ensure cleanup on exit (Ctrl+C, errors, normal exit)
+cleanup() {
+    pkill -f "virtctl port-forward.*konductor" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  build:qcow2:validate-services - Web Terminal Health Check"
 echo "═══════════════════════════════════════════════════════════════════════════"
