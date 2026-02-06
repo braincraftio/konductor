@@ -1041,8 +1041,8 @@ fi
 # Verify source exists
 echo ""
 echo "Source verification:"
-skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" &>/dev/null \
-    || { echo "✗ Source not found: $SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG"; exit 1; }
+SKOPEO_OUTPUT=$(skopeo inspect --cert-dir "$SRC_CERT_DIR" docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" 2>&1) \
+    || { echo "✗ Source not found: $SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG"; echo "  Error: $SKOPEO_OUTPUT"; exit 1; }
 echo "✓ Source exists: ${SRC_REGISTRY}/${SRC_IMAGE}:${SRC_TAG}"
 
 # Read provenance for additional tags
