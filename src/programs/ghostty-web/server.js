@@ -38,6 +38,8 @@ const { values: args } = parseArgs({
     'base-path': { type: 'string', default: '' },
     // WebSocket security
     'check-origin': { type: 'boolean', default: false },
+    // Allow client input (readonly by default)
+    writable: { type: 'boolean', default: false },
   },
 });
 
@@ -67,6 +69,8 @@ const CONFIG = {
   basePath: args['base-path'].replace(/\/$/, ''), // Remove trailing slash
   // WebSocket origin checking
   checkOrigin: args['check-origin'],
+  // Allow client input
+  writable: args.writable,
 };
 
 // =============================================================================
@@ -322,7 +326,8 @@ wss.on('connection', (ws, req) => {
   const cols = parseInt(url.searchParams.get('cols')) || 80;
   const rows = parseInt(url.searchParams.get('rows')) || 24;
 
-  console.log(`[ghostty-web] New connection: ${cols}x${rows} (${sessions.size + 1}/${CONFIG.maxSessions})`);
+  const mode = CONFIG.writable ? 'rw' : 'ro';
+  console.log(`[ghostty-web] New connection: ${cols}x${rows} [${mode}] (${sessions.size + 1}/${CONFIG.maxSessions})`);
 
   // Create PTY session
   let ptyProcess;
@@ -360,7 +365,7 @@ wss.on('connection', (ws, req) => {
     resetIdleTimer(ws);
     const message = data.toString('utf8');
 
-    // Check for JSON control message
+    // Resize commands allowed in readonly mode
     if (message.startsWith('{')) {
       try {
         const msg = JSON.parse(message);
@@ -373,7 +378,11 @@ wss.on('connection', (ws, req) => {
       }
     }
 
-    // Regular input
+    // Readonly mode: ignore input
+    if (!CONFIG.writable) {
+      return;
+    }
+
     ptyProcess.write(message);
   });
 
@@ -440,4 +449,5 @@ httpServer.listen(CONFIG.port, CONFIG.host, () => {
   if (CONFIG.checkOrigin) {
     console.log(`[ghostty-web] Origin checking: enabled`);
   }
+  console.log(`[ghostty-web] Mode: ${CONFIG.writable ? 'writable' : 'readonly'}`);
 });

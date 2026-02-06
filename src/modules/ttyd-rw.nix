@@ -1,46 +1,36 @@
-# src/modules/ttyd.nix
-# NixOS module for Konductor ttyd Web Terminal service (readonly)
+# src/modules/ttyd-rw.nix
+# NixOS module for Konductor ttyd Web Terminal service (writable)
 #
-# Readonly variant on port 7681 for monitoring/viewing.
-# Use konductor-ttyd-rw (port 7683) for interactive sessions.
+# Writable variant on port 7683 for interactive sessions.
+# Use konductor-ttyd (port 7681) for read-only access.
 #
 # Enable via cloud-init:
 #   runcmd:
-#     - systemctl enable --now konductor-ttyd
+#     - systemctl enable --now konductor-ttyd-rw
 
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.services.konductor-ttyd;
-
-  # Import theme from ttyd program module
+  cfg = config.services.konductor-ttyd-rw;
   ttydProgram = import ../programs/ttyd { inherit pkgs lib; };
   themeJson = builtins.toJSON ttydProgram.theme;
 
 in
 {
-  # ===========================================================================
-  # MODULE OPTIONS
-  # ===========================================================================
-
-  options.services.konductor-ttyd = {
-    enable = lib.mkEnableOption "Konductor ttyd web terminal service (themed)";
+  options.services.konductor-ttyd-rw = {
+    enable = lib.mkEnableOption "Konductor ttyd web terminal service (writable)";
 
     package = lib.mkOption {
       type = lib.types.package;
       default = pkgs.ttyd;
       defaultText = lib.literalExpression "pkgs.ttyd";
-      description = ''
-        The ttyd package to use.
-        By default uses the Konductor-patched ttyd with embedded Nerd Fonts
-        (via src/overlays/ttyd.nix).
-      '';
+      description = "The ttyd package to use.";
     };
 
     port = lib.mkOption {
       type = lib.types.port;
-      default = 7681;
-      description = "TCP port for HTTP and WebSocket server.";
+      default = 7683;
+      description = "TCP port (default 7683 for writable mode).";
     };
 
     interface = lib.mkOption {
@@ -70,7 +60,7 @@ in
     shellArgs = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "-l" ];
-      description = "Arguments to pass to the shell (e.g., -l for login shell).";
+      description = "Arguments to pass to the shell.";
     };
 
     workingDirectory = lib.mkOption {
@@ -82,16 +72,13 @@ in
     maxClients = lib.mkOption {
       type = lib.types.ints.unsigned;
       default = 10;
-      description = ''
-        Maximum number of concurrent clients.
-        Set to 0 for unlimited.
-      '';
+      description = "Maximum number of concurrent clients.";
     };
 
     terminalType = lib.mkOption {
       type = lib.types.str;
       default = "xterm-256color";
-      description = "Terminal type to report (TERM environment variable).";
+      description = "Terminal type to report.";
     };
 
     enableIPv6 = lib.mkOption {
@@ -109,84 +96,58 @@ in
     basePath = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "/terminal";
-      description = ''
-        Base path for requests from reverse proxy.
-        Set when running behind Envoy Gateway or similar.
-      '';
+      description = "Base path for reverse proxy.";
     };
 
     clientOptions = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
-      example = { fontSize = "16"; };
-      description = ''
-        Additional xterm.js client options passed via -t flag.
-        Theme and font options are set automatically.
-      '';
+      description = "Additional xterm.js client options.";
     };
 
     enableTheme = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Apply Catppuccin Frappé theme to the terminal.";
+      description = "Apply Catppuccin Frappe theme.";
     };
 
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Whether to open the firewall port for ttyd.";
+      description = "Whether to open the firewall port.";
     };
 
     enableSSL = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = ''
-        Enable SSL/TLS using VM's wildcard certificate.
-        Requires konductor.pki module (generates certs on boot).
-        Certificate paths: /etc/konductor/pki/vm/wildcard.{crt,key}
-      '';
+      description = "Enable SSL/TLS.";
     };
 
     sslCertPath = lib.mkOption {
       type = lib.types.path;
       default = "/etc/konductor/pki/vm/wildcard.crt";
-      description = "Path to SSL certificate (PEM format).";
+      description = "Path to SSL certificate.";
     };
 
     sslKeyPath = lib.mkOption {
       type = lib.types.path;
       default = "/etc/konductor/pki/vm/wildcard.key";
-      description = "Path to SSL private key (PEM format).";
+      description = "Path to SSL private key.";
     };
   };
 
-  # ===========================================================================
-  # MODULE IMPLEMENTATION
-  # ===========================================================================
-
   config = lib.mkIf cfg.enable {
-    # -------------------------------------------------------------------------
-    # SYSTEMD SERVICE
-    # -------------------------------------------------------------------------
-    systemd.services.konductor-ttyd = {
-      description = "Konductor ttyd Web Terminal Service";
+    systemd.services.konductor-ttyd-rw = {
+      description = "Konductor ttyd Web Terminal Service (writable)";
       documentation = [ "https://github.com/tsl0922/ttyd" ];
 
       after = [ "network.target" ] ++ lib.optional cfg.enableSSL "konductor.service";
       wants = [ "network.target" ];
       requires = lib.optional cfg.enableSSL "konductor.service";
-
-      # IMPORTANT: Empty wantedBy means service does NOT start at boot.
-      # Started via cloud-init bootcmd when enabled in stack config
       wantedBy = [ ];
 
-      # Wait for SSL certificates to exist before starting (when SSL enabled)
       unitConfig = lib.mkIf cfg.enableSSL {
-        ConditionPathExists = [
-          cfg.sslCertPath
-          cfg.sslKeyPath
-        ];
+        ConditionPathExists = [ cfg.sslCertPath cfg.sslKeyPath ];
       };
 
       environment = {
@@ -202,7 +163,6 @@ in
 
         ExecStart =
           let
-            # Theme options for xterm.js (only if enabled)
             themeOpts = lib.optionals cfg.enableTheme [
               "-t 'theme=${themeJson}'"
               ''-t 'fontFamily="JetBrainsMono Nerd Font Mono", "JetBrains Mono", "Fira Code", monospace' ''
@@ -210,27 +170,18 @@ in
               "-t cursorBlink=true"
               "-t scrollback=10000"
             ];
-
-            # User-provided client options
             extraOpts = lib.mapAttrsToList (k: v: "-t ${k}=${v}") cfg.clientOptions;
-
-            # SSL flags (when enabled)
             sslFlags = lib.optionals cfg.enableSSL [
-              "--ssl"
-              "--ssl-cert ${cfg.sslCertPath}"
-              "--ssl-key ${cfg.sslKeyPath}"
+              "--ssl" "--ssl-cert ${cfg.sslCertPath}" "--ssl-key ${cfg.sslKeyPath}"
             ];
-
-            # Optional flags
             optionalFlags = lib.optional (cfg.basePath != null) "--base-path ${cfg.basePath}"
               ++ lib.optional cfg.enableIPv6 "--ipv6"
               ++ lib.optional cfg.checkOrigin "--check-origin";
-
-            # Shell command
             shellCmd = [ cfg.shell ] ++ cfg.shellArgs;
           in
           lib.concatStringsSep " " ([
             "${cfg.package}/bin/ttyd"
+            "--writable"
             "--port ${toString cfg.port}"
             "--interface ${cfg.interface}"
             "--cwd ${toString cfg.workingDirectory}"
@@ -241,34 +192,21 @@ in
         Restart = "always";
         RestartSec = 5;
 
-        # -------------------------------------------------------------------
-        # SECURITY HARDENING
-        # -------------------------------------------------------------------
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-        ReadWritePaths = [
-          cfg.workingDirectory
-          "/home/${cfg.user}"
-        ];
+        ReadWritePaths = [ cfg.workingDirectory "/home/${cfg.user}" ];
         PrivateTmp = true;
         ProtectKernelTunables = true;
         ProtectKernelModules = true;
         ProtectControlGroups = true;
         RestrictNamespaces = true;
         RestrictSUIDSGID = true;
-
-        # -------------------------------------------------------------------
-        # RESOURCE LIMITS
-        # -------------------------------------------------------------------
         MemoryMax = "256M";
         TasksMax = toString (cfg.maxClients * 2 + 10);
       };
     };
 
-    # -------------------------------------------------------------------------
-    # FIREWALL
-    # -------------------------------------------------------------------------
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.port ];
   };
 }

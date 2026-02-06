@@ -81,8 +81,10 @@ let
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
-      ../modules/ttyd.nix         # Web terminal (production)
-      ../modules/ghostty-web.nix  # Web terminal (experimental, gated)
+      ../modules/ttyd.nix           # Web terminal readonly (port 7681)
+      ../modules/ttyd-rw.nix        # Web terminal writable (port 7683)
+      ../modules/ghostty-web.nix    # Ghostty readonly (port 7682)
+      ../modules/ghostty-web-rw.nix # Ghostty writable (port 7684)
     ];
 
     # Basic system configuration
@@ -1412,11 +1414,14 @@ let
       # Disk size for VM - increased to accommodate full package set
       diskSize = lib.mkDefault (30 * 1024); # 30GB (full konductor environment)
 
-      # Docker - installed but not started on boot
-      # Start via: systemctl start docker
+      # Docker - starts on boot after cloud-init and proxy configuration
+      # Ordering: cloud-final → konductor-proxy-setup → docker
+      # Note: enableOnBoot=true required to avoid circular dependency when
+      # cloud-init runcmd starts docker (runcmd blocks → docker waits for
+      # proxy-setup → proxy-setup waits for cloud-final → deadlock)
       docker = {
         enable = true;
-        enableOnBoot = false;
+        enableOnBoot = true;
 
         # Explicit storage driver (don't rely on auto-detection)
         storageDriver = "overlay2";
