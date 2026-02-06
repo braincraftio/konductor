@@ -1,8 +1,16 @@
 #!/usr/bin/env node
 // Ghostty Web Terminal Server
-// Konductor Integration - Single-port HTTP + WebSocket PTY Server
+// Konductor Integration - Single-port HTTP/HTTPS + WebSocket PTY Server
+//
+// Features:
+// - SSL/TLS support for encrypted connections
+// - basePath support for reverse proxy deployment
+// - Origin checking for WebSocket security
+// - Path traversal protection
+// - Idle timeout and max session limits
 
-import { createServer } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, extname, normalize, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -22,6 +30,14 @@ const { values: args } = parseArgs({
     'max-sessions': { type: 'string', default: '10' },
     'idle-timeout': { type: 'string', default: '1800' },
     shell: { type: 'string' },
+    // SSL options (matches ttyd pattern)
+    ssl: { type: 'boolean', default: false },
+    'ssl-cert': { type: 'string' },
+    'ssl-key': { type: 'string' },
+    // Reverse proxy support
+    'base-path': { type: 'string', default: '' },
+    // WebSocket security
+    'check-origin': { type: 'boolean', default: false },
   },
 });
 
@@ -43,6 +59,14 @@ const CONFIG = {
   maxSessions: parseInt(args['max-sessions'], 10),
   idleTimeout: parseInt(args['idle-timeout'], 10) * 1000, // Convert to ms
   shell: args.shell || getDefaultShell(),
+  // SSL configuration
+  ssl: args.ssl,
+  sslCert: args['ssl-cert'],
+  sslKey: args['ssl-key'],
+  // Reverse proxy base path (e.g., /terminal)
+  basePath: args['base-path'].replace(/\/$/, ''), // Remove trailing slash
+  // WebSocket origin checking
+  checkOrigin: args['check-origin'],
 };
 
 // =============================================================================
@@ -174,18 +198,34 @@ function serveFile(filePath, res) {
   }
 }
 
-const httpServer = createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const pathname = url.pathname;
+// Strip basePath from pathname if configured
+function stripBasePath(pathname) {
+  if (CONFIG.basePath && pathname.startsWith(CONFIG.basePath)) {
+    const stripped = pathname.slice(CONFIG.basePath.length);
+    return stripped || '/';
+  }
+  return pathname;
+}
 
-  // Health check endpoint
-  if (pathname === '/health') {
+// Request handler (shared between HTTP and HTTPS)
+function handleRequest(req, res) {
+  const protocol = CONFIG.ssl ? 'https' : 'http';
+  const url = new URL(req.url, `${protocol}://${req.headers.host}`);
+  let pathname = url.pathname;
+
+  // Strip basePath for routing
+  pathname = stripBasePath(pathname);
+
+  // Health check endpoint (always accessible, ignores basePath)
+  if (pathname === '/health' || url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
       sessions: sessions.size,
       maxSessions: CONFIG.maxSessions,
       uptime: process.uptime(),
+      ssl: CONFIG.ssl,
+      basePath: CONFIG.basePath || '/',
     }));
     return;
   }
@@ -208,13 +248,66 @@ const httpServer = createServer((req, res) => {
   }
 
   serveFile(resolvedPath, res);
-});
+}
+
+// Create HTTP or HTTPS server based on SSL config
+let httpServer;
+if (CONFIG.ssl) {
+  if (!CONFIG.sslCert || !CONFIG.sslKey) {
+    console.error('[ghostty-web] SSL enabled but --ssl-cert and --ssl-key not provided');
+    process.exit(1);
+  }
+  if (!existsSync(CONFIG.sslCert)) {
+    console.error(`[ghostty-web] SSL certificate not found: ${CONFIG.sslCert}`);
+    process.exit(1);
+  }
+  if (!existsSync(CONFIG.sslKey)) {
+    console.error(`[ghostty-web] SSL key not found: ${CONFIG.sslKey}`);
+    process.exit(1);
+  }
+
+  const sslOptions = {
+    cert: readFileSync(CONFIG.sslCert),
+    key: readFileSync(CONFIG.sslKey),
+  };
+  httpServer = createHttpsServer(sslOptions, handleRequest);
+  console.log('[ghostty-web] SSL enabled');
+} else {
+  httpServer = createHttpServer(handleRequest);
+}
 
 // =============================================================================
 // WEBSOCKET SERVER
 // =============================================================================
 
-const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+// WebSocket path (with basePath if configured)
+const wsPath = CONFIG.basePath ? `${CONFIG.basePath}/ws` : '/ws';
+
+const wss = new WebSocketServer({
+  server: httpServer,
+  path: wsPath,
+  // Origin verification callback
+  verifyClient: CONFIG.checkOrigin ? ({ origin, req }) => {
+    // Allow requests without origin header (non-browser clients)
+    if (!origin) return true;
+
+    // Parse origin and request host
+    const requestHost = req.headers.host;
+    try {
+      const originUrl = new URL(origin);
+      const originHost = originUrl.host;
+
+      // Allow if origin host matches request host
+      if (originHost === requestHost) return true;
+
+      console.warn(`[ghostty-web] Origin check failed: ${origin} vs ${requestHost}`);
+      return false;
+    } catch (e) {
+      console.warn(`[ghostty-web] Invalid origin header: ${origin}`);
+      return false;
+    }
+  } : undefined,
+});
 
 wss.on('connection', (ws, req) => {
   // Check max sessions
@@ -330,11 +423,21 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start server
 httpServer.listen(CONFIG.port, CONFIG.host, () => {
-  console.log(`[ghostty-web] Server listening on http://${CONFIG.host}:${CONFIG.port}`);
-  console.log(`[ghostty-web] WebSocket endpoint: ws://${CONFIG.host}:${CONFIG.port}/ws`);
-  console.log(`[ghostty-web] Health check: http://${CONFIG.host}:${CONFIG.port}/health`);
+  const protocol = CONFIG.ssl ? 'https' : 'http';
+  const wsProtocol = CONFIG.ssl ? 'wss' : 'ws';
+  const baseUrl = CONFIG.basePath || '';
+
+  console.log(`[ghostty-web] Server listening on ${protocol}://${CONFIG.host}:${CONFIG.port}${baseUrl}`);
+  console.log(`[ghostty-web] WebSocket endpoint: ${wsProtocol}://${CONFIG.host}:${CONFIG.port}${baseUrl}/ws`);
+  console.log(`[ghostty-web] Health check: ${protocol}://${CONFIG.host}:${CONFIG.port}/health`);
   console.log(`[ghostty-web] Shell: ${CONFIG.shell}`);
   console.log(`[ghostty-web] Working directory: ${CONFIG.workingDirectory}`);
   console.log(`[ghostty-web] Max sessions: ${CONFIG.maxSessions}`);
   console.log(`[ghostty-web] Idle timeout: ${CONFIG.idleTimeout / 1000}s`);
+  if (CONFIG.basePath) {
+    console.log(`[ghostty-web] Base path: ${CONFIG.basePath}`);
+  }
+  if (CONFIG.checkOrigin) {
+    console.log(`[ghostty-web] Origin checking: enabled`);
+  }
 });

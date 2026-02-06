@@ -163,7 +163,18 @@
     // ==========================================================================
 
     async function main() {
-      setStatus('connecting', 'Loading...');
+      setStatus('connecting', 'Loading fonts...');
+
+      // CRITICAL: Wait for web fonts to load before measuring font metrics
+      // Without this, terminal uses fallback font dimensions → blocky rendering
+      // Note: Fonts are embedded at build time, but this ensures they're decoded
+      try {
+        await document.fonts.ready;
+      } catch (err) {
+        console.warn('Font loading check failed, continuing:', err);
+      }
+
+      setStatus('connecting', 'Loading terminal...');
 
       try {
         await init();
@@ -175,10 +186,11 @@
 
       // Catppuccin Frappé terminal theme
       // Matches tmux, neovim, opencode configs
+      // Font: JetBrainsMono Nerd Font Mono embedded at build time (airgap-safe)
       const terminal = new Terminal({
         cursorBlink: true,
         fontSize: 14,
-        fontFamily: "'JetBrains Mono', 'Symbols Nerd Font Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+        fontFamily: "'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace",
         scrollback: 10000,
         theme: {
           // Base colors
