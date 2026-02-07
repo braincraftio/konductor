@@ -226,7 +226,7 @@ let
     #
     # Access: https://<hostname>:7681 (SSL enabled) or via Envoy Gateway
     services.konductor-ttyd = {
-      enable = false;  # Started via cloud-init when configured
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7681;
       user = "kc2";
       workingDirectory = "/workspace";
@@ -246,12 +246,27 @@ let
     #   runcmd:
     #     - systemctl enable --now ghostty-web
     services.ghostty-web = {
-      enable = false;
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7682;  # Different port to avoid conflict with ttyd
       user = "kc2";
       workingDirectory = "/workspace";
       maxSessions = 10;
       idleTimeout = 1800;
+    };
+
+    # Writable variants (port 7683, 7684)
+    services.konductor-ttyd-rw = {
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
+      port = 7683;
+      user = "kc2";
+      workingDirectory = "/workspace";
+    };
+
+    services.ghostty-web-rw = {
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
+      port = 7684;
+      user = "kc2";
+      workingDirectory = "/workspace";
     };
 
     # =====================================================================
