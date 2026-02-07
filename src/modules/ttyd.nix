@@ -63,7 +63,7 @@ in
 
     shell = lib.mkOption {
       type = lib.types.str;
-      default = "/bin/bash";
+      default = "/run/current-system/sw/bin/bash";
       description = "Shell to spawn for terminal sessions.";
     };
 
