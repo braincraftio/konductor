@@ -43,15 +43,15 @@ const { values: args } = parseArgs({
   },
 });
 
-// Detect if shell is a minimal Nix bash (lacks readline/completions)
+// Detect shell - NixOS doesn't have /bin/bash
 function getDefaultShell() {
-  const envShell = process.env.SHELL || '';
-  // Nix store bash is minimal - prefer system bash for full features
-  // (readline, programmable completion, bind, etc.)
-  if (envShell.includes('/nix/store/') && envShell.includes('bash')) {
-    return '/bin/bash';
+  // NixOS: use system bash wrapper (symlink to nix store)
+  const nixSystemBash = '/run/current-system/sw/bin/bash';
+  if (existsSync(nixSystemBash)) {
+    return nixSystemBash;
   }
-  return envShell || '/bin/bash';
+  // Non-NixOS: use SHELL env or /bin/bash
+  return process.env.SHELL || '/bin/bash';
 }
 
 const CONFIG = {
