@@ -159,7 +159,8 @@ in
         Restart = "always";
         RestartSec = 5;
 
-        NoNewPrivileges = true;
+        # NoNewPrivileges disabled to allow sudo for admin terminals
+        NoNewPrivileges = false;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
         ReadWritePaths = [ cfg.workingDirectory "/home/${cfg.user}" ];
