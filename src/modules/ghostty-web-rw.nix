@@ -171,8 +171,10 @@ in
         RestrictNamespaces = true;
         RestrictSUIDSGID = true;
         MemoryDenyWriteExecute = false;
-        MemoryMax = "512M";
-        TasksMax = toString (cfg.maxSessions * 2 + 10);
+        # Heavy development workloads: Claude Code + LSPs + nested tmux
+        # Single Claude session: ~1.2GB, 70+ tasks (gopls, pyright, tsserver)
+        MemoryMax = "6G";
+        TasksMax = 1024;
       };
     };
 

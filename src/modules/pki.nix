@@ -104,9 +104,11 @@ in {
     environment.systemPackages = [ pkgs.openssl ];
 
     # Create PKI directory structure
+    # vm directory is 0755 to allow service users to read certs (ttyd, ghostty-web)
+    # hypervisor directory is 0700 (only root needs access to parent cluster CA)
     systemd.tmpfiles.rules = [
       "d /etc/konductor/pki 0755 root root -"
-      "d /etc/konductor/pki/vm 0700 root root -"
+      "d /etc/konductor/pki/vm 0755 root root -"
       "d /etc/konductor/pki/hypervisor 0700 root root -"
       "d /etc/konductor/pki/bundle 0755 root root -"
     ];
@@ -144,8 +146,9 @@ in {
             echo "Generating Konductor VM PKI for domain: $DOMAIN"
 
             # Ensure directory exists with correct permissions
+            # 0755 allows service users (ttyd, ghostty-web) to traverse and read certs
             mkdir -p "$PKI_DIR"
-            chmod 700 "$PKI_DIR"
+            chmod 755 "$PKI_DIR"
 
             # Generate CA private key
             ${if cfg.keyAlgorithm == "ec" then ''
@@ -168,13 +171,14 @@ in {
             echo "Generated CA: /O=$ORG/OU=$OU/CN=$DOMAIN Root CA"
 
             # Generate wildcard certificate private key
+            # 0644 allows service users (ttyd, ghostty-web) to use SSL
             ${if cfg.keyAlgorithm == "ec" then ''
               ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 -noout \
                 -out "$PKI_DIR/wildcard.key"
             '' else ''
               ${pkgs.openssl}/bin/openssl genrsa -out "$PKI_DIR/wildcard.key" 4096
             ''}
-            chmod 600 "$PKI_DIR/wildcard.key"
+            chmod 644 "$PKI_DIR/wildcard.key"
 
             # Create CSR config with SANs
             cat > "$PKI_DIR/wildcard.cnf" << EOF

@@ -254,18 +254,18 @@ let
       idleTimeout = 1800;
     };
 
-    # Writable variants (port 7683, 7684)
+    # Writable variants (port 7683, 7684) - use kc2admin for sudo access
     services.konductor-ttyd-rw = {
       enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7683;
-      user = "kc2";
+      user = "kc2admin";
       workingDirectory = "/workspace";
     };
 
     services.ghostty-web-rw = {
       enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7684;
-      user = "kc2";
+      user = "kc2admin";
       workingDirectory = "/workspace";
     };
 
