@@ -24,13 +24,18 @@
   lib,
   versions,
   programs,
+  inputs,
   ...
 }:
 
 let
+  # Catppuccin theme sources from catppuccin/nix flake
+  # Provides theme files for k9s and other applications
+  catppuccinSources = inputs.catppuccin.packages.${pkgs.stdenv.hostPlatform.system};
+
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions; };
+  config = import ../config { inherit pkgs lib versions catppuccinSources; };
 
   # Single source of truth for package composition
   # Config is passed to ensure all linters/formatters are wrapped

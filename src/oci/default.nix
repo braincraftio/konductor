@@ -9,9 +9,12 @@ let
   env = import ../lib/env.nix;
   shellContent = import ../lib/shell-content.nix { inherit lib; };
 
+  # Catppuccin theme sources from catppuccin/nix flake
+  catppuccinSources = inputs.catppuccin.packages.${pkgs.stdenv.hostPlatform.system};
+
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions; };
+  config = import ../config { inherit pkgs lib versions catppuccinSources; };
 
   # Import packages with wrapped config (hermetic linters/formatters)
   packages = import ../packages {

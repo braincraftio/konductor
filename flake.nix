@@ -70,6 +70,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Catppuccin themes for k9s and other applications
+    # Provides theme files as packages via catppuccin.packages.${system}.sources.k9s
+    catppuccin = {
+      url = "github:catppuccin/nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Forked Forgejo runner with workspace isolation
     # Source: git.braincraft.io/BrainCraft/runner
     # Update: nix flake update forgejo-runner-src

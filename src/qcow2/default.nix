@@ -29,9 +29,12 @@ let
   env = import ../lib/env.nix;
   shellContent = import ../lib/shell-content.nix { inherit lib; };
 
+  # Catppuccin theme sources from catppuccin/nix flake
+  catppuccinSources = inputs.catppuccin.packages.${system};
+
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions; };
+  config = import ../config { inherit pkgs lib versions catppuccinSources; };
 
   # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
@@ -224,16 +227,14 @@ let
     #   runcmd:
     #     - systemctl enable --now konductor-ttyd
     #
-    # Access: https://<hostname>:7681 (SSL enabled) or via Envoy Gateway
+    # Access: Via Envoy Gateway (TLS terminated at edge, plain HTTP to backend)
+    # Web terminal (readonly) - Envoy Gateway terminates TLS, so no SSL here
     services.konductor-ttyd = {
       enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7681;
       user = "kc2";
       workingDirectory = "/workspace";
       maxClients = 10;
-      enableSSL = true;  # Uses /etc/konductor/pki/vm/wildcard.{crt,key}
-      sslCertPath = "/etc/konductor/pki/vm/wildcard.crt";
-      sslKeyPath = "/etc/konductor/pki/vm/wildcard.key";
     };
 
     # =====================================================================

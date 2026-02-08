@@ -1,7 +1,7 @@
 # src/packages/cli.nix
 # Modern CLI tools - enhanced Unix utilities
 #
-# Shell tools (git, ssh) use hermetic wrappers from src/config/shell/
+# Shell tools (git, ssh, k9s) use hermetic wrappers from src/config/
 # when config is provided.
 
 {
@@ -13,7 +13,7 @@ let
   hasConfig = config != null;
 
   # Shell tools: wrapped when config available, unwrapped otherwise
-  # All wrappers from src/config/shell/
+  # All wrappers from src/config/
   shellTools =
     if hasConfig then
       [
@@ -21,6 +21,7 @@ let
         config.shell.ssh.package # SSH with KONDUCTOR_SSH_CONFIG support
         config.shell.starship.package # Starship with Konductor theme
         config.tree.package # Tree with gitignore-aware filtering
+        config.k9s.package # k9s with Catppuccin Frappe theme
         # Note: bash.package is not included here - it's used via shellHook/bashrcContent
       ]
       ++ config.shell.atuin.packages # Atuin + bash-preexec for shell history
@@ -30,6 +31,7 @@ let
         pkgs.openssh
         pkgs.starship
         pkgs.tree
+        pkgs.unstable.k9s
         pkgs.atuin
         pkgs.bash-preexec
       ];
@@ -70,7 +72,7 @@ in
       unstable.kubecolor # Kubectl with color
       unstable.kubelogin-oidc # OIDC authentication for kubectl
       unstable.kubernetes-helm # Helm package manager
-      unstable.k9s # Kubernetes TUI
+      # k9s: wrapped with Catppuccin theme in shellTools above
       unstable.kubevirt # Includes virtctl for VM management
       unstable.hubble # Cilium network flow observability
       unstable.cilium-cli # Cilium CLI for network management
