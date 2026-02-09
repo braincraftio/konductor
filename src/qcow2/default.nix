@@ -1077,11 +1077,26 @@ let
               systemctl daemon-reload
               echo "  ✓ systemd daemon reloaded"
 
-              # Restart services to apply proxy settings
-              # (handles case where they started before cloud-init completed)
-              echo "Restarting services to apply proxy configuration..."
-              systemctl restart nix-daemon.service || echo "  ⚠ nix-daemon restart failed (may not be running)"
-              systemctl restart docker.service || echo "  ⚠ docker restart failed (may not be running)"
+              # Restart services to apply proxy settings (ONLY if already active)
+              # Before= ordering means services are blocked from starting until we complete.
+              # On clean boot: services not active → no restart needed → drop-ins apply on first start
+              # On socket activation race: service became active early → restart applies config
+              # CRITICAL: Never restart services in "waiting" state (job queue) - causes deadlock
+              echo "Checking services for proxy configuration apply..."
+
+              # Only restart nix-daemon if it's currently active (not waiting in job queue)
+              if systemctl is-active --quiet nix-daemon.service 2>/dev/null; then
+                systemctl restart nix-daemon.service && echo "  ✓ nix-daemon restarted (was active)"
+              else
+                echo "  · nix-daemon not yet active (will use proxy config on first start)"
+              fi
+
+              # Only restart docker if it's currently active (not waiting in job queue)
+              if systemctl is-active --quiet docker.service 2>/dev/null; then
+                systemctl restart docker.service && echo "  ✓ docker restarted (was active)"
+              else
+                echo "  · docker not yet active (will use proxy config on first start)"
+              fi
 
               echo "Proxy configuration applied to system services"
             '';
