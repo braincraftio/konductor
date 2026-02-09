@@ -1,6 +1,6 @@
 ---
 cwd: ../../..
-shell: bash
+shell: /run/current-system/sw/bin/bash
 skipPrompts: true
 tag: target:qcow2,scope:dev,scope:ci
 runme:
@@ -50,14 +50,14 @@ The image includes:
 
 ## Supply Chain Provenance
 
-Single file `.konductor` accumulates through the supply chain:
+Single file `/.konductor` accumulates provenance attestation through the supply chain:
 
 ```text
 SOURCE ────► NIX ────► BUILD ────► SEAL ────► OCI ────► PUSH
    │          │          │           │          │         │
    ▼          ▼          ▼           ▼          ▼         ▼
 ┌────────────────────────────────────────────────────────────┐
-│ .konductor                                                 │
+│ /.konductor                                                │
 ├────────────────────────────────────────────────────────────┤
 │ git_commit     ✓                                           │
 │ git_dirty      ✓  (trust gate: 0 = reproducible)           │
@@ -693,8 +693,8 @@ mise run dev:k8s:konductor:validate
 
 Validate web terminal services are responding (non-blocking).
 
-Uses `virtctl port-forward` to test ttyd and ghostty-web endpoints.
-This is informational - failures generate warnings but don't block the pipeline.
+Uses `virtctl port-forward` to test ttyd and ghostty-web endpoints. This is informational - failures
+generate warnings but don't block the pipeline.
 
 ```sh {"name":"build:qcow2:validate-services","excludeFromRunAll":"true","tag":"type:entry,requires:k8s"}
 set -eo pipefail
