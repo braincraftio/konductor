@@ -76,6 +76,12 @@ in
 
   # Bash profile content
   bashProfileContent = ''
+    # Source system profile for environment setup (proxy, paths, etc.)
+    if [ -f /etc/profile ]; then
+      source /etc/profile
+    fi
+
+    # Source user bashrc for aliases and shell config
     if [ -f ~/.bashrc ]; then
       source ~/.bashrc
     fi
