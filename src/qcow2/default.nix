@@ -654,6 +654,10 @@ let
           gh
           gnumake
           cachix
+          # Multi-user service infrastructure
+          code-server  # VSCode Server / Windsurf backend
+          yj           # TOML to JSON converter (for konductor-init.service)
+          yq-go        # YAML/TOML/JSON processor
         ]);
 
       # Environment Variables
@@ -1232,6 +1236,354 @@ let
             Restart = "always";
             RestartSec = 10;
           };
+        };
+
+        # =====================================================================
+        # Multi-User Service Orchestration
+        # =====================================================================
+        # Template units for per-user services with deterministic port allocation.
+        # Orchestrator reads /var/lib/konductor/services.toml and instantiates
+        # services dynamically by generating drop-ins to /run/systemd/system/.
+        #
+        # Port Convention: base_port + (uid - 1000)
+        # - Ensures no collisions between users
+        # - Deterministic and discoverable
+        # - One instance per user per service
+        # - Keeps ports within reasonable range
+        #
+        # Example: ttyd base 7681 + (alice UID 1004 - 1000) = port 7685
+        # =====================================================================
+
+        # Template: TTYd Web Terminal (per-user instances)
+        # Base port: 7681, actual port = 7681 + (UID - 1000)
+        "konductor-ttyd@" = {
+          description = "Konductor TTYd Web Terminal for %i";
+          documentation = [ "https://github.com/tsl0922/ttyd" ];
+          after = [ "network.target" ];
+
+          serviceConfig = {
+            Type = "simple";
+            User = "%i";
+            WorkingDirectory = "/home/%i";
+            # Port determined by drop-in from konductor-init.service
+            ExecStart = "${programs.ttyd.package}/bin/ttyd bash";
+            Restart = "on-failure";
+            RestartSec = 10;
+          };
+        };
+
+        # Template: VSCode Server (per-user instances)
+        # Base port: 8080, actual port = 8080 + (UID - 1000)
+        "konductor-vscode@" = {
+          description = "Konductor VSCode Server for %i";
+          documentation = [ "https://github.com/coder/code-server" ];
+          after = [ "network.target" ];
+
+          serviceConfig = {
+            Type = "simple";
+            User = "%i";
+            Group = "users";
+            WorkingDirectory = "/workspace";
+            # Placeholder - ExecStart overridden by drop-in with calculated port
+            ExecStart = "/run/current-system/sw/bin/true";
+            Restart = "on-failure";
+            RestartSec = 5;
+            NoNewPrivileges = true;
+            PrivateTmp = true;
+          };
+        };
+
+        # Template: Windsurf AI Editor Server (per-user instances)
+        # Base port: 8081, actual port = 8081 + (UID - 1000)
+        "konductor-windsurf@" = {
+          description = "Konductor Windsurf AI Editor for %i";
+          documentation = [ "https://codeium.com/windsurf" ];
+          after = [ "network.target" ];
+
+          serviceConfig = {
+            Type = "simple";
+            User = "%i";
+            Group = "users";
+            WorkingDirectory = "/workspace";
+            # Placeholder - ExecStart overridden by drop-in with calculated port
+            ExecStart = "/run/current-system/sw/bin/true";
+            Restart = "on-failure";
+            RestartSec = 5;
+            NoNewPrivileges = true;
+            PrivateTmp = true;
+          };
+        };
+
+        # =====================================================================
+        # Konductor Service Orchestrator (konductor-init.service)
+        # =====================================================================
+        # Reads /var/lib/konductor/services.toml and orchestrates service lifecycle:
+        # 1. Parse configuration file
+        # 2. Generate drop-ins to /run/systemd/system/ with port assignments
+        # 3. Call systemctl daemon-reload
+        # 4. Start/stop services based on enabled state
+        #
+        # Reloadable: systemctl reload konductor-init.service applies config changes
+        # =====================================================================
+        konductor-init = {
+          description = "Konductor Service Orchestrator";
+          documentation = [ "https://github.com/containercraft/konductor" ];
+
+          # Wait for all boot dependencies
+          after = [
+            "cloud-final.service"
+            "network-online.target"
+            "konductor-proxy-setup.service"
+            "workspace-mount.service"
+          ];
+          wants = [ "network-online.target" ];
+          requires = [ "cloud-final.service" ];
+
+          wantedBy = [ "multi-user.target" ];
+
+          path = with pkgs; [
+            coreutils
+            gnused
+            gnugrep
+            gawk
+            systemd
+            util-linux
+            yj  # TOML to JSON converter
+            yq-go  # YAML/TOML/JSON processor
+            jq  # JSON query processor
+            findutils
+          ];
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            RuntimeDirectory = "konductor-init";
+
+            ExecStart = pkgs.writeShellScript "konductor-init-start" ''
+              set -euo pipefail
+
+              CONFIG_FILE="/var/lib/konductor/services.toml"
+              DROPIN_BASE="/run/systemd/system"
+              ENV_DIR="/var/lib/konductor/env"
+              STATE_DIR="/var/lib/konductor/state"
+
+              mkdir -p "$ENV_DIR" "$STATE_DIR" "$DROPIN_BASE"
+
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+              echo "                    Konductor Service Orchestrator"
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+
+              if [ ! -f "$CONFIG_FILE" ]; then
+                echo "⚠  Configuration not found: $CONFIG_FILE"
+                echo "   Skipping service orchestration (deploy-time config not provided)"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                exit 0
+              fi
+
+              echo "✓  Configuration found: $CONFIG_FILE"
+
+              # Parse TOML to JSON using yj with validation
+              if ! CONFIG_JSON=$(yj -t < "$CONFIG_FILE" 2>&1); then
+                echo "✗  Failed to parse TOML configuration:"
+                echo "   $CONFIG_JSON"
+                echo "   Syntax error in $CONFIG_FILE"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                exit 1
+              fi
+
+              if [ -z "$CONFIG_JSON" ]; then
+                echo "✗  Parsed configuration is empty"
+                echo "═══════════════════════════════════════════════════════════════════════════════"
+                exit 1
+              fi
+
+              # Initialize state files on first boot
+              touch "$STATE_DIR/enabled.list"
+
+              # Clear new enabled list
+              > "$STATE_DIR/enabled.list.new"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # Process Per-User Services (ALL users via templates)
+              # ─────────────────────────────────────────────────────────────────────
+              echo ""
+              echo "┌─ Per-User Services ───────────────────────────────────────────────────────────┐"
+
+              # Extract port_bases for calculations
+              PORT_BASES=$(echo "$CONFIG_JSON" | jq -r '.port_bases // {}')
+
+              # Extract user_services section
+              USER_SERVICES=$(echo "$CONFIG_JSON" | jq -r '
+                .user_services // {} |
+                to_entries[] |
+                .key as $user |
+                .value |
+                to_entries[] |
+                select(.value == true) |
+                "\($user)|\(.key)"
+              ')
+
+              if [ -z "$USER_SERVICES" ]; then
+                echo "  No per-user services enabled"
+              else
+                while IFS='|' read -r username svc_name; do
+                  # Verify user exists
+                  if ! USER_UID=$(id -u "$username" 2>/dev/null); then
+                    echo "  ⚠  User $username not found, skipping $svc_name"
+                    continue
+                  fi
+
+                  # Get base port for this service
+                  BASE_PORT=$(echo "$PORT_BASES" | jq -r ".${svc_name} // 0")
+                  if [ "$BASE_PORT" -eq 0 ]; then
+                    echo "  ⚠  No base port defined for $svc_name, skipping"
+                    continue
+                  fi
+
+                  # Calculate port: base_port + (uid - 1000)
+                  CALC_PORT=$((BASE_PORT + USER_UID - 1000))
+
+                  echo "  Configuring: $svc_name@$username"
+                  echo "    User UID: $USER_UID"
+                  echo "    Base Port: $BASE_PORT"
+                  echo "    Calculated Port: $CALC_PORT"
+
+                  # Generate environment file
+                  ENV_FILE="$ENV_DIR/konductor-${svc_name}@${username}.env"
+                  cat > "$ENV_FILE" << EOF
+              PORT=$CALC_PORT
+              USER_UID=$USER_UID
+              WORKSPACE=/workspace
+              EOF
+
+                  # Generate drop-in
+                  SERVICE_NAME="konductor-${svc_name}@${username}.service"
+                  DROPIN_PATH="$DROPIN_BASE/${SERVICE_NAME}.d"
+                  mkdir -p "$DROPIN_PATH"
+
+                  cat > "$DROPIN_PATH/50-config.conf" << EOF
+              [Service]
+              EnvironmentFile=$ENV_FILE
+
+              # Override ExecStart with calculated port
+              ExecStart=
+              EOF
+
+                  # Service-specific ExecStart overrides
+                  case "$svc_name" in
+                    ttyd)
+                      echo "ExecStart=${programs.ttyd.package}/bin/ttyd --port \${PORT} bash" >> "$DROPIN_PATH/50-config.conf"
+                      ;;
+                    vscode)
+                      echo "ExecStart=${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\${PORT} --auth none" >> "$DROPIN_PATH/50-config.conf"
+                      ;;
+                    windsurf)
+                      echo "ExecStart=${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\${PORT} --auth none" >> "$DROPIN_PATH/50-config.conf"
+                      ;;
+                  esac
+
+                  echo "    ✓ Env file: $ENV_FILE"
+                  echo "    ✓ Drop-in: $DROPIN_PATH/50-config.conf"
+
+                  # Track enabled service
+                  echo "$SERVICE_NAME" >> "$STATE_DIR/enabled.list.new"
+
+                done <<< "$USER_SERVICES"
+              fi
+
+              echo "└───────────────────────────────────────────────────────────────────────────────┘"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # Reload systemd and manage services
+              # ─────────────────────────────────────────────────────────────────────
+              echo ""
+              echo "Reloading systemd daemon..."
+              systemctl daemon-reload
+              echo "✓  systemd daemon-reload complete"
+
+              echo ""
+              echo "┌─ Service Lifecycle Management ────────────────────────────────────────────────┐"
+
+              # Start newly enabled services
+              if [ -f "$STATE_DIR/enabled.list.new" ]; then
+                sort -u "$STATE_DIR/enabled.list.new" | while read SERVICE; do
+                  if ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+                    echo "  ↑ Starting: $SERVICE"
+                    systemctl start "$SERVICE" && echo "    ✓ Started" || echo "    ✗ Failed to start"
+                  else
+                    echo "  ✓ Already active: $SERVICE"
+                  fi
+                done
+              fi
+
+              # Stop services that were removed from config
+              if [ -f "$STATE_DIR/enabled.list" ]; then
+                comm -23 <(sort "$STATE_DIR/enabled.list") <(sort "$STATE_DIR/enabled.list.new" 2>/dev/null || true) | while read SERVICE; do
+                  if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+                    echo "  ↓ Stopping: $SERVICE (removed from config)"
+                    systemctl stop "$SERVICE" && echo "    ✓ Stopped" || echo "    ✗ Failed to stop"
+                  fi
+                done
+              fi
+
+              # Update state
+              [ -f "$STATE_DIR/enabled.list.new" ] && mv "$STATE_DIR/enabled.list.new" "$STATE_DIR/enabled.list"
+
+              echo "└───────────────────────────────────────────────────────────────────────────────┘"
+
+              echo ""
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+              echo "  ✓ Orchestration Complete"
+              echo "  View services: systemctl list-units 'konductor-*'"
+              echo "  Edit config: vi /var/lib/konductor/services.toml"
+              echo "  Reload: systemctl reload konductor-init.service"
+              echo "═══════════════════════════════════════════════════════════════════════════════"
+            '';
+
+            # Reload handler (same logic - idempotent reconciliation)
+            ExecReload = "''${serviceConfig.ExecStart}";
+          };
+        };
+
+        # =====================================================================
+        # Configuration Reload Service (triggered by path watcher)
+        # =====================================================================
+        # Triggered by konductor-config-watcher.path when services.toml changes.
+        # Reloads konductor-init.service which reconciles service state.
+        # =====================================================================
+        konductor-config-reload = {
+          description = "Reload Konductor services from configuration file";
+          documentation = [ "https://github.com/containercraft/konductor" ];
+
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "konductor-config-reload" ''
+              echo "Configuration change detected, reloading konductor-init.service..."
+              systemctl reload konductor-init.service
+            '';
+          };
+        };
+      };
+    };
+
+    # =====================================================================
+    # Configuration File Watcher (systemd.path)
+    # =====================================================================
+    # Watches /var/lib/konductor/services.toml for changes and triggers reload.
+    # Enables workflow:
+    # 1. Manual: Edit services.toml → auto-reload
+    # 2. Portal: ConfigMap → NFS mount → file change → auto-reload
+    # =====================================================================
+    systemd.paths = {
+      konductor-config-watcher = {
+        description = "Watch Konductor configuration for changes";
+        documentation = [ "https://github.com/containercraft/konductor" ];
+
+        wantedBy = [ "multi-user.target" ];
+
+        pathConfig = {
+          PathModified = "/var/lib/konductor/services.toml";
+          Unit = "konductor-config-reload.service";
         };
       };
     };
