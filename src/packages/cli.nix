@@ -47,7 +47,8 @@ in
     ++ (with pkgs; [
       bash-completion # Bash programmable completion
       jq # JSON processor
-      yq-go # YAML processor
+      yq-go # YAML/TOML processor
+      yj # TOML/JSON/YAML converter
       sqlite # SQLite for snacks.picker frecency
       gh # GitHub CLI
       tea # Gitea CLI

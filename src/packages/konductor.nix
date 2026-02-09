@@ -35,6 +35,9 @@
     # Cloud-init ISO creation
     cdrkit
 
+    # Web-based IDE servers (for multi-user service orchestration)
+    code-server # VS Code in browser (used by konductor-vscode@username systemd templates)
+
     # CI/CD essentials
     gnumake
     cachix

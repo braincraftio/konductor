@@ -655,7 +655,6 @@ let
           gnumake
           cachix
           # Multi-user service infrastructure
-          code-server  # VSCode Server / Windsurf backend
           yj           # TOML to JSON converter (for konductor-init.service)
           yq-go        # YAML/TOML/JSON processor
         ]);
@@ -1266,7 +1265,7 @@ let
             User = "%i";
             WorkingDirectory = "/home/%i";
             # Port determined by drop-in from konductor-init.service
-            ExecStart = "${programs.ttyd.package}/bin/ttyd bash";
+            ExecStart = "${pkgs.ttyd}/bin/ttyd bash";
             Restart = "on-failure";
             RestartSec = 10;
           };
@@ -1274,6 +1273,7 @@ let
 
         # Template: VSCode Server (per-user instances)
         # Base port: 8080, actual port = 8080 + (UID - 1000)
+        # REQUIRES drop-in from konductor-init.service with actual configuration
         "konductor-vscode@" = {
           description = "Konductor VSCode Server for %i";
           documentation = [ "https://github.com/coder/code-server" ];
@@ -1284,31 +1284,9 @@ let
             User = "%i";
             Group = "users";
             WorkingDirectory = "/workspace";
-            # Placeholder - ExecStart overridden by drop-in with calculated port
-            ExecStart = "/run/current-system/sw/bin/true";
-            Restart = "on-failure";
-            RestartSec = 5;
-            NoNewPrivileges = true;
-            PrivateTmp = true;
-          };
-        };
-
-        # Template: Windsurf AI Editor Server (per-user instances)
-        # Base port: 8081, actual port = 8081 + (UID - 1000)
-        "konductor-windsurf@" = {
-          description = "Konductor Windsurf AI Editor for %i";
-          documentation = [ "https://codeium.com/windsurf" ];
-          after = [ "network.target" ];
-
-          serviceConfig = {
-            Type = "simple";
-            User = "%i";
-            Group = "users";
-            WorkingDirectory = "/workspace";
-            # Placeholder - ExecStart overridden by drop-in with calculated port
-            ExecStart = "/run/current-system/sw/bin/true";
-            Restart = "on-failure";
-            RestartSec = 5;
+            # Placeholder fails if drop-in not generated (prevents silent malfunction)
+            ExecStart = "${pkgs.coreutils}/bin/false";
+            Restart = "no";  # Don't restart on failure - requires intervention
             NoNewPrivileges = true;
             PrivateTmp = true;
           };
@@ -1325,41 +1303,9 @@ let
         #
         # Reloadable: systemctl reload konductor-init.service applies config changes
         # =====================================================================
-        konductor-init = {
-          description = "Konductor Service Orchestrator";
-          documentation = [ "https://github.com/containercraft/konductor" ];
-
-          # Wait for all boot dependencies
-          after = [
-            "cloud-final.service"
-            "network-online.target"
-            "konductor-proxy-setup.service"
-            "workspace-mount.service"
-          ];
-          wants = [ "network-online.target" ];
-          requires = [ "cloud-final.service" ];
-
-          wantedBy = [ "multi-user.target" ];
-
-          path = with pkgs; [
-            coreutils
-            gnused
-            gnugrep
-            gawk
-            systemd
-            util-linux
-            yj  # TOML to JSON converter
-            yq-go  # YAML/TOML/JSON processor
-            jq  # JSON query processor
-            findutils
-          ];
-
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            RuntimeDirectory = "konductor-init";
-
-            ExecStart = pkgs.writeShellScript "konductor-init-start" ''
+        konductor-init =
+          let
+            orchestratorScript = pkgs.writeShellScript "konductor-init-start" ''
               set -euo pipefail
 
               CONFIG_FILE="/var/lib/konductor/services.toml"
@@ -1433,8 +1379,14 @@ let
                     continue
                   fi
 
+                  # Validate UID range (must be >= 1000 for port formula)
+                  if [ "$USER_UID" -lt 1000 ]; then
+                    echo "  ✗  User $username UID $USER_UID < 1000 (invalid for port formula)"
+                    continue
+                  fi
+
                   # Get base port for this service
-                  BASE_PORT=$(echo "$PORT_BASES" | jq -r ".${svc_name} // 0")
+                  BASE_PORT=$(echo "$PORT_BASES" | jq -r --arg svc "$svc_name" '.[$svc] // 0')
                   if [ "$BASE_PORT" -eq 0 ]; then
                     echo "  ⚠  No base port defined for $svc_name, skipping"
                     continue
@@ -1443,13 +1395,19 @@ let
                   # Calculate port: base_port + (uid - 1000)
                   CALC_PORT=$((BASE_PORT + USER_UID - 1000))
 
+                  # Validate calculated port is in valid range
+                  if [ "$CALC_PORT" -lt 1024 ] || [ "$CALC_PORT" -gt 65535 ]; then
+                    echo "  ✗  Calculated port $CALC_PORT out of range (1024-65535) for $svc_name@$username"
+                    continue
+                  fi
+
                   echo "  Configuring: $svc_name@$username"
                   echo "    User UID: $USER_UID"
                   echo "    Base Port: $BASE_PORT"
                   echo "    Calculated Port: $CALC_PORT"
 
                   # Generate environment file
-                  ENV_FILE="$ENV_DIR/konductor-${svc_name}@${username}.env"
+                  ENV_FILE="$ENV_DIR/konductor-''${svc_name}@''${username}.env"
                   cat > "$ENV_FILE" << EOF
               PORT=$CALC_PORT
               USER_UID=$USER_UID
@@ -1457,8 +1415,8 @@ let
               EOF
 
                   # Generate drop-in
-                  SERVICE_NAME="konductor-${svc_name}@${username}.service"
-                  DROPIN_PATH="$DROPIN_BASE/${SERVICE_NAME}.d"
+                  SERVICE_NAME="konductor-''${svc_name}@''${username}.service"
+                  DROPIN_PATH="$DROPIN_BASE/''${SERVICE_NAME}.d"
                   mkdir -p "$DROPIN_PATH"
 
                   cat > "$DROPIN_PATH/50-config.conf" << EOF
@@ -1470,15 +1428,30 @@ let
               EOF
 
                   # Service-specific ExecStart overrides
+                  # All services use shared VM PKI certs (/etc/konductor/pki/vm/wildcard.{crt,key})
+                  # This enables instant revocation via certificate revocation in security events
                   case "$svc_name" in
                     ttyd)
-                      echo "ExecStart=${programs.ttyd.package}/bin/ttyd --port \${PORT} bash" >> "$DROPIN_PATH/50-config.conf"
+                      echo "ExecStart=${pkgs.ttyd}/bin/ttyd --port \''${PORT} bash" >> "$DROPIN_PATH/50-config.conf"
                       ;;
                     vscode)
-                      echo "ExecStart=${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\${PORT} --auth none" >> "$DROPIN_PATH/50-config.conf"
+                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
+ExecStart=${pkgs.code-server}/bin/code-server \\
+  --bind-addr 0.0.0.0:\''${PORT} \\
+  --user-data-dir /home/''${username}/.local/share/code-server \\
+  --extensions-dir /home/''${username}/.local/share/code-server/extensions \\
+  --auth none \\
+  --cert /etc/konductor/pki/vm/wildcard.crt \\
+  --cert-key /etc/konductor/pki/vm/wildcard.key \\
+  --disable-telemetry \\
+  --disable-update-check \\
+  --disable-getting-started-override \\
+  /workspace
+EOF
                       ;;
-                    windsurf)
-                      echo "ExecStart=${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\${PORT} --auth none" >> "$DROPIN_PATH/50-config.conf"
+                    *)
+                      echo "  ✗  Unknown service: $svc_name"
+                      continue
                       ;;
                   esac
 
@@ -1539,11 +1512,46 @@ let
               echo "  Reload: systemctl reload konductor-init.service"
               echo "═══════════════════════════════════════════════════════════════════════════════"
             '';
+          in
+          {
+            description = "Konductor Service Orchestrator";
+            documentation = [ "https://github.com/containercraft/konductor" ];
 
-            # Reload handler (same logic - idempotent reconciliation)
-            ExecReload = "''${serviceConfig.ExecStart}";
+            # Wait for all boot dependencies
+            after = [
+              "cloud-final.service"
+              "network-online.target"
+              "konductor-proxy-setup.service"
+              "workspace-mount.service"
+            ];
+            wants = [ "network-online.target" ];
+            requires = [ "cloud-final.service" ];
+
+            wantedBy = [ "multi-user.target" ];
+
+            path = with pkgs; [
+              coreutils
+              gnused
+              gnugrep
+              gawk
+              systemd
+              util-linux
+              yj  # TOML to JSON converter
+              yq-go  # YAML/TOML/JSON processor
+              jq  # JSON query processor
+              findutils
+            ];
+
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              RuntimeDirectory = "konductor-init";
+
+              # Orchestrator script handles both start and reload (idempotent)
+              ExecStart = orchestratorScript;
+              ExecReload = orchestratorScript;
+            };
           };
-        };
 
         # =====================================================================
         # Configuration Reload Service (triggered by path watcher)
