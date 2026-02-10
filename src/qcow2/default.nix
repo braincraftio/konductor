@@ -1412,7 +1412,7 @@ let
               PORT=$CALC_PORT
               USER_UID=$USER_UID
               WORKSPACE=/workspace
-              EOF
+EOF
 
                   # Generate drop-in
                   SERVICE_NAME="konductor-''${svc_name}@''${username}.service"
@@ -1425,7 +1425,7 @@ let
 
               # Override ExecStart with calculated port
               ExecStart=
-              EOF
+EOF
 
                   # Service-specific ExecStart overrides
                   # All services use shared VM PKI certs (/etc/konductor/pki/vm/wildcard.{crt,key})
