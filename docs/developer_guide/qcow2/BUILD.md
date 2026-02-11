@@ -1581,6 +1581,38 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 ---
 
+### \_build:qcow2:vm:pki:test
+
+Run PKI tests inside the VM to verify the Python PKI package works in the live NixOS environment.
+
+```sh {"name":"_build:qcow2:vm:pki:test"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+set -e
+
+echo "Running PKI tests inside VM..."
+ssh -o ConnectTimeout=10 localhost \
+  'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+
+echo "PKI tests complete"
+```
+
+---
+
+### \_build:qcow2:vm:pki:status
+
+Display PKI certificate status from inside the VM for build attestation. This output is also captured via serial console in `build-vm.log`.
+
+```sh {"name":"_build:qcow2:vm:pki:status"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+set -e
+
+echo "PKI certificate status:"
+ssh -o ConnectTimeout=10 localhost \
+  'PYTHONPATH=/opt/konductor/src/src python3 -m pki status 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+```
+
+---
+
 ### \_build:qcow2:vm:provenance
 
 Write `/.konductor` inside VM.

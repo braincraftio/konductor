@@ -1,6 +1,9 @@
 # src/modules/pki.nix
 # Konductor PKI - VM identity and certificate chain of trust
 #
+# Uses the Python PKI package (src/pki/) with the cryptography library
+# to generate X.509 certificates with P-384 CA keys and P-256 leaf keys.
+#
 # Provides two certificate authorities:
 # 1. VM-local CA: Self-generated identity for the VM (*.konductor.arpa or custom FQDN)
 # 2. Hypervisor CA: Mounted from parent cluster (cloud-init or volume mount)
@@ -34,6 +37,12 @@ let
   defaultDomain = if config.networking.hostName != "localhost"
     then "${config.networking.hostName}.arpa"
     else "konductor.arpa";
+
+  # Python command with PYTHONPATH set so `python3 -m pki` resolves
+  pythonPki = "${pkgs.python3}/bin/python3";
+  pkiEnv = {
+    PYTHONPATH = "/opt/konductor/src/src";
+  };
 
 in {
   options.konductor.pki = {
@@ -76,7 +85,7 @@ in {
     keyAlgorithm = lib.mkOption {
       type = lib.types.enum [ "ec" "rsa" ];
       default = "ec";
-      description = "Key algorithm: ec (prime256v1) or rsa (4096-bit)";
+      description = "Key algorithm: ec (P-384 CA, P-256 leaf) or rsa (4096-bit)";
     };
 
     hypervisorCaPath = lib.mkOption {
@@ -100,12 +109,10 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    # Ensure openssl is available
+    # Keep openssl for manual debugging; cryptography comes via languages.nix
     environment.systemPackages = [ pkgs.openssl ];
 
     # Create PKI directory structure
-    # vm directory is 0755 to allow service users to read certs (ttyd, ghostty-web)
-    # hypervisor directory is 0700 (only root needs access to parent cluster CA)
     systemd.tmpfiles.rules = [
       "d /etc/konductor/pki 0755 root root -"
       "d /etc/konductor/pki/vm 0755 root root -"
@@ -118,6 +125,7 @@ in {
       # VM-local CA Generation
       # =====================================================================
       # Generates self-signed CA and wildcard certificate on first boot.
+      # Uses Python PKI package with cryptography library.
       # Idempotent: only runs if ca.crt doesn't exist.
       konductor-pki-vm = {
         description = "Generate Konductor VM-local PKI";
@@ -126,141 +134,31 @@ in {
         wantedBy = [ "multi-user.target" ];
 
         unitConfig = {
-          # Only run if CA doesn't exist (first boot)
           ConditionPathExists = "!/etc/konductor/pki/vm/ca.crt";
         };
 
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          Environment = [
+            "PYTHONPATH=/opt/konductor/src/src"
+          ];
           ExecStart = pkgs.writeShellScript "generate-vm-pki" ''
             set -euo pipefail
 
-            PKI_DIR="/etc/konductor/pki/vm"
-            DOMAIN="${cfg.domain}"
-            ORG="${cfg.organization}"
-            OU="${cfg.organizationalUnit}"
-            CA_DAYS=${toString cfg.caValidityDays}
-            CERT_DAYS=${toString cfg.certValidityDays}
+            echo "Generating Konductor VM PKI via python3 -m pki generate"
 
-            echo "Generating Konductor VM PKI for domain: $DOMAIN"
+            ${pythonPki} -m pki generate \
+              --domain "${cfg.domain}" \
+              --org "${cfg.organization}" \
+              --ou "${cfg.organizationalUnit}" \
+              --ca-days ${toString cfg.caValidityDays} \
+              --cert-days ${toString cfg.certValidityDays}
 
-            # Ensure directory exists with correct permissions
-            # 0755 allows service users (ttyd, ghostty-web) to traverse and read certs
-            mkdir -p "$PKI_DIR"
-            chmod 755 "$PKI_DIR"
-
-            # Generate CA private key
-            ${if cfg.keyAlgorithm == "ec" then ''
-              ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 -noout \
-                -out "$PKI_DIR/ca.key"
-            '' else ''
-              ${pkgs.openssl}/bin/openssl genrsa -out "$PKI_DIR/ca.key" 4096
-            ''}
-            chmod 600 "$PKI_DIR/ca.key"
-
-            # Generate CA certificate
-            ${pkgs.openssl}/bin/openssl req -new -x509 \
-              -key "$PKI_DIR/ca.key" \
-              -sha256 \
-              -days "$CA_DAYS" \
-              -subj "/O=$ORG/OU=$OU/CN=$DOMAIN Root CA" \
-              -out "$PKI_DIR/ca.crt"
-            chmod 644 "$PKI_DIR/ca.crt"
-
-            echo "Generated CA: /O=$ORG/OU=$OU/CN=$DOMAIN Root CA"
-
-            # Generate wildcard certificate private key
-            # 0644 allows service users (ttyd, ghostty-web) to use SSL
-            ${if cfg.keyAlgorithm == "ec" then ''
-              ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 -noout \
-                -out "$PKI_DIR/wildcard.key"
-            '' else ''
-              ${pkgs.openssl}/bin/openssl genrsa -out "$PKI_DIR/wildcard.key" 4096
-            ''}
-            chmod 644 "$PKI_DIR/wildcard.key"
-
-            # Create CSR config with SANs
-            cat > "$PKI_DIR/wildcard.cnf" << EOF
-            [req]
-            distinguished_name = req_distinguished_name
-            req_extensions = v3_req
-            prompt = no
-
-            [req_distinguished_name]
-            O = $ORG
-            OU = $OU
-            CN = *.$DOMAIN
-
-            [v3_req]
-            keyUsage = critical, digitalSignature, keyEncipherment
-            extendedKeyUsage = serverAuth, clientAuth
-            subjectAltName = @alt_names
-
-            [alt_names]
-            DNS.1 = *.$DOMAIN
-            DNS.2 = $DOMAIN
-            DNS.3 = *.docker.$DOMAIN
-            DNS.4 = docker.$DOMAIN
-            EOF
-
-            # Generate CSR
-            ${pkgs.openssl}/bin/openssl req -new \
-              -key "$PKI_DIR/wildcard.key" \
-              -config "$PKI_DIR/wildcard.cnf" \
-              -out "$PKI_DIR/wildcard.csr"
-
-            # Sign wildcard certificate
-            # Use hypervisor CA if mounted (vertical PKI), otherwise use VM CA
-            ${if (cfg.hypervisorCaPath != null && cfg.hypervisorKeyPath != null) then ''
-              if [ -f "${toString cfg.hypervisorCaPath}" ] && [ -f "${toString cfg.hypervisorKeyPath}" ]; then
-                echo "Signing wildcard cert with hypervisor CA (vertical PKI)"
-                ${pkgs.openssl}/bin/openssl x509 -req \
-                  -in "$PKI_DIR/wildcard.csr" \
-                  -CA "${toString cfg.hypervisorCaPath}" \
-                  -CAkey "${toString cfg.hypervisorKeyPath}" \
-                  -CAcreateserial \
-                  -out "$PKI_DIR/wildcard.crt" \
-                  -days "$CERT_DAYS" \
-                  -sha256 \
-                  -extfile "$PKI_DIR/wildcard.cnf" \
-                  -extensions v3_req
-              else
-                echo "Hypervisor CA configured but not available, using VM CA (self-signed)"
-                ${pkgs.openssl}/bin/openssl x509 -req \
-                  -in "$PKI_DIR/wildcard.csr" \
-                  -CA "$PKI_DIR/ca.crt" \
-                  -CAkey "$PKI_DIR/ca.key" \
-                  -CAcreateserial \
-                  -out "$PKI_DIR/wildcard.crt" \
-                  -days "$CERT_DAYS" \
-                  -sha256 \
-                  -extfile "$PKI_DIR/wildcard.cnf" \
-                  -extensions v3_req
-              fi
-            '' else ''
-              echo "Using VM CA (self-signed)"
-              ${pkgs.openssl}/bin/openssl x509 -req \
-                -in "$PKI_DIR/wildcard.csr" \
-                -CA "$PKI_DIR/ca.crt" \
-                -CAkey "$PKI_DIR/ca.key" \
-                -CAcreateserial \
-                -out "$PKI_DIR/wildcard.crt" \
-                -days "$CERT_DAYS" \
-                -sha256 \
-                -extfile "$PKI_DIR/wildcard.cnf" \
-                -extensions v3_req
-            ''}
-            chmod 644 "$PKI_DIR/wildcard.crt"
-
-            # Cleanup CSR and config (not needed after signing)
-            rm -f "$PKI_DIR/wildcard.csr" "$PKI_DIR/wildcard.cnf" "$PKI_DIR/ca.srl"
-
-            echo "Generated wildcard certificate: *.$DOMAIN"
             echo "VM PKI generation complete"
 
-            # Display certificate info
-            ${pkgs.openssl}/bin/openssl x509 -in "$PKI_DIR/ca.crt" -noout -subject -issuer -dates
+            # Output status to serial console for build attestation
+            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
           '';
         };
       };
@@ -268,7 +166,7 @@ in {
       # =====================================================================
       # Hypervisor CA Import (if mounted)
       # =====================================================================
-      # Copies hypervisor CA from mount point to PKI directory.
+      # Imports hypervisor CA from mount point using Python PKI package.
       # Runs after cloud-init in case CA is injected via user-data.
       konductor-pki-hypervisor = lib.mkIf (cfg.hypervisorCaPath != null) {
         description = "Import Konductor hypervisor CA";
@@ -282,30 +180,24 @@ in {
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          Environment = [
+            "PYTHONPATH=/opt/konductor/src/src"
+          ];
           ExecStart = pkgs.writeShellScript "import-hypervisor-pki" ''
             set -euo pipefail
 
-            SRC_CA="${toString cfg.hypervisorCaPath}"
-            DST_DIR="/etc/konductor/pki/hypervisor"
+            echo "Importing hypervisor CA via python3 -m pki hypervisor"
 
-            echo "Importing hypervisor CA from $SRC_CA"
+            ${pythonPki} -m pki hypervisor \
+              --ca "${toString cfg.hypervisorCaPath}" \
+              ${lib.optionalString (cfg.hypervisorKeyPath != null)
+                "--key \"${toString cfg.hypervisorKeyPath}\""
+              }
 
-            mkdir -p "$DST_DIR"
-            chmod 700 "$DST_DIR"
+            echo "Hypervisor CA import complete"
 
-            cp "$SRC_CA" "$DST_DIR/ca.crt"
-            chmod 644 "$DST_DIR/ca.crt"
-
-            ${lib.optionalString (cfg.hypervisorKeyPath != null) ''
-              if [ -f "${toString cfg.hypervisorKeyPath}" ]; then
-                cp "${toString cfg.hypervisorKeyPath}" "$DST_DIR/ca.key"
-                chmod 600 "$DST_DIR/ca.key"
-                echo "Imported hypervisor CA key"
-              fi
-            ''}
-
-            echo "Hypervisor CA imported"
-            ${pkgs.openssl}/bin/openssl x509 -in "$DST_DIR/ca.crt" -noout -subject -issuer -dates
+            # Output status to serial console for build attestation
+            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
           '';
         };
       };
@@ -325,55 +217,17 @@ in {
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          Environment = [
+            "PYTHONPATH=/opt/konductor/src/src"
+          ];
           ExecStart = pkgs.writeShellScript "generate-ca-bundle" ''
             set -euo pipefail
 
-            BUNDLE_DIR="/etc/konductor/pki/bundle"
-            BUNDLE_FILE="$BUNDLE_DIR/ca-bundle.crt"
-            SYSTEM_CA="/etc/ssl/certs/ca-certificates.crt"
-            VM_CA="/etc/konductor/pki/vm/ca.crt"
-            HYPERVISOR_CA="/etc/konductor/pki/hypervisor/ca.crt"
+            echo "Generating Konductor CA bundle via python3 -m pki bundle"
 
-            echo "Generating Konductor CA bundle"
+            ${pythonPki} -m pki bundle
 
-            mkdir -p "$BUNDLE_DIR"
-
-            # Start with system CAs
-            if [ -f "$SYSTEM_CA" ]; then
-              cp "$SYSTEM_CA" "$BUNDLE_FILE"
-            else
-              touch "$BUNDLE_FILE"
-            fi
-
-            # Append VM CA
-            if [ -f "$VM_CA" ]; then
-              echo "" >> "$BUNDLE_FILE"
-              echo "# Konductor VM CA" >> "$BUNDLE_FILE"
-              cat "$VM_CA" >> "$BUNDLE_FILE"
-              echo "Added VM CA to bundle"
-            fi
-
-            # Append hypervisor CA if present
-            if [ -f "$HYPERVISOR_CA" ]; then
-              echo "" >> "$BUNDLE_FILE"
-              echo "# Konductor Hypervisor CA" >> "$BUNDLE_FILE"
-              cat "$HYPERVISOR_CA" >> "$BUNDLE_FILE"
-              echo "Added hypervisor CA to bundle"
-            fi
-
-            # Also check for cloud-init injected CA (backward compatibility)
-            if [ -f "/etc/konductor/cluster-ca.crt" ]; then
-              echo "" >> "$BUNDLE_FILE"
-              echo "# Cloud-init Cluster CA" >> "$BUNDLE_FILE"
-              cat "/etc/konductor/cluster-ca.crt" >> "$BUNDLE_FILE"
-              echo "Added cloud-init cluster CA to bundle"
-            fi
-
-            chmod 644 "$BUNDLE_FILE"
-
-            # Count certificates in bundle
-            CERT_COUNT=$(grep -c "BEGIN CERTIFICATE" "$BUNDLE_FILE" || echo "0")
-            echo "CA bundle generated with $CERT_COUNT certificates: $BUNDLE_FILE"
+            echo "CA bundle generation complete"
           '';
         };
       };
@@ -408,21 +262,8 @@ in {
         fi
       }
 
-      konductor-ca-info() {
-        echo "=== VM CA ==="
-        if [ -f "$KONDUCTOR_VM_CA_CERT" ]; then
-          openssl x509 -in "$KONDUCTOR_VM_CA_CERT" -noout -subject -issuer -dates -fingerprint
-        else
-          echo "Not generated"
-        fi
-
-        echo ""
-        echo "=== Hypervisor CA ==="
-        if [ -f "/etc/konductor/pki/hypervisor/ca.crt" ]; then
-          openssl x509 -in "/etc/konductor/pki/hypervisor/ca.crt" -noout -subject -issuer -dates -fingerprint
-        else
-          echo "Not mounted"
-        fi
+      konductor-ca-status() {
+        PYTHONPATH=/opt/konductor/src/src python3 -m pki status
       }
     '';
   };

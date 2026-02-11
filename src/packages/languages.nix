@@ -18,6 +18,7 @@ rec {
       ps.pip
       ps.ipython
       ps.pytest
+      ps.cryptography
     ]))
     poetry
     uv

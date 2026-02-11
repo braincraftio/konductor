@@ -791,8 +791,9 @@ let
             "cloud-final.service"
             "local-fs.target"
             "network.target"
+            "konductor-pki-bundle.service"
           ];
-          wants = [ "cloud-final.service" ];
+          wants = [ "cloud-final.service" "konductor-pki-bundle.service" ];
           wantedBy = [ "multi-user.target" ];
           path = with pkgs; [ coreutils gnused git nix jq findutils gnugrep util-linux ];
           serviceConfig = {
@@ -934,6 +935,17 @@ let
                 fi
               else
                 echo "  · /workspace: not mounted"
+              fi
+              echo "└─────────────────────────────────────────────────────────────────────────────┘"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # PKI STATUS
+              # ─────────────────────────────────────────────────────────────────────
+              echo "┌─ PKI ────────────────────────────────────────────────────────────────────────┐"
+              if [ -f /etc/konductor/pki/vm/ca.crt ]; then
+                PYTHONPATH=/opt/konductor/src/src ${pkgs.python3}/bin/python3 -m pki status 2>/dev/null || echo "  · pki status: failed to run"
+              else
+                echo "  · pki: certificates not yet generated"
               fi
               echo "└─────────────────────────────────────────────────────────────────────────────┘"
 
