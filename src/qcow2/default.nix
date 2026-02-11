@@ -943,7 +943,7 @@ let
               # ─────────────────────────────────────────────────────────────────────
               echo "┌─ PKI ────────────────────────────────────────────────────────────────────────┐"
               if [ -f /etc/konductor/pki/vm/ca.crt ]; then
-                PYTHONPATH=/opt/konductor/src/src ${pkgs.python3}/bin/python3 -m pki status 2>/dev/null || echo "  · pki status: failed to run"
+                PYTHONPATH=/opt/konductor/src/src ${pkgs.python3.withPackages (ps: [ps.cryptography])}/bin/python3 -m pki status 2>/dev/null || echo "  · pki status: failed to run"
               else
                 echo "  · pki: certificates not yet generated"
               fi

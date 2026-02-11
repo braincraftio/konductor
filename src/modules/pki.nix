@@ -38,11 +38,9 @@ let
     then "${config.networking.hostName}.arpa"
     else "konductor.arpa";
 
-  # Python command with PYTHONPATH set so `python3 -m pki` resolves
-  pythonPki = "${pkgs.python3}/bin/python3";
-  pkiEnv = {
-    PYTHONPATH = "/opt/konductor/src/src";
-  };
+  # Python with cryptography for X.509 cert generation
+  pythonWithCrypto = pkgs.python3.withPackages (ps: [ ps.cryptography ]);
+  pythonPki = "${pythonWithCrypto}/bin/python3";
 
 in {
   options.konductor.pki = {
