@@ -1311,6 +1311,28 @@ printf "  qemu:  %s\n" "$(qemu-system-x86_64 --version | head -1)"
 printf "  nix:   %s\n" "$(nix --version)"
 printf "  docker: %s\n" "$(docker --version)"
 
+# ─────────────────────────────────────────────────────────────────────
+# FLAKE ATTESTATION
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Flake metadata:"
+nix flake metadata . --no-write-lock-file --json | jq '{
+  path,
+  lastModified: .lastModified,
+  narHash: .locked.narHash // "unlocked",
+  inputs: (.locks.nodes | to_entries | map(select(.key != "root")) | map({
+    (.key): {
+      type: .value.locked.type,
+      rev: (.value.locked.rev // "n/a"),
+      narHash: (.value.locked.narHash // "n/a")
+    }
+  }) | add // {})
+}' 2>/dev/null || nix flake metadata . --no-write-lock-file
+
+echo ""
+echo "Flake outputs:"
+nix flake show . --json 2>/dev/null | jq 'keys' || nix flake show .
+
 for var in $QCOW2_REQUIRED_FILE_VARS; do
     val="${!var}"; [ -n "$val" ] && [ -f "$val" ] && printf "✓ %s\n" "$var" || { printf "✗ %s\n" "$var"; ((ERRORS++)); }
 done
