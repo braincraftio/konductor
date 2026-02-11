@@ -1704,6 +1704,12 @@ oci_tags = $OCI_TAGS
 EOF
 ssh localhost 'sudo chmod 644 /.konductor'
 
+# Regenerate PKI certs now that /.konductor exists with build provenance
+# Embeds git_commit, nix_drv, build_date into X.509 certificate extensions
+ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
+ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
+ssh localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+
 # Copy to host
 ssh localhost 'cat /.konductor' > .konductor
 
