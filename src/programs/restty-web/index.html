@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Konductor Terminal</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* =======================================================================
+       * Catppuccin Frappe Theme
+       * https://catppuccin.com/palette
+       * Matches: tmux, neovim, opencode, ttyd, ghostty-web configs
+       * ======================================================================= */
+      :root {
+        --ctp-rosewater: #f2d5cf;
+        --ctp-flamingo: #eebebe;
+        --ctp-pink: #f4b8e4;
+        --ctp-mauve: #ca9ee6;
+        --ctp-red: #e78284;
+        --ctp-maroon: #ea999c;
+        --ctp-peach: #ef9f76;
+        --ctp-yellow: #e5c890;
+        --ctp-green: #a6d189;
+        --ctp-teal: #81c8be;
+        --ctp-sky: #99d1db;
+        --ctp-sapphire: #85c1dc;
+        --ctp-blue: #8caaee;
+        --ctp-lavender: #babbf1;
+        --ctp-text: #c6d0f5;
+        --ctp-subtext1: #b5bfe2;
+        --ctp-subtext0: #a5adce;
+        --ctp-overlay2: #949cbb;
+        --ctp-overlay1: #838ba7;
+        --ctp-overlay0: #737994;
+        --ctp-surface2: #626880;
+        --ctp-surface1: #51576d;
+        --ctp-surface0: #414559;
+        --ctp-base: #303446;
+        --ctp-mantle: #292c3c;
+        --ctp-crust: #232634;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--ctp-base);
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        background: var(--ctp-mantle);
+        border-bottom: 1px solid var(--ctp-surface0);
+      }
+
+      .title {
+        color: var(--ctp-text);
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--ctp-subtext0);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ctp-overlay0);
+      }
+
+      .status-dot.connected {
+        background: var(--ctp-green);
+      }
+
+      .status-dot.connecting {
+        background: var(--ctp-yellow);
+        animation: pulse 1s infinite;
+      }
+
+      .status-dot.disconnected {
+        background: var(--ctp-red);
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      #terminal {
+        flex: 1;
+        overflow: hidden;
+      }
+
+      #terminal canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="title">Konductor Terminal</div>
+        <div class="status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+      </div>
+      <div id="terminal"></div>
+    </div>
+
+    <script type="module">
+      // =========================================================================
+      // Restty Web Terminal - Konductor Frontend
+      // =========================================================================
+      // Uses restty native API (NOT xterm compat shim) for full WebGPU rendering.
+      // Restty embeds WASM (libghostty-vt) in its JS bundle — no separate .wasm fetch.
+      //
+      // Font loading: Nerd Fonts are embedded as base64 @font-face at Nix build time.
+      // The restty fontSources use "local" type to match the embedded @font-face names.
+      // =========================================================================
+
+      import { Restty, parseGhosttyTheme } from './restty/restty.js';
+
+      // =========================================================================
+      // STATUS MANAGEMENT
+      // =========================================================================
+
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+
+      function setStatus(state, text) {
+        statusDot.className = 'status-dot ' + state;
+        statusText.textContent = text;
+      }
+
+      // =========================================================================
+      // CATPPUCCIN FRAPPE THEME (Ghostty format — native to restty)
+      // =========================================================================
+
+      const catppuccinFrappe = parseGhosttyTheme(`
+name = Catppuccin Frappe
+background = #303446
+foreground = #c6d0f5
+cursor-color = #f2d5cf
+selection-background = #838ba7
+selection-foreground = #c6d0f5
+palette = 0=#51576d
+palette = 1=#e78284
+palette = 2=#a6d189
+palette = 3=#e5c890
+palette = 4=#8caaee
+palette = 5=#ca9ee6
+palette = 6=#81c8be
+palette = 7=#b5bfe2
+palette = 8=#626880
+palette = 9=#e78284
+palette = 10=#a6d189
+palette = 11=#e5c890
+palette = 12=#8caaee
+palette = 13=#f4b8e4
+palette = 14=#99d1db
+palette = 15=#c6d0f5
+`);
+
+      // =========================================================================
+      // TERMINAL INITIALIZATION
+      // =========================================================================
+
+      async function main() {
+        setStatus('connecting', 'Loading fonts...');
+
+        // Wait for embedded build-time fonts to be decoded
+        try {
+          await document.fonts.ready;
+        } catch (err) {
+          console.warn('Font loading check failed, continuing:', err);
+        }
+
+        setStatus('connecting', 'Loading terminal...');
+
+        const container = document.getElementById('terminal');
+
+        // Create restty instance with Catppuccin Frappe theme
+        // Font: JetBrainsMono Nerd Font Mono embedded at build time (airgap-safe)
+        const restty = new Restty({
+          root: container,
+          createInitialPane: true,
+          appOptions: {
+            renderer: 'auto',
+            fontSize: 14,
+            fontSizeMode: 'em',
+            alphaBlending: 'native',
+            fontPreset: 'none',
+            autoResize: true,
+          },
+          fontSources: [
+            {
+              type: 'local',
+              label: 'JetBrainsMono Nerd Font Mono',
+              matchers: [
+                'jetbrainsmono nerd font mono',
+                'jetbrains mono nerd font mono',
+                'jetbrains mono',
+              ],
+              required: true,
+            },
+          ],
+        });
+
+        // Apply Catppuccin Frappe theme
+        restty.applyTheme(catppuccinFrappe, 'Catppuccin Frappe');
+
+        // =====================================================================
+        // WEBSOCKET CONNECTION
+        // =====================================================================
+
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        const reconnectDelay = 1000;
+
+        function connect() {
+          setStatus(
+            'connecting',
+            reconnectAttempts > 0 ? `Reconnecting (${reconnectAttempts})...` : 'Connecting...'
+          );
+
+          const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const ptyUrl = `${protocol}//${location.host}/pty`;
+
+          // Use restty's built-in PTY connection
+          restty.connectPty(ptyUrl);
+
+          // Poll connection status
+          const checkConnection = setInterval(() => {
+            const pane = restty.getActivePane();
+            if (pane && pane.app.isPtyConnected()) {
+              setStatus('connected', 'Connected');
+              reconnectAttempts = 0;
+              clearInterval(checkConnection);
+              restty.focus();
+            }
+          }, 100);
+
+          // Timeout connection check
+          setTimeout(() => {
+            clearInterval(checkConnection);
+            const pane = restty.getActivePane();
+            if (!pane || !pane.app.isPtyConnected()) {
+              setStatus('disconnected', 'Connection failed');
+              if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                setTimeout(connect, reconnectDelay * Math.min(reconnectAttempts, 5));
+              }
+            }
+          }, 10000);
+        }
+
+        // Auto-resize on window resize
+        window.addEventListener('resize', () => {
+          for (const pane of restty.getPanes()) {
+            pane.app.updateSize(true);
+          }
+        });
+
+        // Initial connection
+        connect();
+
+        // Focus terminal on click
+        container.addEventListener('click', () => restty.focus());
+
+        // Expose for debugging
+        window.restty = restty;
+      }
+
+      main();
+    </script>
+  </body>
+</html>

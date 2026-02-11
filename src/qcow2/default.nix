@@ -88,6 +88,8 @@ let
       ../modules/ttyd-rw.nix        # Web terminal writable (port 7683)
       ../modules/ghostty-web.nix    # Ghostty readonly (port 7682)
       ../modules/ghostty-web-rw.nix # Ghostty writable (port 7684)
+      ../modules/restty-web.nix     # Restty readonly (port 7685)
+      ../modules/restty-web-rw.nix  # Restty writable (port 7687)
     ];
 
     # Basic system configuration
@@ -266,6 +268,31 @@ let
     services.ghostty-web-rw = {
       enable = true;  # Unit exists, but wantedBy=[] means no auto-start
       port = 7684;
+      user = "kc2admin";
+      workingDirectory = "/workspace";
+    };
+
+    # =====================================================================
+    # Restty Web Terminal (WebGPU/WebGL2 WASM renderer)
+    # =====================================================================
+    # High-fidelity terminal with GPU-accelerated rendering.
+    # Uses restty (libghostty-vt WASM) with Catppuccin Frappe theme.
+    #
+    # Enable via cloud-init:
+    #   runcmd:
+    #     - systemctl enable --now restty-web
+    services.restty-web = {
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
+      port = 7685;
+      user = "kc2";
+      workingDirectory = "/workspace";
+      maxSessions = 10;
+      idleTimeout = 1800;
+    };
+
+    services.restty-web-rw = {
+      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
+      port = 7687;
       user = "kc2admin";
       workingDirectory = "/workspace";
     };
@@ -1304,6 +1331,28 @@ let
           };
         };
 
+        # Template: Restty Web Terminal (per-user instances)
+        # Base port: 7685, actual port = 7685 + (UID - 1000)
+        "konductor-restty@" = {
+          description = "Konductor Restty Web Terminal for %i";
+          documentation = [ "https://github.com/wiedymi/restty" ];
+          after = [ "network.target" ];
+
+          serviceConfig = let
+            resttyWeb = import ../programs/restty-web { inherit pkgs lib; };
+          in {
+            Type = "simple";
+            User = "%i";
+            Group = "users";
+            WorkingDirectory = "/workspace";
+            # Port determined by drop-in from konductor-init.service
+            ExecStart = "${resttyWeb.server}/bin/restty-web-server --writable";
+            Restart = "on-failure";
+            RestartSec = 10;
+            MemoryDenyWriteExecute = false; # Required for WASM
+          };
+        };
+
         # =====================================================================
         # Konductor Service Orchestrator (konductor-init.service)
         # =====================================================================
@@ -1445,6 +1494,9 @@ EOF
                   case "$svc_name" in
                     ttyd)
                       echo "ExecStart=${pkgs.ttyd}/bin/ttyd --port \''${PORT} bash" >> "$DROPIN_PATH/50-config.conf"
+                      ;;
+                    restty)
+                      echo "ExecStart=${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --writable --working-directory /workspace" >> "$DROPIN_PATH/50-config.conf"
                       ;;
                     vscode)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
