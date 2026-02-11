@@ -1631,7 +1631,7 @@ set -e
 
 echo "Running PKI tests inside VM..."
 ssh -o ConnectTimeout=10 localhost \
-  'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+  'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short --override-ini cache_dir=/tmp/pytest-cache 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 echo "PKI tests complete"
 ```
