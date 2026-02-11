@@ -1415,7 +1415,21 @@ users:
 runcmd:
   # NOTE: /workspace mount is handled by systemd konductor-mount service
   # Do NOT add mount commands here - causes "already mounted" errors
-  - echo "cloud-init runcmd complete" > /dev/ttyS0
+  #
+  # Serial console output (/dev/ttyS0) is captured in build-vm.log
+  # and ships as build provenance attestation in the OCI image wrapper
+  - echo "═══ cloud-init runcmd start ═══" > /dev/ttyS0
+  # SSH diagnostics
+  - ls -lah /home/*/.ssh/ > /dev/ttyS0 2>&1 || true
+  - echo "authorized_keys:" > /dev/ttyS0
+  - wc -l /home/*/.ssh/authorized_keys > /dev/ttyS0 2>&1 || true
+  # Systemd failed units
+  - systemctl --failed --no-pager > /dev/ttyS0 2>&1 || true
+  # PKI certificate status (attestation)
+  - PYTHONPATH=/opt/konductor/src/src python3 -m pki status > /dev/ttyS0 2>&1 || true
+  # Service readiness
+  - systemctl is-active konductor-pki-vm konductor-pki-bundle konductor > /dev/ttyS0 2>&1 || true
+  - echo "═══ cloud-init runcmd complete ═══" > /dev/ttyS0
 EOF
 
 genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
