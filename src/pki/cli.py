@@ -1,0 +1,575 @@
+"""Konductor PKI CLI -- certificate generation, inspection, and bundle management.
+
+Usage:
+    python3 -m pki generate   Generate CA + wildcard cert (idempotent)
+    python3 -m pki bundle     Build CA trust bundle
+    python3 -m pki inspect    Inspect certificate provenance
+    python3 -m pki status     Show PKI status summary
+    python3 -m pki hypervisor Import hypervisor-provided certificates
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.serialization import Encoding
+
+from pki import config
+from pki.crypto.bundle import build_bundle
+from pki.crypto.ca import build_ca_certificate
+from pki.crypto.extensions import decode_provenance_value
+from pki.crypto.keys import (
+    generate_ca_key,
+    generate_leaf_key,
+    load_private_key,
+    write_private_key,
+)
+from pki.crypto.leaf import build_leaf_certificate
+from pki.fingerprint import Fingerprint, OSRelease
+from pki.identity import CertificateIdentity, TrustTier
+from pki.utils import action, atomic_write, ensure_dir, err, info, ok
+
+
+def _load_identity(
+    domain: str | None = None,
+    organization: str | None = None,
+    ou: str | None = None,
+) -> CertificateIdentity:
+    """Load fingerprint + OS release and build certificate identity."""
+    fp = Fingerprint.load()
+    osr = OSRelease.load()
+    return CertificateIdentity(
+        domain=domain or config.DEFAULT_DOMAIN,
+        organization=organization or config.DEFAULT_ORGANIZATION,
+        organizational_unit=ou or config.DEFAULT_OU,
+        fingerprint=fp,
+        osrelease=osr,
+    )
+
+
+# =====================================================================
+# generate -- Create CA + wildcard certificate
+# =====================================================================
+
+
+def cmd_generate(args: list[str]) -> int:
+    """Generate self-signed CA and wildcard certificate.
+
+    Idempotent: skips if /etc/konductor/pki/vm/ca.crt already exists
+    unless --force is passed.
+    """
+    force = "--force" in args
+    domain = _extract_flag(args, "--domain")
+    org = _extract_flag(args, "--org")
+    ou = _extract_flag(args, "--ou")
+    ca_days = int(_extract_flag(args, "--ca-days") or config.DEFAULT_CA_VALIDITY_DAYS)
+    cert_days = int(
+        _extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS
+    )
+
+    if config.VM_CA_CERT.exists() and not force:
+        ok(f"CA already exists: {config.VM_CA_CERT}")
+        info("Use --force to regenerate")
+        return 0
+
+    identity = _load_identity(domain, org, ou)
+    trust_tier = TrustTier.SELF_SIGNED
+
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print("  Konductor PKI -- Self-Signed Certificate Generation")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    info(f"Domain: {identity.domain}")
+    info(f"Organization: {identity.organization}")
+    info(f"OU: {identity.organizational_unit}")
+    info(f"Serial: {identity.serial_hex}")
+    info(f"Trust tier: {trust_tier.display}")
+    print()
+
+    # Ensure directories
+    ensure_dir(config.PKI_VM_DIR, config.MODE_DIRECTORY)
+
+    # 1. CA key (P-384)
+    action("Generating CA key (P-384)")
+    ca_key = generate_ca_key()
+    write_private_key(config.VM_CA_KEY, ca_key, config.MODE_PRIVATE_KEY)
+    ok(f"CA key: {config.VM_CA_KEY}")
+
+    # 2. CA certificate
+    action("Building CA certificate")
+    ca_cert = build_ca_certificate(
+        ca_key, identity, trust_tier, validity_days=ca_days
+    )
+    atomic_write(
+        config.VM_CA_CERT,
+        ca_cert.public_bytes(Encoding.PEM),
+        config.MODE_CERTIFICATE,
+    )
+    ok(f"CA cert: {config.VM_CA_CERT}")
+
+    # 3. Wildcard key (P-256)
+    action("Generating wildcard key (P-256)")
+    leaf_key = generate_leaf_key()
+    write_private_key(config.VM_WILDCARD_KEY, leaf_key, config.MODE_SERVICE_KEY)
+    ok(f"Wildcard key: {config.VM_WILDCARD_KEY}")
+
+    # 4. Wildcard certificate
+    action("Building wildcard certificate")
+    leaf_cert = build_leaf_certificate(
+        leaf_key, ca_key, ca_cert, identity, trust_tier, validity_days=cert_days
+    )
+    atomic_write(
+        config.VM_WILDCARD_CERT,
+        leaf_cert.public_bytes(Encoding.PEM),
+        config.MODE_CERTIFICATE,
+    )
+    ok(f"Wildcard cert: {config.VM_WILDCARD_CERT}")
+
+    print()
+    _print_cert_summary("CA", ca_cert)
+    _print_cert_summary("Wildcard", leaf_cert)
+
+    print()
+    ok("PKI generation complete")
+    return 0
+
+
+# =====================================================================
+# hypervisor -- Import hypervisor-provided certificates
+# =====================================================================
+
+
+def cmd_hypervisor(args: list[str]) -> int:
+    """Import hypervisor-provided CA and optionally sign wildcard with it.
+
+    Checks well-known mount paths (/mnt/pki/ca.crt, /mnt/pki/tls.key).
+    If both CA cert and key are available, generates a wildcard cert
+    signed by the hypervisor CA (vertical PKI).
+    """
+    ca_path = Path(_extract_flag(args, "--ca") or str(config.HYPERVISOR_MOUNT_CA))
+    key_path = Path(_extract_flag(args, "--key") or str(config.HYPERVISOR_MOUNT_KEY))
+    domain = _extract_flag(args, "--domain")
+    org = _extract_flag(args, "--org")
+    ou = _extract_flag(args, "--ou")
+    cert_days = int(
+        _extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS
+    )
+
+    if not ca_path.exists():
+        info(f"Hypervisor CA not found: {ca_path}")
+        info("Nothing to import")
+        return 0
+
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print("  Konductor PKI -- Hypervisor Certificate Import")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+
+    identity = _load_identity(domain, org, ou)
+    trust_tier = TrustTier.HYPERVISOR
+
+    # Import hypervisor CA
+    ensure_dir(config.PKI_HYPERVISOR_DIR, config.MODE_PRIVATE_DIR)
+    action(f"Importing hypervisor CA from {ca_path}")
+    ca_pem = ca_path.read_bytes()
+    atomic_write(config.HYPERVISOR_CA_CERT, ca_pem, config.MODE_CERTIFICATE)
+    ok(f"Hypervisor CA: {config.HYPERVISOR_CA_CERT}")
+
+    if key_path.exists():
+        action(f"Importing hypervisor key from {key_path}")
+        key_pem = key_path.read_bytes()
+        atomic_write(config.HYPERVISOR_CA_KEY, key_pem, config.MODE_PRIVATE_KEY)
+        ok(f"Hypervisor key: {config.HYPERVISOR_CA_KEY}")
+
+        # Sign wildcard cert with hypervisor CA (vertical PKI)
+        if not config.VM_WILDCARD_CERT.exists() or "--force" in args:
+            hyp_ca_cert = x509.load_pem_x509_certificate(ca_pem)
+            hyp_ca_key = load_private_key(config.HYPERVISOR_CA_KEY)
+
+            ensure_dir(config.PKI_VM_DIR, config.MODE_DIRECTORY)
+
+            # Also place hypervisor CA as the VM CA for consistent paths
+            atomic_write(config.VM_CA_CERT, ca_pem, config.MODE_CERTIFICATE)
+            atomic_write(
+                config.VM_CA_KEY, key_pem, config.MODE_PRIVATE_KEY
+            )
+
+            action("Generating wildcard key (P-256)")
+            leaf_key = generate_leaf_key()
+            write_private_key(
+                config.VM_WILDCARD_KEY, leaf_key, config.MODE_SERVICE_KEY
+            )
+
+            action("Signing wildcard cert with hypervisor CA")
+            leaf_cert = build_leaf_certificate(
+                leaf_key,
+                hyp_ca_key,
+                hyp_ca_cert,
+                identity,
+                trust_tier,
+                validity_days=cert_days,
+            )
+            atomic_write(
+                config.VM_WILDCARD_CERT,
+                leaf_cert.public_bytes(Encoding.PEM),
+                config.MODE_CERTIFICATE,
+            )
+            ok(f"Wildcard cert (hypervisor-signed): {config.VM_WILDCARD_CERT}")
+    else:
+        info(f"Hypervisor key not found: {key_path}")
+        info("CA imported for trust only (no wildcard signing)")
+
+    print()
+    ok("Hypervisor import complete")
+    return 0
+
+
+# =====================================================================
+# bundle -- Build CA trust bundle
+# =====================================================================
+
+
+def cmd_bundle(args: list[str]) -> int:
+    """Build combined CA trust bundle from all available sources."""
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print("  Konductor PKI -- CA Bundle Generation")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+
+    count = build_bundle()
+
+    print()
+    ok(f"Bundle complete: {count} certificates in {config.CA_BUNDLE}")
+    return 0
+
+
+# =====================================================================
+# inspect -- Show certificate provenance
+# =====================================================================
+
+
+def cmd_inspect(args: list[str]) -> int:
+    """Inspect certificate and display provenance extensions."""
+    cert_path = Path(args[0]) if args else config.VM_CA_CERT
+
+    if not cert_path.exists():
+        err(f"Certificate not found: {cert_path}")
+        return 1
+
+    cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print(f"  Certificate: {cert_path}")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    _print_cert_summary("", cert)
+
+    # Extract custom OID extensions
+    print()
+    print("  Provenance Extensions:")
+    found = False
+    for ext in cert.extensions:
+        oid_str = ext.oid.dotted_string
+        name = config.OID_NAMES.get(oid_str)
+        if name:
+            value = decode_provenance_value(ext.value.value)
+            info(f"{name}: {value}")
+            found = True
+
+    if not found:
+        info("No Konductor provenance extensions found")
+
+    # Show nsComment if present
+    ns_oid = config.NS_COMMENT_OID
+    for ext in cert.extensions:
+        if ext.oid.dotted_string == ns_oid:
+            raw = ext.value.value
+            # Decode IA5String: skip tag (0x16) + length bytes
+            if raw and raw[0] == 0x16:
+                if raw[1] < 0x80:
+                    comment = raw[2:].decode("ascii", errors="replace")
+                elif raw[1] == 0x81:
+                    comment = raw[3:].decode("ascii", errors="replace")
+                else:
+                    comment = raw[4:].decode("ascii", errors="replace")
+                print()
+                info(f"nsComment: {comment}")
+
+    # Show SANs
+    try:
+        san_ext = cert.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        )
+        print()
+        print("  Subject Alternative Names:")
+        for dns in san_ext.value.get_values_for_type(x509.DNSName):
+            info(f"DNS: {dns}")
+        for uri in san_ext.value.get_values_for_type(
+            x509.UniformResourceIdentifier
+        ):
+            info(f"URI: {uri}")
+    except x509.ExtensionNotFound:
+        pass
+
+    return 0
+
+
+# =====================================================================
+# status -- Single command for full PKI state
+# =====================================================================
+
+
+def cmd_status(args: list[str]) -> int:
+    """Check every PKI file, dump public metadata for each cert found.
+
+    One command, run anywhere (build host, inside VM, CI), gives full
+    picture of PKI state. Same output everywhere = easy to compare.
+    """
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print("  Konductor PKI Status")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+
+    # All files we ever create, grouped by tier
+    files = [
+        ("VM CA cert",       config.VM_CA_CERT,        True),
+        ("VM CA key",        config.VM_CA_KEY,          False),
+        ("VM wildcard cert", config.VM_WILDCARD_CERT,   True),
+        ("VM wildcard key",  config.VM_WILDCARD_KEY,    False),
+        ("Hypervisor CA",    config.HYPERVISOR_CA_CERT, True),
+        ("Hypervisor key",   config.HYPERVISOR_CA_KEY,  False),
+        ("CA bundle",        config.CA_BUNDLE,          False),
+        ("Cluster CA",       config.CLUSTER_CA,         True),
+    ]
+
+    # Also check mount points (deploy-time only)
+    mount_points = [
+        ("Hypervisor mount CA",  config.HYPERVISOR_MOUNT_CA),
+        ("Hypervisor mount key", config.HYPERVISOR_MOUNT_KEY),
+    ]
+
+    print()
+    print("  Files:")
+    for label, path, is_cert in files:
+        if path.exists():
+            ok(f"{label}: {path}")
+        else:
+            info(f"{label}: not found")
+
+    for label, path in mount_points:
+        if path.exists():
+            ok(f"{label}: {path}")
+        else:
+            info(f"{label}: not found")
+
+    # Bundle cert count
+    if config.CA_BUNDLE.exists():
+        count = config.CA_BUNDLE.read_text().count("BEGIN CERTIFICATE")
+        info(f"Bundle contains {count} certificate(s)")
+
+    # Dump public metadata for every cert that exists
+    for label, path, is_cert in files:
+        if not is_cert or not path.exists():
+            continue
+        print()
+        print(f"  {label}: {path}")
+        _dump_cert(path)
+
+    # Build fingerprint
+    print()
+    print("  Build Fingerprint:")
+    if config.FINGERPRINT_PATH.exists():
+        ok(f"/.konductor: {config.FINGERPRINT_PATH}")
+        fp = Fingerprint.load()
+        if fp.git_commit:
+            info(f"git_commit:  {fp.git_commit}")
+        if fp.git_branch:
+            info(f"git_branch:  {fp.git_branch}")
+        if fp.git_remote:
+            info(f"git_remote:  {fp.git_remote}")
+        if fp.nix_drv:
+            info(f"nix_drv:     {fp.nix_drv}")
+        if fp.nix_hash:
+            info(f"nix_hash:    {fp.nix_hash}")
+        if fp.build_date:
+            info(f"build_date:  {fp.build_date}")
+        if fp.build_host:
+            info(f"build_host:  {fp.build_host}")
+        if fp.build_user:
+            info(f"build_user:  {fp.build_user}")
+    else:
+        info("/.konductor: not found (pre-provenance or non-QCOW2)")
+
+    print()
+    return 0
+
+
+def _dump_cert(path: Path) -> None:
+    """Dump all public-safe metadata for a single certificate."""
+    cert = x509.load_pem_x509_certificate(path.read_bytes())
+
+    # Subject and issuer
+    info(f"Subject: {cert.subject.rfc4514_string()}")
+    info(f"Issuer:  {cert.issuer.rfc4514_string()}")
+
+    # Validity
+    not_before = cert.not_valid_before_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+    not_after = cert.not_valid_after_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+    info(f"Valid:   {not_before} to {not_after}")
+
+    # Serial number
+    info(f"Serial:  {cert.serial_number:#x}")
+
+    # SHA-256 fingerprint of the cert itself (what browsers show)
+    sha256_fp = cert.fingerprint(SHA256()).hex(":")
+    info(f"SHA-256: {sha256_fp}")
+
+    # Key type and curve
+    pub = cert.public_key()
+    if isinstance(pub, EllipticCurvePublicKey):
+        info(f"Key:     EC {pub.curve.name} ({pub.key_size}-bit)")
+
+    # Basic constraints
+    try:
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints)
+        ca_str = "CA:TRUE" if bc.value.ca else "CA:FALSE"
+        info(f"Basic:   {ca_str}")
+    except x509.ExtensionNotFound:
+        pass
+
+    # SANs
+    try:
+        san = cert.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        )
+        dns_names = san.value.get_values_for_type(x509.DNSName)
+        if dns_names:
+            info(f"DNS:     {', '.join(dns_names)}")
+        uri_names = san.value.get_values_for_type(
+            x509.UniformResourceIdentifier
+        )
+        for uri in uri_names:
+            info(f"URI:     {uri}")
+    except x509.ExtensionNotFound:
+        pass
+
+    # nsComment
+    for ext in cert.extensions:
+        if ext.oid.dotted_string == config.NS_COMMENT_OID:
+            raw = ext.value.value
+            if raw and raw[0] == 0x16:
+                offset = 2 if raw[1] < 0x80 else (3 if raw[1] == 0x81 else 4)
+                comment = raw[offset:].decode("ascii", errors="replace")
+                info(f"Comment: {comment}")
+
+    # Custom OID provenance extensions
+    for ext in cert.extensions:
+        name = config.OID_NAMES.get(ext.oid.dotted_string)
+        if name:
+            value = decode_provenance_value(ext.value.value)
+            info(f"{name}: {value}")
+
+
+# =====================================================================
+# Helpers
+# =====================================================================
+
+
+def _extract_flag(args: list[str], flag: str) -> str | None:
+    """Extract --flag value from args list, removing both flag and value."""
+    try:
+        idx = args.index(flag)
+        if idx + 1 < len(args):
+            value = args[idx + 1]
+            del args[idx : idx + 2]
+            return value
+        del args[idx]
+    except ValueError:
+        pass
+    return None
+
+
+def _print_cert_summary(label: str, cert: x509.Certificate) -> None:
+    """Print certificate subject, issuer, validity."""
+    prefix = f"  {label} " if label else "  "
+    subject = cert.subject.rfc4514_string()
+    issuer = cert.issuer.rfc4514_string()
+    not_before = cert.not_valid_before_utc.strftime("%Y-%m-%d")
+    not_after = cert.not_valid_after_utc.strftime("%Y-%m-%d")
+    info(f"{prefix}Subject: {subject}")
+    info(f"{prefix}Issuer:  {issuer}")
+    info(f"{prefix}Valid:   {not_before} to {not_after}")
+
+
+USAGE = """\
+Usage: python3 -m pki <command> [options]
+
+Commands:
+  generate    Generate CA + wildcard cert (idempotent)
+  hypervisor  Import hypervisor-provided certificates
+  bundle      Build CA trust bundle
+  inspect     Inspect certificate provenance
+  status      Show PKI status summary
+
+Options (generate/hypervisor):
+  --domain <domain>     Certificate domain (default: konductor.arpa)
+  --org <organization>  Organization name (default: Konductor)
+  --ou <unit>           Organizational unit (default: Infrastructure)
+  --ca-days <days>      CA validity in days (default: 3650)
+  --cert-days <days>    Leaf cert validity in days (default: 365)
+  --force               Regenerate even if certs exist
+
+Options (inspect):
+  <path>                Certificate file to inspect (default: VM CA cert)
+"""
+
+COMMANDS = {
+    "generate": cmd_generate,
+    "hypervisor": cmd_hypervisor,
+    "bundle": cmd_bundle,
+    "inspect": cmd_inspect,
+    "status": cmd_status,
+}
+
+
+def run() -> int:
+    """CLI entry point. Returns exit code."""
+    args = sys.argv[1:]
+
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+
+    command = args[0]
+    if command not in COMMANDS:
+        err(f"Unknown command: {command}")
+        print(USAGE, file=sys.stderr)
+        return 1
+
+    try:
+        return COMMANDS[command](args[1:])
+    except KeyboardInterrupt:
+        print()
+        return 130
+    except Exception as exc:
+        err(f"{type(exc).__name__}: {exc}")
+        return 1
