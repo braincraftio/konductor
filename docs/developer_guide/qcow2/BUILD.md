@@ -1425,10 +1425,14 @@ runcmd:
   - wc -l /home/*/.ssh/authorized_keys > /dev/ttyS0 2>&1 || true
   # Systemd failed units
   - systemctl --failed --no-pager > /dev/ttyS0 2>&1 || true
+  # PKI service journal output (attestation regardless of success/failure)
+  - journalctl -u konductor-pki-vm --no-pager -o short > /dev/ttyS0 2>&1 || true
+  - journalctl -u konductor-pki-hypervisor --no-pager -o short > /dev/ttyS0 2>&1 || true
+  - journalctl -u konductor-pki-bundle --no-pager -o short > /dev/ttyS0 2>&1 || true
   # PKI certificate status (attestation)
   - PYTHONPATH=/opt/konductor/src/src python3 -m pki status > /dev/ttyS0 2>&1 || true
-  # Service readiness
-  - systemctl is-active konductor-pki-vm konductor-pki-bundle konductor > /dev/ttyS0 2>&1 || true
+  # Konductor validation gate journal
+  - journalctl -u konductor --no-pager -o short > /dev/ttyS0 2>&1 || true
   - echo "═══ cloud-init runcmd complete ═══" > /dev/ttyS0
 EOF
 
@@ -1614,7 +1618,8 @@ echo "PKI tests complete"
 
 ### \_build:qcow2:vm:pki:status
 
-Display PKI certificate status from inside the VM for build attestation. This output is also captured via serial console in `build-vm.log`.
+Display PKI certificate status from inside the VM for build attestation. This output is also
+captured via serial console in `build-vm.log`.
 
 ```sh {"name":"_build:qcow2:vm:pki:status"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0

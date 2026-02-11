@@ -114,7 +114,7 @@ in {
     systemd.tmpfiles.rules = [
       "d /etc/konductor/pki 0755 root root -"
       "d /etc/konductor/pki/vm 0755 root root -"
-      "d /etc/konductor/pki/hypervisor 0700 root root -"
+      "d /etc/konductor/pki/hypervisor 0755 root root -"
       "d /etc/konductor/pki/bundle 0755 root root -"
     ];
 
