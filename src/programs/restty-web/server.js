@@ -139,6 +139,8 @@ function createPtySession(cols, rows) {
       ...process.env,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
+      // restty uses libghostty-vt WASM core — TERM_PROGRAM='ghostty' activates
+      // ghostty-specific shell integrations which restty supports natively
       TERM_PROGRAM: 'ghostty',
       TERM_PROGRAM_VERSION: '1.0',
       LANG: process.env.LANG || 'C.UTF-8',

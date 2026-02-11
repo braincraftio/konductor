@@ -12,43 +12,26 @@
       }
 
       /* =======================================================================
-       * Catppuccin Frappe Theme
-       * https://catppuccin.com/palette
-       * Matches: tmux, neovim, opencode, ttyd, ghostty-web configs
+       * Status bar chrome — uses CSS custom properties set by JS after
+       * restty loads the builtin theme.  Fallback values are neutral dark
+       * tones so the page renders acceptably before JS executes.
        * ======================================================================= */
       :root {
-        --ctp-rosewater: #f2d5cf;
-        --ctp-flamingo: #eebebe;
-        --ctp-pink: #f4b8e4;
-        --ctp-mauve: #ca9ee6;
-        --ctp-red: #e78284;
-        --ctp-maroon: #ea999c;
-        --ctp-peach: #ef9f76;
-        --ctp-yellow: #e5c890;
-        --ctp-green: #a6d189;
-        --ctp-teal: #81c8be;
-        --ctp-sky: #99d1db;
-        --ctp-sapphire: #85c1dc;
-        --ctp-blue: #8caaee;
-        --ctp-lavender: #babbf1;
-        --ctp-text: #c6d0f5;
-        --ctp-subtext1: #b5bfe2;
-        --ctp-subtext0: #a5adce;
-        --ctp-overlay2: #949cbb;
-        --ctp-overlay1: #838ba7;
-        --ctp-overlay0: #737994;
-        --ctp-surface2: #626880;
-        --ctp-surface1: #51576d;
-        --ctp-surface0: #414559;
-        --ctp-base: #303446;
-        --ctp-mantle: #292c3c;
-        --ctp-crust: #232634;
+        --bg: #1e1e2e;
+        --bg-alt: #181825;
+        --border: #313244;
+        --text: #cdd6f4;
+        --text-dim: #a6adc8;
+        --green: #a6e3a1;
+        --yellow: #f9e2af;
+        --red: #f38ba8;
+        --muted: #6c7086;
       }
 
       html,
       body {
         height: 100%;
-        background: var(--ctp-base);
+        background: var(--bg);
         font-family:
           system-ui,
           -apple-system,
@@ -66,12 +49,12 @@
         align-items: center;
         justify-content: space-between;
         padding: 8px 16px;
-        background: var(--ctp-mantle);
-        border-bottom: 1px solid var(--ctp-surface0);
+        background: var(--bg-alt);
+        border-bottom: 1px solid var(--border);
       }
 
       .title {
-        color: var(--ctp-text);
+        color: var(--text);
         font-size: 14px;
         font-weight: 500;
       }
@@ -81,27 +64,27 @@
         align-items: center;
         gap: 8px;
         font-size: 12px;
-        color: var(--ctp-subtext0);
+        color: var(--text-dim);
       }
 
       .status-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--ctp-overlay0);
+        background: var(--muted);
       }
 
       .status-dot.connected {
-        background: var(--ctp-green);
+        background: var(--green);
       }
 
       .status-dot.connecting {
-        background: var(--ctp-yellow);
+        background: var(--yellow);
         animation: pulse 1s infinite;
       }
 
       .status-dot.disconnected {
-        background: var(--ctp-red);
+        background: var(--red);
       }
 
       @keyframes pulse {
@@ -147,7 +130,35 @@
       // The restty fontSources use "local" type to match the embedded @font-face names.
       // =========================================================================
 
-      import { Restty, parseGhosttyTheme } from './restty/restty.js';
+      import { Restty, getBuiltinTheme } from './restty/restty.js';
+
+      // =========================================================================
+      // THEME — use restty's shipped builtin (no hardcoded colors)
+      // =========================================================================
+      // restty bundles 300+ Ghostty themes parsed at runtime from the
+      // assets/themes/ directory.  We select by name so upstream palette
+      // updates flow through automatically.
+
+      const THEME_NAME = 'Catppuccin Frappe';
+      const theme = getBuiltinTheme(THEME_NAME);
+
+      // Sync CSS custom properties from the loaded theme so the status bar
+      // chrome matches the terminal without duplicating color constants.
+      function syncCssVars(t) {
+        if (!t?.colors) return;
+        const c = t.colors;
+        const root = document.documentElement.style;
+        const hex = ({ r, g, b }) =>
+          '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+        if (c.background) root.setProperty('--bg', hex(c.background));
+        if (c.foreground) root.setProperty('--text', hex(c.foreground));
+        // palette[2]=green, palette[3]=yellow, palette[1]=red from ANSI
+        if (c.palette[2]) root.setProperty('--green', hex(c.palette[2]));
+        if (c.palette[3]) root.setProperty('--yellow', hex(c.palette[3]));
+        if (c.palette[1]) root.setProperty('--red', hex(c.palette[1]));
+      }
+
+      syncCssVars(theme);
 
       // =========================================================================
       // STATUS MANAGEMENT
@@ -160,35 +171,6 @@
         statusDot.className = 'status-dot ' + state;
         statusText.textContent = text;
       }
-
-      // =========================================================================
-      // CATPPUCCIN FRAPPE THEME (Ghostty format — native to restty)
-      // =========================================================================
-
-      const catppuccinFrappe = parseGhosttyTheme(`
-name = Catppuccin Frappe
-background = #303446
-foreground = #c6d0f5
-cursor-color = #f2d5cf
-selection-background = #838ba7
-selection-foreground = #c6d0f5
-palette = 0=#51576d
-palette = 1=#e78284
-palette = 2=#a6d189
-palette = 3=#e5c890
-palette = 4=#8caaee
-palette = 5=#ca9ee6
-palette = 6=#81c8be
-palette = 7=#b5bfe2
-palette = 8=#626880
-palette = 9=#e78284
-palette = 10=#a6d189
-palette = 11=#e5c890
-palette = 12=#8caaee
-palette = 13=#f4b8e4
-palette = 14=#99d1db
-palette = 15=#c6d0f5
-`);
 
       // =========================================================================
       // TERMINAL INITIALIZATION
@@ -235,8 +217,10 @@ palette = 15=#c6d0f5
           ],
         });
 
-        // Apply Catppuccin Frappe theme
-        restty.applyTheme(catppuccinFrappe, 'Catppuccin Frappe');
+        // Apply builtin theme (restty ships the full Ghostty theme catalog)
+        if (theme) {
+          restty.applyTheme(theme, THEME_NAME);
+        }
 
         // =====================================================================
         // WEBSOCKET CONNECTION
@@ -258,10 +242,9 @@ palette = 15=#c6d0f5
           // Use restty's built-in PTY connection
           restty.connectPty(ptyUrl);
 
-          // Poll connection status
+          // Poll connection status via public API (ResttyActivePaneApi)
           const checkConnection = setInterval(() => {
-            const pane = restty.getActivePane();
-            if (pane && pane.app.isPtyConnected()) {
+            if (restty.isPtyConnected()) {
               setStatus('connected', 'Connected');
               reconnectAttempts = 0;
               clearInterval(checkConnection);
@@ -272,8 +255,7 @@ palette = 15=#c6d0f5
           // Timeout connection check
           setTimeout(() => {
             clearInterval(checkConnection);
-            const pane = restty.getActivePane();
-            if (!pane || !pane.app.isPtyConnected()) {
+            if (!restty.isPtyConnected()) {
               setStatus('disconnected', 'Connection failed');
               if (reconnectAttempts < maxReconnectAttempts) {
                 reconnectAttempts++;
@@ -283,11 +265,9 @@ palette = 15=#c6d0f5
           }, 10000);
         }
 
-        // Auto-resize on window resize
+        // Auto-resize on window resize via public API (ResttyActivePaneApi)
         window.addEventListener('resize', () => {
-          for (const pane of restty.getPanes()) {
-            pane.app.updateSize(true);
-          }
+          restty.updateSize(true);
         });
 
         // Initial connection

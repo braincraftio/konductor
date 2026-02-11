@@ -23,32 +23,12 @@
 
 let
   # ===========================================================================
-  # CATPPUCCIN FRAPPE THEME (exported for NixOS module)
+  # THEME (selected by name — restty ships 300+ builtin Ghostty themes)
   # ===========================================================================
-  catppuccinFrappe = {
-    background = "#303446";
-    foreground = "#c6d0f5";
-    cursor = "#f2d5cf";
-    cursorAccent = "#303446";
-    selectionBackground = "rgba(131, 139, 167, 0.3)";
-    selectionForeground = "#c6d0f5";
-    black = "#51576d";
-    red = "#e78284";
-    green = "#a6d189";
-    yellow = "#e5c890";
-    blue = "#8caaee";
-    magenta = "#ca9ee6";
-    cyan = "#81c8be";
-    white = "#b5bfe2";
-    brightBlack = "#626880";
-    brightRed = "#e78284";
-    brightGreen = "#a6d189";
-    brightYellow = "#e5c890";
-    brightBlue = "#8caaee";
-    brightMagenta = "#f4b8e4";
-    brightCyan = "#99d1db";
-    brightWhite = "#c6d0f5";
-  };
+  # Palette colors are NOT duplicated here.  The frontend calls
+  # getBuiltinTheme(themeName) at runtime so upstream theme updates
+  # propagate automatically without touching Nix code.
+  themeName = "Catppuccin Frappe";
 
   # ===========================================================================
   # FONT CONFIGURATION
@@ -217,7 +197,7 @@ in
     RESTTY_WEB_STATIC = "${resttyWebServer}/lib/restty-web/static";
   };
 
-  theme = catppuccinFrappe;
+  theme = themeName;
   inherit fontFamily fontSize;
   inherit defaults;
 }

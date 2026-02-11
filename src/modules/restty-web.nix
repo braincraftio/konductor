@@ -24,7 +24,6 @@
 let
   cfg = config.services.restty-web;
   resttyWeb = import ../programs/restty-web { inherit pkgs lib; };
-  themeJson = builtins.toJSON resttyWeb.theme;
 
 in
 {
