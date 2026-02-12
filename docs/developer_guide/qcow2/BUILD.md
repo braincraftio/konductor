@@ -1434,6 +1434,20 @@ users:
     lock_passwd: true
     ssh_authorized_keys:
       - $(cat "$SSH_PUBKEY")
+write_files:
+  - path: /var/lib/konductor/services.toml
+    content: |
+      [port_bases]
+      ttyd = 7681
+      vscode = 8080
+      restty = 7685
+
+      [user_services.$USER]
+      ttyd = true
+      vscode = true
+      restty = false
+    owner: root:root
+    permissions: '0644'
 runcmd:
   # NOTE: /workspace mount is handled by systemd konductor-mount service
   # Do NOT add mount commands here - causes "already mounted" errors
@@ -1453,8 +1467,10 @@ runcmd:
   - journalctl -u konductor-pki-bundle --no-pager -o short > /dev/ttyS0 2>&1 || true
   # PKI certificate status (attestation)
   - PYTHONPATH=/opt/konductor/src/src python3 -m pki status > /dev/ttyS0 2>&1 || true
-  # Konductor validation gate journal
+  # Konductor orchestrator and validation gate journal
+  - journalctl -u konductor-init --no-pager -o short > /dev/ttyS0 2>&1 || true
   - journalctl -u konductor --no-pager -o short > /dev/ttyS0 2>&1 || true
+  - systemctl status 'konductor-vscode@*' 'konductor-ttyd@*' --no-pager > /dev/ttyS0 2>&1 || true
   - echo "═══ cloud-init runcmd complete ═══" > /dev/ttyS0
 EOF
 
@@ -1513,7 +1529,7 @@ qemu-system-x86_64 \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
     -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
     -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
-    -netdev user,id=net0,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22 \
+    -netdev user,id=net0,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22,hostfwd=tcp::8080-:8080,hostfwd=tcp::7681-:7681 \
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \

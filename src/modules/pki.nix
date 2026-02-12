@@ -155,6 +155,11 @@ in {
 
             echo "VM PKI generation complete"
 
+            # Make wildcard cert/key readable by kc2 group (for per-user services)
+            chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
+            chmod 640 /etc/konductor/pki/vm/wildcard.key
+            chmod 644 /etc/konductor/pki/vm/wildcard.crt
+
             # Output status to serial console for build attestation
             ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
           '';
