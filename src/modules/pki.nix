@@ -155,13 +155,36 @@ in {
 
             echo "VM PKI generation complete"
 
-            # Make wildcard cert/key readable by kc2 group (for per-user services)
+            # Output status to serial console for build attestation
+            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
+          '';
+        };
+      };
+
+      # =====================================================================
+      # PKI Permissions
+      # =====================================================================
+      # Sets wildcard cert/key group to kc2 so per-user services can read them.
+      # Runs unconditionally (no ConditionPathExists guard) because certs may
+      # be baked into the image at build time, skipping konductor-pki-vm.
+      konductor-pki-permissions = {
+        description = "Set Konductor PKI file permissions";
+        after = [ "konductor-pki-vm.service" ];
+        wantedBy = [ "multi-user.target" ];
+
+        unitConfig = {
+          ConditionPathExists = "/etc/konductor/pki/vm/wildcard.key";
+        };
+
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = pkgs.writeShellScript "set-pki-permissions" ''
+            set -euo pipefail
             chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
             chmod 640 /etc/konductor/pki/vm/wildcard.key
             chmod 644 /etc/konductor/pki/vm/wildcard.crt
-
-            # Output status to serial console for build attestation
-            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
+            echo "PKI permissions set: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
           '';
         };
       };
