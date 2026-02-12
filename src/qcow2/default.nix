@@ -815,12 +815,12 @@ let
         konductor = {
           description = "Konductor Validation Gate";
           after = [
-            "cloud-final.service"
+            "cloud-init.service"
             "local-fs.target"
             "network.target"
             "konductor-pki-bundle.service"
           ];
-          wants = [ "cloud-final.service" "konductor-pki-bundle.service" ];
+          wants = [ "konductor-pki-bundle.service" ];
           wantedBy = [ "multi-user.target" ];
           path = with pkgs; [ coreutils gnused git nix jq findutils gnugrep util-linux ];
           serviceConfig = {
@@ -1062,7 +1062,7 @@ let
         #   - docker: For pulling container images
         #
         # CRITICAL ORDERING:
-        #   - MUST run AFTER cloud-final.service (when write_files completes)
+        #   - MUST run AFTER cloud-init.service (when write_files completes)
         #   - MUST run BEFORE nix-daemon/docker to configure them on first boot
         #   - Explicitly restarts services to handle case where they started early
         #
@@ -1079,8 +1079,7 @@ let
         konductor-proxy-setup = {
           description = "Configure proxy for system services from cloud-init";
           # Wait for cloud-init to complete (when proxy.env is written)
-          after = [ "cloud-final.service" ];
-          requires = [ "cloud-final.service" ];
+          after = [ "cloud-init.service" ];
           # Start before these services (for ordering on subsequent boots)
           before = [ "nix-daemon.service" "docker.service" ];
           # Activate via multi-user target (not wantedBy the services themselves)
@@ -1163,9 +1162,8 @@ let
         konductor-ca-setup = {
           description = "Configure CA trust from cloud-init cluster CA";
           before = [ "forgejo-runner.service" ];
-          # Wait for cloud-final.service (when write_files completes)
-          after = [ "cloud-final.service" ];
-          requires = [ "cloud-final.service" ];
+          # Wait for cloud-init to write files (cluster-ca.crt)
+          after = [ "cloud-init.service" ];
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
             ConditionPathExists = "/etc/konductor/cluster-ca.crt";
@@ -1874,10 +1872,7 @@ EOF
       diskSize = lib.mkDefault (30 * 1024); # 30GB (full konductor environment)
 
       # Docker - starts on boot after cloud-init and proxy configuration
-      # Ordering: cloud-final → konductor-proxy-setup → docker
-      # Note: enableOnBoot=true required to avoid circular dependency when
-      # cloud-init runcmd starts docker (runcmd blocks → docker waits for
-      # proxy-setup → proxy-setup waits for cloud-final → deadlock)
+      # Ordering: cloud-init → konductor-proxy-setup → docker
       docker = {
         enable = true;
         enableOnBoot = true;
