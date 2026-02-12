@@ -1068,7 +1068,7 @@ let
               NIX_DRV=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' /.konductor)
 
               echo "  ✓ provenance: /.konductor"
-              [ -n "$GIT_COMMIT" ] && echo "  ✓ git_commit: ''${GIT_COMMIT:0:12}"
+              [ -n "$GIT_COMMIT" ] && echo "  ✓ git_commit: $GIT_COMMIT"
               [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && echo "  ✓ nix_drv: $NIX_DRV"
 
               if [ "$GIT_DIRTY" != "0" ]; then
@@ -1081,7 +1081,7 @@ let
                 cd /opt/konductor/src
                 ACTUAL_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 if [ "$GIT_COMMIT" != "$ACTUAL_COMMIT" ]; then
-                  echo "  ✗ git_commit mismatch: expected ''${GIT_COMMIT:0:12}, got ''${ACTUAL_COMMIT:0:12}"
+                  echo "  ✗ git_commit mismatch: expected $GIT_COMMIT, got $ACTUAL_COMMIT"
                   ((ERRORS++)) || true
                 fi
 
@@ -1092,7 +1092,7 @@ let
                     echo "  ✗ flake_lock mismatch"
                     ((ERRORS++)) || true
                   else
-                    echo "  ✓ flake_lock: ''${EXPECTED_LOCK:0:12}..."
+                    echo "  ✓ flake_lock: $EXPECTED_LOCK"
                   fi
                 fi
                 cd /
@@ -1178,8 +1178,8 @@ let
               # DETERMINE EXIT STATUS
               # ─────────────────────────────────────────────────────────────────────
               IDENTITY="Konductor"
-              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV:0:12}"
-              [ -n "$GIT_COMMIT" ] && [ "$GIT_COMMIT" != "unknown" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT:0:7}"
+              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV}"
+              [ -n "$GIT_COMMIT" ] && [ "$GIT_COMMIT" != "unknown" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT}"
 
               if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
                 # All checks passed

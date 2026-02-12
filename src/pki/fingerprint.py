@@ -250,16 +250,16 @@ class Fingerprint:
             if self.git_commit != discovered.git_commit:
                 errors.append(
                     f"git_commit mismatch: "
-                    f"baked={self.git_commit[:12]} "
-                    f"discovered={discovered.git_commit[:12]}"
+                    f"baked={self.git_commit} "
+                    f"discovered={discovered.git_commit}"
                 )
 
         if self.flake_lock_sha256 and discovered.flake_lock_sha256:
             if self.flake_lock_sha256 != discovered.flake_lock_sha256:
                 errors.append(
                     f"flake_lock_sha256 mismatch: "
-                    f"baked={self.flake_lock_sha256[:16]}... "
-                    f"discovered={discovered.flake_lock_sha256[:16]}..."
+                    f"baked={self.flake_lock_sha256} "
+                    f"discovered={discovered.flake_lock_sha256}"
                 )
 
         return errors

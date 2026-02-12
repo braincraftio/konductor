@@ -100,7 +100,7 @@ oci_image=$(sed -n 's/^oci_image = "\(.*\)"$/\1/p' /.konductor)
 git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
 
 # Pull source container
-docker pull "${oci_image}:git-${git_commit:0:7}"
+docker pull "${oci_image}:qcow2-${git_commit}"
 ```
 
 ### Example
@@ -513,10 +513,10 @@ nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
 # Build tag list
 TAGS=("$BASE_TAG")
 if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-    TAGS+=("git-${git_commit:0:7}")
+    TAGS+=("qcow2-${git_commit}")
 fi
 if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-    TAGS+=("nix-${nix_drv:0:12}")
+    TAGS+=("qcow2-${nix_drv}")
 fi
 
 # Push with all tags
@@ -1143,10 +1143,10 @@ nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' "$PROVENANCE_FILE")
 # Build tag list
 TAGS=("$DST_TAG")
 if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-    TAGS+=("git-${git_commit:0:7}")
+    TAGS+=("qcow2-${git_commit}")
 fi
 if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-    TAGS+=("nix-${nix_drv:0:12}")
+    TAGS+=("qcow2-${nix_drv}")
 fi
 
 echo ""
@@ -1701,8 +1701,8 @@ OCI_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-contai
 
 # Build tag list for provenance
 OCI_TAGS="[\"${CONTAINER_TAG:-latest-qcow2}\""
-[ "$GIT_DIRTY" = "0" ] && OCI_TAGS+=", \"git-${GIT_COMMIT:0:7}\""
-OCI_TAGS+=", \"nix-${NIX_DRV:0:12}\""
+[ "$GIT_DIRTY" = "0" ] && OCI_TAGS+=", \"qcow2-${GIT_COMMIT}\""
+OCI_TAGS+=", \"qcow2-${NIX_DRV}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM
