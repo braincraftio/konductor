@@ -52,6 +52,204 @@ let
   # Systemd mount service template for virtio disk mounting
   mountService = import ./konductor-mount-template.nix { inherit pkgs; };
 
+  # Pre-installed VS Code extensions for code-server
+  # Symlinked into each user's extensions dir at service start
+  vscodeExtensionsList = with pkgs.vscode-extensions; [
+    # Theme
+    catppuccin.catppuccin-vsc            # Catppuccin theme (default)
+    catppuccin.catppuccin-vsc-icons      # Catppuccin file icons
+
+    # Language support — Python
+    ms-python.python                     # Python language server + debugging
+    ms-python.vscode-pylance             # Pylance type checker
+    ms-python.debugpy                    # Python debugger
+    charliermarsh.ruff                   # Ruff linter/formatter
+
+    # Language support — Go
+    golang.go                            # Go language server (gopls)
+
+    # Language support — Rust
+    rust-lang.rust-analyzer              # Rust analyzer
+
+    # Language support — JavaScript/TypeScript
+    dbaeumer.vscode-eslint               # ESLint integration
+
+    # Language support — Nix
+    jnoortheen.nix-ide                   # Nix language support
+    mkhl.direnv                          # direnv integration
+
+    # Language support — Shell
+    timonwong.shellcheck                 # ShellCheck linter
+    foxundermoon.shell-format            # Shell script formatter
+
+    # Config file support
+    redhat.vscode-yaml                   # YAML language server
+    tamasfe.even-better-toml             # TOML language server
+    ms-azuretools.vscode-docker          # Dockerfile + Compose
+
+    # Editor tools
+    editorconfig.editorconfig            # EditorConfig support
+    esbenp.prettier-vscode               # Prettier formatter
+    christian-kohler.path-intellisense   # Path autocompletion
+    gruntfuggly.todo-tree                # TODO/FIXME tree view
+    usernamehw.errorlens                 # Inline error/warning display
+    vscodevim.vim                        # Vim keybindings
+    streetsidesoftware.code-spell-checker # Spell checking
+    alefragnani.bookmarks                # Bookmarkable lines
+    formulahendry.auto-rename-tag        # Auto-rename paired HTML/XML tags
+
+    # Markdown
+    bierner.github-markdown-preview      # GitHub-flavored markdown preview
+    bierner.markdown-mermaid             # Mermaid diagram support
+    davidanson.vscode-markdownlint       # Markdown linting
+    yzhang.markdown-all-in-one           # Markdown TOC, preview, shortcuts
+
+    # Remote development
+    ms-vscode-remote.remote-ssh          # SSH into remote hosts
+    ms-vscode-remote.remote-ssh-edit     # Edit SSH config
+    ms-vscode-remote.remote-containers   # Dev containers support
+    ms-vscode.remote-explorer            # Remote explorer UI
+
+    # Infrastructure
+    ms-kubernetes-tools.vscode-kubernetes-tools  # Kubernetes cluster management
+
+    # Nix (additional)
+    bbenoist.nix                          # Nix syntax highlighting
+    arrterian.nix-env-selector           # Nix environment selector
+
+    # Debugging
+    vadimcn.vscode-lldb                  # LLDB debugger (Rust/C/C++)
+
+    # Collaboration
+    ms-vsliveshare.vsliveshare           # Live Share real-time collaboration
+
+    # Git & GitHub
+    eamodio.gitlens                      # Git blame, history, annotations
+    mhutchie.git-graph                   # Git commit graph visualization
+    github.vscode-github-actions         # GitHub Actions workflow support
+    github.vscode-pull-request-github    # GitHub PR and issue integration
+
+    # AI
+    github.copilot                       # GitHub Copilot
+    github.copilot-chat                  # GitHub Copilot Chat
+  ] ++ [
+    # Extensions not in nixpkgs or with stale nixpkgs hashes — fetched from VS Code Marketplace
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "claude-code";
+      publisher = "anthropic";
+      version = "2.0.50";
+      sha256 = "sha256-Pd4rRLS613/zSn8Pvr/cozaIAqrG06lmUC6IxHm97XQ=";
+    })
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "runme";
+      publisher = "stateful";
+      version = "3.16.1";
+      sha256 = "sha256-o7wYCCnVGzUDNr2Lb+ovbifn/Zq7IU/jZUPQJVeFPeI=";
+    })
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "mise-vscode";
+      publisher = "hverlin";
+      version = "1.3.0";
+      sha256 = "sha256-uYpc2+eXmIAqOOviywitAUxXLc6+cZl/CdeoBZsW5C8=";
+    })
+    # GitHub Local Actions
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "github-local-actions";
+      publisher = "sanjulaganepola";
+      version = "1.2.5";
+      sha256 = "sha256-gc3iOB/ibu4YBRdeyE6nmG72RbAsV0WIhiD8x2HNCfY=";
+    })
+    # TODO highlight
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "vscode-todo-highlight";
+      publisher = "wayou";
+      version = "1.0.5";
+      sha256 = "sha256-CQVtMdt/fZcNIbH/KybJixnLqCsz5iF1U0k+GfL65Ok=";
+    })
+    # Python environment selector
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "vscode-python-envs";
+      publisher = "ms-python";
+      version = "1.16.0";
+      sha256 = "sha256-81bFme63+UHrti1JWU8jlfj79k9bFVyqnY0SyaVO6Dc=";
+    })
+    # Pulumi IaC
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "pulumi-lsp-client";
+      publisher = "pulumi";
+      version = "0.3.2024091924";
+      sha256 = "sha256-yWQY5/JpOKw4gerzy04er39Qsc87qnSz4C1tDC34BLw=";
+    })
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "pulumi-vscode-tools";
+      publisher = "pulumi";
+      version = "0.4.0";
+      sha256 = "sha256-VthowmmNENCcJGiFQpORGoVDMVAZX4k1f8YkFB7cD0c=";
+    })
+    (pkgs.vscode-utils.extensionFromVscodeMarketplace {
+      name = "pulumi-vscode-copilot";
+      publisher = "pulumi";
+      version = "0.3.4";
+      sha256 = "sha256-2XLSTlkPMj+z6WL/CCEaFnU1trYZqYcPrODg+S67gcE=";
+    })
+  ];
+
+  # Combined extensions directory: /nix/store/...-vscode-extensions/share/vscode/extensions/
+  vscodeExtensionsDir = pkgs.symlinkJoin {
+    name = "vscode-extensions";
+    paths = vscodeExtensionsList;
+  };
+
+  # Default VS Code settings (copied to user dir on first start, user can modify)
+  vscodeDefaultSettings = pkgs.writeText "vscode-settings.json" (builtins.toJSON {
+    # Window
+    "window.title" = "\${dirty}\${activeEditorShort}\${separator}\${rootName}";
+
+    # Theme
+    "workbench.colorTheme" = "Catppuccin Frappé";
+    "workbench.iconTheme" = "catppuccin-frappe";
+
+    # Terminal
+    "terminal.integrated.fontFamily" = "JetBrainsMono Nerd Font";
+    "terminal.integrated.fontSize" = 14;
+    "terminal.integrated.defaultProfile.linux" = "bash";
+    "terminal.integrated.profiles.linux" = {
+      bash = { path = "/bin/bash"; args = ["-l"]; };
+    };
+
+    # Editor
+    "editor.fontFamily" = "JetBrainsMono Nerd Font, monospace";
+    "editor.fontSize" = 14;
+    "editor.lineNumbers" = "relative";
+    "editor.formatOnSave" = true;
+    "editor.formatOnPaste" = true;
+    "editor.rulers" = [80 120];
+    "editor.bracketPairColorization.enabled" = true;
+    "editor.guides.bracketPairs" = true;
+
+    # Files
+    "files.trimTrailingWhitespace" = true;
+    "files.insertFinalNewline" = true;
+
+    # Git
+    "git.ignoreLimitWarning" = true;
+    "github.gitAuthentication" = true;
+
+    # Go
+    "go.toolsManagement.checkForUpdates" = "off";
+    "go.useLanguageServer" = true;
+
+    # Rust
+    "rust-analyzer.check.command" = "clippy";
+
+    # Nix
+    "nix.enableLanguageServer" = true;
+    "nix.serverPath" = "nixd";
+
+    # direnv
+    "direnv.restart.automatic" = true;
+  });
+
   # PKI module for VM identity and certificate chain of trust
   pkiModule = import ../modules/pki.nix;
 
@@ -1498,6 +1696,8 @@ EOF
                       ;;
                     vscode)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
+ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/extensions && for ext in ${vscodeExtensionsDir}/share/vscode/extensions/*; do ln -sfn "\$ext" /home/''${username}/.local/share/code-server/extensions/; done'
+ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/User && test -f /home/''${username}/.local/share/code-server/User/settings.json || cp ${vscodeDefaultSettings} /home/''${username}/.local/share/code-server/User/settings.json'
 ExecStart=${pkgs.code-server}/bin/code-server \\
   --bind-addr 0.0.0.0:\''${PORT} \\
   --user-data-dir /home/''${username}/.local/share/code-server \\
