@@ -1583,13 +1583,12 @@ EOF
 
             # Wait for all boot dependencies
             after = [
-              "cloud-final.service"
+              "cloud-init.service"
               "network-online.target"
               "konductor-proxy-setup.service"
               "workspace-mount.service"
             ];
             wants = [ "network-online.target" ];
-            after = [ "cloud-init.service" ];
 
             wantedBy = [ "multi-user.target" ];
 
