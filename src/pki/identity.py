@@ -103,12 +103,12 @@ class CertificateIdentity:
     @property
     def short_commit(self) -> str:
         c = self.fingerprint.git_commit
-        return c[:7] if c else "unknown"
+        return c[:7] if c else "orphaned"
 
     @property
     def short_nix_drv(self) -> str:
         d = self.fingerprint.nix_drv
-        return d[:12] if d else "unknown"
+        return d[:12] if d else "orphaned"
 
     def ns_comment(self, cert_type: str, trust_tier: TrustTier) -> str:
         """Build nsComment string for browser certificate viewer.

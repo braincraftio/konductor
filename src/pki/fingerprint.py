@@ -1,27 +1,45 @@
-"""Parse the /.konductor build fingerprint and /etc/os-release.
+"""Parse /.konductor and self-discover provenance from the source tree.
 
-The /.konductor file is a TOML file baked into every QCOW2 image at build
-time by the build pipeline (_build:qcow2:vm:provenance task in BUILD.md).
-It contains git, nix, and build metadata used to derive certificate identity.
+Two provenance sources, one truth:
 
-/etc/os-release provides NixOS version information for additional provenance.
+1. /.konductor -- TOML file baked by the build pipeline. Contains git,
+   nix, and build metadata written at image build time.
+
+2. /opt/konductor/src -- the source tree shipped inside every VM,
+   including .git history. Self-discoverable at runtime.
+
+When /.konductor exists, it MUST parse cleanly and its git_commit MUST
+match the source tree. Any mismatch is a build integrity failure and
+the tool refuses to generate certificates.
+
+When /.konductor does not exist (first boot, pre-provenance), certs are
+explicitly marked ephemeral. "unknown" is never acceptable output.
+
+/etc/os-release provides NixOS version information.
 """
 
 from __future__ import annotations
 
+import hashlib
 import socket
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pki import config
 
 
+class FingerprintError(Exception):
+    """Raised when /.konductor exists but cannot be parsed or validated."""
+
+
 @dataclass(frozen=True)
 class Fingerprint:
     """Build fingerprint from /.konductor TOML.
 
-    All fields are optional -- when the file doesn't exist or a field
-    is missing, the value is None and consumers use defaults.
+    All fields are optional only in the ephemeral (pre-provenance) case
+    when /.konductor does not exist. When the file exists, critical
+    fields (git_commit, nix_drv) must be present and valid.
     """
 
     git_commit: str | None = None
@@ -42,28 +60,45 @@ class Fingerprint:
     image_sha256: str | None = None
     image_size: str | None = None
 
+    @property
+    def is_ephemeral(self) -> bool:
+        """True when no provenance data is available (pre-provenance boot)."""
+        return self.git_commit is None and self.nix_drv is None
+
     @classmethod
     def load(cls, path: Path | None = None) -> Fingerprint:
-        """Load fingerprint from TOML file. Returns empty on failure."""
+        """Load fingerprint from TOML file.
+
+        Returns empty Fingerprint (ephemeral) when file does not exist.
+        Raises FingerprintError when file exists but cannot be parsed.
+        """
         path = Path(path) if path else config.FINGERPRINT_PATH
 
         if not path.exists():
             return cls()
 
+        # Parse TOML -- errors are fatal, not silent
         try:
             import tomllib
         except ModuleNotFoundError:
-            # Python < 3.11 fallback
             try:
                 import tomli as tomllib  # type: ignore[no-redef]
             except ModuleNotFoundError:
-                return cls._parse_fallback(path)
+                # No TOML library: use line parser (still strict)
+                return cls._parse_strict(path)
 
         try:
             with open(path, "rb") as f:
                 data = tomllib.load(f)
-        except Exception:
-            return cls()
+        except Exception as exc:
+            # TOML parse failure is a build integrity error
+            # Show the actual error so the operator can fix the source
+            raise FingerprintError(
+                f"Failed to parse {path}: {exc}\n"
+                f"  This indicates a malformed /.konductor file.\n"
+                f"  The build pipeline wrote invalid TOML.\n"
+                f"  Refusing to generate certificates with corrupt provenance."
+            ) from exc
 
         # /.konductor has a [konductor] section
         section = data.get("konductor", data)
@@ -89,11 +124,11 @@ class Fingerprint:
         )
 
     @classmethod
-    def _parse_fallback(cls, path: Path) -> Fingerprint:
-        """Minimal TOML parser for when tomllib/tomli are unavailable.
+    def _parse_strict(cls, path: Path) -> Fingerprint:
+        """Line-by-line TOML parser for when tomllib is unavailable.
 
-        Only handles the simple key = "value" and key = number patterns
-        present in /.konductor. Does NOT handle nested tables, arrays, etc.
+        Handles simple key = "value" and key = number patterns.
+        Raises FingerprintError on any parse failure.
         """
         values: dict[str, str] = {}
         try:
@@ -107,8 +142,10 @@ class Fingerprint:
                 key = key.strip()
                 val = val.strip().strip('"')
                 values[key] = val
-        except Exception:
-            return cls()
+        except Exception as exc:
+            raise FingerprintError(
+                f"Failed to read {path}: {exc}"
+            ) from exc
 
         dirty = values.get("git_dirty")
         return cls(
@@ -129,6 +166,125 @@ class Fingerprint:
             image_sha256=values.get("image_sha256"),
             image_size=values.get("image_size"),
         )
+
+    @classmethod
+    def discover(cls, source_tree: Path | None = None) -> Fingerprint:
+        """Self-discover provenance from the source tree and running system.
+
+        Gathers what can be determined from:
+        - /opt/konductor/src/.git (git commit, branch, remote, dirty)
+        - /opt/konductor/src/flake.lock (sha256)
+
+        Only populates fields that are directly comparable to /.konductor.
+        Does NOT discover nix_drv (/.konductor stores the flake output
+        hash from the build host; /run/current-system is the system
+        derivation hash — different semantic, comparing them is wrong).
+
+        Returns a Fingerprint with only discoverable fields populated.
+        Fields that require build context (build_date, build_host,
+        build_user, oci_image, oci_tags) are left None.
+        """
+        src = source_tree or config.SOURCE_TREE
+        git_dir = src / ".git"
+
+        git_commit = None
+        git_branch = None
+        git_remote = None
+        git_dirty = None
+
+        if git_dir.exists():
+            git_commit = _run_strict(
+                ["git", "-C", str(src), "rev-parse", "HEAD"],
+                "git rev-parse HEAD",
+            )
+            branch = _run_strict(
+                ["git", "-C", str(src), "rev-parse", "--abbrev-ref", "HEAD"],
+                "git rev-parse --abbrev-ref HEAD",
+            )
+            git_branch = branch if branch != "HEAD" else None
+            git_remote = _run_strict(
+                ["git", "-C", str(src), "remote", "get-url", "origin"],
+                "git remote get-url origin",
+            )
+            porcelain = _run_strict(
+                ["git", "-C", str(src), "status", "--porcelain"],
+                "git status --porcelain",
+            )
+            git_dirty = len(porcelain.splitlines()) if porcelain else 0
+
+        # flake.lock sha256
+        flake_lock = src / "flake.lock"
+        flake_lock_sha256 = None
+        if flake_lock.exists():
+            flake_lock_sha256 = hashlib.sha256(
+                flake_lock.read_bytes()
+            ).hexdigest()
+
+        return cls(
+            git_commit=git_commit,
+            git_branch=git_branch,
+            git_remote=git_remote,
+            git_dirty=git_dirty,
+            flake_lock_sha256=flake_lock_sha256,
+        )
+
+    def validate_against(self, discovered: Fingerprint) -> list[str]:
+        """Validate baked provenance against self-discovered values.
+
+        Returns list of validation errors. Empty list = valid.
+        Only validates fields that are present in both baked and discovered.
+        """
+        errors: list[str] = []
+
+        if self.git_commit and discovered.git_commit:
+            if self.git_commit != discovered.git_commit:
+                errors.append(
+                    f"git_commit mismatch: "
+                    f"baked={self.git_commit[:12]} "
+                    f"discovered={discovered.git_commit[:12]}"
+                )
+
+        if self.flake_lock_sha256 and discovered.flake_lock_sha256:
+            if self.flake_lock_sha256 != discovered.flake_lock_sha256:
+                errors.append(
+                    f"flake_lock_sha256 mismatch: "
+                    f"baked={self.flake_lock_sha256[:16]}... "
+                    f"discovered={discovered.flake_lock_sha256[:16]}..."
+                )
+
+        return errors
+
+
+def _run_strict(cmd: list[str], description: str) -> str:
+    """Run a command and return stripped stdout. Raises on failure.
+
+    Every discovery command is expected to succeed when its
+    preconditions are met (e.g. .git exists). Failures indicate
+    a broken source tree, not an expected condition.
+    """
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception as exc:
+        raise FingerprintError(
+            f"Discovery command failed: {description}\n"
+            f"  Command: {' '.join(cmd)}\n"
+            f"  Error: {exc}"
+        ) from exc
+
+    if result.returncode != 0:
+        raise FingerprintError(
+            f"Discovery command failed: {description}\n"
+            f"  Command: {' '.join(cmd)}\n"
+            f"  Exit code: {result.returncode}\n"
+            f"  Stderr: {result.stderr.strip()}"
+        )
+
+    return result.stdout.strip()
 
 
 @dataclass(frozen=True)

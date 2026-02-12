@@ -29,7 +29,7 @@ from pki.crypto.keys import (
     write_private_key,
 )
 from pki.crypto.leaf import build_leaf_certificate
-from pki.fingerprint import Fingerprint, OSRelease
+from pki.fingerprint import Fingerprint, FingerprintError, OSRelease
 from pki.identity import CertificateIdentity, TrustTier
 from pki.utils import action, atomic_write, ensure_dir, err, info, ok
 
@@ -39,7 +39,10 @@ def _load_identity(
     organization: str | None = None,
     ou: str | None = None,
 ) -> CertificateIdentity:
-    """Load fingerprint + OS release and build certificate identity."""
+    """Load fingerprint + OS release and build certificate identity.
+
+    Raises FingerprintError if /.konductor exists but is corrupt.
+    """
     fp = Fingerprint.load()
     osr = OSRelease.load()
     return CertificateIdentity(
@@ -49,6 +52,28 @@ def _load_identity(
         fingerprint=fp,
         osrelease=osr,
     )
+
+
+def _validate_provenance(fp: Fingerprint) -> None:
+    """Validate baked provenance against self-discovered source tree.
+
+    When /.konductor exists (non-ephemeral), self-discovers provenance
+    from /opt/konductor/src and validates critical fields match.
+    Raises FingerprintError on mismatch.
+    """
+    if fp.is_ephemeral:
+        return
+
+    discovered = Fingerprint.discover()
+    errors = fp.validate_against(discovered)
+    if errors:
+        raise FingerprintError(
+            "Provenance integrity validation FAILED:\n"
+            + "\n".join(f"  ✗ {e}" for e in errors)
+            + "\n  Baked /.konductor does not match source tree at "
+            + str(config.SOURCE_TREE)
+            + "\n  Refusing to generate certificates with mismatched provenance."
+        )
 
 
 # =====================================================================
@@ -61,6 +86,11 @@ def cmd_generate(args: list[str]) -> int:
 
     Idempotent: skips if /etc/konductor/pki/vm/ca.crt already exists
     unless --force is passed.
+
+    Provenance enforcement:
+    - If /.konductor exists but is malformed: FAIL (FingerprintError)
+    - If /.konductor exists but mismatches source tree: FAIL
+    - If /.konductor does not exist: orphaned certs, loud warning
     """
     force = "--force" in args
     domain = _extract_flag(args, "--domain")
@@ -76,21 +106,42 @@ def cmd_generate(args: list[str]) -> int:
         info("Use --force to regenerate")
         return 0
 
+    # Load identity -- FingerprintError propagates as fatal exit
     identity = _load_identity(domain, org, ou)
+
+    # Validate baked provenance against source tree
+    _validate_provenance(identity.fingerprint)
+
     trust_tier = TrustTier.SELF_SIGNED
 
     print(
         "═══════════════════════════════════════════════════════════════"
     )
-    print("  Konductor PKI -- Self-Signed Certificate Generation")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    if identity.fingerprint.is_ephemeral:
+        print("  ⚠ Konductor PKI -- ORPHANED Certificate Generation")
+        print(
+            "═══════════════════════════════════════════════════════════════"
+        )
+        print()
+        err("/.konductor not found -- generating ORPHANED certificates")
+        err("Certs will be marked git:orphaned | nix:orphaned")
+        err("These certs have NO provenance chain and CANNOT be audited")
+        err("Run the build pipeline to write /.konductor and regenerate")
+        print()
+    else:
+        print("  Konductor PKI -- Self-Signed Certificate Generation")
+        print(
+            "═══════════════════════════════════════════════════════════════"
+        )
     info(f"Domain: {identity.domain}")
     info(f"Organization: {identity.organization}")
     info(f"OU: {identity.organizational_unit}")
     info(f"Serial: {identity.serial_hex}")
     info(f"Trust tier: {trust_tier.display}")
+    if not identity.fingerprint.is_ephemeral:
+        info(f"Git: {identity.fingerprint.git_commit}")
+        info(f"Nix: {identity.fingerprint.nix_drv}")
+        info(f"Built: {identity.fingerprint.build_date} by {identity.fingerprint.build_user}@{identity.fingerprint.build_host}")
     print()
 
     # Ensure directories
@@ -396,28 +447,60 @@ def cmd_status(args: list[str]) -> int:
 
     # Build fingerprint
     print()
-    print("  Build Fingerprint:")
+    print("  Build Fingerprint (/.konductor):")
+    fp: Fingerprint | None = None
     if config.FINGERPRINT_PATH.exists():
-        ok(f"/.konductor: {config.FINGERPRINT_PATH}")
-        fp = Fingerprint.load()
-        if fp.git_commit:
-            info(f"git_commit:  {fp.git_commit}")
-        if fp.git_branch:
-            info(f"git_branch:  {fp.git_branch}")
-        if fp.git_remote:
-            info(f"git_remote:  {fp.git_remote}")
-        if fp.nix_drv:
-            info(f"nix_drv:     {fp.nix_drv}")
-        if fp.nix_hash:
-            info(f"nix_hash:    {fp.nix_hash}")
-        if fp.build_date:
-            info(f"build_date:  {fp.build_date}")
-        if fp.build_host:
-            info(f"build_host:  {fp.build_host}")
-        if fp.build_user:
-            info(f"build_user:  {fp.build_user}")
+        try:
+            fp = Fingerprint.load()
+        except FingerprintError as exc:
+            err(f"CORRUPT: {exc}")
+            print()
+            return 1
+
+        if fp.is_ephemeral:
+            err("ORPHANED: /.konductor exists but contains no provenance data")
+        else:
+            ok(f"Parsed: {config.FINGERPRINT_PATH}")
+            info(f"git_commit:       {fp.git_commit}")
+            info(f"git_branch:       {fp.git_branch}")
+            info(f"git_remote:       {fp.git_remote}")
+            info(f"nix_drv:          {fp.nix_drv}")
+            info(f"nix_hash:         {fp.nix_hash}")
+            info(f"build_date:       {fp.build_date}")
+            info(f"build_host:       {fp.build_host}")
+            info(f"build_user:       {fp.build_user}")
     else:
-        info("/.konductor: not found (pre-provenance or non-QCOW2)")
+        err("ORPHANED: /.konductor not found (pre-provenance)")
+
+    # Self-discovery from source tree
+    print()
+    print("  Source Tree Discovery:")
+    src_exists = config.SOURCE_TREE.exists()
+    if src_exists:
+        try:
+            discovered = Fingerprint.discover()
+            if discovered.git_commit:
+                ok(f"git_commit:        {discovered.git_commit}")
+            if discovered.flake_lock_sha256:
+                ok(f"flake_lock_sha256: {discovered.flake_lock_sha256}")
+        except FingerprintError as exc:
+            err(f"Discovery failed: {exc}")
+            discovered = None
+    else:
+        info(f"Source tree not found at {config.SOURCE_TREE}")
+        discovered = None
+
+    # Cross-validate baked vs discovered
+    if fp is not None and not fp.is_ephemeral and discovered is not None:
+        errors = fp.validate_against(discovered)
+        print()
+        if errors:
+            print("  ⚠ Provenance Validation: FAILED")
+            for e in errors:
+                err(e)
+        else:
+            print("  Provenance Validation: PASSED")
+            ok("Baked /.konductor matches source tree self-discovery")
 
     print()
     return 0

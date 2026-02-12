@@ -42,7 +42,7 @@ from pki.crypto.keys import (
     write_private_key,
 )
 from pki.crypto.leaf import build_leaf_certificate
-from pki.fingerprint import Fingerprint, OSRelease
+from pki.fingerprint import Fingerprint, FingerprintError, OSRelease
 from pki.identity import CertificateIdentity, TrustTier
 
 
@@ -352,12 +352,12 @@ class TestHypervisorFlow:
 
 
 # =====================================================================
-# No-fingerprint fallback (missing /.konductor)
+# Orphaned certificates (missing /.konductor)
 # =====================================================================
 
 
 class TestNoFingerprint:
-    """Certs must generate cleanly even without /.konductor file."""
+    """Certs must generate cleanly even without /.konductor (orphaned mode)."""
 
     def test_generate_with_empty_fingerprint(self, empty_identity):
         ca_key = generate_ca_key()
@@ -527,9 +527,11 @@ class TestBundle:
 
 class TestFingerprint:
     def test_load_missing_file(self, tmp_path):
+        """Missing /.konductor returns ephemeral fingerprint (pre-provenance)."""
         fp = Fingerprint.load(tmp_path / "nonexistent")
         assert fp.git_commit is None
         assert fp.build_date is None
+        assert fp.is_ephemeral is True
 
     def test_load_toml(self, tmp_path):
         toml_file = tmp_path / ".konductor"
@@ -543,16 +545,53 @@ class TestFingerprint:
         assert fp.git_commit == "abc123"
         assert fp.git_branch == "main"
         assert fp.build_date == "2025-01-15"
+        assert fp.is_ephemeral is False
 
-    def test_fallback_parser(self, tmp_path):
+    def test_load_corrupt_toml_raises(self, tmp_path):
+        """Malformed TOML must raise FingerprintError, never silently degrade."""
+        bad_file = tmp_path / ".konductor"
+        bad_file.write_text(textwrap.dedent("""\
+            [konductor]
+            git_commit = "abc123"
+            nix_version = "nix (Lix, like Nix) 2.93.0
+            System type: x86_64-linux
+            Features: gc, signed-caches"
+            nix_drv = "abc123xyz456"
+        """))
+        with pytest.raises(FingerprintError, match="Failed to parse"):
+            Fingerprint.load(bad_file)
+
+    def test_strict_parser(self, tmp_path):
         flat_file = tmp_path / ".konductor"
         flat_file.write_text(textwrap.dedent("""\
             git_commit = "deadbeef"
             build_host = "myhost"
         """))
-        fp = Fingerprint._parse_fallback(flat_file)
+        fp = Fingerprint._parse_strict(flat_file)
         assert fp.git_commit == "deadbeef"
         assert fp.build_host == "myhost"
+
+    def test_validate_matching(self):
+        """Identical provenance passes validation."""
+        baked = Fingerprint(git_commit="abc123", flake_lock_sha256="def456")
+        discovered = Fingerprint(git_commit="abc123", flake_lock_sha256="def456")
+        assert baked.validate_against(discovered) == []
+
+    def test_validate_mismatch(self):
+        """Mismatched git_commit fails validation."""
+        baked = Fingerprint(git_commit="abc123")
+        discovered = Fingerprint(git_commit="xyz789")
+        errors = baked.validate_against(discovered)
+        assert len(errors) == 1
+        assert "git_commit mismatch" in errors[0]
+
+    def test_validate_flake_lock_mismatch(self):
+        """Mismatched flake_lock_sha256 fails validation."""
+        baked = Fingerprint(git_commit="abc123", flake_lock_sha256="aaa")
+        discovered = Fingerprint(git_commit="abc123", flake_lock_sha256="bbb")
+        errors = baked.validate_against(discovered)
+        assert len(errors) == 1
+        assert "flake_lock_sha256 mismatch" in errors[0]
 
 
 # =====================================================================
@@ -637,6 +676,7 @@ class TestPKIStatus:
         monkeypatch.setattr(cfg, "HYPERVISOR_MOUNT_CA", tmp_path / "mnt-ca.crt")
         monkeypatch.setattr(cfg, "HYPERVISOR_MOUNT_KEY", tmp_path / "mnt-tls.key")
         monkeypatch.setattr(cfg, "FINGERPRINT_PATH", tmp_path / ".konductor")
+        monkeypatch.setattr(cfg, "SOURCE_TREE", tmp_path / "src")
 
         rc = cmd_status([])
         assert rc == 0

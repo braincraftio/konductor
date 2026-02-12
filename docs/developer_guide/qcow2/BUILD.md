@@ -1676,27 +1676,27 @@ Write `/.konductor` inside VM.
 
 ```sh {"name":"_build:qcow2:vm:provenance"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -e
+set -euo pipefail
 
-# Gather provenance
-GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-GIT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "unknown")
-GIT_DIRTY=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-NIX_VERSION=$(nix --version 2>/dev/null | sed 's/nix (Nix) //' || echo "unknown")
-NIX_HASH=$(nix flake metadata --json 2>/dev/null | jq -r '.locked.narHash // "unknown"')
-NIX_DRV=$(cat .nix_drv 2>/dev/null || echo "unknown")
-FLAKE_LOCK_SHA=$(sha256sum flake.lock 2>/dev/null | cut -d' ' -f1 || echo "unknown")
-BUILD_DATE=$(date -Iseconds)
-BUILD_HOST=$(hostname)
-BUILD_USER="$USER"
-QEMU_VER=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //')
+# Gather provenance -- every field is mandatory, fail fast on missing
+GIT_COMMIT=$(git rev-parse HEAD) || { echo "✗ git rev-parse HEAD failed: not in a git repository"; exit 1; }
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) || { echo "✗ git rev-parse --abbrev-ref HEAD failed"; exit 1; }
+GIT_REMOTE=$(git remote get-url origin) || { echo "✗ git remote get-url origin failed: no remote configured"; exit 1; }
+NIX_VERSION=$(nix --version | head -1) || { echo "✗ nix --version failed: nix not available"; exit 1; }
+NIX_HASH=$(nix flake metadata --json | jq -r '.locked.narHash') || { echo "✗ nix flake metadata failed: flake not locked"; exit 1; }
+NIX_DRV=$(cat .nix_drv) || { echo "✗ .nix_drv not found: previous build step did not produce derivation hash"; exit 1; }
+FLAKE_LOCK_SHA=$(sha256sum flake.lock | cut -d' ' -f1) || { echo "✗ flake.lock not found: flake is broken"; exit 1; }
+GIT_DIRTY=$(git status --porcelain | wc -l | tr -d ' ') || { echo "✗ git status failed: not in a git repository"; exit 1; }
+BUILD_DATE=$(date -Iseconds) || { echo "✗ date failed"; exit 1; }
+BUILD_HOST=$(hostname) || { echo "✗ hostname failed"; exit 1; }
+BUILD_USER="${USER:?✗ USER not set}"
+QEMU_VER=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //') || { echo "✗ qemu-system-x86_64 not available"; exit 1; }
 OCI_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
 
 # Build tag list for provenance
 OCI_TAGS="[\"${CONTAINER_TAG:-latest-qcow2}\""
-[ "$GIT_DIRTY" = "0" ] && [ "$GIT_COMMIT" != "unknown" ] && OCI_TAGS+=", \"git-${GIT_COMMIT:0:7}\""
-[ "$NIX_DRV" != "unknown" ] && OCI_TAGS+=", \"nix-${NIX_DRV:0:12}\""
+[ "$GIT_DIRTY" = "0" ] && OCI_TAGS+=", \"git-${GIT_COMMIT:0:7}\""
+OCI_TAGS+=", \"nix-${NIX_DRV:0:12}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM

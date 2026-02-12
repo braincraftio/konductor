@@ -45,6 +45,9 @@ CLUSTER_CA = Path("/etc/konductor/cluster-ca.crt")
 # Build fingerprint
 FINGERPRINT_PATH = Path("/.konductor")
 
+# Source tree (rsynced into VM at build time, includes .git)
+SOURCE_TREE = Path("/opt/konductor/src")
+
 # OS release
 OS_RELEASE_PATH = Path("/etc/os-release")
 
