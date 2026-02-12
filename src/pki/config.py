@@ -83,6 +83,9 @@ OID_BUILD_HOST = f"{OID_ARC}.1.7"
 OID_BUILD_USER = f"{OID_ARC}.1.8"
 OID_FLAKE_LOCK_SHA256 = f"{OID_ARC}.1.9"
 OID_NIXOS_VERSION = f"{OID_ARC}.1.10"
+OID_BUILD_HW_VENDOR = f"{OID_ARC}.1.11"
+OID_BUILD_HW_PRODUCT = f"{OID_ARC}.1.12"
+OID_BUILD_HW_SERIAL = f"{OID_ARC}.1.13"
 
 # Trust metadata extensions (arc .2.x)
 OID_TRUST_TIER = f"{OID_ARC}.2.1"
@@ -104,6 +107,9 @@ OID_NAMES: dict[str, str] = {
     OID_BUILD_USER: "buildUser",
     OID_FLAKE_LOCK_SHA256: "flakeLockSha256",
     OID_NIXOS_VERSION: "nixosVersion",
+    OID_BUILD_HW_VENDOR: "buildHwVendor",
+    OID_BUILD_HW_PRODUCT: "buildHwProduct",
+    OID_BUILD_HW_SERIAL: "buildHwSerial",
     OID_TRUST_TIER: "trustTier",
     OID_IMAGE_SHA256: "imageSha256",
     OID_PROVENANCE_URI: "provenanceUri",

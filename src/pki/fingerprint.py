@@ -54,6 +54,10 @@ class Fingerprint:
     build_host: str | None = None
     build_user: str | None = None
     qemu: str | None = None
+    # Build host hardware identity (from /sys/devices/virtual/dmi/id/)
+    build_hw_vendor: str | None = None
+    build_hw_product: str | None = None
+    build_hw_serial: str | None = None
     strict: bool = False
     oci_image: str | None = None
     oci_tags: list[str] = field(default_factory=list)
@@ -116,6 +120,9 @@ class Fingerprint:
             build_host=section.get("build_host"),
             build_user=section.get("build_user"),
             qemu=section.get("qemu"),
+            build_hw_vendor=section.get("build_hw_vendor"),
+            build_hw_product=section.get("build_hw_product"),
+            build_hw_serial=section.get("build_hw_serial"),
             strict=bool(section.get("strict", False)),
             oci_image=section.get("oci_image"),
             oci_tags=section.get("oci_tags", []),
@@ -161,6 +168,9 @@ class Fingerprint:
             build_host=values.get("build_host"),
             build_user=values.get("build_user"),
             qemu=values.get("qemu"),
+            build_hw_vendor=values.get("build_hw_vendor"),
+            build_hw_product=values.get("build_hw_product"),
+            build_hw_serial=values.get("build_hw_serial"),
             strict=values.get("strict", "false").lower() == "true",
             oci_image=values.get("oci_image"),
             image_sha256=values.get("image_sha256"),

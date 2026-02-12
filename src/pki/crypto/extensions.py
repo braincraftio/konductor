@@ -84,6 +84,9 @@ def build_provenance_extensions(
         (config.OID_BUILD_USER, prov.get("build_user")),
         (config.OID_FLAKE_LOCK_SHA256, prov.get("flake_lock_sha256")),
         (config.OID_NIXOS_VERSION, prov.get("nixos_version")),
+        (config.OID_BUILD_HW_VENDOR, prov.get("build_hw_vendor")),
+        (config.OID_BUILD_HW_PRODUCT, prov.get("build_hw_product")),
+        (config.OID_BUILD_HW_SERIAL, prov.get("build_hw_serial")),
         (config.OID_TRUST_TIER, trust_tier.value),
     ]
 

@@ -124,9 +124,11 @@ class CertificateIdentity:
         ]
         if self.fingerprint.build_date:
             date_short = self.fingerprint.build_date.split("T")[0]
-            user = self.fingerprint.build_user or "unknown"
-            host = self.fingerprint.build_host or "unknown"
+            user = self.fingerprint.build_user or "orphaned"
+            host = self.fingerprint.build_host or "orphaned"
             parts.append(f"{date_short} {user}@{host}")
+        if self.fingerprint.build_hw_vendor and self.fingerprint.build_hw_product:
+            parts.append(f"{self.fingerprint.build_hw_vendor} {self.fingerprint.build_hw_product}")
         parts.append(trust_tier.display)
         return " | ".join(parts)
 
@@ -143,4 +145,7 @@ class CertificateIdentity:
             "build_user": self.fingerprint.build_user,
             "flake_lock_sha256": self.fingerprint.flake_lock_sha256,
             "nixos_version": self.osrelease.display,
+            "build_hw_vendor": self.fingerprint.build_hw_vendor,
+            "build_hw_product": self.fingerprint.build_hw_product,
+            "build_hw_serial": self.fingerprint.build_hw_serial,
         }

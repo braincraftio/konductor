@@ -1691,6 +1691,12 @@ BUILD_DATE=$(date -Iseconds) || { echo "✗ date failed"; exit 1; }
 BUILD_HOST=$(hostname) || { echo "✗ hostname failed"; exit 1; }
 BUILD_USER="${USER:?✗ USER not set}"
 QEMU_VER=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //') || { echo "✗ qemu-system-x86_64 not available"; exit 1; }
+
+# Build host hardware identity (sysfs — no dmidecode needed)
+BUILD_HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || BUILD_HW_VENDOR=""
+BUILD_HW_PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || BUILD_HW_PRODUCT=""
+BUILD_HW_SERIAL=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || BUILD_HW_SERIAL=""
+
 OCI_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
 
 # Build tag list for provenance
@@ -1714,6 +1720,9 @@ build_date = "$BUILD_DATE"
 build_host = "$BUILD_HOST"
 build_user = "$BUILD_USER"
 qemu = "$QEMU_VER"
+build_hw_vendor = "$BUILD_HW_VENDOR"
+build_hw_product = "$BUILD_HW_PRODUCT"
+build_hw_serial = "$BUILD_HW_SERIAL"
 strict = ${KONDUCTOR_STRICT:-false}
 oci_image = "$OCI_IMAGE"
 oci_tags = $OCI_TAGS

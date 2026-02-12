@@ -469,6 +469,12 @@ def cmd_status(args: list[str]) -> int:
             info(f"build_date:       {fp.build_date}")
             info(f"build_host:       {fp.build_host}")
             info(f"build_user:       {fp.build_user}")
+            if fp.build_hw_vendor:
+                info(f"build_hw_vendor:  {fp.build_hw_vendor}")
+            if fp.build_hw_product:
+                info(f"build_hw_product: {fp.build_hw_product}")
+            if fp.build_hw_serial:
+                info(f"build_hw_serial:  {fp.build_hw_serial}")
     else:
         err("ORPHANED: /.konductor not found (pre-provenance)")
 
