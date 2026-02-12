@@ -1069,7 +1069,7 @@ let
 
               echo "  ✓ provenance: /.konductor"
               [ -n "$GIT_COMMIT" ] && echo "  ✓ git_commit: $GIT_COMMIT"
-              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && echo "  ✓ nix_drv: $NIX_DRV"
+              [ -n "$NIX_DRV" ] && echo "  ✓ nix_drv: $NIX_DRV"
 
               if [ "$GIT_DIRTY" != "0" ]; then
                 echo "  ⚠ git_dirty: $GIT_DIRTY (built from dirty tree)"
@@ -1178,8 +1178,8 @@ let
               # DETERMINE EXIT STATUS
               # ─────────────────────────────────────────────────────────────────────
               IDENTITY="Konductor"
-              [ -n "$NIX_DRV" ] && [ "$NIX_DRV" != "unknown" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV}"
-              [ -n "$GIT_COMMIT" ] && [ "$GIT_COMMIT" != "unknown" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT}"
+              [ -n "$NIX_DRV" ] && IDENTITY="$IDENTITY · nix-''${NIX_DRV}"
+              [ -n "$GIT_COMMIT" ] && IDENTITY="$IDENTITY · git-''${GIT_COMMIT}"
 
               if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
                 # All checks passed

@@ -101,11 +101,13 @@ class CertificateIdentity:
     # --- Provenance strings ---
 
     @property
-    def short_commit(self) -> str:
+    def commit_display(self) -> str:
+        """Full git commit hash, or 'orphaned' if pre-provenance."""
         return self.fingerprint.git_commit or "orphaned"
 
     @property
-    def short_nix_drv(self) -> str:
+    def nix_drv_display(self) -> str:
+        """Full nix derivation hash, or 'orphaned' if pre-provenance."""
         return self.fingerprint.nix_drv or "orphaned"
 
     def ns_comment(self, cert_type: str, trust_tier: TrustTier) -> str:
@@ -117,8 +119,8 @@ class CertificateIdentity:
         parts = [
             f"Konductor {cert_type}",
             self.osrelease.display,
-            f"git:{self.short_commit}",
-            f"nix:{self.short_nix_drv}",
+            f"git:{self.commit_display}",
+            f"nix:{self.nix_drv_display}",
         ]
         if self.fingerprint.build_date:
             date_short = self.fingerprint.build_date.split("T")[0]
