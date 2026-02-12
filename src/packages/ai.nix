@@ -7,8 +7,8 @@
   packages = with pkgs; [
     # Claude Code ecosystem
     unstable.claude-code # Anthropic Claude Code CLI
-    claude-monitor # Real-time Claude Code usage monitor
-    claude-code-router # Route requests to different models
+    unstable.claude-code-acp # ACP-compatible agent for Zed IDE (by Zed Industries)
+    unstable.vscode-extensions.anthropic.claude-code # Official VS Code extension
 
     # Other AI assistants
     codex # OpenAI Codex CLI

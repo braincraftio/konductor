@@ -1589,7 +1589,7 @@ EOF
               "workspace-mount.service"
             ];
             wants = [ "network-online.target" ];
-            requires = [ "cloud-final.service" ];
+            after = [ "cloud-init.service" ];
 
             wantedBy = [ "multi-user.target" ];
 
@@ -1631,7 +1631,11 @@ EOF
             Type = "oneshot";
             ExecStart = pkgs.writeShellScript "konductor-config-reload" ''
               echo "Configuration change detected, reloading konductor-init.service..."
-              systemctl reload konductor-init.service
+              if systemctl is-active --quiet konductor-init.service; then
+                systemctl reload konductor-init.service
+              else
+                systemctl start konductor-init.service
+              fi
             '';
           };
         };
