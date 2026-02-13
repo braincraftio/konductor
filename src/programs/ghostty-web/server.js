@@ -24,7 +24,7 @@ import { parseArgs } from 'node:util';
 
 const { values: args } = parseArgs({
   options: {
-    port: { type: 'string', default: '7681' },
+    port: { type: 'string', default: '10000' },
     host: { type: 'string', default: '0.0.0.0' },
     'working-directory': { type: 'string', default: '/workspace' },
     'max-sessions': { type: 'string', default: '10' },

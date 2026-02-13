@@ -282,12 +282,6 @@ let
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
-      ../modules/ttyd.nix           # Web terminal readonly (port 7681)
-      ../modules/ttyd-rw.nix        # Web terminal writable (port 7683)
-      ../modules/ghostty-web.nix    # Ghostty readonly (port 7682)
-      ../modules/ghostty-web-rw.nix # Ghostty writable (port 7684)
-      ../modules/restty-web.nix     # Restty readonly (port 7685)
-      ../modules/restty-web-rw.nix  # Restty writable (port 7687)
     ];
 
     # Basic system configuration
@@ -415,84 +409,6 @@ let
       # Vertical PKI: parent cluster CA signs VM wildcard cert
       hypervisorCaPath = "/mnt/pki/ca.crt";
       hypervisorKeyPath = "/mnt/pki/tls.key";
-    };
-
-    # =====================================================================
-    # Web Terminal (ttyd)
-    # =====================================================================
-    # Production web terminal with Catppuccin Frappé theme and embedded
-    # Nerd Fonts. Works in airgapped environments (no CDN dependencies).
-    #
-    # Disabled by default - enable via cloud-init or systemctl:
-    #   runcmd:
-    #     - systemctl enable --now konductor-ttyd
-    #
-    # Access: Via Envoy Gateway (TLS terminated at edge, plain HTTP to backend)
-    # Web terminal (readonly) - Envoy Gateway terminates TLS, so no SSL here
-    services.konductor-ttyd = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7681;
-      user = "kc2";
-      workingDirectory = "/workspace";
-      maxClients = 10;
-    };
-
-    # =====================================================================
-    # Ghostty Web Terminal (Experimental)
-    # =====================================================================
-    # Alternative web terminal using ghostty WASM. Under active development.
-    # Requires CDN access for fonts (not airgap-compatible yet).
-    #
-    # Enable via cloud-init:
-    #   runcmd:
-    #     - systemctl enable --now ghostty-web
-    services.ghostty-web = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7682;  # Different port to avoid conflict with ttyd
-      user = "kc2";
-      workingDirectory = "/workspace";
-      maxSessions = 10;
-      idleTimeout = 1800;
-    };
-
-    # Writable variants (port 7683, 7684) - use kc2admin for sudo access
-    services.konductor-ttyd-rw = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7683;
-      user = "kc2admin";
-      workingDirectory = "/workspace";
-    };
-
-    services.ghostty-web-rw = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7684;
-      user = "kc2admin";
-      workingDirectory = "/workspace";
-    };
-
-    # =====================================================================
-    # Restty Web Terminal (WebGPU/WebGL2 WASM renderer)
-    # =====================================================================
-    # High-fidelity terminal with GPU-accelerated rendering.
-    # Uses restty (libghostty-vt WASM) with Catppuccin Frappe theme.
-    #
-    # Enable via cloud-init:
-    #   runcmd:
-    #     - systemctl enable --now restty-web
-    services.restty-web = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7685;
-      user = "kc2";
-      workingDirectory = "/workspace";
-      maxSessions = 10;
-      idleTimeout = 1800;
-    };
-
-    services.restty-web-rw = {
-      enable = true;  # Unit exists, but wantedBy=[] means no auto-start
-      port = 7687;
-      user = "kc2admin";
-      workingDirectory = "/workspace";
     };
 
     # =====================================================================
@@ -1485,11 +1401,11 @@ let
         # - One instance per user per service
         # - Keeps ports within reasonable range
         #
-        # Example: ttyd base 7681 + (alice UID 1004 - 1000) = port 7685
+        # Example: ttyd base 7000 + (alice UID 1004 - 1000) = port 7004
         # =====================================================================
 
         # Template: TTYd Web Terminal (per-user instances)
-        # Base port: 7681, actual port = 7681 + (UID - 1000)
+        # Base port: 7000, actual port = 7000 + (UID - 1000)
         "konductor-ttyd@" = {
           description = "Konductor TTYd Web Terminal for %i";
           documentation = [ "https://github.com/tsl0922/ttyd" ];
@@ -1507,7 +1423,7 @@ let
         };
 
         # Template: VSCode Server (per-user instances)
-        # Base port: 8080, actual port = 8080 + (UID - 1000)
+        # Base port: 8000, actual port = 8000 + (UID - 1000)
         # REQUIRES drop-in from konductor-init.service with actual configuration
         "konductor-vscode@" = {
           description = "Konductor VSCode Server for %i";
@@ -1528,7 +1444,7 @@ let
         };
 
         # Template: Restty Web Terminal (per-user instances)
-        # Base port: 7685, actual port = 7685 + (UID - 1000)
+        # Base port: 9000, actual port = 9000 + (UID - 1000)
         "konductor-restty@" = {
           description = "Konductor Restty Web Terminal for %i";
           documentation = [ "https://github.com/wiedymi/restty" ];
@@ -1546,6 +1462,27 @@ let
             Restart = "on-failure";
             RestartSec = 10;
             MemoryDenyWriteExecute = false; # Required for WASM
+          };
+        };
+
+        # Template: Ghostty Web Terminal (per-user instances)
+        # Base port: 10000, actual port = 10000 + (UID - 1000)
+        "konductor-ghostty@" = {
+          description = "Konductor Ghostty Web Terminal for %i";
+          documentation = [ "https://github.com/coder/ghostty-web" ];
+          after = [ "network.target" ];
+
+          serviceConfig = let
+            ghosttyWeb = import ../programs/ghostty-web { inherit pkgs lib; };
+          in {
+            Type = "simple";
+            User = "%i";
+            Group = "users";
+            WorkingDirectory = "/workspace";
+            # Port determined by drop-in from konductor-init.service
+            ExecStart = "${ghosttyWeb.server}/bin/ghostty-web-server --writable";
+            Restart = "on-failure";
+            RestartSec = 10;
           };
         };
 
@@ -1693,6 +1630,9 @@ EOF
                       ;;
                     restty)
                       echo "ExecStart=${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --writable --working-directory /workspace" >> "$DROPIN_PATH/50-config.conf"
+                      ;;
+                    ghostty)
+                      echo "ExecStart=${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server --port \''${PORT} --writable --working-directory /workspace" >> "$DROPIN_PATH/50-config.conf"
                       ;;
                     vscode)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
