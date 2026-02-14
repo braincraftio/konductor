@@ -96,8 +96,8 @@ SOURCE ────► NIX ────► BUILD ────► SEAL ───�
 
 ```bash {"excludeFromRunAll":"true","name":"example:self-pull"}
 # Parse provenance (run inside a Konductor VM)
-oci_image=$(sed -n 's/^oci_image = "\(.*\)"$/\1/p' /.konductor)
-git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
+  oci_image=$(sed -n 's/^oci_image = "\(.*\)"$/\1/p' /.konductor)
+  git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
 
 # Pull source container
 docker pull "${oci_image}:qcow2-${git_commit}"
@@ -1413,14 +1413,6 @@ SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 cat > "$CLOUD_INIT_DIR/user-data" << EOF
 #cloud-config
 users:
-  - name: $USER
-    uid: $(id -u)
-    groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
-    ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -1434,6 +1426,12 @@ users:
     lock_passwd: true
     ssh_authorized_keys:
       - $(cat "$SSH_PUBKEY")
+  - name: runner
+    groups: docker, libvirtd, kvm
+    shell: /run/current-system/sw/bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - $(cat "$SSH_PUBKEY")
 write_files:
   - path: /var/lib/konductor/services.toml
     content: |
@@ -1442,7 +1440,7 @@ write_files:
       vscode = 8080
       restty = 7685
 
-      [user_services.$USER]
+      [user_services.kc2]
       ttyd = true
       vscode = true
       restty = false
@@ -1552,7 +1550,7 @@ Wait for SSH.
 
 ```sh {"name":"_build:qcow2:vm:wait","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh localhost true 2>/dev/null; do sleep 3; done' \
+timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh kc2admin@localhost true 2>/dev/null; do sleep 3; done' \
     || { echo "SSH timeout"; exit 1; }
 ```
 
@@ -1577,7 +1575,7 @@ set -e
 COMMIT=$(git rev-parse --short HEAD)
 BUNDLE="k9-${COMMIT}.bundle"
 
-ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
+ssh kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 
 # git bundle: portable repo with full history
 echo "Creating bundle ${BUNDLE}..."
@@ -1585,22 +1583,22 @@ git bundle create "/tmp/${BUNDLE}" HEAD --all
 
 # Transfer bundle
 echo "Transferring bundle..."
-scp "/tmp/${BUNDLE}" "localhost:/tmp/${BUNDLE}"
-ssh localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
+scp "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
+ssh kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
 # Clone from bundle (creates clean repo with history)
 echo "Cloning to /opt/konductor/src/..."
-ssh localhost "sudo git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh localhost "cd /opt/konductor/src && sudo git checkout ${COMMIT}"
+ssh kc2admin@localhost "sudo git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo git checkout ${COMMIT}"
 
 # Verify clean state
-DIRTY=$(ssh localhost 'cd /opt/konductor/src && git status --porcelain' || true)
+DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
 if [ -n "$DIRTY" ]; then
     echo "WARNING: Tree is dirty after sync"
     echo "$DIRTY"
 fi
 
-ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
+ssh kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
 rm -f "/tmp/${BUNDLE}"
 
 echo "✓ /opt/konductor/${BUNDLE} (bundle)"
@@ -1624,13 +1622,13 @@ This ensures:
 set -e
 
 # Rebuild NixOS from the synced flake
-ssh localhost 'cd /opt/konductor/src && sudo nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures
 # This ensures `nix develop` works offline
-ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
-ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
-ssh localhost 'cd /opt/konductor/src && nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
@@ -1646,7 +1644,7 @@ Run PKI tests inside the VM to verify the Python PKI package works in the live N
 set -e
 
 echo "Running PKI tests inside VM..."
-ssh -o ConnectTimeout=10 localhost \
+ssh -o ConnectTimeout=10 kc2admin@localhost \
   'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short --override-ini cache_dir=/tmp/pytest-cache 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 echo "PKI tests complete"
@@ -1664,7 +1662,7 @@ captured via serial console in `build-vm.log`.
 set -e
 
 echo "PKI certificate status:"
-ssh -o ConnectTimeout=10 localhost \
+ssh -o ConnectTimeout=10 kc2admin@localhost \
   'PYTHONPATH=/opt/konductor/src/src python3 -m pki status 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
@@ -1706,7 +1704,7 @@ OCI_TAGS+=", \"qcow2-${NIX_DRV}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM
-ssh localhost "sudo tee /.konductor > /dev/null" << EOF
+ssh kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
 [konductor]
 git_commit = "$GIT_COMMIT"
 git_branch = "$GIT_BRANCH"
@@ -1727,19 +1725,19 @@ strict = ${KONDUCTOR_STRICT:-false}
 oci_image = "$OCI_IMAGE"
 oci_tags = $OCI_TAGS
 EOF
-ssh localhost 'sudo chmod 644 /.konductor'
+ssh kc2admin@localhost 'sudo chmod 644 /.konductor'
 
 # Regenerate PKI certs now that /.konductor exists with build provenance
 # Embeds git_commit, nix_drv, build_date into X.509 certificate extensions
-ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
-ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
-ssh localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
+ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
+ssh kc2admin@localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Copy to host
-ssh localhost 'cat /.konductor' > .konductor
+ssh kc2admin@localhost 'cat /.konductor' > .konductor
 
 # Display comprehensive system state (ff = hermetic fastfetch wrapper)
-ssh localhost 'ff'
+ssh kc2admin@localhost 'ff'
 
 # Serial output handled by konductor-provenance.service (systemd)
 ```
@@ -1753,9 +1751,9 @@ Garbage collect.
 ```sh {"name":"_build:qcow2:vm:gc"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
-ssh localhost 'sudo nix-collect-garbage -d'
-ssh localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
-ssh localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
+ssh kc2admin@localhost 'sudo nix-collect-garbage -d'
+ssh kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
+ssh kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
 
 ---
@@ -1766,7 +1764,7 @@ Zero free space.
 
 ```sh {"name":"_build:qcow2:vm:zero","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
+ssh kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
 ```
 
 ---
@@ -1781,7 +1779,7 @@ PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 PID=$(cat "$PIDFILE")
 if kill -0 "$PID" 2>/dev/null; then
-    ssh localhost 'sudo poweroff' 2>/dev/null || true
+    ssh kc2admin@localhost 'sudo poweroff' 2>/dev/null || true
     sleep 5
     kill "$PID" 2>/dev/null || true
 fi

@@ -20,34 +20,49 @@
     # GitHub API rate limits can cause 403 errors - use FlakeHub or configure access token
     # See docs/GITHUB_AUTHENTICATION.md for token setup
     # FlakeHub URL caching causes mismatch errors - use GitHub directly
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "path:./_sources/nixpkgs";
     # nixos-unstable lags behind on omnictl (1.4.4 vs 1.4.6 in nixpkgs-unstable)
     # nixpkgs-unstable branch tracks upstream nixpkgs master more closely
     # nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs-unstable.url = "path:./_sources/nixpkgs-unstable";
     # nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511.*";
     # nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
     # FlakeHub URL caching causes mismatch errors - use GitHub directly
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-utils.url = "path:./_sources/flake-utils";
+    flake-utils.inputs.systems.follows = "systems";
+
+    flake-parts.url = "path:./_sources/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+
+    nuschtosSearch.url = "path:./_sources/nuschtosSearch";
+    nuschtosSearch.inputs.flake-utils.follows = "flake-utils";
+    nuschtosSearch.inputs.nixpkgs.follows = "nixpkgs";
+
+    ixx.url = "path:./_sources/ixx";
+    ixx.inputs.flake-utils.follows = "flake-utils";
+    ixx.inputs.nixpkgs.follows = "nixpkgs";
+
+    nixlib.url = "path:./_sources/nixlib";
+    nixlib.inputs.nixpkgs.follows = "nixpkgs";
     # flake-utils.url = "https://flakehub.com/f/numtide/flake-utils/*";
 
     # nix2container not available on FlakeHub - requires GitHub token for updates
     nix2container = {
       # url = "github:nlewo/nix2container";
-      url = "git+https://github.com/nlewo/nix2container";
+      url = "path:./_sources/nix2container";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nixos-generators = {
       # FlakeHub URL caching causes mismatch errors - use GitHub directly
-      url = "github:nix-community/nixos-generators";
+      url = "path:./_sources/nixos-generators";
       # url = "https://flakehub.com/f/nix-community/nixos-generators/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     rust-overlay = {
       # FlakeHub URL caching causes mismatch errors - use GitHub directly
-      url = "github:oxalica/rust-overlay";
+      url = "path:./_sources/rust-overlay";
       # url = "https://flakehub.com/f/oxalica/rust-overlay/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -59,21 +74,24 @@
       # url = "github:nix-community/nixvim/nixos-25.05";
       # url = "https://flakehub.com/f/nix-community/nixvim/*";
       # url = "https://flakehub.com/f/nix-community/nixvim/0.1.805";
-      url = "github:nix-community/nixvim/nixos-25.11";
+      url = "path:./_sources/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.systems.follows = "systems";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.nuschtosSearch.follows = "nuschtosSearch";
     };
 
     # Home Manager for declarative user home directory management
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "path:./_sources/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Catppuccin themes for k9s and other applications
     # Provides theme files as packages via catppuccin.packages.${system}.sources.k9s
     catppuccin = {
-      url = "github:catppuccin/nix";
+      url = "path:./_sources/catppuccin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -81,9 +99,11 @@
     # Source: git.braincraft.io/BrainCraft/runner
     # Update: nix flake update forgejo-runner-src
     forgejo-runner-src = {
-      url = "git+https://git.braincraft.io/BrainCraft/runner";
+      url = "path:./_sources/forgejo-runner-src";
       flake = false;
     };
+
+    systems.url = "path:./_sources/systems";
   };
 
   nixConfig = {

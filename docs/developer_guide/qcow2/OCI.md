@@ -76,6 +76,7 @@ Development:
 Debug:
   oci:debug:log          View boot log
   oci:vm:kill            Force kill VM
+  oci:cache:seed         Seed flake input cache (online, host-only)
 ```
 
 ---
@@ -253,7 +254,7 @@ OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-    echo "VM running. Use: ssh localhost"
+    echo "VM running. Use: ssh kc2@localhost"
     exit 0
 fi
 [ -f result/nixos.qcow2 ] || { echo "No image. Run oci:image first."; exit 1; }
@@ -266,7 +267,7 @@ sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:cloudinit
 runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:boot
 runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:wait
-echo "VM ready: ssh localhost"
+echo "VM ready: ssh kc2@localhost"
 ```
 
 ---
@@ -274,7 +275,7 @@ echo "VM ready: ssh localhost"
 ## oci:ssh
 
 ```sh {"name":"oci:ssh","excludeFromRunAll":"true","tag":"type:entry"}
-ssh localhost
+ssh kc2@localhost
 ```
 
 ---
@@ -284,6 +285,21 @@ ssh localhost
 ```sh {"name":"oci:stop","excludeFromRunAll":"true","tag":"type:entry"}
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:halt
+```
+
+---
+
+## oci:cache:seed
+
+Seed host flake input cache (online; run once on a connected machine).
+
+```sh {"name":"oci:cache:seed","excludeFromRunAll":"true","tag":"type:entry"}
+set -e
+echo "Seeding host flake cache (online)..."
+sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
+  nix --extra-experimental-features 'nix-command flakes' \
+  flake archive --json --no-write-lock-file .
+echo "✓ Host flake cache seeded in /root/.cache/nix"
 ```
 
 ---
@@ -462,14 +478,6 @@ SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 cat > "$CLOUD_INIT_DIR/user-data" << EOF
 #cloud-config
 users:
-  - name: $USER
-    uid: $(id -u)
-    groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
-    ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -483,6 +491,12 @@ users:
     lock_passwd: true
     ssh_authorized_keys:
       - $(cat "$SSH_PUBKEY")
+  - name: runner
+    groups: docker, libvirtd, kvm
+    shell: /run/current-system/sw/bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - $(cat "$SSH_PUBKEY")
 write_files:
   - path: /var/lib/konductor/services.toml
     content: |
@@ -491,7 +505,7 @@ write_files:
       vscode = 8080
       restty = 7685
 
-      [user_services.$USER]
+      [user_services.kc2]
       ttyd = true
       vscode = true
       restty = false
@@ -591,7 +605,7 @@ Wait for SSH.
 
 ```sh {"name":"_oci:vm:wait","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh localhost true 2>/dev/null; do sleep 3; done' \
+timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh kc2admin@localhost true 2>/dev/null; do sleep 3; done' \
     || { echo "SSH timeout"; exit 1; }
 ```
 
@@ -608,43 +622,106 @@ set -e
 COMMIT=$(git rev-parse --short HEAD)
 BUNDLE="k9-${COMMIT}.bundle"
 
-ssh localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
+ssh kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 
 echo "Creating bundle ${BUNDLE}..."
 git bundle create "/tmp/${BUNDLE}" HEAD --all
 
 echo "Transferring bundle..."
-scp "/tmp/${BUNDLE}" "localhost:/tmp/${BUNDLE}"
-ssh localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
+scp "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
+ssh kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
 echo "Cloning to /opt/konductor/src/..."
-ssh localhost "sudo git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh localhost "cd /opt/konductor/src && sudo git checkout ${COMMIT}"
+ssh kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
 
-DIRTY=$(ssh localhost 'cd /opt/konductor/src && git status --porcelain' || true)
+DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
 if [ -n "$DIRTY" ]; then
     echo "WARNING: Tree is dirty after sync"
     echo "$DIRTY"
 fi
 
-ssh localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
+ssh kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
 rm -f "/tmp/${BUNDLE}"
 
 # Sync host's nix flake caches to VM for offline builds
 # This includes gitv3 (git repos) and tarball-cache (flake input archives)
 # Use root's cache since that's where the build caches are
 echo "Syncing nix flake caches to VM..."
+# Prime flake input cache from local artifacts only (no network).
+# If this fails, the host cache is missing inputs and offline VM builds will fail.
+echo "Priming host flake caches (offline)..."
+if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
+    nix --extra-experimental-features 'nix-command flakes' \
+    flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json; then
+    echo "Error: missing flake inputs in local cache."
+    echo "Run once on a connected host to seed cache:"
+    echo "  sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix --extra-experimental-features 'nix-command flakes' flake archive --json --no-write-lock-file ."
+    exit 1
+fi
+
+# Extract store paths for flake inputs so we can copy them into the VM store.
+jq -r '.. | objects | select(has("path")) | .path' /tmp/flake-archive.json \
+  | sort -u > /tmp/flake-input-paths.txt
+rm -f /tmp/flake-archive.json
+
+# Seed VM store with flake inputs over SSH (no network).
+echo "Seeding VM flake inputs (offline, ssh)..."
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
+    nix --extra-experimental-features 'nix-command flakes' \
+    flake archive --no-write-lock-file --offline --to "ssh://localhost" .; then
+    echo "Error: unable to seed VM store from local cache."
+    echo "Ensure host cache is primed and SSH to VM is available."
+    exit 1
+fi
+unset SSH_PORT
+
+# Copy flake input store paths into VM store via nix copy (offline).
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
+  xargs -r nix copy --offline --to "ssh://localhost" < /tmp/flake-input-paths.txt
+unset SSH_PORT
+rm -f /tmp/flake-input-paths.txt
+
+# Copy system closure to VM store (ensures nixos-rebuild works offline).
+echo "Seeding VM system closure (offline, ssh)..."
+SYSTEM_TOPLEVEL=$(nix path-info .#nixosConfigurations.konductor.config.system.build.toplevel 2>/dev/null | head -1)
+if [ -n "$SYSTEM_TOPLEVEL" ]; then
+    nix path-info -r "$SYSTEM_TOPLEVEL" > /tmp/system-paths.txt
+    SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+    NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
+      xargs -r nix copy --offline --to "ssh://localhost" < /tmp/system-paths.txt
+    unset SSH_PORT
+    rm -f /tmp/system-paths.txt
+else
+    echo "WARNING: Could not resolve system toplevel; skipping closure copy."
+fi
+
 if [ -d /root/.cache/nix ]; then
     # Root cache exists (from previous builds)
-    ssh localhost 'sudo mkdir -p /root/.cache/nix'
-    sudo rsync -a --info=progress2 /root/.cache/nix/ "localhost:/tmp/nix-cache/"
-    ssh localhost 'sudo mv /tmp/nix-cache/* /root/.cache/nix/ 2>/dev/null || sudo cp -a /tmp/nix-cache/* /root/.cache/nix/'
-    ssh localhost 'sudo rm -rf /tmp/nix-cache'
+    ssh kc2admin@localhost 'sudo mkdir -p /root/.cache/nix'
+    sudo rsync -a --info=progress2 /root/.cache/nix/ "kc2admin@localhost:/tmp/nix-cache/"
+    ssh kc2admin@localhost 'sudo mv /tmp/nix-cache/* /root/.cache/nix/ 2>/dev/null || sudo cp -a /tmp/nix-cache/* /root/.cache/nix/'
+    ssh kc2admin@localhost 'sudo rm -rf /tmp/nix-cache'
 elif [ -d "$HOME/.cache/nix" ]; then
     # Fall back to user cache
-    ssh localhost 'mkdir -p ~/.cache/nix'
-    rsync -a --info=progress2 "$HOME/.cache/nix/" "localhost:~/.cache/nix/"
-    ssh localhost 'sudo mkdir -p /root/.cache && sudo cp -a ~/.cache/nix /root/.cache/'
+    sudo mkdir -p /root/.cache
+    sudo cp -a "$HOME/.cache/nix" /root/.cache/ 2>/dev/null || true
+    ssh kc2admin@localhost 'mkdir -p ~/.cache/nix'
+    rsync -a --info=progress2 "$HOME/.cache/nix/" "kc2admin@localhost:~/.cache/nix/"
+    ssh kc2admin@localhost 'sudo mkdir -p /root/.cache && sudo cp -a ~/.cache/nix /root/.cache/'
+fi
+
+# Verify VM can resolve all flake inputs offline before rebuild.
+echo "Validating VM flake inputs (offline)..."
+if ! ssh kc2admin@localhost \
+    "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
+    nix --extra-experimental-features 'nix-command flakes' \
+    flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json"; then
+    echo "Error: VM missing flake inputs for offline build."
+    echo "Run: runme run oci:cache:seed (on a connected host), then re-run oci:image."
+    exit 1
 fi
 
 echo "✓ /opt/konductor/${BUNDLE} (bundle)"
@@ -667,12 +744,12 @@ set -e
 # Flake caches were synced in _oci:vm:sync
 NIX_OFFLINE_OPTS="--offline --option extra-substituters /nix/.host-store --option require-sigs false"
 
-ssh localhost "cd /opt/konductor/src && sudo nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures (also offline)
-ssh localhost "cd /opt/konductor/src && nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.default 2>&1 || true"
-ssh localhost "cd /opt/konductor/src && nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.full 2>&1 || true"
-ssh localhost "cd /opt/konductor/src && nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.konductor 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.default 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.full 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.konductor 2>&1 || true"
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
@@ -688,7 +765,7 @@ Run PKI tests inside VM.
 set -e
 
 echo "Running PKI tests inside VM..."
-ssh -o ConnectTimeout=10 localhost \
+ssh -o ConnectTimeout=10 kc2admin@localhost \
   'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short --override-ini cache_dir=/tmp/pytest-cache 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 echo "PKI tests complete"
@@ -705,7 +782,7 @@ Display PKI certificate status.
 set -e
 
 echo "PKI certificate status:"
-ssh -o ConnectTimeout=10 localhost \
+ssh -o ConnectTimeout=10 kc2admin@localhost \
   'PYTHONPATH=/opt/konductor/src/src python3 -m pki status 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
@@ -747,7 +824,7 @@ OCI_TAGS+=", \"qcow2-${NIX_DRV:0:12}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM
-ssh localhost "sudo tee /.konductor > /dev/null" << EOF
+ssh kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
 [konductor]
 git_commit = "$GIT_COMMIT"
 git_branch = "$GIT_BRANCH"
@@ -768,18 +845,18 @@ strict = ${KONDUCTOR_STRICT:-false}
 oci_image = "$OCI_IMAGE"
 oci_tags = $OCI_TAGS
 EOF
-ssh localhost 'sudo chmod 644 /.konductor'
+ssh kc2admin@localhost 'sudo chmod 644 /.konductor'
 
 # Regenerate PKI certs with provenance
-ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
-ssh localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
-ssh localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
+ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
+ssh kc2admin@localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Copy to host
-ssh localhost 'cat /.konductor' > .konductor
+ssh kc2admin@localhost 'cat /.konductor' > .konductor
 
 # Display system state
-ssh localhost 'ff 2>/dev/null || fastfetch 2>/dev/null || true'
+ssh kc2admin@localhost 'ff 2>/dev/null || fastfetch 2>/dev/null || true'
 ```
 
 ---
@@ -791,9 +868,9 @@ Garbage collect.
 ```sh {"name":"_oci:vm:gc"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
-ssh localhost 'sudo nix-collect-garbage -d'
-ssh localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
-ssh localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
+ssh kc2admin@localhost 'sudo nix-collect-garbage -d'
+ssh kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
+ssh kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
 
 ---
@@ -804,7 +881,7 @@ Zero free space.
 
 ```sh {"name":"_oci:vm:zero","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-ssh localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
+ssh kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
 ```
 
 ---
@@ -819,7 +896,7 @@ PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 PID=$(cat "$PIDFILE")
 if kill -0 "$PID" 2>/dev/null; then
-    ssh localhost 'sudo poweroff' 2>/dev/null || true
+    ssh kc2admin@localhost 'sudo poweroff' 2>/dev/null || true
     sleep 5
     kill "$PID" 2>/dev/null || true
 fi
