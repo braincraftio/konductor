@@ -2312,17 +2312,14 @@ EOF
     };
 
     # =====================================================================
-    # PKI Trust Configuration (Dynamic CA Trust)
+    # PKI Trust Configuration (Git CA Trust)
     # =====================================================================
-    # Add hypervisor CA to system trust store if mounted
-    # NixOS will include this in /etc/ssl/certs/ CA bundle via p11-kit
-    # If file doesn't exist at build time, NixOS gracefully handles it
-    security.pki.certificateFiles = lib.optional (builtins.pathExists /mnt/pki/ca.crt) /mnt/pki/ca.crt;
-
     # Configure global git settings for all users
+    # Points directly to mounted hypervisor CA (available at runtime)
+    # If CA not mounted, git will fall back to system CA bundle
     environment.etc."gitconfig".text = ''
       [http]
-        sslCAInfo = /etc/ssl/certs/ca-bundle.crt
+        sslCAInfo = /mnt/pki/ca.crt
       [safe]
         directory = /workspace
     '';
