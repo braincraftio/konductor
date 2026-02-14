@@ -486,8 +486,14 @@ if ! nix flake update forgejo-runner-src --no-warn-dirty 2>/dev/null; then
     echo "  (skipped - network/SSL error, using cached input)"
 fi
 
-# Capture nix_drv before build (derivation hash is known from eval)
-NIX_DRV=$(nix path-info --derivation .#qcow2 2>/dev/null | head -1 | xargs basename | cut -d- -f1)
+# Build to ensure the output exists, then derive nix_drv from the output path.
+OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths | tail -1)
+NIX_DRV_PATH=$(nix path-info --derivation "$OUT_PATH" 2>/dev/null | head -1 || true)
+if [ -z "$NIX_DRV_PATH" ]; then
+    echo "Error: nix path-info --derivation failed for $OUT_PATH"
+    exit 1
+fi
+NIX_DRV=$(basename "$NIX_DRV_PATH" | cut -d- -f1)
 echo "$NIX_DRV" > .nix_drv
 
 nix build .#qcow2 --no-warn-dirty
