@@ -1941,6 +1941,50 @@ EOF
             '';
           };
         };
+
+        # =====================================================================
+        # Dynamic CA Trust Service
+        # =====================================================================
+        # Adds hypervisor CA to system trust store at boot if mounted
+        konductor-dynamic-ca-trust = {
+          description = "Dynamically add hypervisor CA to system trust store";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "konductor-pki-permissions.service" "local-fs.target" ];
+          requires = [ "konductor-pki-permissions.service" ];
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+
+          script = ''
+            set -euo pipefail
+            echo "=========================================="
+            echo "Konductor Dynamic CA Trust"
+            echo "=========================================="
+
+            # Ensure target directory exists
+            mkdir -p /etc/ssl/certs/
+
+            # Check if hypervisor CA is mounted
+            if [ -f /mnt/pki/ca.crt ]; then
+              echo "✓ Hypervisor CA found: /mnt/pki/ca.crt"
+
+              # Copy to system trust store
+              cp /mnt/pki/ca.crt /etc/ssl/certs/hypervisor-ca.crt
+              chmod 644 /etc/ssl/certs/hypervisor-ca.crt
+
+              # Update CA bundle
+              # NixOS uses p11-kit-trust, certificate is picked up automatically
+              # from /etc/ssl/certs/ when applications call p11-kit
+              echo "✓ CA certificate installed to /etc/ssl/certs/hypervisor-ca.crt"
+            else
+              echo "· Hypervisor CA not found (mount may not be available)"
+            fi
+
+            echo "=========================================="
+          '';
+        };
       };
     };
 
@@ -2324,47 +2368,6 @@ EOF
       [safe]
         directory = /workspace
     '';
-
-    # Systemd service to dynamically add hypervisor CA to system trust store
-    systemd.services.konductor-dynamic-ca-trust = {
-      description = "Dynamically add hypervisor CA to system trust store";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "konductor-pki-permissions.service" "local-fs.target" ];
-      requires = [ "konductor-pki-permissions.service" ];
-
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-      };
-
-      script = ''
-        set -euo pipefail
-        echo "=========================================="
-        echo "Konductor Dynamic CA Trust"
-        echo "=========================================="
-
-        # Ensure target directory exists
-        mkdir -p /etc/ssl/certs/
-
-        # Check if hypervisor CA is mounted
-        if [ -f /mnt/pki/ca.crt ]; then
-          echo "✓ Hypervisor CA found: /mnt/pki/ca.crt"
-
-          # Copy to system trust store
-          cp /mnt/pki/ca.crt /etc/ssl/certs/hypervisor-ca.crt
-          chmod 644 /etc/ssl/certs/hypervisor-ca.crt
-
-          # Update CA bundle
-          # NixOS uses p11-kit-trust, certificate is picked up automatically
-          # from /etc/ssl/certs/ when applications call p11-kit
-          echo "✓ CA certificate installed to /etc/ssl/certs/hypervisor-ca.crt"
-        else
-          echo "· Hypervisor CA not found (mount may not be available)"
-        fi
-
-        echo "=========================================="
-      '';
-    };
 
     # =====================================================================
     # Filesystem Configuration
