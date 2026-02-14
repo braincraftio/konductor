@@ -72,7 +72,8 @@ Development:
   oci:start              Boot VM for development
   oci:ssh                SSH into running VM
   oci:stop               Shutdown VM
-  oci:vendor:inputs      Vendor flake inputs into ./_sources (online)
+  oci:vendor:inputs           Vendor flake inputs into ./_sources (online)
+  oci:vendor:inputs:online    Refresh lock + vendor inputs from network (intermittent)
 
 Debug:
   oci:debug:log          View boot log
@@ -297,11 +298,16 @@ Vendor all flake inputs into `./_sources` for fully offline builds.
 set -euo pipefail
 
 echo "Vendoring flake inputs into ./_sources ..."
-rm -rf _sources
+sudo -E rm -rf _sources
 mkdir -p _sources
+sudo -E chown -R "$(id -u):$(id -g)" _sources
+
+export XDG_CACHE_HOME="/tmp/konductor-nix-cache"
+export HOME="/tmp/konductor-nix-home"
+mkdir -p "$XDG_CACHE_HOME" "$HOME"
 
 # Resolve inputs from flake.lock (works even when flake.nix uses path inputs).
-jq -r '
+jq -c '
   .nodes as $nodes
   | (.nodes.root.inputs | keys) as $roots
   | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
@@ -313,22 +319,29 @@ jq -r '
   | [
       .name,
       .locked.type,
-      .locked.owner // "",
-      .locked.repo // "",
-      .locked.rev // "",
-      .locked.ref // "",
-      .locked.url // ""
-    ] | @tsv
-' flake.lock > /tmp/vendor-lock.txt
+      (.locked.owner // null),
+      (.locked.repo // null),
+      (.locked.rev // null),
+      (.locked.ref // null),
+      (.locked.url // null)
+    ]
+' flake.lock > /tmp/vendor-lock.jsonl
 
-while IFS=$'\t' read -r name typ owner repo rev ref url; do
+while read -r row; do
+  name=$(jq -r '.[0]' <<<"$row")
+  typ=$(jq -r '.[1]' <<<"$row")
+  owner=$(jq -r '.[2] // empty' <<<"$row")
+  repo=$(jq -r '.[3] // empty' <<<"$row")
+  rev=$(jq -r '.[4] // empty' <<<"$row")
+  ref=$(jq -r '.[5] // empty' <<<"$row")
+  url=$(jq -r '.[6] // empty' <<<"$row")
   [ -n "$name" ] || continue
   case "$typ" in
     github)
       flakeref="github:${owner}/${repo}/${rev}"
       ;;
     git)
-      flakeref="git+${url}?ref=${ref}&rev=${rev}"
+      flakeref="git+${url}?rev=${rev}"
       ;;
     *)
       echo "Skipping unsupported input type: $name ($typ)"
@@ -336,17 +349,151 @@ while IFS=$'\t' read -r name typ owner repo rev ref url; do
       ;;
   esac
   echo "  -> $name"
-  store_path=$(nix --extra-experimental-features 'nix-command flakes' \
-    flake prefetch --json "$flakeref" | jq -r '.storePath')
-  rsync -a "$store_path/" "_sources/$name/"
-done < /tmp/vendor-lock.txt
+  attempt=1
+  max_attempts=3
+  while :; do
+    XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
+      nix --extra-experimental-features 'nix-command flakes' \
+      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null && break
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "Error: prefetch failed for $name ($flakeref)"
+      cat /tmp/prefetch.json 2>/dev/null || true
+      exit 1
+    fi
+    echo "  retry ${attempt}/${max_attempts} for $name (clearing tarball cache)"
+    rm -rf "$XDG_CACHE_HOME/nix/tarball-cache" "$XDG_CACHE_HOME/nix/tarball-cache-"* || true
+    attempt=$((attempt + 1))
+  done
+  if ! store_path=$(jq -e -r '.storePath' /tmp/prefetch.json); then
+    echo "Error: failed to resolve store path for $name ($flakeref)"
+    cat /tmp/prefetch.json
+    rm -f /tmp/prefetch.json
+    exit 1
+  fi
+  if [[ "$store_path" != /nix/store/* ]]; then
+    echo "Error: invalid store path for $name ($flakeref): $store_path"
+    cat /tmp/prefetch.json
+    rm -f /tmp/prefetch.json
+    exit 1
+  fi
+  rm -f /tmp/prefetch.json
+  rsync -a --chmod=Du+w,Fu+w "$store_path/" "_sources/$name/"
+done < /tmp/vendor-lock.jsonl
 
-rm -f /tmp/vendor-lock.txt
+rm -f /tmp/vendor-lock.jsonl
+unset XDG_CACHE_HOME HOME
 
 # Refresh flake.lock now that inputs are local paths.
 nix --extra-experimental-features 'nix-command flakes' flake lock
 
 echo "✓ Vendored inputs into ./_sources"
+```
+
+---
+
+## oci:vendor:inputs:online
+
+Intermittent online refresh: update lock from network, then vendor into `./_sources`,
+then re-lock to local paths for offline builds.
+
+```sh {"name":"oci:vendor:inputs:online","excludeFromRunAll":"true","tag":"type:entry"}
+set -euo pipefail
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+echo "Refreshing flake.lock from network (temp flake in $tmpdir)..."
+
+cat > "$tmpdir/flake.nix" <<'EOF'
+{
+  description = "Konductor lock refresh (network)";
+  inputs = {
+EOF
+
+# Build input list from existing lock (prefer original refs, fallback to locked).
+jq -c '
+  .nodes as $nodes
+  | (.nodes.root.inputs | keys) as $roots
+  | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
+  | unique
+  | map(select($nodes[.] != null))
+  | .[]
+  | . as $k
+  | {name:$k, locked:($nodes[$k].locked // {}), original:($nodes[$k].original // {}), flake:($nodes[$k].flake // true)}
+  | [
+      .name,
+      (.original.type // .locked.type // null),
+      (.original.owner // .locked.owner // null),
+      (.original.repo // .locked.repo // null),
+      (.original.ref // .locked.ref // null),
+      (.original.rev // .locked.rev // null),
+      (.original.url // .locked.url // null),
+      (.original.dir // .locked.dir // null),
+      (if .flake == false then "false" else "true" end)
+    ]
+' flake.lock > "$tmpdir/inputs.jsonl"
+
+while read -r row; do
+  name=$(jq -r '.[0]' <<<"$row")
+  typ=$(jq -r '.[1] // empty' <<<"$row")
+  owner=$(jq -r '.[2] // empty' <<<"$row")
+  repo=$(jq -r '.[3] // empty' <<<"$row")
+  ref=$(jq -r '.[4] // empty' <<<"$row")
+  rev=$(jq -r '.[5] // empty' <<<"$row")
+  url=$(jq -r '.[6] // empty' <<<"$row")
+  dir=$(jq -r '.[7] // empty' <<<"$row")
+  is_flake=$(jq -r '.[8] // "true"' <<<"$row")
+  [ -n "$name" ] || continue
+  case "$typ" in
+    github)
+      if [ -n "$ref" ] && [ "$ref" != "null" ]; then
+        flakeref="github:${owner}/${repo}/${ref}"
+      elif [ -n "$rev" ] && [ "$rev" != "null" ]; then
+        flakeref="github:${owner}/${repo}/${rev}"
+      else
+        flakeref="github:${owner}/${repo}"
+      fi
+      ;;
+    git)
+      if [ -n "$ref" ] && [ "$ref" != "null" ]; then
+        flakeref="git+${url}?ref=${ref}"
+      elif [ -n "$rev" ] && [ "$rev" != "null" ]; then
+        flakeref="git+${url}?rev=${rev}"
+      else
+        flakeref="git+${url}"
+      fi
+      ;;
+    *)
+      echo "Skipping unsupported input type: $name ($typ)"
+      continue
+      ;;
+  esac
+  if [ -n "$dir" ] && [ "$dir" != "null" ]; then
+    if [[ "$flakeref" == *"?"* ]]; then
+      flakeref="${flakeref}&dir=${dir}"
+    else
+      flakeref="${flakeref}?dir=${dir}"
+    fi
+  fi
+  echo "    ${name}.url = \"${flakeref}\";" >> "$tmpdir/flake.nix"
+  if [ "$is_flake" = "false" ]; then
+    echo "    ${name}.flake = false;" >> "$tmpdir/flake.nix"
+  fi
+done < "$tmpdir/inputs.jsonl"
+
+cat >> "$tmpdir/flake.nix" <<'EOF'
+  };
+  outputs = { self, ... }: { };
+}
+EOF
+
+nix --extra-experimental-features 'nix-command flakes' flake update --flake "$tmpdir"
+cp -f "$tmpdir/flake.lock" ./flake.lock
+
+echo "Vendoring refreshed inputs into ./_sources ..."
+runme run oci:vendor:inputs
+
+echo "✓ Online refresh complete: flake.lock + _sources updated for offline use"
 ```
 
 ---
@@ -480,10 +627,20 @@ if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     exit 0
 fi
 
+# Vendored inputs are required for offline builds.
+if [ ! -f "_sources/catppuccin/flake.nix" ]; then
+    echo "Error: vendored inputs missing. Run: runme run oci:vendor:inputs"
+    exit 1
+fi
+
 # Update forked forgejo-runner to latest commit (optional - skip on network errors)
 echo "Updating forgejo-runner-src flake input..."
-if ! nix flake update forgejo-runner-src --no-warn-dirty 2>/dev/null; then
-    echo "  (skipped - network/SSL error, using cached input)"
+if [ "${ALLOW_ONLINE_UPDATE:-false}" = "true" ]; then
+    if ! nix flake update forgejo-runner-src --no-warn-dirty 2>/dev/null; then
+        echo "  (skipped - network/SSL error, using cached input)"
+    fi
+else
+    echo "  (skipped - offline mode)"
 fi
 
 # Build to ensure the output exists, then derive nix_drv from the output path.
