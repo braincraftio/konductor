@@ -1591,6 +1591,12 @@ echo "Cloning to /opt/konductor/src/..."
 ssh kc2admin@localhost "sudo git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
 ssh kc2admin@localhost "cd /opt/konductor/src && sudo git checkout ${COMMIT}"
 
+# Sync vendored inputs if present (required for offline flake evaluation)
+if [ -d _sources ]; then
+    rsync -a _sources/ "kc2admin@localhost:/tmp/_sources/"
+    ssh kc2admin@localhost 'sudo rm -rf /opt/konductor/src/_sources && sudo mv /tmp/_sources /opt/konductor/src/_sources'
+fi
+
 # Verify clean state
 DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
 if [ -n "$DIRTY" ]; then

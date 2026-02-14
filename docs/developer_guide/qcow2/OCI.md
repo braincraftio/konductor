@@ -72,11 +72,11 @@ Development:
   oci:start              Boot VM for development
   oci:ssh                SSH into running VM
   oci:stop               Shutdown VM
+  oci:vendor:inputs      Vendor flake inputs into ./_sources (online)
 
 Debug:
   oci:debug:log          View boot log
   oci:vm:kill            Force kill VM
-  oci:cache:seed         Seed flake input cache (online, host-only)
 ```
 
 ---
@@ -289,18 +289,67 @@ runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:h
 
 ---
 
-## oci:cache:seed
+## oci:vendor:inputs
 
-Seed host flake input cache (online; run once on a connected machine).
+Vendor all flake inputs into `./_sources` for fully offline builds.
 
-```sh {"name":"oci:cache:seed","excludeFromRunAll":"true","tag":"type:entry"}
-set -e
-echo "Seeding host flake cache (online)..."
-sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
-  nix --extra-experimental-features 'nix-command flakes' \
-  flake archive --json --no-write-lock-file .
-echo "✓ Host flake cache seeded in /root/.cache/nix"
+```sh {"name":"oci:vendor:inputs","excludeFromRunAll":"true","tag":"type:entry"}
+set -euo pipefail
+
+echo "Vendoring flake inputs into ./_sources ..."
+rm -rf _sources
+mkdir -p _sources
+
+# Resolve inputs from flake.lock (works even when flake.nix uses path inputs).
+jq -r '
+  .nodes as $nodes
+  | (.nodes.root.inputs | keys) as $roots
+  | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
+  | unique
+  | map(select($nodes[.] != null))
+  | .[]
+  | . as $k
+  | {name:$k} + ($nodes[$k])
+  | [
+      .name,
+      .locked.type,
+      .locked.owner // "",
+      .locked.repo // "",
+      .locked.rev // "",
+      .locked.ref // "",
+      .locked.url // ""
+    ] | @tsv
+' flake.lock > /tmp/vendor-lock.txt
+
+while IFS=$'\t' read -r name typ owner repo rev ref url; do
+  [ -n "$name" ] || continue
+  case "$typ" in
+    github)
+      flakeref="github:${owner}/${repo}/${rev}"
+      ;;
+    git)
+      flakeref="git+${url}?ref=${ref}&rev=${rev}"
+      ;;
+    *)
+      echo "Skipping unsupported input type: $name ($typ)"
+      continue
+      ;;
+  esac
+  echo "  -> $name"
+  store_path=$(nix --extra-experimental-features 'nix-command flakes' \
+    flake prefetch --json "$flakeref" | jq -r '.storePath')
+  rsync -a "$store_path/" "_sources/$name/"
+done < /tmp/vendor-lock.txt
+
+rm -f /tmp/vendor-lock.txt
+
+# Refresh flake.lock now that inputs are local paths.
+nix --extra-experimental-features 'nix-command flakes' flake lock
+
+echo "✓ Vendored inputs into ./_sources"
 ```
+
+---
 
 ---
 
@@ -635,6 +684,12 @@ echo "Cloning to /opt/konductor/src/..."
 ssh kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
 ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
 
+# Sync vendored inputs if present (required for offline flake evaluation)
+if [ -d _sources ]; then
+    rsync -a _sources/ "kc2admin@localhost:/tmp/_sources/"
+    ssh kc2admin@localhost 'sudo rm -rf /opt/konductor/src/_sources && sudo mv /tmp/_sources /opt/konductor/src/_sources'
+fi
+
 DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
 if [ -n "$DIRTY" ]; then
     echo "WARNING: Tree is dirty after sync"
@@ -649,14 +704,13 @@ rm -f "/tmp/${BUNDLE}"
 # Use root's cache since that's where the build caches are
 echo "Syncing nix flake caches to VM..."
 # Prime flake input cache from local artifacts only (no network).
-# If this fails, the host cache is missing inputs and offline VM builds will fail.
+# Offline pipeline requires full cache saturation every run.
 echo "Priming host flake caches (offline)..."
 if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
     nix --extra-experimental-features 'nix-command flakes' \
     flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json; then
     echo "Error: missing flake inputs in local cache."
-    echo "Run once on a connected host to seed cache:"
-    echo "  sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix --extra-experimental-features 'nix-command flakes' flake archive --json --no-write-lock-file ."
+    echo "This pipeline requires a fully saturated local cache (no network)."
     exit 1
 fi
 
@@ -672,7 +726,7 @@ if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache NIX_SSHOPTS="-p ${SSH_PO
     nix --extra-experimental-features 'nix-command flakes' \
     flake archive --no-write-lock-file --offline --to "ssh://localhost" .; then
     echo "Error: unable to seed VM store from local cache."
-    echo "Ensure host cache is primed and SSH to VM is available."
+    echo "Ensure host cache is fully saturated and SSH to VM is available."
     exit 1
 fi
 unset SSH_PORT
@@ -718,9 +772,10 @@ echo "Validating VM flake inputs (offline)..."
 if ! ssh kc2admin@localhost \
     "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
     nix --extra-experimental-features 'nix-command flakes' \
+    --option substituters '' --option extra-substituters '' \
     flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json"; then
     echo "Error: VM missing flake inputs for offline build."
-    echo "Run: runme run oci:cache:seed (on a connected host), then re-run oci:image."
+    echo "Offline cache saturation failed."
     exit 1
 fi
 
@@ -742,7 +797,7 @@ set -e
 # Use offline mode with host store as substituter
 # The host's /nix/store is mounted at /nix/.host-store via 9p virtfs
 # Flake caches were synced in _oci:vm:sync
-NIX_OFFLINE_OPTS="--offline --option extra-substituters /nix/.host-store --option require-sigs false"
+NIX_OFFLINE_OPTS="--offline --option extra-substituters /nix/.host-store --option require-sigs false --option substituters '' --option extra-substituters ''"
 
 ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
