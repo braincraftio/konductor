@@ -114,6 +114,7 @@ in {
     systemd.tmpfiles.rules = [
       "d /etc/konductor/pki 0755 root root -"
       "d /etc/konductor/pki/vm 0755 root root -"
+      "d /etc/konductor/pki/signed 0755 root root -"
       "d /etc/konductor/pki/hypervisor 0755 root root -"
       "d /etc/konductor/pki/bundle 0755 root root -"
     ];
@@ -162,6 +163,108 @@ in {
       };
 
       # =====================================================================
+      # Tier 2: Hypervisor-Signed Certificate Generation
+      # =====================================================================
+      # Generates wildcard certificate signed by hypervisor CA (if available).
+      # This is Tier 2 in the certificate precedence hierarchy:
+      #   Tier 1: Cluster-provided (future)
+      #   Tier 2: Hypervisor-signed (this service)
+      #   Tier 3: Self-signed (konductor-pki-vm above)
+      #
+      # Runs after VM PKI generation to ensure Tier 3 fallback always exists.
+      # Creates /etc/konductor/pki/signed/wildcard.{crt,key} if hypervisor CA
+      # is mounted at /mnt/pki/ca.{crt,key}.
+      konductor-pki-signed = {
+        description = "Generate Konductor Hypervisor-Signed Certificate";
+        after = [ "local-fs.target" "konductor-pki-vm.service" ];
+        before = [ "network.target" ];
+        wantedBy = [ "multi-user.target" ];
+
+        # Only run if hypervisor CA key is mounted
+        unitConfig = {
+          ConditionPathExists = "/mnt/pki/ca.key";
+        };
+
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = pkgs.writeShellScript "generate-signed-pki" ''
+            set -euo pipefail
+
+            echo "=========================================="
+            echo "Konductor Tier 2 Certificate Generation"
+            echo "=========================================="
+
+            PKI_ROOT="/etc/konductor/pki"
+
+            # Verify hypervisor CA is available
+            if [ ! -f /mnt/pki/ca.key ] || [ ! -f /mnt/pki/ca.crt ]; then
+              echo "✗ Hypervisor CA not available - skipping Tier 2"
+              exit 0
+            fi
+
+            echo "✓ Hypervisor CA available - generating signed certificate"
+
+            # Generate private key (EC secp256r1 for performance)
+            ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 \
+              -out "$PKI_ROOT/signed/wildcard.key"
+            chmod 640 "$PKI_ROOT/signed/wildcard.key"
+
+            # Create CSR with proper subject
+            ${pkgs.openssl}/bin/openssl req -new \
+              -key "$PKI_ROOT/signed/wildcard.key" \
+              -out /tmp/wildcard.csr \
+              -subj "/O=${cfg.organization}/OU=${cfg.organizationalUnit}/CN=*.${cfg.domain}"
+
+            # Create SAN extensions file
+            cat > /tmp/san.ext << 'EOF'
+            subjectAltName=DNS:*.${cfg.domain},DNS:${cfg.domain},DNS:*.docker.${cfg.domain},DNS:docker.${cfg.domain}
+            basicConstraints=CA:FALSE
+            keyUsage=digitalSignature,keyEncipherment
+            extendedKeyUsage=serverAuth,clientAuth
+            EOF
+
+            # Sign with hypervisor CA
+            ${pkgs.openssl}/bin/openssl x509 -req \
+              -in /tmp/wildcard.csr \
+              -CA /mnt/pki/ca.crt \
+              -CAkey /mnt/pki/ca.key \
+              -out "$PKI_ROOT/signed/wildcard.crt" \
+              -days ${toString cfg.certValidityDays} \
+              -sha256 \
+              -extfile /tmp/san.ext \
+              -set_serial "0x$(${pkgs.openssl}/bin/openssl rand -hex 20)"
+
+            # Copy hypervisor CA for reference
+            cp /mnt/pki/ca.crt "$PKI_ROOT/hypervisor/ca.crt"
+
+            # Verify certificate
+            if ${pkgs.openssl}/bin/openssl verify -CAfile /mnt/pki/ca.crt "$PKI_ROOT/signed/wildcard.crt" >/dev/null 2>&1; then
+              echo "✓ Certificate signed by hypervisor CA"
+              ISSUER=$(${pkgs.openssl}/bin/openssl x509 -in "$PKI_ROOT/signed/wildcard.crt" -noout -issuer | sed 's/issuer=//')
+              echo "  Issuer: $ISSUER"
+
+              # Set permissions (readable by kc2 group)
+              chgrp kc2 "$PKI_ROOT/signed/wildcard.key" "$PKI_ROOT/signed/wildcard.crt"
+              chmod 640 "$PKI_ROOT/signed/wildcard.key"
+              chmod 644 "$PKI_ROOT/signed/wildcard.crt"
+            else
+              echo "✗ Certificate verification failed - removing Tier 2 certs"
+              rm -f "$PKI_ROOT/signed/wildcard."{crt,key}
+              exit 1
+            fi
+
+            # Cleanup temp files
+            rm -f /tmp/wildcard.csr /tmp/san.ext
+
+            echo "=========================================="
+            echo "Tier 2 Certificate Generation Complete"
+            echo "=========================================="
+          '';
+        };
+      };
+
+      # =====================================================================
       # PKI Permissions
       # =====================================================================
       # Sets wildcard cert/key group to kc2 so per-user services can read them.
@@ -169,7 +272,7 @@ in {
       # be baked into the image at build time, skipping konductor-pki-vm.
       konductor-pki-permissions = {
         description = "Set Konductor PKI file permissions";
-        after = [ "konductor-pki-vm.service" ];
+        after = [ "konductor-pki-vm.service" "konductor-pki-signed.service" ];
         wantedBy = [ "multi-user.target" ];
 
         unitConfig = {
@@ -181,10 +284,24 @@ in {
           RemainAfterExit = true;
           ExecStart = pkgs.writeShellScript "set-pki-permissions" ''
             set -euo pipefail
-            chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
-            chmod 640 /etc/konductor/pki/vm/wildcard.key
-            chmod 644 /etc/konductor/pki/vm/wildcard.crt
-            echo "PKI permissions set: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
+
+            # Tier 3: VM self-signed (always present)
+            if [ -f /etc/konductor/pki/vm/wildcard.key ]; then
+              chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
+              chmod 640 /etc/konductor/pki/vm/wildcard.key
+              chmod 644 /etc/konductor/pki/vm/wildcard.crt
+              echo "✓ Tier 3 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
+            fi
+
+            # Tier 2: Hypervisor-signed (if present)
+            if [ -f /etc/konductor/pki/signed/wildcard.key ]; then
+              chgrp kc2 /etc/konductor/pki/signed/wildcard.key /etc/konductor/pki/signed/wildcard.crt
+              chmod 640 /etc/konductor/pki/signed/wildcard.key
+              chmod 644 /etc/konductor/pki/signed/wildcard.crt
+              echo "✓ Tier 2 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
+            fi
+
+            echo "PKI permissions set complete"
           '';
         };
       };

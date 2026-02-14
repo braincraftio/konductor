@@ -253,6 +253,9 @@ let
   # PKI module for VM identity and certificate chain of trust
   pkiModule = import ../modules/pki.nix;
 
+  # Certificate precedence detection script (Tier 1 → 2 → 3 fallback)
+  certPrecedenceScript = import ../lib/cert-precedence.nix { inherit pkgs; };
+
   # Common home-manager configuration for built-in users
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
@@ -272,6 +275,92 @@ let
       dotenv_if_exists "$HOME/.env"
     '';
     home.stateVersion = versions.nixos.stateVersion;
+  };
+
+  # Service template generator for konductor multi-user services
+  # Reduces code duplication by abstracting common patterns:
+  # - Dynamic firewall management (ExecStartPre opens port, ExecStopPost closes)
+  # - Certificate precedence detection (Tier 1→2→3 fallback)
+  # - RuntimeDirectory for /run/konductor state
+  # - EnvironmentFile pattern for PORT and cert variables
+  mkKonductorService = {
+    serviceName,     # Service name (ttyd, vscode, restty, ghostty)
+    basePort,        # Base port for port calculation (e.g., 8000 for vscode)
+    afterServices ? [ "network.target" "konductor-init.service" "konductor-pki.service" ],
+    documentation ? [],
+    workingDirectory ? "/workspace",
+    extraServiceConfig ? {},  # Additional serviceConfig options
+  }: {
+    "konductor-${serviceName}@" = {
+      description = "Konductor ${lib.toUpper (builtins.substring 0 1 serviceName)}${builtins.substring 1 (builtins.stringLength serviceName) serviceName} for %i";
+      inherit documentation;
+      after = afterServices;
+
+      serviceConfig = {
+        Type = "simple";
+        User = "%i";
+        Group = "users";
+        WorkingDirectory = workingDirectory;
+
+        # RuntimeDirectory creates /run/konductor with proper permissions
+        # Automatically cleaned up when last service stops
+        RuntimeDirectory = "konductor";
+
+        ExecStartPre = [
+          # Step 1: Find best available certificate (Tier 1→2→3)
+          # Writes CERT_PATH, KEY_PATH, CERT_TIER to /run/konductor/konductor-SERVICE@USER.cert-env
+          # Exits non-zero if no valid cert found (prevents service start)
+          "+${pkgs.writeShellScript "find-cert-${serviceName}" ''
+            set -euo pipefail
+
+            # Run precedence check
+            if ! CERT_INFO=$(${certPrecedenceScript}/bin/konductor-find-best-cert); then
+              echo "FATAL: No valid certificate available for konductor-${serviceName}@%i" >&2
+              exit 1
+            fi
+
+            # Write cert info to runtime env file
+            echo "$CERT_INFO" > /run/konductor/konductor-${serviceName}@%i.cert-env
+
+            # Log which cert tier was selected
+            TIER=$(echo "$CERT_INFO" | ${pkgs.gnugrep}/bin/grep CERT_TIER | ${pkgs.coreutils}/bin/cut -d= -f2)
+            echo "✓ Using certificate tier: $TIER"
+          ''}"
+
+          # Step 2: Open firewall port
+          # PORT variable from EnvironmentFile (written by konductor-init.service)
+          ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment "konductor-${serviceName}@%i-port''${PORT}"''
+        ];
+
+        # Environment files (merged at runtime)
+        # EnvironmentFile variables are expanded in ExecStart
+        EnvironmentFile = [
+          "/var/lib/konductor/env/konductor-${serviceName}@%i.env"  # PORT, USER_UID
+          "/run/konductor/konductor-${serviceName}@%i.cert-env"     # CERT_PATH, KEY_PATH, CERT_TIER
+        ];
+
+        # Placeholder ExecStart - konductor-init.service drop-in overrides with actual command
+        # Using /usr/bin/false ensures service fails if drop-in not generated (fail-safe)
+        ExecStart = "${pkgs.coreutils}/bin/false";
+
+        # Close firewall port on stop
+        # Parse nftables output to find rule handle by comment, then delete by handle
+        ExecStopPost = pkgs.writeShellScript "cleanup-firewall-${serviceName}" ''
+          HANDLE=$(${pkgs.nftables}/bin/nft --handle list chain inet nixos-fw input-allow | \
+            ${pkgs.gnugrep}/bin/grep "comment \"konductor-${serviceName}@%i-port''${PORT}\"" | \
+            ${pkgs.gnugrep}/bin/grep -o "handle [0-9]*" | \
+            ${pkgs.gawk}/bin/awk '{print $2}')
+          if [ -n "$HANDLE" ]; then
+            ${pkgs.nftables}/bin/nft delete rule inet nixos-fw input-allow handle $HANDLE
+          fi
+        '';
+
+        Restart = "on-failure";
+        RestartSec = 10;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+      } // extraServiceConfig;
+    };
   };
 
   # Shared NixOS configuration module for both qcow2 image and nixos-rebuild
@@ -375,6 +464,9 @@ let
           22    # SSH
           80    # HTTP (forwarded to Envoy Gateway)
           443   # HTTPS (forwarded to Envoy Gateway)
+          # Multi-user web service ports (7000-10499) are dynamically managed
+          # by systemd service templates (konductor-{ttyd,vscode,restty,ghostty}@)
+          # via ExecStartPre/ExecStopPost nftables rules
         ];
         # Trust Docker bridge networks for internal traffic
         trustedInterfaces = [ "docker-dev" "docker0" ];
@@ -798,6 +890,10 @@ let
           # Multi-user service infrastructure
           yj           # TOML to JSON converter (for konductor-init.service)
           yq-go        # YAML/TOML/JSON processor
+        ])
+        # Certificate precedence detection for multi-user services
+        ++ [ certPrecedenceScript ]
+        ++ (with pkgs; [
         ]);
 
       # Environment Variables
@@ -1403,88 +1499,46 @@ let
         #
         # Example: ttyd base 7000 + (alice UID 1004 - 1000) = port 7004
         # =====================================================================
-
+      }
+      # Merge in service templates generated by mkKonductorService
+      // (mkKonductorService {
         # Template: TTYd Web Terminal (per-user instances)
         # Base port: 7000, actual port = 7000 + (UID - 1000)
-        "konductor-ttyd@" = {
-          description = "Konductor TTYd Web Terminal for %i";
-          documentation = [ "https://github.com/tsl0922/ttyd" ];
-          after = [ "network.target" ];
-
-          serviceConfig = {
-            Type = "simple";
-            User = "%i";
-            WorkingDirectory = "/home/%i";
-            # Port determined by drop-in from konductor-init.service
-            ExecStart = "${pkgs.ttyd}/bin/ttyd bash";
-            Restart = "on-failure";
-            RestartSec = 10;
-          };
-        };
-
+        serviceName = "ttyd";
+        basePort = 7000;
+        afterServices = [ "network.target" "konductor-init.service" "konductor-pki.service" ];
+        documentation = [ "https://github.com/tsl0922/ttyd" ];
+        workingDirectory = "/home/%i";
+      })
+      // (mkKonductorService {
         # Template: VSCode Server (per-user instances)
         # Base port: 8000, actual port = 8000 + (UID - 1000)
         # REQUIRES drop-in from konductor-init.service with actual configuration
-        "konductor-vscode@" = {
-          description = "Konductor VSCode Server for %i";
-          documentation = [ "https://github.com/coder/code-server" ];
-          after = [ "network.target" ];
-
-          serviceConfig = {
-            Type = "simple";
-            User = "%i";
-            Group = "users";
-            WorkingDirectory = "/workspace";
-            # Placeholder fails if drop-in not generated (prevents silent malfunction)
-            ExecStart = "${pkgs.coreutils}/bin/false";
-            Restart = "no";  # Don't restart on failure - requires intervention
-            NoNewPrivileges = true;
-            PrivateTmp = true;
-          };
+        serviceName = "vscode";
+        basePort = 8000;
+        documentation = [ "https://github.com/coder/code-server" ];
+        extraServiceConfig = {
+          Restart = "no";  # Don't restart on failure - requires intervention
         };
-
+      })
+      // (mkKonductorService {
         # Template: Restty Web Terminal (per-user instances)
         # Base port: 9000, actual port = 9000 + (UID - 1000)
-        "konductor-restty@" = {
-          description = "Konductor Restty Web Terminal for %i";
-          documentation = [ "https://github.com/wiedymi/restty" ];
-          after = [ "network.target" ];
-
-          serviceConfig = let
-            resttyWeb = import ../programs/restty-web { inherit pkgs lib; };
-          in {
-            Type = "simple";
-            User = "%i";
-            Group = "users";
-            WorkingDirectory = "/workspace";
-            # Port determined by drop-in from konductor-init.service
-            ExecStart = "${resttyWeb.server}/bin/restty-web-server --writable";
-            Restart = "on-failure";
-            RestartSec = 10;
-            MemoryDenyWriteExecute = false; # Required for WASM
-          };
+        serviceName = "restty";
+        basePort = 9000;
+        documentation = [ "https://github.com/wiedymi/restty" ];
+        extraServiceConfig = {
+          MemoryDenyWriteExecute = false; # Required for WASM
         };
-
+      })
+      // (mkKonductorService {
         # Template: Ghostty Web Terminal (per-user instances)
         # Base port: 10000, actual port = 10000 + (UID - 1000)
-        "konductor-ghostty@" = {
-          description = "Konductor Ghostty Web Terminal for %i";
-          documentation = [ "https://github.com/coder/ghostty-web" ];
-          after = [ "network.target" ];
-
-          serviceConfig = let
-            ghosttyWeb = import ../programs/ghostty-web { inherit pkgs lib; };
-          in {
-            Type = "simple";
-            User = "%i";
-            Group = "users";
-            WorkingDirectory = "/workspace";
-            # Port determined by drop-in from konductor-init.service
-            ExecStart = "${ghosttyWeb.server}/bin/ghostty-web-server --writable";
-            Restart = "on-failure";
-            RestartSec = 10;
-          };
-        };
+        serviceName = "ghostty";
+        basePort = 10000;
+        documentation = [ "https://github.com/coder/ghostty-web" ];
+      })
+      // {
 
         # =====================================================================
         # Konductor Service Orchestrator (konductor-init.service)
@@ -1622,17 +1676,38 @@ EOF
 EOF
 
                   # Service-specific ExecStart overrides
-                  # All services use shared VM PKI certs (/etc/konductor/pki/vm/wildcard.{crt,key})
-                  # This enables instant revocation via certificate revocation in security events
+                  # All services use multi-tier certificate precedence (cluster→hypervisor→self-signed)
+                  # Certificate variables (CERT_PATH, KEY_PATH) come from ExecStartPre cert detection
                   case "$svc_name" in
                     ttyd)
-                      echo "ExecStart=${pkgs.ttyd}/bin/ttyd --port \''${PORT} bash" >> "$DROPIN_PATH/50-config.conf"
+                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
+ExecStart=${pkgs.ttyd}/bin/ttyd \\
+  --port \''${PORT} \\
+  --ssl \\
+  --ssl-cert \''${CERT_PATH} \\
+  --ssl-key \''${KEY_PATH} \\
+  bash
+EOF
                       ;;
                     restty)
-                      echo "ExecStart=${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --writable --working-directory /workspace" >> "$DROPIN_PATH/50-config.conf"
+                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
+ExecStart=${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server \\
+  --port \''${PORT} \\
+  --cert \''${CERT_PATH} \\
+  --key \''${KEY_PATH} \\
+  --writable \\
+  --working-directory /workspace
+EOF
                       ;;
                     ghostty)
-                      echo "ExecStart=${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server --port \''${PORT} --writable --working-directory /workspace" >> "$DROPIN_PATH/50-config.conf"
+                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
+ExecStart=${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server \\
+  --port \''${PORT} \\
+  --cert \''${CERT_PATH} \\
+  --key \''${KEY_PATH} \\
+  --writable \\
+  --working-directory /workspace
+EOF
                       ;;
                     vscode)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
@@ -1643,8 +1718,8 @@ ExecStart=${pkgs.code-server}/bin/code-server \\
   --user-data-dir /home/''${username}/.local/share/code-server \\
   --extensions-dir /home/''${username}/.local/share/code-server/extensions \\
   --auth none \\
-  --cert /etc/konductor/pki/vm/wildcard.crt \\
-  --cert-key /etc/konductor/pki/vm/wildcard.key \\
+  --cert \''${CERT_PATH} \\
+  --cert-key \''${KEY_PATH} \\
   --disable-telemetry \\
   --disable-update-check \\
   --disable-getting-started-override \\
@@ -1772,6 +1847,96 @@ EOF
                 systemctl reload konductor-init.service
               else
                 systemctl start konductor-init.service
+              fi
+            '';
+          };
+        };
+
+        # =====================================================================
+        # Nix Store Overlay Service
+        # =====================================================================
+        # Systemd service to set up nix store overlay when host store is available
+        # This runs early in boot, before nix-daemon, and only activates during
+        # QCOW2 build when the host's /nix/store is mounted via 9p virtfs.
+        # Note: No ConditionPathIsMountPoint since we use automount - the script
+        # checks availability by accessing the path (triggering automount if device exists)
+        nix-store-overlay = {
+          description = "Set up Nix store overlay with host cache";
+          wantedBy = [ "nix-daemon.service" ];
+          before = [ "nix-daemon.service" ];
+          after = [ "local-fs.target" "nix-.host\\x2dstore.automount" ];
+          unitConfig = {
+            DefaultDependencies = false;
+          };
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "nix-store-overlay-setup" ''
+              set -euo pipefail
+
+              # =====================================================================
+              # Check for 9p device BEFORE triggering automount
+              # =====================================================================
+              # The /nix/.host-store mount is configured with x-systemd.automount,
+              # which triggers on directory access. Checking the directory existence
+              # would trigger the automount and cause kernel errors if no 9p device.
+              #
+              # Instead, check for virtio 9p devices by scanning mount_tag files.
+              # Each virtio 9p device exposes its tag in /sys/bus/virtio/devices/*/mount_tag
+              #
+              # Wait up to 10 seconds for virtio devices to enumerate (boot timing)
+              FOUND_NIXSTORE=0
+              for i in $(${pkgs.coreutils}/bin/seq 1 10); do
+                VIRTIO_9P_DEVICES=$(${pkgs.findutils}/bin/find /sys/bus/virtio/devices -name 'mount_tag' -exec ${pkgs.coreutils}/bin/cat {} \; 2>/dev/null || true)
+                if echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
+                  FOUND_NIXSTORE=1
+                  echo "Found 9p device 'nixstore' after ''${i}s"
+                  break
+                fi
+                ${pkgs.coreutils}/bin/sleep 1
+              done
+
+              if [ "$FOUND_NIXSTORE" -eq 0 ]; then
+                echo "9p device 'nixstore' not available (production mode), using local store"
+                exit 0
+              fi
+
+              # Device exists, now safe to check host store content (will trigger automount)
+              if [ ! -d /nix/.host-store ] || [ -z "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
+                echo "Host store mounted but empty, using local store"
+                exit 0
+              fi
+
+              # Create overlay directories
+              mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
+
+              # Check if already mounted as overlay
+              if mount | grep -q "overlay on /nix/store"; then
+                echo "Overlay already mounted"
+                exit 0
+              fi
+
+              # Bind mount original store to preserve it
+              if [ ! -d /nix/.local-store ]; then
+                mkdir -p /nix/.local-store
+                mount --bind /nix/store /nix/.local-store
+              fi
+
+              # Mount overlay: host store (ro) + rw-store (rw) -> /nix/store
+              mount -t overlay overlay \
+                -o lowerdir=/nix/.host-store:/nix/.local-store,upperdir=/nix/.rw-store/upper,workdir=/nix/.rw-store/work \
+                /nix/store
+
+              echo "Nix store overlay activated with host cache"
+            '';
+            ExecStop = pkgs.writeShellScript "nix-store-overlay-teardown" ''
+              # Unmount overlay and restore local store
+              if mount | grep -q "overlay on /nix/store"; then
+                umount /nix/store || true
+                if [ -d /nix/.local-store ]; then
+                  mount --bind /nix/.local-store /nix/store || true
+                  umount /nix/.local-store || true
+                fi
               fi
             '';
           };
@@ -2214,93 +2379,6 @@ EOF
         "nofail"
       ];
       neededForBoot = false;
-    };
-
-    # Systemd service to set up nix store overlay when host store is available
-    # This runs early in boot, before nix-daemon, and only activates during
-    # QCOW2 build when the host's /nix/store is mounted via 9p virtfs.
-    # Note: No ConditionPathIsMountPoint since we use automount - the script
-    # checks availability by accessing the path (triggering automount if device exists)
-    systemd.services.nix-store-overlay = {
-      description = "Set up Nix store overlay with host cache";
-      wantedBy = [ "nix-daemon.service" ];
-      before = [ "nix-daemon.service" ];
-      after = [ "local-fs.target" "nix-.host\\x2dstore.automount" ];
-      unitConfig = {
-        DefaultDependencies = false;
-      };
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        ExecStart = pkgs.writeShellScript "nix-store-overlay-setup" ''
-          set -euo pipefail
-
-          # =====================================================================
-          # Check for 9p device BEFORE triggering automount
-          # =====================================================================
-          # The /nix/.host-store mount is configured with x-systemd.automount,
-          # which triggers on directory access. Checking the directory existence
-          # would trigger the automount and cause kernel errors if no 9p device.
-          #
-          # Instead, check for virtio 9p devices by scanning mount_tag files.
-          # Each virtio 9p device exposes its tag in /sys/bus/virtio/devices/*/mount_tag
-          #
-          # Wait up to 10 seconds for virtio devices to enumerate (boot timing)
-          FOUND_NIXSTORE=0
-          for i in $(${pkgs.coreutils}/bin/seq 1 10); do
-            VIRTIO_9P_DEVICES=$(${pkgs.findutils}/bin/find /sys/bus/virtio/devices -name 'mount_tag' -exec ${pkgs.coreutils}/bin/cat {} \; 2>/dev/null || true)
-            if echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
-              FOUND_NIXSTORE=1
-              echo "Found 9p device 'nixstore' after ''${i}s"
-              break
-            fi
-            ${pkgs.coreutils}/bin/sleep 1
-          done
-
-          if [ "$FOUND_NIXSTORE" -eq 0 ]; then
-            echo "9p device 'nixstore' not available (production mode), using local store"
-            exit 0
-          fi
-
-          # Device exists, now safe to check host store content (will trigger automount)
-          if [ ! -d /nix/.host-store ] || [ -z "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
-            echo "Host store mounted but empty, using local store"
-            exit 0
-          fi
-
-          # Create overlay directories
-          mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
-
-          # Check if already mounted as overlay
-          if mount | grep -q "overlay on /nix/store"; then
-            echo "Overlay already mounted"
-            exit 0
-          fi
-
-          # Bind mount original store to preserve it
-          if [ ! -d /nix/.local-store ]; then
-            mkdir -p /nix/.local-store
-            mount --bind /nix/store /nix/.local-store
-          fi
-
-          # Mount overlay: host store (ro) + rw-store (rw) -> /nix/store
-          mount -t overlay overlay \
-            -o lowerdir=/nix/.host-store:/nix/.local-store,upperdir=/nix/.rw-store/upper,workdir=/nix/.rw-store/work \
-            /nix/store
-
-          echo "Nix store overlay activated with host cache"
-        '';
-        ExecStop = pkgs.writeShellScript "nix-store-overlay-teardown" ''
-          # Unmount overlay and restore local store
-          if mount | grep -q "overlay on /nix/store"; then
-            umount /nix/store || true
-            if [ -d /nix/.local-store ]; then
-              mount --bind /nix/.local-store /nix/store || true
-              umount /nix/.local-store || true
-            fi
-          fi
-        '';
-      };
     };
 
     # Nix configuration
