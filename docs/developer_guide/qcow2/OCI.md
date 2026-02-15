@@ -5,6 +5,7 @@ skipPrompts: true
 tag: target:qcow2,scope:standalone
 runme:
   version: v3
+  debug: true
 ---
 
 # Konductor QCOW2 OCI Build (Standalone)
@@ -690,6 +691,13 @@ SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 cat > "$CLOUD_INIT_DIR/user-data" << EOF
 #cloud-config
 users:
+  - name: ${USER}
+    groups: kc2, wheel, docker, libvirtd, kvm
+    shell: /run/current-system/sw/bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - $(cat "$SSH_PUBKEY")
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -829,7 +837,7 @@ Sync source to VM.
 
 ```sh {"name":"_oci:vm:sync"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -e
+set -ex
 
 COMMIT=$(git rev-parse --short HEAD)
 BUNDLE="k9-${COMMIT}.bundle"
@@ -869,7 +877,7 @@ echo "Syncing nix flake caches to VM..."
 # Prime flake input cache from local artifacts only (no network).
 # Offline pipeline requires full cache saturation every run.
 echo "Priming host flake caches (offline)..."
-if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
+if ! sudo -E env PATH="$PATH" HOME=/root XDG_CACHE_HOME=/root/.cache \
     nix --extra-experimental-features 'nix-command flakes' \
     flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json; then
     echo "Error: missing flake inputs in local cache."
@@ -885,7 +893,7 @@ rm -f /tmp/flake-archive.json
 # Seed VM store with flake inputs over SSH (no network).
 echo "Seeding VM flake inputs (offline, ssh)..."
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
-if ! sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
+if ! sudo -E env PATH="$PATH" HOME=/root XDG_CACHE_HOME=/root/.cache NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
     nix --extra-experimental-features 'nix-command flakes' \
     flake archive --no-write-lock-file --offline --to "ssh://localhost" .; then
     echo "Error: unable to seed VM store from local cache."
@@ -901,19 +909,33 @@ NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
 unset SSH_PORT
 rm -f /tmp/flake-input-paths.txt
 
-# Copy system closure to VM store (ensures nixos-rebuild works offline).
-echo "Seeding VM system closure (offline, ssh)..."
-SYSTEM_TOPLEVEL=$(nix path-info .#nixosConfigurations.konductor.config.system.build.toplevel 2>/dev/null | head -1)
-if [ -n "$SYSTEM_TOPLEVEL" ]; then
-    nix path-info -r "$SYSTEM_TOPLEVEL" > /tmp/system-paths.txt
-    SSH_PORT="${QCOW2_SSH_PORT:-2222}"
-    NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
-      xargs -r nix copy --offline --to "ssh://localhost" < /tmp/system-paths.txt
-    unset SSH_PORT
-    rm -f /tmp/system-paths.txt
-else
-    echo "WARNING: Could not resolve system toplevel; skipping closure copy."
-fi
+# Copy FULL build closure to VM store (not just runtime - includes stdenv, bootstrap).
+# This is critical for offline nixos-rebuild capability.
+# nix path-info -r only gives runtime closure; nix-store --requisites --include-outputs
+# gives ALL dependencies including build-time deps (stdenv, bootstrap-tools, etc).
+echo "Building system closure for VM seeding..."
+SYSTEM_TOPLEVEL=$(nix build --no-link --print-out-paths .#nixosConfigurations.konductor.config.system.build.toplevel)
+echo "Seeding VM with FULL build closure: $SYSTEM_TOPLEVEL"
+
+# Get runtime closure
+nix path-info -r "$SYSTEM_TOPLEVEL" > /tmp/runtime-paths.txt
+echo "  Runtime closure: $(wc -l < /tmp/runtime-paths.txt) paths"
+
+# Get build closure (includes stdenv, bootstrap-tools, all build deps)
+# This is what enables nixos-rebuild switch to work offline.
+nix-store --query --requisites --include-outputs "$SYSTEM_TOPLEVEL" > /tmp/build-paths.txt
+echo "  Build closure: $(wc -l < /tmp/build-paths.txt) paths"
+
+# Combine and dedupe
+cat /tmp/runtime-paths.txt /tmp/build-paths.txt | sort -u > /tmp/all-paths.txt
+echo "  Total unique: $(wc -l < /tmp/all-paths.txt) paths"
+
+# Copy all paths to VM (this registers them in VM's nix database)
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
+  xargs -r nix copy --offline --to "ssh://localhost" < /tmp/all-paths.txt
+unset SSH_PORT
+rm -f /tmp/runtime-paths.txt /tmp/build-paths.txt /tmp/all-paths.txt
 
 if [ -d /root/.cache/nix ]; then
     # Root cache exists (from previous builds)
@@ -933,7 +955,7 @@ fi
 # Verify VM can resolve all flake inputs offline before rebuild.
 echo "Validating VM flake inputs (offline)..."
 if ! ssh kc2admin@localhost \
-    "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache \
+    "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache \
     nix --extra-experimental-features 'nix-command flakes' \
     --option substituters '' --option extra-substituters '' \
     flake archive --json --no-write-lock-file --offline . >/tmp/flake-archive.json"; then
@@ -957,17 +979,20 @@ Run `nixos-rebuild switch` inside VM.
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
-# Use offline mode with host store as substituter
-# The host's /nix/store is mounted at /nix/.host-store via 9p virtfs
-# Flake caches were synced in _oci:vm:sync
-NIX_OFFLINE_OPTS="--offline --option extra-substituters /nix/.host-store --option require-sigs false --option substituters '' --option extra-substituters ''"
+# Offline rebuild using paths copied in _oci:vm:sync + 9p host-store as fallback.
+# Primary: Full build closure was copied to VM store (registered in nix db).
+# Fallback: Host /nix/store mounted at /nix/.host-store via 9p virtfs.
+# Syntax: file:///path for local substituters, space-separated for multiple.
+NIX_OFFLINE_OPTS="--offline --option substituters 'file:///nix/.host-store' --option require-sigs false"
 
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+echo "Running nixos-rebuild switch (offline)..."
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures (also offline)
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.default 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.full 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.konductor 2>&1 || true"
+echo "Pre-building devshells..."
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.default 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.full 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.konductor 2>&1 || true"
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```

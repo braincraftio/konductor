@@ -2382,17 +2382,10 @@ EOF
       neededForBoot = false;  # Not required - graceful degradation
     };
 
-    # Writable layer for overlay (tmpfs during build)
-    fileSystems."/nix/.rw-store" = {
-      device = "tmpfs";
-      fsType = "tmpfs";
-      options = [
-        "mode=0755"
-        "size=20G"         # Upper layer for new builds
-        "nofail"
-      ];
-      neededForBoot = false;
-    };
+    # Writable layer for overlay (persistent on root fs)
+    # Using root fs instead of tmpfs ensures overlay writes survive shutdown.
+    # This enables nixos-rebuild results to persist in the final image.
+    # The overlay service creates /nix/.rw-store/{upper,work} as needed.
 
     # Nix configuration
     nix = {
