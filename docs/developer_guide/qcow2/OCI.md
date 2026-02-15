@@ -622,7 +622,7 @@ echo ""
 Build NixOS closure and capture nix_drv.
 
 ```sh {"name":"_oci:nix","tag":"requires:nix"}
-set -e
+set -ex
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
     exit 0
@@ -644,8 +644,12 @@ else
     echo "  (skipped - offline mode)"
 fi
 
-# Build to ensure the output exists, then derive nix_drv from the output path.
-OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths | tail -1)
+# Build qcow2 image (shows real-time progress, no output buffering)
+echo "Building .#qcow2..."
+nix build .#qcow2 --no-warn-dirty
+
+# Get output path and derivation hash after build completes
+OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths 2>/dev/null | head -1)
 NIX_DRV_PATH=$(nix path-info --derivation "$OUT_PATH" 2>/dev/null | head -1 || true)
 if [ -z "$NIX_DRV_PATH" ]; then
     echo "Error: nix path-info --derivation failed for $OUT_PATH"
@@ -653,8 +657,7 @@ if [ -z "$NIX_DRV_PATH" ]; then
 fi
 NIX_DRV=$(basename "$NIX_DRV_PATH" | cut -d- -f1)
 echo "$NIX_DRV" > .nix_drv
-
-nix build .#qcow2 --no-warn-dirty
+echo "Build complete: $OUT_PATH"
 
 BACKING_FILE="$(readlink -f result/nixos.qcow2)"
 rm -rf result.writable && mkdir -p result.writable
