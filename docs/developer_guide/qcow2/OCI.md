@@ -909,33 +909,25 @@ NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
 unset SSH_PORT
 rm -f /tmp/flake-input-paths.txt
 
-# Copy FULL build closure to VM store (not just runtime - includes stdenv, bootstrap).
-# This is critical for offline nixos-rebuild capability.
-# nix path-info -r only gives runtime closure; nix-store --requisites --include-outputs
-# gives ALL dependencies including build-time deps (stdenv, bootstrap-tools, etc).
+# Copy system closure to VM using nix-copy-closure (idiomatic approach).
+# With system.includeBuildDependencies = true in the NixOS config, the runtime
+# closure now INCLUDES all build-time dependencies (stdenv, bootstrap-tools, etc).
+# This enables offline nixos-rebuild switch capability.
 echo "Building system closure for VM seeding..."
 SYSTEM_TOPLEVEL=$(nix build --no-link --print-out-paths .#nixosConfigurations.konductor.config.system.build.toplevel)
-echo "Seeding VM with FULL build closure: $SYSTEM_TOPLEVEL"
+echo "Seeding VM with system closure: $SYSTEM_TOPLEVEL"
+echo "  (includes build deps via system.includeBuildDependencies = true)"
 
-# Get runtime closure
-nix path-info -r "$SYSTEM_TOPLEVEL" > /tmp/runtime-paths.txt
-echo "  Runtime closure: $(wc -l < /tmp/runtime-paths.txt) paths"
+# Count paths for visibility
+CLOSURE_SIZE=$(nix path-info -r "$SYSTEM_TOPLEVEL" | wc -l)
+echo "  Closure size: $CLOSURE_SIZE paths"
 
-# Get build closure (includes stdenv, bootstrap-tools, all build deps)
-# This is what enables nixos-rebuild switch to work offline.
-nix-store --query --requisites --include-outputs "$SYSTEM_TOPLEVEL" > /tmp/build-paths.txt
-echo "  Build closure: $(wc -l < /tmp/build-paths.txt) paths"
-
-# Combine and dedupe
-cat /tmp/runtime-paths.txt /tmp/build-paths.txt | sort -u > /tmp/all-paths.txt
-echo "  Total unique: $(wc -l < /tmp/all-paths.txt) paths"
-
-# Copy all paths to VM (this registers them in VM's nix database)
+# Use nix-copy-closure - more idiomatic than manual path enumeration.
+# This copies the full closure and registers paths in VM's nix database.
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
-NIX_SSHOPTS="-p ${SSH_PORT} -l kc2admin" \
-  xargs -r nix copy --offline --to "ssh://localhost" < /tmp/all-paths.txt
+NIX_SSHOPTS="-o StrictHostKeyChecking=no -p ${SSH_PORT}" \
+  nix-copy-closure --to kc2admin@localhost "$SYSTEM_TOPLEVEL"
 unset SSH_PORT
-rm -f /tmp/runtime-paths.txt /tmp/build-paths.txt /tmp/all-paths.txt
 
 if [ -d /root/.cache/nix ]; then
     # Root cache exists (from previous builds)
@@ -979,20 +971,19 @@ Run `nixos-rebuild switch` inside VM.
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
-# Offline rebuild using paths copied in _oci:vm:sync + 9p host-store as fallback.
-# Primary: Full build closure was copied to VM store (registered in nix db).
-# Fallback: Host /nix/store mounted at /nix/.host-store via 9p virtfs.
-# Syntax: file:///path for local substituters, space-separated for multiple.
-NIX_OFFLINE_OPTS="--offline --option substituters 'file:///nix/.host-store' --option require-sigs false"
+# Offline rebuild using paths copied via nix-copy-closure in _oci:vm:sync.
+# With system.includeBuildDependencies = true, the full build closure
+# (including stdenv, bootstrap-tools) is in the VM's local store.
+# No substituter needed - paths are registered in VM's nix database.
 
 echo "Running nixos-rebuild switch (offline)..."
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor $NIX_OFFLINE_OPTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor --offline 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures (also offline)
 echo "Pre-building devshells..."
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.default 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.full 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link $NIX_OFFLINE_OPTS .#devShells.x86_64-linux.konductor 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link --offline .#devShells.x86_64-linux.default 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link --offline .#devShells.x86_64-linux.full 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env PATH=\"\$PATH\" HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link --offline .#devShells.x86_64-linux.konductor 2>&1 || true"
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
