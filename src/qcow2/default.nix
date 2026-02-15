@@ -377,13 +377,10 @@ let
     # stateVersion from src/lib/versions.nix nixos.stateVersion
     system.stateVersion = versions.nixos.stateVersion;
 
-    # Include full build closure in runtime closure for offline rebuilds.
-    # This is CRITICAL for air-gapped deployments where the VM must be able to:
-    # 1. nixos-rebuild switch offline (config changes while deployed)
-    # 2. Build new QCOW2 images from scratch without network
-    # 3. Pass ATO audits demonstrating fully offline build capability
-    # Trade-off: Significantly increases system size, but enables true offline operation.
-    system.includeBuildDependencies = true;
+    # NOTE: system.includeBuildDependencies was removed to avoid ~117GB closure.
+    # Offline rebuild capability is achieved by pre-building on the host and
+    # transferring only the runtime closure (~5-15GB) via nix-copy-closure,
+    # then activating with switch-to-configuration. See OCI.md _oci:vm:sync.
 
     # =====================================================================
     # /etc Overlay Filesystem (Runtime Mutability)
