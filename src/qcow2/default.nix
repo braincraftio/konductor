@@ -402,14 +402,18 @@ let
     # See: https://nixos.wiki/wiki/Etc_overlay
     system.etc.overlay.enable = true;
 
-    # Disable copying system configuration into image closure
+    # Disable nixpkgs source in registry to prevent 50,000+ file closure bloat
+    # nixos/modules/misc/nixpkgs-flake.nix auto-adds nixpkgs to /etc/nix/registry.json
+    # which pulls the entire nixpkgs source tree into the system closure.
     #
     # Troubleshoot closure file count:
     #   TOPLEVEL=$(nix build .#nixosConfigurations.konductor.config.system.build.toplevel --no-link --print-out-paths)
     #   for path in $(nix path-info -r $TOPLEVEL); do
     #     printf "%s\t%s\n" "$(fd -t f . "$path" 2>/dev/null | wc -l)" "$path"
     #   done | sort -rn | head -10
-    system.copySystemConfiguration = false;
+    nixpkgs.flake.setFlakeRegistry = false;
+    nixpkgs.flake.setNixPath = false;
+
     networking = {
       hostName = "konductor";
       useNetworkd = true;
@@ -2431,6 +2435,7 @@ EOF
           "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         ];
       };
+
       # Pre-configured flake registry - local source for zero network dependency
       # The bundled /opt/konductor/src has the full Nix store cache from build
       # This enables offline operation and provenance-attested builds
