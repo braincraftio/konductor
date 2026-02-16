@@ -80,7 +80,8 @@ rec {
   # Rust
   # ===========================================================================
   rustPackages = with pkgs; [
-    (rust-bin.stable."${langs.rust.version}".default.override {
+    # Use minimal profile to exclude rust-docs (saves ~700MB + tens of thousands of small files)
+    (rust-bin.stable."${langs.rust.version}".minimal.override {
       extensions = [
         "rust-src"
         "rust-analyzer"

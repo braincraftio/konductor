@@ -404,7 +404,7 @@ Build QCOW2: nix → VM configure → seal → verify.
 
 ```sh {"name":"build:qcow2:image","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" --all
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" --all
 ```
 
 ---
@@ -563,9 +563,9 @@ fi
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:cloudinit
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:boot
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:wait
 echo "VM ready: ssh localhost"
 ```
 
@@ -582,7 +582,7 @@ ssh localhost
 ### build:qcow2:stop
 
 ```sh {"name":"build:qcow2:stop","excludeFromRunAll":"true","tag":"type:entry"}
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:halt
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" _build:qcow2:vm:halt
 ```
 
 ---
@@ -593,11 +593,11 @@ Full pipeline: clean → image → container → login → push.
 
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:login
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:login
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
 cat .konductor
 ```
 
@@ -628,45 +628,45 @@ echo "════════════════════════�
 
 echo ""
 echo "▶ Phase 1: Build QCOW2 image..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:image
 
 echo ""
 echo "▶ Phase 2: Package as containerDisk..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:container
 
 # Phase 2: Cluster
 echo ""
 echo "▶ Phase 3: Start cluster and deploy platform..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" cluster:up
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" cluster:up
 
 # Phase 3: Registry setup
 echo ""
 echo "▶ Phase 4: Install cluster CA..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:trust
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" registry:trust
 
 echo ""
 echo "▶ Phase 5: Authenticate to registry..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:login
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" registry:login
 
 # Phase 4: Push
 echo ""
 echo "▶ Phase 6: Push to registry..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
 
 # Verify
 echo ""
 echo "▶ Phase 7: Verify pushed tags..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" registry:tags
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" registry:tags
 
 # Validate
 echo ""
 echo "▶ Phase 8: Deploy and validate in KubeVirt..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
 
 # Runner test
 echo ""
 echo "▶ Phase 9: Test Forgejo runner workflow..."
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:runner-test
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:runner-test
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -1241,8 +1241,18 @@ Validate environment.
 ```sh {"name":"_build:qcow2:preflight"}
 set -e
 
+# DEBUG: Show PATH inheritance
+echo "DEBUG: pwd=$(pwd)"
+echo "DEBUG: which docker=$(which docker 2>&1 || echo 'NOT FOUND')"
+echo "DEBUG: which mise=$(which mise 2>&1 || echo 'NOT FOUND')"
+echo "DEBUG: DIRENV_DIR=${DIRENV_DIR:-unset}"
+echo "DEBUG: IN_NIX_SHELL=${IN_NIX_SHELL:-unset}"
+echo "DEBUG: PATH first 5 entries:"
+echo "$PATH" | tr ':' '\n' | head -5
+
 # Build host system state
 ff
+date -u +"%Y%m%d%H%M%S"
 
 # Fail fast: WORKSPACE_ROOT must be absolute (inherited from direnv)
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT='${WORKSPACE_ROOT:-}' must be absolute"; exit 1; }
@@ -1259,7 +1269,7 @@ ERRORS=0
 echo ""
 echo "Reset:"
 mise run dev:k8s:compose:reset
-runme run --direnv=false --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:clean
 
 # ─────────────────────────────────────────────────────────────────────
 # VALIDATE CLEAN STATE

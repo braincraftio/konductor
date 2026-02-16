@@ -12,8 +12,8 @@ runme:
 
 Standalone offline build pipeline for QCOW2 VM image with OCI containerDisk packaging.
 
-This file is self-contained and does not require the parent workspace or mise tasks.
-It can be used directly from `/opt/konductor/src` without external dependencies.
+This file is self-contained and does not require the parent workspace or mise tasks. It can be used
+directly from `/opt/konductor/src` without external dependencies.
 
 ## Contents
 
@@ -100,15 +100,15 @@ echo ""
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 
 echo "▶ Phase 1: Clean..."
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" oci:clean
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" oci:clean
 
 echo ""
 echo "▶ Phase 2: Build QCOW2 image..."
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" oci:image
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" oci:image
 
 echo ""
 echo "▶ Phase 3: Package as containerDisk..."
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" oci:container
+runme run --direnv=true --load-env=true --filename "$OCI_BUILD_FILE" oci:container
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -153,7 +153,7 @@ PHASES=(
 for phase in "${PHASES[@]}"; do
     echo ""
     echo "▶ ${phase}..."
-    runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" "$phase"
+    runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" "$phase"
 done
 ```
 
@@ -165,6 +165,10 @@ Package QCOW2 as containerDisk.
 
 ```sh {"name":"oci:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
+eval "$(nix print-dev-env .#konductor 2>/dev/null)" || true
+echo "DEBUG: which docker=$(which docker)"
+echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
+echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
 REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
 IMAGE="${OCI_IMAGE:-helix/flake}"
 TAG="${OCI_TAG:-latest-qcow2}"
@@ -240,7 +244,7 @@ rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 sudo rm -rf "${QCOW2_MOUNT:-/tmp/nixmount}" "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
-rm -rf result result.writable konductor.qcow2 konductor.qcow2.tmp .konductor .nix_drv .system-toplevel
+sudo rm -rf result result.writable konductor.qcow2 konductor.qcow2.tmp .konductor .nix_drv .system-toplevel
 echo "✓ Clean"
 ```
 
@@ -266,9 +270,9 @@ fi
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:cloudinit
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:boot
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:wait
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:cloudinit
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:boot
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:wait
 echo "VM ready: ssh kc2@localhost"
 ```
 
@@ -286,7 +290,7 @@ ssh kc2@localhost
 
 ```sh {"name":"oci:stop","excludeFromRunAll":"true","tag":"type:entry"}
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
-runme run --direnv=false --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:halt
+runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:halt
 ```
 
 ---
@@ -394,8 +398,8 @@ echo "✓ Vendored inputs into ./_sources"
 
 ## oci:vendor:inputs:online
 
-Intermittent online refresh: update lock from network, then vendor into `./_sources`,
-then re-lock to local paths for offline builds.
+Intermittent online refresh: update lock from network, then vendor into `./_sources`, then re-lock
+to local paths for offline builds.
 
 ```sh {"name":"oci:vendor:inputs:online","excludeFromRunAll":"true","tag":"type:entry"}
 set -euo pipefail
@@ -594,8 +598,14 @@ echo "OVMF firmware:"
 # ─────────────────────────────────────────────────────────────────────
 # SSH KEY
 # ─────────────────────────────────────────────────────────────────────
-SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
-ssh-keygen -l -f "$SSH_PUBKEY" &>/dev/null && printf "✓ SSH key: %s\n" "$SSH_PUBKEY" || { printf "✗ SSH key: %s\n" "$SSH_PUBKEY"; ((ERRORS++)); }
+SSH_KEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519"
+SSH_PUBKEY="${SSH_KEY}.pub"
+if ! ssh-keygen -l -f "$SSH_PUBKEY" &>/dev/null; then
+    echo "  No SSH key found, generating..."
+    mkdir -p "$(dirname "$SSH_KEY")"
+    ssh-keygen -t ed25519 -N "" -f "$SSH_KEY" -q
+fi
+printf "✓ SSH key: %s\n" "$SSH_PUBKEY"
 
 # ─────────────────────────────────────────────────────────────────────
 # KVM ACCESS
@@ -622,7 +632,7 @@ echo ""
 Build NixOS closure and capture nix_drv.
 
 ```sh {"name":"_oci:nix","tag":"requires:nix"}
-set -ex
+set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
     exit 0
@@ -840,25 +850,23 @@ Sync source to VM.
 
 ```sh {"name":"_oci:vm:sync"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -ex
+set -e
 
 COMMIT=$(git rev-parse --short HEAD)
 BUNDLE="k9-${COMMIT}.bundle"
-SSH_PORT="${QCOW2_SSH_PORT:-2222}"
-export NIX_SSHOPTS="-o StrictHostKeyChecking=no -p ${SSH_PORT}"
 
-# ─────────────────────────────────────────────────────────────────────
-# Phase 1: Sync source tree (for provenance, flake eval, future rebuilds)
-# ─────────────────────────────────────────────────────────────────────
 ssh kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 
+# git bundle: portable repo with full history
 echo "Creating bundle ${BUNDLE}..."
 git bundle create "/tmp/${BUNDLE}" HEAD --all
 
+# Transfer bundle
 echo "Transferring bundle..."
 scp "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
 ssh kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
+# Clone from bundle (creates clean repo with history)
 echo "Cloning to /opt/konductor/src/..."
 ssh kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
 ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
@@ -869,75 +877,46 @@ if [ -d _sources ]; then
     ssh kc2admin@localhost 'sudo rm -rf /opt/konductor/src/_sources && sudo mv /tmp/_sources /opt/konductor/src/_sources'
 fi
 
+# Verify clean state
+DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
+if [ -n "$DIRTY" ]; then
+    echo "WARNING: Tree is dirty after sync"
+    echo "$DIRTY"
+fi
+
 ssh kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
 rm -f "/tmp/${BUNDLE}"
 
-# ─────────────────────────────────────────────────────────────────────
-# Phase 2: Pre-build system closure on host, transfer runtime-only
-# ─────────────────────────────────────────────────────────────────────
-# Build the target NixOS system on the host (where nix cache is warm).
-# Only the RUNTIME closure is transferred — no build deps (stdenv, gcc, etc).
-# This reduces transfer from ~117GB to ~5-15GB.
-echo "Building system closure on host..."
-SYSTEM_TOPLEVEL=$(nix build --no-link --print-out-paths .#nixosConfigurations.konductor.config.system.build.toplevel)
-echo "System toplevel: $SYSTEM_TOPLEVEL"
-
-CLOSURE_PATHS=$(nix path-info -r "$SYSTEM_TOPLEVEL" | wc -l)
-CLOSURE_SIZE=$(nix path-info -rS "$SYSTEM_TOPLEVEL" | tail -1 | awk '{printf "%.1f GB", $2/1024/1024/1024}')
-echo "  Runtime closure: $CLOSURE_PATHS paths, $CLOSURE_SIZE"
-
-echo "Transferring runtime closure to VM via nix-copy-closure..."
-nix-copy-closure --to kc2admin@localhost "$SYSTEM_TOPLEVEL"
-
-# Store toplevel path for _oci:vm:rebuild to activate
-echo "$SYSTEM_TOPLEVEL" > .system-toplevel
-ssh kc2admin@localhost "echo '$SYSTEM_TOPLEVEL' | sudo tee /opt/konductor/system-toplevel > /dev/null"
-
-# ─────────────────────────────────────────────────────────────────────
-# Phase 3: Pre-build devshells on host, transfer runtime closures
-# ─────────────────────────────────────────────────────────────────────
-echo "Building devshell closures on host..."
-for shell in default full konductor; do
-    SHELL_PATH=$(nix build --no-link --print-out-paths ".#devShells.x86_64-linux.${shell}" 2>/dev/null || true)
-    if [ -n "$SHELL_PATH" ]; then
-        echo "  Transferring devshell: $shell"
-        nix-copy-closure --to kc2admin@localhost "$SHELL_PATH"
-    fi
-done
-
-unset NIX_SSHOPTS
-
-echo "✓ /opt/konductor/src/ (source tree)"
-echo "✓ $SYSTEM_TOPLEVEL (runtime closure)"
-echo "✓ devshell closures transferred"
+echo "✓ /opt/konductor/${BUNDLE} (bundle)"
+echo "✓ /opt/konductor/src/ (cloned)"
 ```
 
 ---
 
 ### \_oci:vm:rebuild
 
-Activate pre-built system closure inside VM.
+Run `nixos-rebuild switch` inside VM to build the environment natively.
+
+This ensures:
+
+- Full Konductor environment is built natively inside the VM
+- All nix store paths are pre-cached for airgap use
+- The VM can reproduce itself from /opt/konductor/src
 
 ```sh {"name":"_oci:vm:rebuild","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
-# Activate pre-built system closure transferred by _oci:vm:sync.
-# No compilation happens here — the host already built the full system.
-# This is equivalent to nixos-rebuild switch but without needing build deps.
+# Rebuild NixOS from the synced flake
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
-SYSTEM_TOPLEVEL=$(ssh kc2admin@localhost 'cat /opt/konductor/system-toplevel')
-echo "Activating pre-built system: $SYSTEM_TOPLEVEL"
+# Pre-build devshells to cache their closures
+# This ensures `nix develop` works offline
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
+ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
 
-# Set the system profile to the new closure
-ssh kc2admin@localhost "sudo nix-env -p /nix/var/nix/profiles/system --set '$SYSTEM_TOPLEVEL'" \
-    2>&1 | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
-
-# Activate the new configuration (equivalent to nixos-rebuild switch)
-ssh kc2admin@localhost "sudo '$SYSTEM_TOPLEVEL/bin/switch-to-configuration' switch" \
-    2>&1 | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
-
-echo "✓ System activated from pre-built closure (no compilation in VM)"
+echo "VM rebuilt from /opt/konductor/src flake"
 ```
 
 ---
