@@ -120,7 +120,7 @@ baseShell.overrideAttrs (old: {
       echo ""
       echo "Build Tools:"
       echo "  docker, docker-compose, buildkit, skopeo, crane"
-      echo "  qemu, libvirt, virt-manager, virt-sparsify, OVMF"
+      echo "  qemu, libvirt, virt-sparsify, OVMF"
       echo ""
       echo "Git Forge CLIs:"
       echo "  fj (forgejo-cli), tea (gitea-cli), gh (github-cli)"

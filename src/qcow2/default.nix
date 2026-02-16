@@ -377,10 +377,14 @@ let
     # stateVersion from src/lib/versions.nix nixos.stateVersion
     system.stateVersion = versions.nixos.stateVersion;
 
-    # NOTE: system.includeBuildDependencies was removed to avoid ~117GB closure.
-    # Offline rebuild capability is achieved by pre-building on the host and
-    # transferring only the runtime closure (~5-15GB) via nix-copy-closure,
-    # then activating with switch-to-configuration. See OCI.md _oci:vm:sync.
+    # Include build dependencies in the system closure (~117GB) so the VM
+    # can nixos-rebuild switch and nix build offline in airgapped environments.
+    # Future: investigate nix-copy-closure of runtime-only closures (~5-15GB)
+    # as a lightweight alternative, but this requires solving build dep caching
+    # separately (see OCI.md _oci:vm:sync for prior art).
+    # TODO: support separate online (runtime-only ~5-15GB) and offline (~117GB)
+    # derivations before re-enabling. Currently disabled to unblock dev iteration.
+    system.includeBuildDependencies = false;
 
     # =====================================================================
     # /etc Overlay Filesystem (Runtime Mutability)
@@ -2179,7 +2183,7 @@ EOF
     # =====================================================================
     virtualisation = {
       # Disk size for VM - increased to accommodate full package set
-      diskSize = lib.mkDefault (30 * 1024); # 30GB (full konductor environment)
+      diskSize = lib.mkDefault (150 * 1024); # 150GB (includes build dependencies for airgap self-rebuild)
 
       # Docker - starts on boot after cloud-init and proxy configuration
       # Ordering: cloud-init → konductor-proxy-setup → docker

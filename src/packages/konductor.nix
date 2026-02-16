@@ -27,7 +27,7 @@
     qemu_kvm
     qemu-utils
     libvirt
-    virt-manager
+    # virt-manager removed — GUI VM manager unnecessary in headless VM (saves ~1.3GB)
     libguestfs-with-appliance # guestmount, guestunmount (includes appliance)
     guestfs-tools # virt-sparsify
     OVMF # EFI firmware for QEMU
