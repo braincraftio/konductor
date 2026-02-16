@@ -1774,6 +1774,17 @@ ssh kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null 
 
 ---
 
+### \_build:qcow2:vm:fingerprint
+
+Filesystem fingerprint before sealing.
+
+```sh {"name":"_build:qcow2:vm:fingerprint"}
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+ssh kc2admin@localhost 'sudo dust -bcPx -d 12 -n 120 / | sudo tee /dev/ttyS0'
+```
+
+---
+
 ### \_build:qcow2:vm:zero
 
 Zero free space.

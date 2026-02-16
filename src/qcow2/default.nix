@@ -401,6 +401,15 @@ let
     # Requires kernel >= 6.6 (we use linuxPackages_latest)
     # See: https://nixos.wiki/wiki/Etc_overlay
     system.etc.overlay.enable = true;
+
+    # Disable copying system configuration into image closure
+    #
+    # Troubleshoot closure file count:
+    #   TOPLEVEL=$(nix build .#nixosConfigurations.konductor.config.system.build.toplevel --no-link --print-out-paths)
+    #   for path in $(nix path-info -r $TOPLEVEL); do
+    #     printf "%s\t%s\n" "$(fd -t f . "$path" 2>/dev/null | wc -l)" "$path"
+    #   done | sort -rn | head -10
+    system.copySystemConfiguration = false;
     networking = {
       hostName = "konductor";
       useNetworkd = true;
