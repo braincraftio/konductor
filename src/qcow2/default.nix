@@ -1,5 +1,5 @@
 # src/qcow2/default.nix
-# QCOW2 VM build using nixos-generators
+# QCOW2 VM image builder using native nixpkgs (no nixos-generators)
 #
 # Full konductor environment pre-installed for immediate productivity.
 # SSH in and start working - no additional setup required.
@@ -10,13 +10,16 @@
 #   - Self-hosting tools (Docker, QEMU, libvirt)
 #   - Linters, formatters, AI tools
 #
+# Uses custom make-disk-image-fast.nix that copies files INSIDE the VM
+# via virtiofs instead of slow cptofs (LKL). 5-10x faster for large closures.
+#
 # Services installed but not auto-started (lean boot).
 # Start via cloud-init or: systemctl start docker libvirtd
 
 {
   pkgs,
   lib,
-  nixos-generators,
+  nixpkgs,  # For lib.nixosSystem
   inputs,
   system,
   versions,
@@ -34,7 +37,8 @@ let
 
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions catppuccinSources; };
+  # Named 'konductorConfig' to avoid shadowing NixOS 'config' in modules
+  konductorConfig = import ../config { inherit pkgs lib versions catppuccinSources; };
 
   # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
@@ -42,8 +46,8 @@ let
       pkgs
       lib
       versions
-      config
       ;
+    config = konductorConfig;
   };
 
   # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
@@ -260,12 +264,12 @@ let
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
-    home.file.".bashrc".text = config.shell.bash.bashrcContent;
+    home.file.".bashrc".text = konductorConfig.shell.bash.bashrcContent;
     home.file.".bash_profile".text = shellContent.bashProfileContent;
     home.file.".inputrc".text = shellContent.inputrcContent;
-    home.file.".config/starship.toml".text = config.shell.starship.configContent;
+    home.file.".config/starship.toml".text = konductorConfig.shell.starship.configContent;
     home.file.".config/atuin/config.toml" = {
-      text = config.shell.atuin.configContent;
+      text = konductorConfig.shell.atuin.configContent;
       force = true;  # Overwrite existing atuin config
     };
     home.file.".envrc".text = ''
@@ -365,12 +369,14 @@ let
 
   # Shared NixOS configuration module for both qcow2 image and nixos-rebuild
   # This allows live updates to running VMs via: nixos-rebuild switch --flake .#konductor
-  konductorModule = {
-    # Import the konductor mount service template, PKI module, and home-manager
+  konductorModule = { config, lib, pkgs, modulesPath, ... }: {
+    # Import the konductor mount service template, PKI module, home-manager, and QEMU profile
     imports = [
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
+      # QEMU guest profile for virtio drivers and guest agent
+      "${modulesPath}/profiles/qemu-guest.nix"
     ];
 
     # Basic system configuration
@@ -775,11 +781,11 @@ let
         # CI environment marker
         CI = "true";
         # Hermetic bash configuration (from devshell)
-        KONDUCTOR_BASHRC = config.shell.bash.env.KONDUCTOR_BASHRC;
-        KONDUCTOR_INPUTRC = config.shell.bash.env.KONDUCTOR_INPUTRC;
+        KONDUCTOR_BASHRC = konductorConfig.shell.bash.env.KONDUCTOR_BASHRC;
+        KONDUCTOR_INPUTRC = konductorConfig.shell.bash.env.KONDUCTOR_INPUTRC;
         # Atuin shell history (config + bash-preexec for hooks)
-        ATUIN_CONFIG_DIR = config.shell.atuin.env.ATUIN_CONFIG_DIR;
-        KONDUCTOR_PREEXEC_PATH = config.shell.atuin.env.KONDUCTOR_PREEXEC_PATH;
+        ATUIN_CONFIG_DIR = konductorConfig.shell.atuin.env.ATUIN_CONFIG_DIR;
+        KONDUCTOR_PREEXEC_PATH = konductorConfig.shell.atuin.env.KONDUCTOR_PREEXEC_PATH;
         # Language paths (PAM @{HOME} expansion)
         GOPATH = "@{HOME}/go";
         CARGO_HOME = "@{HOME}/.cargo";
@@ -795,12 +801,12 @@ let
       # Same shell experience as devshell and OCI container
       # Uses canonical config from src/config/shell/ (SSOT)
       etc = {
-        "skel/.bashrc".text = config.shell.bash.bashrcContent;
+        "skel/.bashrc".text = konductorConfig.shell.bash.bashrcContent;
         "skel/.bash_profile".text = shellContent.bashProfileContent;
         "skel/.inputrc".text = shellContent.inputrcContent;
         # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
-        "skel/.config/starship.toml".text = config.shell.starship.configContent;
-        "skel/.config/atuin/config.toml".text = config.shell.atuin.configContent;
+        "skel/.config/starship.toml".text = konductorConfig.shell.starship.configContent;
+        "skel/.config/atuin/config.toml".text = konductorConfig.shell.atuin.configContent;
 
         # /etc/skel/.envrc - for project .env files only (packages pre-installed)
         "skel/.envrc".text = ''
@@ -2256,6 +2262,9 @@ EOF
     # Boot Configuration
     # =====================================================================
     boot = {
+      # Enable partition growing for cloud deployments
+      growPartition = true;
+
       # Use latest kernel for best hardware support and security
       kernelPackages = pkgs.linuxPackages_latest;
 
@@ -2266,6 +2275,7 @@ EOF
       # The qcow-efi format provides this automatically for image builds,
       # but nixpkgs.lib.nixosSystem needs explicit bootloader config.
       loader = {
+        timeout = 0;  # Skip boot menu for faster boot
         grub = {
           enable = true;
           device = "nodev";  # EFI doesn't use a specific device
@@ -2355,6 +2365,7 @@ EOF
     fileSystems."/" = {
       device = "/dev/disk/by-label/nixos";
       fsType = "ext4";
+      autoResize = true;  # Grow partition on first boot (cloud-init growpart)
       options = [
         "noatime"     # Reduce metadata writes
         "nodiratime"  # Reduce directory access time updates
@@ -2409,6 +2420,30 @@ EOF
     # This enables nixos-rebuild results to persist in the final image.
     # The overlay service creates /nix/.rw-store/{upper,work} as needed.
 
+    # =====================================================================
+    # QCOW2 Image Builder (Fast - no cptofs)
+    # =====================================================================
+    # Build QCOW2 image using our custom fast builder that copies files
+    # INSIDE the VM via virtiofs instead of using slow cptofs (LKL).
+    #
+    # Standard make-disk-image.nix uses cptofs which is extremely slow:
+    # - Runs Linux kernel in userspace (LKL)
+    # - 4KB buffer, single-threaded, ~9 syscalls per file
+    # - 100k files = 40+ minutes
+    #
+    # Our fast builder:
+    # - Real Linux kernel with virtiofs-shared /nix/store
+    # - Native ext4 I/O with proper caching
+    # - nixos-install for proper system setup
+    # - 5-10x faster for large closures
+    system.build.image = import ./make-disk-image-fast.nix {
+      inherit lib config pkgs;
+      inherit (config.virtualisation) diskSize;
+      format = "qcow2";
+      partitionTableType = "efi";
+      memSize = 4096;
+    };
+
     # Nix configuration
     nix = {
       settings = {
@@ -2459,24 +2494,14 @@ in
 
   # QCOW2 VM image using FAST builder (no cptofs bottleneck)
   #
-  # Standard make-disk-image.nix uses cptofs (LKL) which is extremely slow:
-  # - Runs Linux kernel in userspace
-  # - 4KB buffer, single-threaded, ~9 syscalls per file
-  # - 100k files = 40+ minutes
+  # Uses nixpkgs.lib.nixosSystem to evaluate konductorModule, then
+  # accesses config.system.build.image which uses our custom
+  # make-disk-image-fast.nix that copies files INSIDE the VM.
   #
-  # Our custom format (qcow-efi-fast) copies files INSIDE the VM:
-  # - Real Linux kernel with virtiofs-shared /nix/store
-  # - Native ext4 I/O with proper caching
-  # - tar streaming for bulk copy
-  # - 5-10x faster for large closures
-  #
-  # Falls back to standard qcow-efi if fast builder fails.
-  image = nixos-generators.nixosGenerate {
+  # No nixos-generators required - the image builder is defined
+  # directly in konductorModule.system.build.image.
+  image = (nixpkgs.lib.nixosSystem {
     inherit system;
-    format = "qcow-efi-fast";
-    customFormats = {
-      qcow-efi-fast = ./format-qcow-efi-fast.nix;
-    };
     modules = [ konductorModule ];
-  };
+  }).config.system.build.image;
 }

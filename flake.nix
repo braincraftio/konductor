@@ -43,10 +43,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    nixos-generators = {
-      url = "path:./_sources/nixos-generators";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # nixos-generators removed - using native nixpkgs image building
+    # (nixos-generators deprecated in NixOS 25.05, mainlined to nixpkgs)
 
     rust-overlay = {
       url = "path:./_sources/rust-overlay";
@@ -82,11 +80,7 @@
       flake = false;
     };
 
-<<<<<<< HEAD
     systems.url = "path:./_sources/systems";
-=======
-    systems.url = "github:nix-systems/default";
->>>>>>> dec179555 (refactor(flake): canonical github: URLs + standalone OCI pipeline)
   };
 
   nixConfig = {
@@ -145,16 +139,17 @@
         };
 
         # QCOW2 VM (Linux-only)
+        # Uses native nixpkgs image building (no nixos-generators)
         qcow2 = import ./src/qcow2 {
           inherit
             pkgs
+            nixpkgs
             inputs
             system
             versions
             programs
             ;
           inherit (nixpkgs) lib;
-          inherit (inputs) nixos-generators;
         };
 
       in
@@ -212,9 +207,8 @@
             inherit (nixpkgs) lib;
           };
           qcow2 = import ./src/qcow2 {
-            inherit pkgs inputs system versions programs;
+            inherit pkgs nixpkgs inputs system versions programs;
             inherit (nixpkgs) lib;
-            inherit (inputs) nixos-generators;
           };
         in
         nixpkgs.lib.nixosSystem {
