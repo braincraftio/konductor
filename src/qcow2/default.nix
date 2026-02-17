@@ -318,22 +318,24 @@ let
           # Step 1: Find best available certificate (Tier 1→2→3)
           # Writes CERT_PATH, KEY_PATH, CERT_TIER to /run/konductor/konductor-SERVICE@USER.cert-env
           # Exits non-zero if no valid cert found (prevents service start)
+          # NOTE: %i is passed as $1 because systemd specifiers aren't expanded inside scripts
           "+${pkgs.writeShellScript "find-cert-${serviceName}" ''
             set -euo pipefail
+            INSTANCE="$1"
 
             # Run precedence check
             if ! CERT_INFO=$(${certPrecedenceScript}/bin/konductor-find-best-cert); then
-              echo "FATAL: No valid certificate available for konductor-${serviceName}@%i" >&2
+              echo "FATAL: No valid certificate available for konductor-${serviceName}@$INSTANCE" >&2
               exit 1
             fi
 
             # Write cert info to runtime env file
-            echo "$CERT_INFO" > /run/konductor/konductor-${serviceName}@%i.cert-env
+            echo "$CERT_INFO" > /run/konductor/konductor-${serviceName}@$INSTANCE.cert-env
 
             # Log which cert tier was selected
             TIER=$(echo "$CERT_INFO" | ${pkgs.gnugrep}/bin/grep CERT_TIER | ${pkgs.coreutils}/bin/cut -d= -f2)
             echo "✓ Using certificate tier: $TIER"
-          ''}"
+          ''} %i"
 
           # Step 2: Open firewall port
           # PORT variable from EnvironmentFile (written by konductor-init.service)
@@ -355,15 +357,18 @@ let
 
         # Close firewall port on stop
         # Parse nftables output to find rule handle by comment, then delete by handle
-        ExecStopPost = pkgs.writeShellScript "cleanup-firewall-${serviceName}" ''
+        # NOTE: %i is passed as $1, PORT as $2 because systemd specifiers aren't expanded inside scripts
+        ExecStopPost = "+${pkgs.writeShellScript "cleanup-firewall-${serviceName}" ''
+          INSTANCE="$1"
+          PORT="$2"
           HANDLE=$(${pkgs.nftables}/bin/nft --handle list chain inet nixos-fw input-allow | \
-            ${pkgs.gnugrep}/bin/grep "comment \"konductor-${serviceName}@%i-port''${PORT}\"" | \
+            ${pkgs.gnugrep}/bin/grep "comment \"konductor-${serviceName}@$INSTANCE-port$PORT\"" | \
             ${pkgs.gnugrep}/bin/grep -o "handle [0-9]*" | \
             ${pkgs.gawk}/bin/awk '{print $2}')
           if [ -n "$HANDLE" ]; then
             ${pkgs.nftables}/bin/nft delete rule inet nixos-fw input-allow handle $HANDLE
           fi
-        '';
+        ''} %i \${PORT}";
 
         Restart = "on-failure";
         RestartSec = 10;
