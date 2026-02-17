@@ -571,16 +571,34 @@ let
     };
 
     # =====================================================================
-    # FHS Symlinks for VS Code Remote SSH Pre-flight Checks
+    # FHS Compatibility for VS Code Remote SSH
     # =====================================================================
-    # VS Code Remote SSH runs pre-flight checks that look for libstdc++.so
-    # in FHS standard paths (/lib) before attempting to run the server binary.
-    # nix-ld provides runtime library resolution but doesn't satisfy these
-    # explicit file existence checks. These symlinks bridge the gap.
+    # VS Code Remote SSH pre-flight checks:
+    # 1. Looks for /lib/libstdc++.so (file existence check)
+    # 2. Runs `ldconfig -p | grep libstdc++` (library cache check)
+    #
+    # On NixOS, ldconfig errors because there's no /etc/ld.so.cache.
+    # Solution: symlinks for (1) + dummy ldconfig wrapper for (2).
     system.activationScripts.vscode-fhs-compat = ''
+      # Create /lib symlinks for file existence checks
       mkdir -p /lib
       ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so.6
       ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so
+
+      # Create dummy ldconfig wrapper that satisfies VS Code's `ldconfig -p` check
+      # Real ldconfig errors on NixOS (no /etc/ld.so.cache), breaking pre-flight
+      mkdir -p /usr/bin
+      cat > /usr/bin/ldconfig << 'LDCONFIG_WRAPPER'
+#!/bin/sh
+# Dummy ldconfig for NixOS - satisfies VS Code Remote SSH pre-flight checks
+# Real libraries provided by nix-ld at runtime
+if [ "$1" = "-p" ]; then
+  echo "	libstdc++.so.6 (libc6,x86-64) => /lib/libstdc++.so.6"
+  exit 0
+fi
+exit 0
+LDCONFIG_WRAPPER
+      chmod +x /usr/bin/ldconfig
     '';
 
     # =====================================================================
