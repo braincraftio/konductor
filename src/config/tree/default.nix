@@ -54,6 +54,12 @@ in
       ARGS=()
       EXTRA_EZA_ARGS=()
 
+      # Track flags to avoid duplicates (braincraft wrapper may pass same flag twice)
+      HAS_ALL=false
+      HAS_CLASSIFY=false
+      HAS_DIRS_ONLY=false
+      HAS_REVERSE=false
+
       while [[ $# -gt 0 ]]; do
         case "$1" in
           -L)
@@ -68,28 +74,76 @@ in
             # Escape hatch: disable all Konductor defaults, raw eza passthrough
             RAW_MODE=true
             ;;
-          # GNU tree flag translation to eza equivalents
-          -C)
+          # GNU tree flag translation to eza equivalents (with deduplication)
+          -C|--color)
             # GNU tree colorize -> eza --color=always (already default)
+            ;;
+          -n)
+            # GNU tree no color -> eza --color=never
+            EXTRA_EZA_ARGS+=(--color=never)
             ;;
           -F)
             # GNU tree classify -> eza --classify=always
-            EXTRA_EZA_ARGS+=(--classify=always)
+            if [[ "$HAS_CLASSIFY" == false ]]; then
+              EXTRA_EZA_ARGS+=(--classify=always)
+              HAS_CLASSIFY=true
+            fi
             ;;
-          -a)
+          -a|--all)
             # GNU tree show all -> eza --all
-            EXTRA_EZA_ARGS+=(--all)
+            if [[ "$HAS_ALL" == false ]]; then
+              EXTRA_EZA_ARGS+=(--all)
+              HAS_ALL=true
+            fi
             ;;
-          --dirsfirst)
+          -d)
+            # GNU tree directories only -> eza --only-dirs
+            if [[ "$HAS_DIRS_ONLY" == false ]]; then
+              EXTRA_EZA_ARGS+=(--only-dirs)
+              HAS_DIRS_ONLY=true
+            fi
+            ;;
+          -r)
+            # GNU tree reverse sort -> eza --reverse
+            if [[ "$HAS_REVERSE" == false ]]; then
+              EXTRA_EZA_ARGS+=(--reverse)
+              HAS_REVERSE=true
+            fi
+            ;;
+          -f)
+            # GNU tree full path -> eza --absolute
+            EXTRA_EZA_ARGS+=(--absolute)
+            ;;
+          -s)
+            # GNU tree show size -> eza --long (shows size in long format)
+            EXTRA_EZA_ARGS+=(--long --no-permissions --no-user --no-time)
+            ;;
+          -D)
+            # GNU tree show date -> eza --long with time
+            EXTRA_EZA_ARGS+=(--long --no-permissions --no-user --no-filesize)
+            ;;
+          --dirsfirst|--group-directories-first)
             # GNU tree dirs first -> eza --group-directories-first (already default)
             ;;
-          --prune)
-            # GNU tree prune empty dirs - not supported by eza, ignore
+          --prune|--noreport)
+            # GNU tree flags not supported by eza, ignore
             ;;
           -I)
             # GNU tree ignore pattern -> eza --ignore-glob
             if [[ -n "''${2:-}" ]]; then
               EXTRA_EZA_ARGS+=(--ignore-glob="$2")
+              shift
+            fi
+            ;;
+          -P)
+            # GNU tree pattern match - not directly supported, skip
+            if [[ -n "''${2:-}" ]]; then
+              shift
+            fi
+            ;;
+          -o)
+            # GNU tree output file - skip flag and argument
+            if [[ -n "''${2:-}" ]]; then
               shift
             fi
             ;;
