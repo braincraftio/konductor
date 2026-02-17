@@ -571,6 +571,19 @@ let
     };
 
     # =====================================================================
+    # FHS Symlinks for VS Code Remote SSH Pre-flight Checks
+    # =====================================================================
+    # VS Code Remote SSH runs pre-flight checks that look for libstdc++.so
+    # in FHS standard paths (/lib) before attempting to run the server binary.
+    # nix-ld provides runtime library resolution but doesn't satisfy these
+    # explicit file existence checks. These symlinks bridge the gap.
+    system.activationScripts.vscode-fhs-compat = ''
+      mkdir -p /lib
+      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so.6
+      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so
+    '';
+
+    # =====================================================================
     # Image Size Optimization
     # =====================================================================
     # Disable documentation (saves ~1.5GB: ghc-doc, rust-docs, man pages)
