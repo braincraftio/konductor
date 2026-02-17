@@ -17,29 +17,27 @@
   # ===========================================================================
   inputs = {
     # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
-    # Vendored sources for offline/airgapped builds
-    nixpkgs.url = "path:./_sources/nixpkgs";
-    nixpkgs-unstable.url = "path:./_sources/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
-    flake-utils.url = "path:./_sources/flake-utils";
+    flake-utils.url = "github:numtide/flake-utils";
     flake-utils.inputs.systems.follows = "systems";
 
-    flake-parts.url = "path:./_sources/flake-parts";
+    flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
 
-    nuschtosSearch.url = "path:./_sources/nuschtosSearch";
+    nuschtosSearch.url = "github:NuschtOS/search";
     nuschtosSearch.inputs.flake-utils.follows = "flake-utils";
     nuschtosSearch.inputs.nixpkgs.follows = "nixpkgs";
 
-    ixx.url = "path:./_sources/ixx";
+    ixx.url = "github:NuschtOS/ixx";
     ixx.inputs.flake-utils.follows = "flake-utils";
     ixx.inputs.nixpkgs.follows = "nixpkgs";
 
-    nixlib.url = "path:./_sources/nixlib";
-    nixlib.inputs.nixpkgs.follows = "nixpkgs";
+    nixlib.url = "github:nix-community/nixpkgs.lib";
 
     nix2container = {
-      url = "path:./_sources/nix2container";
+      url = "git+https://github.com/nlewo/nix2container";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -47,13 +45,13 @@
     # (nixos-generators deprecated in NixOS 25.05, mainlined to nixpkgs)
 
     rust-overlay = {
-      url = "path:./_sources/rust-overlay";
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     nixvim = {
-      url = "path:./_sources/nixvim";
+      url = "github:nix-community/nixvim/nixos-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.systems.follows = "systems";
       inputs.flake-parts.follows = "flake-parts";
@@ -62,13 +60,13 @@
 
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     home-manager = {
-      url = "path:./_sources/home-manager";
+      url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Catppuccin themes for k9s and other applications
     catppuccin = {
-      url = "path:./_sources/catppuccin";
+      url = "github:catppuccin/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -76,11 +74,11 @@
     # Source: git.braincraft.io/BrainCraft/runner
     # Update: nix flake update forgejo-runner-src
     forgejo-runner-src = {
-      url = "path:./_sources/forgejo-runner-src";
+      url = "git+https://git.braincraft.io/BrainCraft/runner";
       flake = false;
     };
 
-    systems.url = "path:./_sources/systems";
+    systems.url = "github:nix-systems/default";
   };
 
   nixConfig = {
