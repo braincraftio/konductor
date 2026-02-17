@@ -260,6 +260,163 @@ let
   # Certificate precedence detection script (Tier 1 → 2 → 3 fallback)
   certPrecedenceScript = import ../lib/cert-precedence.nix { inherit pkgs; };
 
+  # =====================================================================
+  # VS Code Remote SSH Support (buildFHSEnv + node patching)
+  # =====================================================================
+  # VS Code Remote SSH downloads pre-compiled node binaries that expect
+  # FHS paths (/lib64/ld-linux-x86-64.so.2, /lib/libstdc++.so.6, etc).
+  # On NixOS, these paths don't exist. The nixos-vscode-server approach:
+  # 1. Create an FHS environment with nodejs and required libraries
+  # 2. Replace VS Code's node binary with a symlink to this FHS wrapper
+  # 3. Watch for new VS Code server installations and patch them
+  #
+  # This integrates with konductor's orchestrator (konductor-init.service)
+  # to automatically start the watcher for users with vscode enabled.
+
+  # FHS environment wrapping nodejs - provides all libraries VS Code needs
+  vscodeServerFHS = pkgs.buildFHSEnv {
+    name = "vscode-server-fhs";
+    targetPkgs = pkgs: with pkgs; [
+      # Core runtime
+      nodejs_20
+      stdenv.cc.libc      # glibc (libc.so, ld-linux)
+      stdenv.cc.cc.lib    # libstdc++, libgcc_s
+
+      # Libraries VS Code and extensions commonly need
+      zlib                # Compression
+      openssl             # SSL/TLS
+      icu                 # Unicode/i18n
+      curl                # HTTP client
+      libsecret           # Secret storage
+      xorg.libX11         # X11 (for clipboard, etc.)
+      xorg.libxcb         # XCB
+    ];
+    runScript = "${pkgs.nodejs_20}/bin/node";
+  };
+
+  # Script to patch VS Code server node binary by symlinking to FHS wrapper
+  # Called by konductor-vscode-fix@.service on startup and when new installs detected
+  vscodeServerPatchScript = pkgs.writeShellScript "vscode-server-patch" ''
+    set -euo pipefail
+    USER_HOME="$1"
+
+    patch_node() {
+      local node_path="$1"
+      # Only patch if it's a real binary (not already a symlink to our FHS)
+      if [ -f "$node_path" ] && [ ! -L "$node_path" ]; then
+        echo "[vscode-fix] Patching: $node_path"
+        # Backup original binary (for debugging if needed)
+        mv "$node_path" "$node_path.orig" 2>/dev/null || true
+        # Symlink to FHS-wrapped nodejs
+        ln -sf ${vscodeServerFHS}/bin/vscode-server-fhs "$node_path"
+        echo "[vscode-fix] ✓ Patched successfully"
+        return 0
+      elif [ -L "$node_path" ]; then
+        # Already a symlink - check if it points to our FHS
+        local target
+        target=$(readlink -f "$node_path" 2>/dev/null || echo "")
+        if [[ "$target" == *"vscode-server-fhs"* ]]; then
+          echo "[vscode-fix] Already patched: $node_path"
+          return 0
+        fi
+      fi
+      return 1
+    }
+
+    PATCHED=0
+
+    # VS Code stable/insiders paths
+    for vscode_dir in ".vscode-server" ".vscode-server-insiders"; do
+      BASE_DIR="$USER_HOME/$vscode_dir"
+
+      # Standard VS Code Remote SSH paths
+      if [ -d "$BASE_DIR/bin" ]; then
+        for dir in "$BASE_DIR/bin"/*; do
+          [ -d "$dir" ] && [ -f "$dir/node" ] && patch_node "$dir/node" && PATCHED=$((PATCHED + 1))
+        done
+      fi
+
+      # CLI servers path (newer VS Code versions)
+      if [ -d "$BASE_DIR/cli/servers" ]; then
+        for dir in "$BASE_DIR/cli/servers"/*/*; do
+          [ -d "$dir" ] && [ -f "$dir/node" ] && patch_node "$dir/node" && PATCHED=$((PATCHED + 1))
+        done
+      fi
+    done
+
+    # VSCodium paths
+    for vscode_dir in ".vscodium-server"; do
+      BASE_DIR="$USER_HOME/$vscode_dir"
+
+      if [ -d "$BASE_DIR/bin" ]; then
+        for dir in "$BASE_DIR/bin"/*; do
+          [ -d "$dir" ] && [ -f "$dir/node" ] && patch_node "$dir/node" && PATCHED=$((PATCHED + 1))
+        done
+      fi
+    done
+
+    if [ "$PATCHED" -gt 0 ]; then
+      echo "[vscode-fix] Patched $PATCHED node binary/binaries"
+    else
+      echo "[vscode-fix] No unpatched node binaries found"
+    fi
+  '';
+
+  # Watcher script that monitors for new VS Code server installations
+  vscodeServerWatchScript = pkgs.writeShellScript "vscode-server-watch" ''
+    set -euo pipefail
+    USERNAME="$1"
+    USER_HOME="/home/$USERNAME"
+
+    # Directories to watch for new VS Code server installations
+    WATCH_DIRS=(
+      "$USER_HOME/.vscode-server/bin"
+      "$USER_HOME/.vscode-server/cli/servers"
+      "$USER_HOME/.vscode-server-insiders/bin"
+      "$USER_HOME/.vscode-server-insiders/cli/servers"
+      "$USER_HOME/.vscodium-server/bin"
+    )
+
+    # Create watch directories if they don't exist
+    for dir in "''${WATCH_DIRS[@]}"; do
+      mkdir -p "$dir" 2>/dev/null || true
+    done
+
+    echo "[vscode-fix] Watching for new VS Code server installations..."
+    echo "[vscode-fix] Directories: ''${WATCH_DIRS[*]}"
+
+    # Filter to only existing directories for inotifywait
+    EXISTING_DIRS=()
+    for dir in "''${WATCH_DIRS[@]}"; do
+      [ -d "$dir" ] && EXISTING_DIRS+=("$dir")
+    done
+
+    if [ ''${#EXISTING_DIRS[@]} -eq 0 ]; then
+      echo "[vscode-fix] No watch directories exist yet, waiting for creation..."
+      # Wait for any of the base directories to be created
+      ${pkgs.inotify-tools}/bin/inotifywait -m -e create "$USER_HOME" 2>/dev/null | while read -r _ event filename; do
+        case "$filename" in
+          .vscode-server|.vscode-server-insiders|.vscodium-server)
+            echo "[vscode-fix] VS Code directory created: $filename"
+            # Re-exec to pick up new directories
+            exec "$0" "$USERNAME"
+            ;;
+        esac
+      done
+    fi
+
+    # Watch for new VS Code server installations
+    ${pkgs.inotify-tools}/bin/inotifywait -m -e create,isdir "''${EXISTING_DIRS[@]}" 2>/dev/null | while read -r directory event filename; do
+      if [[ "$event" == *"CREATE"* ]] && [[ "$event" == *"ISDIR"* ]]; then
+        echo "[vscode-fix] New VS Code server detected: $directory$filename"
+        # Wait a moment for download to complete
+        sleep 3
+        # Run patch script
+        ${vscodeServerPatchScript} "$USER_HOME"
+      fi
+    done
+  '';
+
   # Common home-manager configuration for built-in users
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
@@ -569,37 +726,6 @@ let
         bzip2              # Compression (archives)
       ];
     };
-
-    # =====================================================================
-    # FHS Compatibility for VS Code Remote SSH
-    # =====================================================================
-    # VS Code Remote SSH pre-flight checks:
-    # 1. Looks for /lib/libstdc++.so (file existence check)
-    # 2. Runs `ldconfig -p | grep libstdc++` (library cache check)
-    #
-    # On NixOS, ldconfig errors because there's no /etc/ld.so.cache.
-    # Solution: symlinks for (1) + dummy ldconfig wrapper for (2).
-    system.activationScripts.vscode-fhs-compat = ''
-      # Create /lib symlinks for file existence checks
-      mkdir -p /lib
-      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so.6
-      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so
-
-      # Create dummy ldconfig wrapper that satisfies VS Code's `ldconfig -p` check
-      # Real ldconfig errors on NixOS (no /etc/ld.so.cache), breaking pre-flight
-      mkdir -p /usr/bin
-      cat > /usr/bin/ldconfig << 'LDCONFIG_WRAPPER'
-#!/bin/sh
-# Dummy ldconfig for NixOS - satisfies VS Code Remote SSH pre-flight checks
-# Real libraries provided by nix-ld at runtime
-if [ "$1" = "-p" ]; then
-  echo "	libstdc++.so.6 (libc6,x86-64) => /lib/libstdc++.so.6"
-  exit 0
-fi
-exit 0
-LDCONFIG_WRAPPER
-      chmod +x /usr/bin/ldconfig
-    '';
 
     # =====================================================================
     # Image Size Optimization
@@ -1637,6 +1763,44 @@ LDCONFIG_WRAPPER
         documentation = [ "https://github.com/coder/ghostty-web" ];
       })
       // {
+        # =====================================================================
+        # VS Code Remote SSH Fix Service (per-user watcher)
+        # =====================================================================
+        # Patches VS Code Remote SSH server node binaries to work on NixOS.
+        # VS Code downloads pre-compiled node that expects FHS paths.
+        # This service:
+        # 1. Patches existing VS Code server installations on startup
+        # 2. Watches for new installations and patches them automatically
+        #
+        # Uses buildFHSEnv wrapper (vscodeServerFHS) that provides nodejs
+        # with all required libraries in an FHS-compatible environment.
+        #
+        # Based on: https://github.com/nix-community/nixos-vscode-server
+        # Adapted for konductor's multi-user systemd template architecture.
+        # =====================================================================
+        "konductor-vscode-fix@" = {
+          description = "VS Code Remote SSH Fix for %i";
+          documentation = [ "https://github.com/nix-community/nixos-vscode-server" ];
+          after = [ "network.target" ];
+
+          path = with pkgs; [ inotify-tools coreutils findutils ];
+
+          serviceConfig = {
+            Type = "simple";
+            User = "%i";
+            Group = "users";
+            Restart = "on-failure";
+            RestartSec = 5;
+
+            # Patch any existing VS Code server installations before watching
+            ExecStartPre = "${vscodeServerPatchScript} /home/%i";
+
+            # Watch for new VS Code server installations and patch them
+            ExecStart = "${vscodeServerWatchScript} %i";
+          };
+        };
+      }
+      // {
 
         # =====================================================================
         # Konductor Service Orchestrator (konductor-init.service)
@@ -1803,6 +1967,11 @@ ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/e
 ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/User && test -f /home/''${username}/.local/share/code-server/User/settings.json || cp ${vscodeDefaultSettings} /home/''${username}/.local/share/code-server/User/settings.json'
 ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\''${PORT} --user-data-dir /home/''${username}/.local/share/code-server --extensions-dir /home/''${username}/.local/share/code-server/extensions --auth none --cert \$CERT_PATH --cert-key \$KEY_PATH --disable-telemetry --disable-update-check --disable-getting-started-override /workspace'
 EOF
+                      # Also enable VS Code Remote SSH fix service for this user
+                      # This patches VS Code's downloaded node binary to work on NixOS
+                      # See: konductor-vscode-fix@.service and vscodeServerFHS/vscodeServerPatchScript
+                      echo "konductor-vscode-fix@''${username}.service" >> "$STATE_DIR/enabled.list.new"
+                      echo "    ✓ VS Code Remote SSH fix: konductor-vscode-fix@''${username}.service"
                       ;;
                     *)
                       echo "  ✗  Unknown service: $svc_name"
