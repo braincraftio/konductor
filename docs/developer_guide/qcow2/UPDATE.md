@@ -30,16 +30,17 @@ This is useful for rapid iteration during development.
 | Concept | Description |
 | ------- | ----------- |
 | Vendored inputs | Flake inputs stored in `_sources/` for offline builds |
+| `--override-input` | Redirects flake inputs from github to local vendored paths |
 | `path:.` reference | Forces nix to use working directory (includes gitignored files) |
-| Git flake | Default behavior copies git-tracked files to store (excludes `_sources/`) |
 
-### Why `path:.`?
+### Architecture
 
-The flake uses vendored inputs via `path:./_sources/*` URLs for airgap/offline builds.
-Since `_sources/` is in `.gitignore`, when nix evaluates a git flake it copies the repo
-to `/nix/store` **without** the `_sources/` directory, causing evaluation to fail.
+The flake.nix uses github inputs for remote compatibility (`github:braincraftio/konductor`).
+For offline/airgapped builds, vendored inputs in `_sources/` are used via `--override-input` flags.
 
-Using `path:.` tells nix to use the working directory directly, which includes gitignored files.
+```
+flake.nix (github inputs) + --override-input → _sources/* (vendored)
+```
 
 ---
 
@@ -47,14 +48,14 @@ Using `path:.` tells nix to use the working directory directly, which includes g
 
 ```bash
 # On the VM: pull latest changes
-cd /workspace/*/git.braincraft.io/braincraft/k9
+cd /opt/konductor/src
 git pull
 
 # Vendor flake inputs (populates _sources/)
-runme run oci:vendor:inputs || true  # Final nix flake lock may fail, that's OK
+runme run oci:vendor:inputs
 
-# Rebuild with path: reference (includes _sources/)
-sudo nixos-rebuild switch --flake 'path:.#konductor'
+# Rebuild with vendored inputs
+runme run --filename docs/developer_guide/qcow2/UPDATE.md update:rebuild
 ```
 
 ---
@@ -64,10 +65,7 @@ sudo nixos-rebuild switch --flake 'path:.#konductor'
 ```text
 Entry Points:
   update:quick           Pull, vendor, rebuild (one command)
-  update:vendor          Vendor flake inputs only
   update:rebuild         Rebuild NixOS configuration
-
-Debug:
   update:status          Show current system generation
   update:diff            Show changes between current and pending
 ```
@@ -86,7 +84,7 @@ git pull || { echo "Pull failed - resolve conflicts first"; exit 1; }
 
 echo ""
 echo "Vendoring flake inputs..."
-runme run --filename docs/developer_guide/qcow2/UPDATE.md update:vendor || true
+runme run --filename docs/developer_guide/qcow2/OCI.md oci:vendor:inputs
 
 echo ""
 echo "Rebuilding NixOS configuration..."
@@ -95,102 +93,35 @@ runme run --filename docs/developer_guide/qcow2/UPDATE.md update:rebuild
 
 ---
 
-## update:vendor
-
-Vendor flake inputs into `_sources/` for offline evaluation.
-
-Reads from the committed `flake.lock` (via `git show HEAD:flake.lock`) which has
-github/git URLs, not the working copy which may have been modified to path types.
-
-```sh {"name":"update:vendor","excludeFromRunAll":"true","tag":"type:entry"}
-set -euo pipefail
-
-echo "Vendoring flake inputs into ./_sources ..."
-sudo -E rm -rf _sources
-mkdir -p _sources
-sudo -E chown -R "$(id -u):$(id -g)" _sources
-
-export XDG_CACHE_HOME="/tmp/konductor-nix-cache"
-export HOME="/tmp/konductor-nix-home"
-mkdir -p "$XDG_CACHE_HOME" "$HOME"
-
-# Read from committed flake.lock (has github refs), not working copy (may have path refs)
-git show HEAD:flake.lock > /tmp/flake.lock.reference
-
-jq -c '
-  .nodes as $nodes
-  | (.nodes.root.inputs | keys) as $roots
-  | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
-  | unique
-  | map(select($nodes[.] != null))
-  | .[]
-  | . as $k
-  | {name:$k} + ($nodes[$k])
-  | [
-      .name,
-      .locked.type,
-      (.locked.owner // null),
-      (.locked.repo // null),
-      (.locked.rev // null),
-      (.locked.ref // null),
-      (.locked.url // null)
-    ]
-' /tmp/flake.lock.reference > /tmp/vendor-lock.jsonl
-rm -f /tmp/flake.lock.reference
-
-while read -r row; do
-  name=$(jq -r '.[0]' <<<"$row")
-  typ=$(jq -r '.[1]' <<<"$row")
-  owner=$(jq -r '.[2] // empty' <<<"$row")
-  repo=$(jq -r '.[3] // empty' <<<"$row")
-  rev=$(jq -r '.[4] // empty' <<<"$row")
-  url=$(jq -r '.[6] // empty' <<<"$row")
-  [ -n "$name" ] || continue
-  case "$typ" in
-    github) flakeref="github:${owner}/${repo}/${rev}" ;;
-    git) flakeref="git+${url}?rev=${rev}" ;;
-    *) echo "Skipping: $name ($typ)"; continue ;;
-  esac
-  echo "  -> $name"
-  XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
-    nix --extra-experimental-features 'nix-command flakes' \
-    flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null || {
-      echo "Warning: prefetch failed for $name"
-      continue
-    }
-  store_path=$(jq -r '.storePath' /tmp/prefetch.json)
-  [ -d "$store_path" ] && rsync -a --chmod=Du+w,Fu+w "$store_path/" "_sources/$name/"
-done < /tmp/vendor-lock.jsonl
-
-rm -f /tmp/vendor-lock.jsonl /tmp/prefetch.json
-unset XDG_CACHE_HOME HOME
-
-echo "Vendored inputs into ./_sources"
-ls -la _sources/
-```
-
----
-
 ## update:rebuild
 
-Rebuild NixOS configuration using path: flake reference.
+Rebuild NixOS configuration with vendored inputs.
 
 ```sh {"name":"update:rebuild","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
 
 # Verify _sources exists
 if [ ! -d "_sources" ] || [ ! -f "_sources/nixpkgs/flake.nix" ]; then
-    echo "Error: _sources not populated. Run update:vendor first."
+    echo "Error: _sources not populated. Run: runme run oci:vendor:inputs"
     exit 1
 fi
 
+# Generate --override-input flags from _sources/ contents
+# This redirects github inputs in flake.nix to local vendored paths
+OVERRIDE_INPUTS=""
+for dir in _sources/*/; do
+    input=$(basename "$dir")
+    OVERRIDE_INPUTS="$OVERRIDE_INPUTS --override-input $input path:./_sources/$input"
+done
+
 echo "Rebuilding NixOS configuration..."
 echo "  Flake: path:.#konductor"
+echo "  Vendored inputs: $(ls -1 _sources | wc -l)"
 echo ""
 
-# --no-write-lock-file prevents nix from rewriting flake.lock to path types
-# This preserves the committed github refs for future vendor runs
-sudo nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file
+# path:. includes gitignored _sources/
+# --no-write-lock-file preserves committed github refs
+sudo nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS
 
 echo ""
 echo "Current system generation:"
@@ -226,12 +157,19 @@ Show what would change in a rebuild (dry-run).
 set -e
 
 if [ ! -d "_sources" ]; then
-    echo "Error: _sources not populated. Run update:vendor first."
+    echo "Error: _sources not populated. Run: runme run oci:vendor:inputs"
     exit 1
 fi
 
+# Generate --override-input flags from _sources/ contents
+OVERRIDE_INPUTS=""
+for dir in _sources/*/; do
+    input=$(basename "$dir")
+    OVERRIDE_INPUTS="$OVERRIDE_INPUTS --override-input $input path:./_sources/$input"
+done
+
 echo "Building new configuration (dry-run)..."
-NEW_SYSTEM=$(nix build --no-link --print-out-paths 'path:.#nixosConfigurations.konductor.config.system.build.toplevel')
+NEW_SYSTEM=$(nix build --no-link --print-out-paths --no-write-lock-file $OVERRIDE_INPUTS 'path:.#nixosConfigurations.konductor.config.system.build.toplevel')
 CURRENT_SYSTEM=$(readlink /nix/var/nix/profiles/system)
 
 echo ""
@@ -252,35 +190,24 @@ fi
 
 ## Troubleshooting
 
-### Error: path '.../_sources/catppuccin/flake.nix' does not exist
+### Error: _sources not populated
 
-**Cause:** Using git flake reference instead of `path:.`
+**Cause:** Vendor task not run or failed.
 
-**Solution:** Use `path:.#konductor` not `$(pwd)#konductor`:
+**Solution:**
 ```bash
-sudo nixos-rebuild switch --flake 'path:.#konductor'
+runme run oci:vendor:inputs
 ```
 
 ### Error: cannot pull with rebase: You have unstaged changes
 
-**Cause:** `runme run oci:vendor:inputs` modified `flake.lock`
+**Cause:** Local modifications to tracked files.
 
-**Solution:** Reset flake.lock before pull:
+**Solution:**
 ```bash
-git checkout flake.lock
+git stash
 git pull
-```
-
-### Vendor task exits with error but _sources is populated
-
-**Expected behavior.** The vendor task's final `nix flake lock` step fails because
-it tries to evaluate the flake from a git context. The inputs are already vendored
-at that point.
-
-**Solution:** Ignore the error and proceed with rebuild:
-```bash
-runme run oci:vendor:inputs || true
-sudo nixos-rebuild switch --flake 'path:.#konductor'
+git stash pop
 ```
 
 ### Services fail after rebuild

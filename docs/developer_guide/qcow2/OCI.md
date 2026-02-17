@@ -917,14 +917,23 @@ This ensures:
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
+# Generate --override-input flags from _sources/ contents (offline builds)
+# This redirects github inputs in flake.nix to local vendored paths
+OVERRIDE_INPUTS=""
+if ssh kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
+    echo "Using vendored inputs from _sources/ for offline build..."
+    OVERRIDE_INPUTS=$(ssh kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:./_sources/$input"; done')
+fi
+
 # Rebuild NixOS from the synced flake
-ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake .#konductor 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+# path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures
 # This ensures `nix develop` works offline
-ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.default 2>&1 || true'
-ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.full 2>&1 || true'
-ssh kc2admin@localhost 'cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link .#devShells.x86_64-linux.konductor 2>&1 || true'
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.default' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
+ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
