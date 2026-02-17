@@ -779,6 +779,13 @@ let
 
       # Symlink glibc for completeness
       ln -sf ${pkgs.glibc}/lib/libc.so.6 /lib/libc.so.6
+
+      # Symlink dynamic linker to /lib (VS Code checks both /lib and /lib64)
+      ln -sf /lib64/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2
+
+      # VS Code CLI checks /sbin/ldconfig specifically (found via binary analysis)
+      mkdir -p /sbin
+      ln -sf /run/current-system/sw/bin/ldconfig /sbin/ldconfig
     '';
 
     # Layer 2: ldconfig Wrapper - forcibly replace glibc's ldconfig
