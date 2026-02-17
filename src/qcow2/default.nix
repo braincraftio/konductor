@@ -293,7 +293,8 @@ let
     # NOTE: Do NOT include konductor-init.service here - creates circular dependency!
     # konductor-init starts these services, so they can't wait for init to complete.
     # The drop-in config is written BEFORE init calls systemctl start.
-    afterServices ? [ "network.target" "konductor-pki.service" ],
+    # Use konductor-pki-permissions.service (the last PKI service) to ensure certs are ready.
+    afterServices ? [ "network.target" "konductor-pki-permissions.service" ],
     documentation ? [],
     workingDirectory ? "/workspace",
     extraServiceConfig ? {},  # Additional serviceConfig options
@@ -341,9 +342,11 @@ let
 
         # Environment files (merged at runtime)
         # EnvironmentFile variables are expanded in ExecStart
+        # NOTE: cert-env is optional (-) because it's created by ExecStartPre AFTER
+        # systemd loads EnvironmentFile. ExecStart wrapper sources it directly.
         EnvironmentFile = [
           "/var/lib/konductor/env/konductor-${serviceName}@%i.env"  # PORT, USER_UID
-          "/run/konductor/konductor-${serviceName}@%i.cert-env"     # CERT_PATH, KEY_PATH, CERT_TIER
+          "-/run/konductor/konductor-${serviceName}@%i.cert-env"    # CERT_PATH, KEY_PATH, CERT_TIER (optional)
         ];
 
         # Placeholder ExecStart - konductor-init.service drop-in overrides with actual command
@@ -1687,6 +1690,8 @@ let
 
                   # Generate environment file
                   ENV_FILE="$ENV_DIR/konductor-''${svc_name}@''${username}.env"
+                  # Cert env is created by ExecStartPre, sourced by ExecStart wrapper
+                  CERT_ENV_FILE="/run/konductor/konductor-''${svc_name}@''${username}.cert-env"
                   cat > "$ENV_FILE" << EOF
               PORT=$CALC_PORT
               USER_UID=$USER_UID
@@ -1703,58 +1708,36 @@ EOF
               EnvironmentFile=$ENV_FILE
 
               # Override ExecStart with calculated port
+              # NOTE: ExecStart sources cert-env because EnvironmentFile is loaded
+              # BEFORE ExecStartPre (which creates cert-env). Shell wrapper pattern.
               ExecStart=
 EOF
 
                   # Service-specific ExecStart overrides
                   # All services use multi-tier certificate precedence (cluster→hypervisor→self-signed)
-                  # Certificate variables (CERT_PATH, KEY_PATH) come from ExecStartPre cert detection
+                  # Certificate variables (CERT_PATH, KEY_PATH) come from cert-env file
+                  # which is created by base unit's ExecStartPre and sourced by ExecStart wrapper
                   case "$svc_name" in
                     ttyd)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=${pkgs.ttyd}/bin/ttyd \\
-  --port \''${PORT} \\
-  --ssl \\
-  --ssl-cert \''${CERT_PATH} \\
-  --ssl-key \''${KEY_PATH} \\
-  bash
+ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.ttyd}/bin/ttyd --port \''${PORT} --ssl --ssl-cert \$CERT_PATH --ssl-key \$KEY_PATH bash'
 EOF
                       ;;
                     restty)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server \\
-  --port \''${PORT} \\
-  --cert \''${CERT_PATH} \\
-  --key \''${KEY_PATH} \\
-  --writable \\
-  --working-directory /workspace
+ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
 EOF
                       ;;
                     ghostty)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server \\
-  --port \''${PORT} \\
-  --cert \''${CERT_PATH} \\
-  --key \''${KEY_PATH} \\
-  --writable \\
-  --working-directory /workspace
+ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
 EOF
                       ;;
                     vscode)
                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
 ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/extensions && for ext in ${vscodeExtensionsDir}/share/vscode/extensions/*; do ln -sfn "\$ext" /home/''${username}/.local/share/code-server/extensions/; done'
 ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/User && test -f /home/''${username}/.local/share/code-server/User/settings.json || cp ${vscodeDefaultSettings} /home/''${username}/.local/share/code-server/User/settings.json'
-ExecStart=${pkgs.code-server}/bin/code-server \\
-  --bind-addr 0.0.0.0:\''${PORT} \\
-  --user-data-dir /home/''${username}/.local/share/code-server \\
-  --extensions-dir /home/''${username}/.local/share/code-server/extensions \\
-  --auth none \\
-  --cert \''${CERT_PATH} \\
-  --cert-key \''${KEY_PATH} \\
-  --disable-telemetry \\
-  --disable-update-check \\
-  --disable-getting-started-override \\
-  /workspace
+ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\''${PORT} --user-data-dir /home/''${username}/.local/share/code-server --extensions-dir /home/''${username}/.local/share/code-server/extensions --auth none --cert \$CERT_PATH --cert-key \$KEY_PATH --disable-telemetry --disable-update-check --disable-getting-started-override /workspace'
 EOF
                       ;;
                     *)
