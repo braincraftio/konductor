@@ -362,6 +362,22 @@ let
     fi
   '';
 
+  # Dummy ldconfig wrapper for VS Code Remote SSH pre-flight checks
+  # VS Code CLI runs `ldconfig -p | grep libstdc++` to verify glibc environment.
+  # NixOS ldconfig errors (no /etc/ld.so.cache), causing pre-flight to fail.
+  # This wrapper satisfies the check by returning expected output.
+  # Added to environment.systemPackages to be in PATH before real ldconfig.
+  vscodeLdconfigWrapper = pkgs.writeShellScriptBin "ldconfig" ''
+    # Dummy ldconfig for NixOS - satisfies VS Code Remote SSH pre-flight checks
+    # Real libraries provided by nix-ld at runtime
+    if [ "$1" = "-p" ]; then
+      echo "	libstdc++.so.6 (libc6,x86-64) => /lib/libstdc++.so.6"
+      echo "	libgcc_s.so.1 (libc6,x86-64) => /lib/libgcc_s.so.1"
+      exit 0
+    fi
+    exit 0
+  '';
+
   # Watcher script that monitors for new VS Code server installations
   vscodeServerWatchScript = pkgs.writeShellScript "vscode-server-watch" ''
     set -euo pipefail
@@ -726,6 +742,47 @@ let
         bzip2              # Compression (archives)
       ];
     };
+
+    # =====================================================================
+    # FHS Compatibility Layer (System-Wide)
+    # =====================================================================
+    # Provides FHS compatibility for ALL pre-compiled binaries, not just VS Code.
+    # This is a layered defense approach:
+    #
+    # Layer 1: FHS Library Symlinks (file existence checks)
+    #   - Creates /lib/libstdc++.so.6, /lib/libgcc_s.so.1
+    #   - Satisfies binaries that check for library file existence
+    #
+    # Layer 2: ldconfig Wrapper (pre-flight checks)
+    #   - Provides working `ldconfig -p` output
+    #   - NixOS glibc's ldconfig errors because it looks for ld.so.cache
+    #     relative to its PREFIX in nix store, not /etc
+    #   - Uses meta.priority to shadow glibc's ldconfig
+    #
+    # Layer 3: nix-ld (runtime library loading) - configured above
+    #
+    # Layer 4: buildFHSEnv + node patching - for downloaded binaries
+    #
+    # This approach helps ALL FHS-expecting software, not just VS Code.
+    # =====================================================================
+
+    # Layer 1: FHS Library Symlinks
+    system.activationScripts.fhs-compat = ''
+      # Create FHS library directories
+      mkdir -p /lib /lib64
+
+      # Symlink core C++ runtime libraries to FHS paths
+      # These satisfy file existence checks that pre-compiled binaries perform
+      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so.6
+      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libstdc++.so.6 /lib/libstdc++.so
+      ln -sf ${pkgs.stdenv.cc.cc.lib}/lib/libgcc_s.so.1 /lib/libgcc_s.so.1
+
+      # Symlink glibc for completeness
+      ln -sf ${pkgs.glibc}/lib/libc.so.6 /lib/libc.so.6
+    '';
+
+    # Layer 2: ldconfig Wrapper - added to environment.systemPackages below
+    # with meta.priority to shadow glibc's ldconfig
 
     # =====================================================================
     # Image Size Optimization
@@ -1117,6 +1174,17 @@ let
         ])
         # Certificate precedence detection for multi-user services
         ++ [ certPrecedenceScript ]
+        # FHS compatibility: ldconfig wrapper with high priority
+        # Shadows glibc's ldconfig to satisfy pre-flight checks
+        ++ [
+          (vscodeLdconfigWrapper.overrideAttrs (old: {
+            meta = (old.meta or {}) // {
+              # Lower number = higher priority = appears first in PATH
+              # glibc has default priority (0), so -10 ensures we win
+              priority = -10;
+            };
+          }))
+        ]
         ++ (with pkgs; [
         ]);
 
