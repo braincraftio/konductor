@@ -29,8 +29,8 @@ pkgs.writeShellScriptBin "konductor-find-best-cert" ''
     [ -f "$cert" ] && [ -r "$cert" ] || return 1
     [ -f "$key" ] && [ -r "$key" ] || return 1
 
-    # Check cert is not expired
-    ${pkgs.openssl}/bin/openssl x509 -in "$cert" -noout -checkend 0 2>/dev/null || return 1
+    # Check cert is not expired (redirect stdout too - openssl prints "Certificate will not expire")
+    ${pkgs.openssl}/bin/openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1 || return 1
 
     # Check key type matches cert (both EC or both RSA)
     cert_text=$(${pkgs.openssl}/bin/openssl x509 -in "$cert" -noout -text 2>/dev/null) || return 1
