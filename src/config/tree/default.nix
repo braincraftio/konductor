@@ -52,6 +52,7 @@ in
       DEPTH_SET=false
       RAW_MODE=false
       ARGS=()
+      EXTRA_EZA_ARGS=()
 
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -67,6 +68,31 @@ in
             # Escape hatch: disable all Konductor defaults, raw eza passthrough
             RAW_MODE=true
             ;;
+          # GNU tree flag translation to eza equivalents
+          -C)
+            # GNU tree colorize -> eza --color=always (already default)
+            ;;
+          -F)
+            # GNU tree classify -> eza --classify=always
+            EXTRA_EZA_ARGS+=(--classify=always)
+            ;;
+          -a)
+            # GNU tree show all -> eza --all
+            EXTRA_EZA_ARGS+=(--all)
+            ;;
+          --dirsfirst)
+            # GNU tree dirs first -> eza --group-directories-first (already default)
+            ;;
+          --prune)
+            # GNU tree prune empty dirs - not supported by eza, ignore
+            ;;
+          -I)
+            # GNU tree ignore pattern -> eza --ignore-glob
+            if [[ -n "''${2:-}" ]]; then
+              EXTRA_EZA_ARGS+=(--ignore-glob="$2")
+              shift
+            fi
+            ;;
           *)
             ARGS+=("$1")
             ;;
@@ -76,7 +102,7 @@ in
 
       if [[ "$RAW_MODE" == true ]]; then
         # Raw mode: just eza --tree with user args, no Konductor defaults
-        exec eza --tree "''${ARGS[@]}"
+        exec eza --tree "''${EXTRA_EZA_ARGS[@]}" "''${ARGS[@]}"
       fi
 
       # Build command with Konductor defaults
@@ -94,7 +120,7 @@ in
       CMD+=(--git-ignore)
       CMD+=(-I '${excludePattern}')
 
-      exec "''${CMD[@]}" "''${ARGS[@]}"
+      exec "''${CMD[@]}" "''${EXTRA_EZA_ARGS[@]}" "''${ARGS[@]}"
     '';
   };
 
