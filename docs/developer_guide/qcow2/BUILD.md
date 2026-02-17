@@ -19,6 +19,7 @@ Build an airgap-ready NixOS VM image with pre-cached development environment.
 - [Registry Setup](#registry-setup)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [Development Workflow](#development-workflow)
 - [Task Reference](#task-reference)
 - [Pipeline Tasks](#pipeline-tasks)
 - [Debug Tools](#debug-tools)
@@ -333,6 +334,96 @@ All prerequisites are provided by `nix develop .#konductor` (devshell).
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Development Workflow
+
+When iterating on the build, run individual phases instead of the full pipeline. This allows you to
+retry failed steps without rebuilding everything.
+
+#### Phase 1: Build Image (no cluster required)
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+# Clean previous build state
+runme run build:qcow2:clean
+
+# Build QCOW2 image (runs all _build:qcow2:* subtasks)
+runme run build:qcow2:image
+
+# Package as containerDisk
+runme run build:qcow2:container
+```
+
+#### Phase 2: Cluster Setup
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+# Start Talos cluster + deploy platform (registry, gateway, kubevirt)
+mise run dev:k8s:compose:up
+mise run dev:k8s:pulumi:up
+```
+
+#### Phase 3: Registry Authentication
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+# Install cluster CA for Docker/Skopeo
+runme run registry:trust
+
+# Authenticate to registry
+runme run build:qcow2:login
+```
+
+#### Phase 4: Push + Deploy
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+# Push to local Zot registry
+runme run build:qcow2:push
+
+# Deploy VM to KubeVirt
+mise run dev:k8s:konductor:up
+```
+
+#### Phase 5: Validate + Promote
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+# SSH + provenance validation
+mise run dev:k8s:konductor:validate
+
+# Promote to docker.io (after validation passes)
+mise run dev:k8s:konductor:promote
+```
+
+#### Debugging Individual Subtasks
+
+The `build:qcow2:image` task runs these subtasks in order:
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+runme run _build:qcow2:preflight    # Validate environment
+runme run _build:qcow2:nix          # Build NixOS closure
+runme run _build:qcow2:cloudinit    # Generate cloud-init ISO
+runme run _build:qcow2:img:reset    # Reset image to pristine state
+runme run _build:qcow2:vm:boot      # Boot VM
+runme run _build:qcow2:vm:wait      # Wait for SSH
+runme run _build:qcow2:vm:sync      # Sync source to VM
+runme run _build:qcow2:vm:rebuild   # nixos-rebuild switch
+runme run _build:qcow2:vm:provenance # Write /.konductor
+runme run _build:qcow2:vm:gc        # Garbage collect
+runme run _build:qcow2:vm:zero      # Zero free space
+runme run _build:qcow2:vm:halt      # Shutdown VM
+runme run _build:qcow2:img:clean    # Clean credentials
+runme run _build:qcow2:img:compress # ZSTD compress
+runme run _build:qcow2:img:sparsify # Sparsify image
+runme run _build:qcow2:tmp:clean    # Remove temp files
+runme run _build:qcow2:verify       # Final verification
+```
+
+Skip flags for faster iteration:
+
+```bash {"excludeFromRunAll":"true","interactive":"false"}
+SKIP_NIX_BUILD=true runme run build:qcow2:image  # Reuse existing result/
+SKIP_VM_PHASE=true runme run build:qcow2:image   # Reuse existing image
+SKIP_COMPRESS=true runme run build:qcow2:image   # Skip ZSTD compression
+```
+
+---
+
 ### build:qcow2
 
 ```sh {"name":"build:qcow2","excludeFromRunAll":"true","tag":"type:entry"}
@@ -415,6 +506,9 @@ Package QCOW2 as containerDisk.
 
 ```sh {"name":"build:qcow2:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
+eval "$(nix print-dev-env .#konductor 2>/dev/null)" || true
+echo "DEBUG: which docker=$(which docker)"
+echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
 FULL_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
@@ -428,6 +522,8 @@ docker buildx build -f Dockerfile.qcow2 \
     --build-arg PROVENANCE=.konductor \
     --provenance=false --sbom=false \
     --load -t "$FULL_IMAGE" .
+
+echo "✓ Built: $FULL_IMAGE"
 ```
 
 ---
@@ -1322,26 +1418,15 @@ printf "  nix:   %s\n" "$(nix --version)"
 printf "  docker: %s\n" "$(docker --version)"
 
 # ─────────────────────────────────────────────────────────────────────
-# FLAKE ATTESTATION
+# FLAKE ATTESTATION (informational - errors are non-fatal)
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "Flake metadata:"
-nix flake metadata . --no-write-lock-file --json | jq '{
-  path,
-  lastModified: .lastModified,
-  narHash: .locked.narHash // "unlocked",
-  inputs: (.locks.nodes | to_entries | map(select(.key != "root")) | map({
-    (.key): {
-      type: .value.locked.type,
-      rev: (.value.locked.rev // "n/a"),
-      narHash: (.value.locked.narHash // "n/a")
-    }
-  }) | add // {})
-}' 2>/dev/null || nix flake metadata . --no-write-lock-file
+nix flake metadata . --no-write-lock-file --json 2>/dev/null | jq '.path, .lastModified' || echo "  ✗ flake metadata failed: check network or run 'nix flake metadata .' manually"
 
 echo ""
 echo "Flake outputs:"
-nix flake show . --json 2>/dev/null | jq 'keys' || nix flake show .
+nix flake show . --json 2>/dev/null | jq -r 'keys[]' || echo "  ✗ flake show failed: check network or run 'nix flake show .' manually"
 
 for var in $QCOW2_REQUIRED_FILE_VARS; do
     val="${!var}"; [ -n "$val" ] && [ -f "$val" ] && printf "✓ %s\n" "$var" || { printf "✗ %s\n" "$var"; ((ERRORS++)); }

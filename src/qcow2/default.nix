@@ -290,7 +290,10 @@ let
   mkKonductorService = {
     serviceName,     # Service name (ttyd, vscode, restty, ghostty)
     basePort,        # Base port for port calculation (e.g., 8000 for vscode)
-    afterServices ? [ "network.target" "konductor-init.service" "konductor-pki.service" ],
+    # NOTE: Do NOT include konductor-init.service here - creates circular dependency!
+    # konductor-init starts these services, so they can't wait for init to complete.
+    # The drop-in config is written BEFORE init calls systemctl start.
+    afterServices ? [ "network.target" "konductor-pki.service" ],
     documentation ? [],
     workingDirectory ? "/workspace",
     extraServiceConfig ? {},  # Additional serviceConfig options
@@ -1534,7 +1537,7 @@ let
         # Base port: 7000, actual port = 7000 + (UID - 1000)
         serviceName = "ttyd";
         basePort = 7000;
-        afterServices = [ "network.target" "konductor-init.service" "konductor-pki.service" ];
+        # NOTE: afterServices uses default (no konductor-init.service to avoid circular dep)
         documentation = [ "https://github.com/tsl0922/ttyd" ];
         workingDirectory = "/home/%i";
       })

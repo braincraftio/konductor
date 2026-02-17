@@ -48,7 +48,7 @@ Set these in `.env` or export before running:
 ```bash
 # Registry configuration
 export OCI_REGISTRY="registry.ucs.arpa"
-export OCI_IMAGE="helix/flake"
+export OCI_IMAGE="braincraft/konductor"
 export OCI_TAG="latest-qcow2"
 
 # Optional: Skip phases for iteration
@@ -94,7 +94,7 @@ echo "════════════════════════�
 echo "  oci:build - Standalone QCOW2 + OCI Build Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
-echo "  Target: ${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-helix/flake}:${OCI_TAG:-latest-qcow2}"
+echo "  Target: ${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-braincraft/konductor}:${OCI_TAG:-latest-qcow2}"
 echo ""
 
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
@@ -170,7 +170,7 @@ echo "DEBUG: which docker=$(which docker)"
 echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
 echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
 REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
-IMAGE="${OCI_IMAGE:-helix/flake}"
+IMAGE="${OCI_IMAGE:-braincraft/konductor}"
 TAG="${OCI_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 
@@ -198,7 +198,7 @@ Push container with multi-tag (git/nix/latest).
 ```sh {"name":"oci:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
 REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
-IMAGE="${OCI_IMAGE:-helix/flake}"
+IMAGE="${OCI_IMAGE:-braincraft/konductor}"
 BASE_TAG="${OCI_TAG:-latest-qcow2}"
 
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
@@ -980,7 +980,7 @@ BUILD_HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d
 BUILD_HW_PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || BUILD_HW_PRODUCT=""
 BUILD_HW_SERIAL=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || BUILD_HW_SERIAL=""
 
-OCI_IMAGE="${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-helix/flake}"
+OCI_IMAGE="${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-braincraft/konductor}"
 
 # Build tag list for provenance
 OCI_TAGS="[\"${OCI_TAG:-latest-qcow2}\""
