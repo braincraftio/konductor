@@ -311,7 +311,10 @@ export XDG_CACHE_HOME="/tmp/konductor-nix-cache"
 export HOME="/tmp/konductor-nix-home"
 mkdir -p "$XDG_CACHE_HOME" "$HOME"
 
-# Resolve inputs from flake.lock (works even when flake.nix uses path inputs).
+# Read from committed flake.lock (has github refs), not working copy (may have path refs)
+# This ensures we always have fetchable URLs even after nixos-rebuild modifies the working copy
+git show HEAD:flake.lock > /tmp/flake.lock.reference
+
 jq -c '
   .nodes as $nodes
   | (.nodes.root.inputs | keys) as $roots
@@ -330,7 +333,8 @@ jq -c '
       (.locked.ref // null),
       (.locked.url // null)
     ]
-' flake.lock > /tmp/vendor-lock.jsonl
+' /tmp/flake.lock.reference > /tmp/vendor-lock.jsonl
+rm -f /tmp/flake.lock.reference
 
 while read -r row; do
   name=$(jq -r '.[0]' <<<"$row")
@@ -388,10 +392,13 @@ done < /tmp/vendor-lock.jsonl
 rm -f /tmp/vendor-lock.jsonl
 unset XDG_CACHE_HOME HOME
 
-# Refresh flake.lock now that inputs are local paths.
-nix --extra-experimental-features 'nix-command flakes' flake lock
+# NOTE: We do NOT run 'nix flake lock' here.
+# The committed flake.lock has github refs; keep it that way for future vendor runs.
+# When building with 'path:.#konductor', nix resolves the path inputs from flake.nix
+# without needing to update flake.lock (use --no-write-lock-file to prevent changes).
 
 echo "✓ Vendored inputs into ./_sources"
+ls _sources/
 ```
 
 ---
@@ -415,7 +422,10 @@ cat > "$tmpdir/flake.nix" <<'EOF'
   inputs = {
 EOF
 
-# Build input list from existing lock (prefer original refs, fallback to locked).
+# Read from committed flake.lock (has github refs), not working copy
+git show HEAD:flake.lock > "$tmpdir/flake.lock.reference"
+
+# Build input list from committed lock (prefer original refs, fallback to locked).
 jq -c '
   .nodes as $nodes
   | (.nodes.root.inputs | keys) as $roots
@@ -436,7 +446,7 @@ jq -c '
       (.original.dir // .locked.dir // null),
       (if .flake == false then "false" else "true" end)
     ]
-' flake.lock > "$tmpdir/inputs.jsonl"
+' "$tmpdir/flake.lock.reference" > "$tmpdir/inputs.jsonl"
 
 while read -r row; do
   name=$(jq -r '.[0]' <<<"$row")

@@ -99,9 +99,8 @@ runme run --filename docs/developer_guide/qcow2/UPDATE.md update:rebuild
 
 Vendor flake inputs into `_sources/` for offline evaluation.
 
-The final `nix flake lock` step may fail because it tries to evaluate the flake
-from a git context (which excludes `_sources/`). This is expected - the inputs
-are still vendored successfully.
+Reads from the committed `flake.lock` (via `git show HEAD:flake.lock`) which has
+github/git URLs, not the working copy which may have been modified to path types.
 
 ```sh {"name":"update:vendor","excludeFromRunAll":"true","tag":"type:entry"}
 set -euo pipefail
@@ -115,7 +114,9 @@ export XDG_CACHE_HOME="/tmp/konductor-nix-cache"
 export HOME="/tmp/konductor-nix-home"
 mkdir -p "$XDG_CACHE_HOME" "$HOME"
 
-# Resolve inputs from flake.lock (works even when flake.nix uses path inputs)
+# Read from committed flake.lock (has github refs), not working copy (may have path refs)
+git show HEAD:flake.lock > /tmp/flake.lock.reference
+
 jq -c '
   .nodes as $nodes
   | (.nodes.root.inputs | keys) as $roots
@@ -134,7 +135,8 @@ jq -c '
       (.locked.ref // null),
       (.locked.url // null)
     ]
-' flake.lock > /tmp/vendor-lock.jsonl
+' /tmp/flake.lock.reference > /tmp/vendor-lock.jsonl
+rm -f /tmp/flake.lock.reference
 
 while read -r row; do
   name=$(jq -r '.[0]' <<<"$row")
@@ -186,7 +188,9 @@ echo "Rebuilding NixOS configuration..."
 echo "  Flake: path:.#konductor"
 echo ""
 
-sudo nixos-rebuild switch --flake 'path:.#konductor'
+# --no-write-lock-file prevents nix from rewriting flake.lock to path types
+# This preserves the committed github refs for future vendor runs
+sudo nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file
 
 echo ""
 echo "Current system generation:"
