@@ -781,8 +781,13 @@ let
       ln -sf ${pkgs.glibc}/lib/libc.so.6 /lib/libc.so.6
     '';
 
-    # Layer 2: ldconfig Wrapper - added to environment.systemPackages below
-    # with meta.priority to shadow glibc's ldconfig
+    # Layer 2: ldconfig Wrapper - forcibly replace glibc's ldconfig
+    # meta.priority doesn't work because glibc is a dependency, not a systemPackage
+    # environment.extraSetup runs in postBuild and can replace the symlink
+    environment.extraSetup = ''
+      rm -f $out/bin/ldconfig
+      ln -s ${vscodeLdconfigWrapper}/bin/ldconfig $out/bin/ldconfig
+    '';
 
     # =====================================================================
     # Image Size Optimization
