@@ -386,6 +386,7 @@ let
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
+      inputs.vscode-server.nixosModules.default
       # QEMU guest profile for virtio drivers and guest agent
       "${modulesPath}/profiles/qemu-guest.nix"
     ];
@@ -540,6 +541,24 @@ let
       # Vertical PKI: parent cluster CA signs VM wildcard cert
       hypervisorCaPath = "/mnt/pki/ca.crt";
       hypervisorKeyPath = "/mnt/pki/tls.key";
+    };
+
+    # =====================================================================
+    # VS Code Remote SSH Support
+    # =====================================================================
+    # Enables VS Code Remote SSH extension to connect to this NixOS VM.
+    # The nixos-vscode-server module patches VS Code Server binaries to work
+    # with NixOS's non-FHS layout (no /lib, /usr/lib).
+    #
+    # enableFHS creates an FHS-compatible environment providing:
+    # - libstdc++.so and other C++ libraries VS Code Server expects
+    # - Standard paths for extension binaries to work without patching
+    #
+    # After VM boot, users must enable the service:
+    #   systemctl --user enable --now auto-fix-vscode-server.service
+    services.vscode-server = {
+      enable = true;
+      enableFHS = true;
     };
 
     # =====================================================================
