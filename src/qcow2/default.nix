@@ -386,7 +386,6 @@ let
       mountService
       pkiModule
       inputs.home-manager.nixosModules.home-manager
-      inputs.vscode-server.nixosModules.default
       # QEMU guest profile for virtio drivers and guest agent
       "${modulesPath}/profiles/qemu-guest.nix"
     ];
@@ -544,21 +543,31 @@ let
     };
 
     # =====================================================================
-    # VS Code Remote SSH Support
+    # Dynamic Linker for Pre-compiled Binaries (nix-ld)
     # =====================================================================
-    # Enables VS Code Remote SSH extension to connect to this NixOS VM.
-    # The nixos-vscode-server module patches VS Code Server binaries to work
-    # with NixOS's non-FHS layout (no /lib, /usr/lib).
-    #
-    # enableFHS creates an FHS-compatible environment providing:
-    # - libstdc++.so and other C++ libraries VS Code Server expects
-    # - Standard paths for extension binaries to work without patching
-    #
-    # After VM boot, users must enable the service:
-    #   systemctl --user enable --now auto-fix-vscode-server.service
-    services.vscode-server = {
+    # Enables pre-compiled binaries (VS Code Remote SSH server, language
+    # servers, native modules, CLI tools) to find shared libraries on NixOS.
+    # Works automatically for all users - no per-user services needed.
+    programs.nix-ld = {
       enable = true;
-      enableFHS = true;
+      libraries = with pkgs; [
+        # C/C++ runtime (both for maximum compatibility)
+        stdenv.cc.cc.lib   # C standard library from stdenv
+        gcc-unwrapped.lib  # GCC runtime (libstdc++, libgcc_s)
+
+        # Core libraries for VS Code, language servers, and dev tools
+        zlib               # Compression (VS Code, many tools)
+        openssl            # SSL/TLS (network tools, language servers)
+        icu                # Unicode/i18n (VS Code, text processing)
+        curl               # HTTP client (some extensions, tools)
+        sqlite             # Embedded database (some extensions)
+        ncurses            # Terminal UI (TUI tools, debugging)
+        readline           # Line editing (interactive CLIs)
+        libffi             # FFI (Python extensions, etc.)
+        expat              # XML parser (some language servers)
+        xz                 # LZMA compression (archives)
+        bzip2              # Compression (archives)
+      ];
     };
 
     # =====================================================================

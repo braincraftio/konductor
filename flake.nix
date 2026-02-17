@@ -78,13 +78,6 @@
       flake = false;
     };
 
-    # VS Code Remote SSH support for NixOS
-    # Patches VS Code Server binaries to work with NixOS's non-FHS layout
-    vscode-server = {
-      url = "github:nix-community/nixos-vscode-server";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     systems.url = "github:nix-systems/default";
   };
 
