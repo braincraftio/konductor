@@ -337,7 +337,7 @@ let
 
           # Step 2: Open firewall port
           # PORT variable from EnvironmentFile (written by konductor-init.service)
-          ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment "konductor-${serviceName}@%i-port''${PORT}"''
+          ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment \"konductor-${serviceName}@%i-port''${PORT}\"''
         ];
 
         # Environment files (merged at runtime)
