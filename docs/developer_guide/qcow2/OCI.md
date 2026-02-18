@@ -827,11 +827,11 @@ runcmd:
   - echo "--- cloud-init status ---" > /dev/ttyS0
   - cloud-init status --long > /dev/ttyS0 2>&1 || true
   - echo "═══ Network preflight checks ═══" > /dev/ttyS0
-  - ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: no routes" > /dev/ttyS0; exit 1; }
-  - ip route | grep -q default || { echo "PREFLIGHT FAILED: no default route" > /dev/ttyS0; exit 1; }
-  - nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: DNS resolution failed" > /dev/ttyS0; exit 1; }
-  - if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed 's|http://||' | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed 's|http://||' | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; exit 1; }; fi
-  - curl -I --connect-timeout 5 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: cannot reach cache.nixos.org" > /dev/ttyS0; exit 1; }
+  - 'ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: no routes" > /dev/ttyS0; exit 1; }'
+  - 'ip route | grep -q default || { echo "PREFLIGHT FAILED: no default route" > /dev/ttyS0; exit 1; }'
+  - 'nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: DNS resolution failed" > /dev/ttyS0; exit 1; }'
+  - 'if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed "s|http://||" | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed "s|http://||" | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; exit 1; }; fi'
+  - 'curl -I --connect-timeout 5 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: cannot reach cache.nixos.org" > /dev/ttyS0; exit 1; }'
   - echo "═══ Network preflight PASSED ═══" > /dev/ttyS0
   - ls -lah /home/*/.ssh/ > /dev/ttyS0 2>&1 || true
   - echo "authorized_keys:" > /dev/ttyS0
@@ -962,9 +962,36 @@ Wait for SSH.
 
 ```bash {"name":"_oci:vm:wait","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+<<<<<<< HEAD
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c "until ssh -p $SSH_PORT -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost true 2>/dev/null; do sleep 3; done" \
     || { echo "SSH timeout after ${QCOW2_SSH_TIMEOUT:-300}s on port $SSH_PORT"; exit 1; }
+=======
+
+TIMEOUT="${QCOW2_SSH_TIMEOUT:-300}"
+START_TIME=$(date +%s)
+RETRY_COUNT=0
+
+echo "Waiting for SSH (timeout: ${TIMEOUT}s)..."
+echo "Start time: $(date '+%Y-%m-%d %H:%M:%S')"
+
+while true; do
+    if ssh kc2admin@localhost true 2>/dev/null; then
+        echo "SSH connection successful after ${RETRY_COUNT} retries ($(( $(date +%s) - START_TIME ))s elapsed)"
+        break
+    fi
+
+    ELAPSED=$(( $(date +%s) - START_TIME ))
+    if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+        echo "SSH timeout after ${TIMEOUT}s (${RETRY_COUNT} retries)"
+        exit 1
+    fi
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "  Retry ${RETRY_COUNT}: SSH not ready yet (${ELAPSED}s elapsed, $(( TIMEOUT - ELAPSED ))s remaining)"
+    sleep 3
+done
+>>>>>>> eb78444 (fix(cloud-init): quote runcmd shell commands with colons for YAML parsing)
 ```
 
 ---
