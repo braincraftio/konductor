@@ -919,6 +919,9 @@ TOTAL_CPUS=$(nproc)
 VM_CPUS=$((TOTAL_CPUS - 2))
 [ "$VM_CPUS" -lt 2 ] && VM_CPUS=2
 
+# TODO: Switch to passt networking once the image includes it (konductor.nix has passt added)
+# passt provides better performance and modern rootless networking vs QEMU user mode
+# For now using user mode (restrict=off) since host VM doesn't have passt until next rebuild
 qemu-system-x86_64 \
     -machine q35,accel=kvm,mem-merge=on \
     -m "${QCOW2_VM_MEMORY:-4096}" \
@@ -930,7 +933,11 @@ qemu-system-x86_64 \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
     -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
     -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
+<<<<<<< HEAD
     -netdev user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
+=======
+    -netdev user,id=net0,restrict=off,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22,hostfwd=tcp::8080-:8080,hostfwd=tcp::7681-:7681 \
+>>>>>>> 215de1a (fix(qcow2): revert to user mode networking until passt available in image)
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
@@ -1270,19 +1277,17 @@ Note: SKIP_COMPRESS=true produces a larger, uncompressed image (faster builds, l
 ```bash {"name":"_oci:img:compress","tag":"duration:slow"}
 set -e
 
+# Cap coroutines to prevent excessive memory usage on high-core systems
+CORES=$(nproc)
+[ "$CORES" -gt 16 ] && CORES=16
+
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
     echo "SKIP_COMPRESS: copying uncompressed image..."
     cp result/nixos.qcow2 konductor.qcow2
 else
-    echo "Compressing with qemu-img (zstd)..."
-    qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+    echo "Compressing with qemu-img (zstd, ${CORES} coroutines)..."
+    qemu-img convert -c -p -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
 fi
-<<<<<<< HEAD
-=======
-CORES=$(nproc)
-[ "$CORES" -gt 16 ] && CORES=16
-qemu-img convert -c -p -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
->>>>>>> 60225c5 (fix(proxy): implement wrapper script for nix-daemon proxy configuration)
 ```
 
 ---
