@@ -1073,6 +1073,10 @@ if ssh $SSH_OPTS kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'
     OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:./_sources/$input"; done')
 fi
 
+# Stop cloud-init services before rebuild to prevent restart failures
+# Cloud-init services are oneshot boot services that fail when reactivated
+ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.service cloud-init-local.service cloud-init.service 2>/dev/null || true"
+
 # Rebuild NixOS from the synced flake
 # path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
 # Rebuild NixOS with proxy support
