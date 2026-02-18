@@ -83,9 +83,10 @@ in
       unstable.omnictl # Sidero Omni CLI (1.4.4)
 
       # Infrastructure as Code
-      pulumi # IaC with real programming languages
-      pulumictl # Pulumi CLI utilities
-      pulumiPackages.pulumi-python # Python language plugin
+      # Pulumi with NixOS-native Python environment (src/packages/pulumi.nix)
+      # Replaces: pulumi, pulumictl, pulumiPackages.pulumi-python
+      # Provides python.withPackages environment with properly-linked native extensions
+      (import ../packages/pulumi.nix { inherit pkgs; })
 
       # Cloud provider CLIs (unstable for faster updates)
       unstable.awscli2 # AWS CLI v2

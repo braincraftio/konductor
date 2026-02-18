@@ -551,6 +551,21 @@ let
     };
   };
 
+  # Nix daemon wrapper that sources proxy environment at runtime
+  # This is the correct approach for optional runtime proxy configuration (not EnvironmentFile in drop-ins)
+  # See: https://github.com/NixOS/nixpkgs (systemd EnvironmentFile + socket-activated services)
+  nixDaemonProxyWrapper = pkgs.writeShellScript "nix-daemon-proxy-wrapper" ''
+    # Source proxy configuration if it exists (cloud-init runtime config)
+    if [ -f /etc/konductor/proxy.env ]; then
+      set -a
+      . /etc/konductor/proxy.env
+      set +a
+    fi
+
+    # Execute the real nix-daemon
+    exec ${pkgs.nix}/bin/nix-daemon "$@"
+  '';
+
   # Shared NixOS configuration module for both qcow2 image and nixos-rebuild
   # This allows live updates to running VMs via: nixos-rebuild switch --flake .#konductor
   konductorModule = { config, lib, pkgs, modulesPath, ... }: {
@@ -1572,13 +1587,15 @@ let
         # Applies proxy settings from cloud-init to system services.
         # Cloud-init writes /etc/konductor/proxy.env, this service creates
         # systemd drop-ins for services that need proxy configuration:
-        #   - nix-daemon: For nix builds and cache fetches
         #   - docker: For pulling container images
+        #
+        # NOTE: nix-daemon proxy is handled via wrapper script (see nixDaemonProxyWrapper)
+        # because socket-activated services don't reliably load EnvironmentFile from runtime drop-ins.
         #
         # CRITICAL ORDERING:
         #   - MUST run AFTER cloud-init.service (when write_files completes)
-        #   - MUST run BEFORE nix-daemon/docker to configure them on first boot
-        #   - Explicitly restarts services to handle case where they started early
+        #   - MUST run BEFORE docker to configure it on first boot
+        #   - Explicitly restarts service to handle case where it started early
         #
         # Usage: Cloud-init user-data (or Pulumi KonductorProxySpec) writes:
         #   write_files:
@@ -1591,12 +1608,12 @@ let
         #         no_proxy=localhost,127.0.0.1,10.0.0.0/8
         #         NO_PROXY=localhost,127.0.0.1,10.0.0.0/8
         konductor-proxy-setup = {
-          description = "Configure proxy for system services from cloud-init";
+          description = "Configure proxy for Docker from cloud-init";
           # Wait for cloud-init to complete (when proxy.env is written)
           after = [ "cloud-init.service" ];
-          # Start before these services (for ordering on subsequent boots)
-          before = [ "nix-daemon.service" "docker.service" ];
-          # Activate via multi-user target (not wantedBy the services themselves)
+          # Start before docker (for ordering on subsequent boots)
+          before = [ "docker.service" ];
+          # Activate via multi-user target (not wantedBy the service itself)
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
             ConditionPathExists = "/etc/konductor/proxy.env";
@@ -1604,20 +1621,11 @@ let
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
-            ExecStart = pkgs.writeShellScript "setup-system-proxy" ''
+            ExecStart = pkgs.writeShellScript "setup-docker-proxy" ''
               set -euo pipefail
               PROXY_ENV="/etc/konductor/proxy.env"
 
-              echo "Configuring system proxy from $PROXY_ENV"
-
-              # Configure nix-daemon proxy
-              NIX_DROPIN_DIR="/run/systemd/system/nix-daemon.service.d"
-              mkdir -p "$NIX_DROPIN_DIR"
-              cat > "$NIX_DROPIN_DIR/proxy.conf" << EOF
-              [Service]
-              EnvironmentFile=$PROXY_ENV
-              EOF
-              echo "  ✓ nix-daemon proxy drop-in created"
+              echo "Configuring Docker proxy from $PROXY_ENV"
 
               # Configure Docker daemon proxy
               DOCKER_DROPIN_DIR="/run/systemd/system/docker.service.d"
@@ -1628,23 +1636,15 @@ let
               EOF
               echo "  ✓ docker proxy drop-in created"
 
-              # Reload systemd to pick up the drop-ins
+              # Reload systemd to pick up the drop-in
               systemctl daemon-reload
               echo "  ✓ systemd daemon reloaded"
 
-              # Restart services to apply proxy settings (ONLY if already active)
-              # Before= ordering means services are blocked from starting until we complete.
-              # On clean boot: services not active → no restart needed → drop-ins apply on first start
-              # On socket activation race: service became active early → restart applies config
-              # CRITICAL: Never restart services in "waiting" state (job queue) - causes deadlock
-              echo "Checking services for proxy configuration apply..."
-
-              # Only restart nix-daemon if it's currently active (not waiting in job queue)
-              if systemctl is-active --quiet nix-daemon.service 2>/dev/null; then
-                systemctl restart nix-daemon.service && echo "  ✓ nix-daemon restarted (was active)"
-              else
-                echo "  · nix-daemon not yet active (will use proxy config on first start)"
-              fi
+              # Restart docker to apply proxy settings (ONLY if already active)
+              # Before= ordering means service is blocked from starting until we complete.
+              # On clean boot: service not active → no restart needed → drop-in applies on first start
+              # On early activation race: service became active early → restart applies config
+              echo "Checking docker for proxy configuration apply..."
 
               # Only restart docker if it's currently active (not waiting in job queue)
               if systemctl is-active --quiet docker.service 2>/dev/null; then
@@ -1653,8 +1653,20 @@ let
                 echo "  · docker not yet active (will use proxy config on first start)"
               fi
 
-              echo "Proxy configuration applied to system services"
+              echo "Proxy configuration applied to Docker"
             '';
+          };
+        };
+
+        # Override nix-daemon to use proxy wrapper script
+        # Socket-activated services don't reliably load EnvironmentFile from runtime drop-ins,
+        # so we use a wrapper that sources /etc/konductor/proxy.env at execution time.
+        # See: https://github.com/NixOS/nixpkgs (systemd documentation)
+        nix-daemon = {
+          serviceConfig = {
+            # Override ExecStart with our proxy wrapper
+            # Empty string "" clears previous ExecStart directives
+            ExecStart = lib.mkForce [ "" "${nixDaemonProxyWrapper}" ];
           };
         };
 

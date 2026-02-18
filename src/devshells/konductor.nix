@@ -52,7 +52,8 @@ baseShell.overrideAttrs (old: {
     ++ konductor.packages
     # ttyd web terminal with Catppuccin Frappé theme
     ++ programs.ttyd.packages
-    # C++ stdlib for Python grpc (used by Pulumi)
+    # NOTE: C++ stdlib for Pulumi grpc no longer needed (native solution in packages/pulumi.nix)
+    # Keeping for other potential native extension use cases
     ++ [ pkgs.stdenv.cc.cc.lib ];
 
   shellHook = ''

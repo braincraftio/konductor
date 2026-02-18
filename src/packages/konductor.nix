@@ -26,6 +26,7 @@
     # VM/QCOW2 tooling
     qemu_kvm
     qemu-utils
+    passt # Modern rootless VM networking (replacement for SLIRP/user mode)
     libvirt
     # virt-manager removed — GUI VM manager unnecessary in headless VM (saves ~1.3GB)
     libguestfs-with-appliance # guestmount, guestunmount (includes appliance)

@@ -160,7 +160,7 @@ PHASES=(
 for phase in "${PHASES[@]}"; do
     echo ""
     echo "▶ ${phase}..."
-    runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" "$phase"
+    runme run --direnv=true --filename "$OCI_BUILD_FILE" "$phase"
 done
 ```
 
@@ -583,7 +583,7 @@ echo "Clean state validation:"
 echo ""
 echo "Environment validation:"
 
-REQUIRED_BINS="${QCOW2_REQUIRED_BINS:-nix qemu-img qemu-system-x86_64 genisoimage guestmount guestunmount virt-sparsify ssh rsync timeout ss du sha256sum jq docker}"
+REQUIRED_BINS="${QCOW2_REQUIRED_BINS:-nix qemu-img qemu-system-x86_64 passt genisoimage guestmount guestunmount virt-sparsify ssh rsync timeout ss du sha256sum jq docker}"
 
 for cmd in $REQUIRED_BINS; do
     if command -v "$cmd" &>/dev/null; then
@@ -760,6 +760,7 @@ set -e
 [ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
 
 CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+rm -rf "$CLOUD_INIT_DIR"
 mkdir -p "$CLOUD_INIT_DIR"
 
 cp "$OVMF_VARS" "$CLOUD_INIT_DIR/OVMF_VARS.fd"
@@ -773,28 +774,35 @@ EOF
 SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 [ -f "$SSH_PUBKEY" ] || { echo "Error: $SSH_PUBKEY not found"; exit 1; }
 
-cat > "$CLOUD_INIT_DIR/user-data" << EOF
+cat > "$CLOUD_INIT_DIR/user-data" << 'EOF'
 #cloud-config
 users:
+  - name: PLACEHOLDER_USER
+    groups: kc2, wheel, docker, libvirtd, kvm
+    shell: /run/current-system/sw/bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - PLACEHOLDER_PUBKEY
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     lock_passwd: true
     ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
+      - PLACEHOLDER_PUBKEY
   - name: kc2admin
     groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
+      - PLACEHOLDER_PUBKEY
   - name: runner
     groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     lock_passwd: true
     ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
+      - PLACEHOLDER_PUBKEY
 write_files:
   - path: /var/lib/konductor/services.toml
     content: |
@@ -811,6 +819,20 @@ write_files:
     permissions: '0644'
 runcmd:
   - echo "═══ cloud-init runcmd start ═══" > /dev/ttyS0
+  - echo "═══ Cloud-init configuration ═══" > /dev/ttyS0
+  - echo "--- user-data ---" > /dev/ttyS0
+  - cat /var/lib/cloud/instance/user-data.txt > /dev/ttyS0 2>&1 || echo "user-data not found" > /dev/ttyS0
+  - echo "--- network-config ---" > /dev/ttyS0
+  - cat /var/lib/cloud/instance/network-config > /dev/ttyS0 2>&1 || echo "network-config not found" > /dev/ttyS0
+  - echo "--- cloud-init status ---" > /dev/ttyS0
+  - cloud-init status --long > /dev/ttyS0 2>&1 || true
+  - echo "═══ Network preflight checks ═══" > /dev/ttyS0
+  - ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: no routes" > /dev/ttyS0; exit 1; }
+  - ip route | grep -q default || { echo "PREFLIGHT FAILED: no default route" > /dev/ttyS0; exit 1; }
+  - nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: DNS resolution failed" > /dev/ttyS0; exit 1; }
+  - if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed 's|http://||' | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed 's|http://||' | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; exit 1; }; fi
+  - curl -I --connect-timeout 5 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: cannot reach cache.nixos.org" > /dev/ttyS0; exit 1; }
+  - echo "═══ Network preflight PASSED ═══" > /dev/ttyS0
   - ls -lah /home/*/.ssh/ > /dev/ttyS0 2>&1 || true
   - echo "authorized_keys:" > /dev/ttyS0
   - wc -l /home/*/.ssh/authorized_keys > /dev/ttyS0 2>&1 || true
@@ -824,6 +846,26 @@ runcmd:
   - systemctl status 'konductor-vscode@*' 'konductor-ttyd@*' --no-pager > /dev/ttyS0 2>&1 || true
   - echo "═══ cloud-init runcmd complete ═══" > /dev/ttyS0
 EOF
+
+# Replace placeholders
+sed -i "s/PLACEHOLDER_USER/${USER}/g" "$CLOUD_INIT_DIR/user-data"
+sed -i "s|PLACEHOLDER_PUBKEY|$(cat "$SSH_PUBKEY")|g" "$CLOUD_INIT_DIR/user-data"
+
+# Add proxy configuration if it exists
+if [ -f /etc/konductor/proxy.env ]; then
+    echo "Detected proxy configuration, adding to cloud-init"
+    # Create temp file with proxy write_files entry
+    {
+        echo "  - path: /etc/konductor/proxy.env"
+        echo "    content: |"
+        sed 's/^/      /' /etc/konductor/proxy.env
+        echo "    owner: root:root"
+        echo "    permissions: '0644'"
+    } > "$CLOUD_INIT_DIR/proxy.tmp"
+    # Insert before runcmd
+    sed -i '/^runcmd:/e cat '"$CLOUD_INIT_DIR/proxy.tmp" "$CLOUD_INIT_DIR/user-data"
+    rm -f "$CLOUD_INIT_DIR/proxy.tmp"
+fi
 
 genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
     -volid cidata -joliet -rock -input-charset utf-8 \
@@ -872,11 +914,16 @@ TTYD_PORT="${QCOW2_TTYD_PORT:-17681}"
 CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
+# Calculate CPUs: all cores minus 2, minimum 2
+TOTAL_CPUS=$(nproc)
+VM_CPUS=$((TOTAL_CPUS - 2))
+[ "$VM_CPUS" -lt 2 ] && VM_CPUS=2
+
 qemu-system-x86_64 \
     -machine q35,accel=kvm,mem-merge=on \
     -m "${QCOW2_VM_MEMORY:-4096}" \
     -cpu host \
-    -smp "${QCOW2_VM_CPUS:-4}" \
+    -smp "${QCOW2_VM_CPUS:-$VM_CPUS}" \
     -rtc base=utc,clock=host \
     -boot order=c,menu=off \
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
@@ -994,14 +1041,15 @@ fi
 
 # Rebuild NixOS from the synced flake
 # path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+# Rebuild NixOS with proxy support
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
-# Pre-build devshells to cache their closures
+# Pre-build devshells to cache their closures with proxy support
 # This ensures `nix develop` works offline - failures here break offline support
 echo "Caching devshells for offline use..."
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.default' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.default failed"; exit 1; }
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.full failed"; exit 1; }
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.konductor failed"; exit 1; }
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link 'path:.#devShells.x86_64-linux.default' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.default failed"; exit 1; }
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link 'path:.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.full failed"; exit 1; }
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link 'path:.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.konductor failed"; exit 1; }
 echo "✓ Devshells cached"
 
 echo "VM rebuilt from /opt/konductor/src flake"
@@ -1229,6 +1277,12 @@ else
     echo "Compressing with qemu-img (zstd)..."
     qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
 fi
+<<<<<<< HEAD
+=======
+CORES=$(nproc)
+[ "$CORES" -gt 16 ] && CORES=16
+qemu-img convert -c -p -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+>>>>>>> 60225c5 (fix(proxy): implement wrapper script for nix-daemon proxy configuration)
 ```
 
 ---
