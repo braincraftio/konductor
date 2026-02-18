@@ -195,6 +195,20 @@ docker buildx build -f Dockerfile.qcow2 \
     --provenance=false --sbom=false \
     --load -t "$FULL_IMAGE" .
 
+# Apply all tags from .konductor so CI output matches reality
+# Parse oci_tags array from .konductor TOML and create docker tags
+OCI_TAGS_LINE=$(grep '^oci_tags = ' .konductor | sed 's/^oci_tags = //')
+# Extract tags from JSON array: ["tag1", "tag2", ...] -> tag1 tag2 ...
+TAGS=$(echo "$OCI_TAGS_LINE" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$')
+
+echo "Applying tags:"
+for tag in $TAGS; do
+    if [ "$tag" != "$TAG" ]; then
+        docker tag "$FULL_IMAGE" "$REGISTRY/$IMAGE:$tag"
+        echo "  ✓ $REGISTRY/$IMAGE:$tag"
+    fi
+done
+
 echo "✓ Built: $FULL_IMAGE"
 ```
 
