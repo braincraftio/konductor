@@ -12,8 +12,10 @@ runme:
 
 Standalone offline build pipeline for QCOW2 VM image with OCI containerDisk packaging.
 
-This file is self-contained and does not require the parent workspace or mise tasks. It can be used
-directly from `/opt/konductor/src` without external dependencies.
+This file is intended to be self-contained and should not require the parent workspace or mise
+tasks.
+
+Use directly from `${WORKSPACE_ROOT}/flake` or `/opt/konductor/src` without external dependencies.
 
 ## Contents
 
@@ -30,13 +32,13 @@ directly from `/opt/konductor/src` without external dependencies.
 # Full build pipeline (clean → nix → vm → seal → container)
 runme run oci:build
 
-# Push to registry
-runme run oci:push
-
 # Or run individual steps
 runme run oci:clean
 runme run oci:image
 runme run oci:container
+
+# Push to registry
+runme run oci:push
 ```
 
 ---
@@ -47,14 +49,19 @@ Set these in `.env` or export before running:
 
 ```bash
 # Registry configuration
-export OCI_REGISTRY="registry.ucs.arpa"
+export OCI_REGISTRY="registry.docker.arpa"
 export OCI_IMAGE="braincraft/konductor"
 export OCI_TAG="latest-qcow2"
 
+# VM port forwarding (host ports, avoid conflicts with host services)
+export QCOW2_SSH_PORT=2222       # SSH access
+export QCOW2_TTYD_PORT=17681     # TTYD terminal (guest :7681)
+export QCOW2_VSCODE_PORT=18080   # VS Code server (guest :8080)
+
 # Optional: Skip phases for iteration
-export SKIP_NIX_BUILD=false
 export SKIP_VM_PHASE=false
 export SKIP_COMPRESS=false
+export SKIP_NIX_BUILD=false
 ```
 
 ---
@@ -87,7 +94,7 @@ Debug:
 
 Full pipeline: clean → image → container.
 
-```sh {"name":"oci:build","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:build","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
 
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -123,7 +130,7 @@ cat .konductor
 
 Build QCOW2: nix → VM configure → seal → verify.
 
-```sh {"name":"oci:image","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:image","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 
@@ -163,9 +170,11 @@ done
 
 Package QCOW2 as containerDisk.
 
-```sh {"name":"oci:container","excludeFromRunAll":"true","tag":"requires:docker"}
+```bash {"name":"oci:container","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-eval "$(nix print-dev-env .#konductor 2>/dev/null)" || true
+if ! eval "$(nix print-dev-env .#konductor)"; then
+    echo "Warning: nix print-dev-env failed, using current environment"
+fi
 echo "DEBUG: which docker=$(which docker)"
 echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
 echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
@@ -195,7 +204,7 @@ echo "✓ Built: $FULL_IMAGE"
 
 Push container with multi-tag (git/nix/latest).
 
-```sh {"name":"oci:push","excludeFromRunAll":"true","tag":"requires:docker"}
+```bash {"name":"oci:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
 REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
 IMAGE="${OCI_IMAGE:-braincraft/konductor}"
@@ -208,13 +217,15 @@ git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
 git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
 nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
 
-# Build tag list
+# Build tag list - full hashes, dirty indicator when tree is dirty
 TAGS=("$BASE_TAG")
 if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-    TAGS+=("qcow2-${git_commit:0:12}")
+    TAGS+=("qcow2-${git_commit}")
+else
+    TAGS+=("qcow2-dirty")
 fi
 if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-    TAGS+=("qcow2-${nix_drv:0:12}")
+    TAGS+=("qcow2-${nix_drv}")
 fi
 
 FULL_IMAGE="$REGISTRY/$IMAGE:$BASE_TAG"
@@ -238,7 +249,7 @@ printf "  %s\n" "${TAGS[@]}"
 
 Reset build state.
 
-```sh {"name":"oci:clean","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"oci:clean","excludeFromRunAll":"true","tag":"type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -254,13 +265,13 @@ echo "✓ Clean"
 
 Boot image for local development.
 
-```sh {"name":"oci:start","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:start","excludeFromRunAll":"true","tag":"type:entry"}
 set -e
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-    echo "VM running. Use: ssh kc2@localhost"
+    echo "VM running. Use: ssh -p ${QCOW2_SSH_PORT:-2222} kc2admin@localhost"
     exit 0
 fi
 [ -f result/nixos.qcow2 ] || { echo "No image. Run oci:image first."; exit 1; }
@@ -273,22 +284,22 @@ sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:cloudinit
 runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:boot
 runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:wait
-echo "VM ready: ssh kc2@localhost"
+echo "VM ready: ssh -p ${QCOW2_SSH_PORT:-2222} kc2admin@localhost"
 ```
 
 ---
 
 ## oci:ssh
 
-```sh {"name":"oci:ssh","excludeFromRunAll":"true","tag":"type:entry"}
-ssh kc2@localhost
+```bash {"name":"oci:ssh","excludeFromRunAll":"true","tag":"type:entry"}
+ssh -p "${QCOW2_SSH_PORT:-2222}" kc2admin@localhost
 ```
 
 ---
 
 ## oci:stop
 
-```sh {"name":"oci:stop","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:stop","excludeFromRunAll":"true","tag":"type:entry"}
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:halt
 ```
@@ -299,7 +310,7 @@ runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:ha
 
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
-```sh {"name":"oci:vendor:inputs","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:vendor:inputs","excludeFromRunAll":"true","tag":"type:entry"}
 set -euo pipefail
 
 echo "Vendoring flake inputs into ./_sources ..."
@@ -361,12 +372,14 @@ while read -r row; do
   attempt=1
   max_attempts=3
   while :; do
-    XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
+    if XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
       nix --extra-experimental-features 'nix-command flakes' \
-      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null && break
+      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null; then
+      break
+    fi
     if [ "$attempt" -ge "$max_attempts" ]; then
       echo "Error: prefetch failed for $name ($flakeref)"
-      cat /tmp/prefetch.json 2>/dev/null || true
+      cat /tmp/prefetch.json || true
       exit 1
     fi
     echo "  retry ${attempt}/${max_attempts} for $name (clearing tarball cache)"
@@ -408,7 +421,7 @@ ls _sources/
 Intermittent online refresh: update lock from network, then vendor into `./_sources`, then re-lock
 to local paths for offline builds.
 
-```sh {"name":"oci:vendor:inputs:online","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"oci:vendor:inputs:online","excludeFromRunAll":"true","tag":"type:entry"}
 set -euo pipefail
 
 tmpdir="$(mktemp -d)"
@@ -521,11 +534,17 @@ echo "✓ Online refresh complete: flake.lock + _sources updated for offline use
 
 Validate environment (standalone - no cluster required).
 
-```sh {"name":"_oci:preflight"}
+```bash {"name":"_oci:preflight"}
 set -e
 
 # Build host system state
-ff 2>/dev/null || fastfetch 2>/dev/null || echo "(fastfetch not available)"
+if command -v ff &>/dev/null; then
+    ff
+elif command -v fastfetch &>/dev/null; then
+    fastfetch
+else
+    echo "(fastfetch not available)"
+fi
 
 # Resolve WORKSPACE_ROOT: env > PWD
 export WORKSPACE_ROOT="${WORKSPACE_ROOT:-$PWD}"
@@ -574,27 +593,29 @@ printf "  docker: %s\n" "$(docker --version)"
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "Flake metadata:"
-if nix flake metadata . --no-write-lock-file --json 2>/dev/null | jq '{
-  path,
-  lastModified: .lastModified,
-  narHash: .locked.narHash // "unlocked",
-  inputs: (.locks.nodes | to_entries | map(select(.key != "root")) | map({
-    (.key): {
-      type: .value.locked.type,
-      rev: (.value.locked.rev // "n/a"),
-      narHash: (.value.locked.narHash // "n/a")
-    }
-  }) | add // {})
-}' 2>/dev/null; then
-    :
+if FLAKE_META=$(nix flake metadata . --no-write-lock-file --json 2>/dev/null); then
+    echo "$FLAKE_META" | jq '{
+      path,
+      lastModified: .lastModified,
+      narHash: .locked.narHash // "unlocked",
+      inputs: (.locks.nodes | to_entries | map(select(.key != "root")) | map({
+        (.key): {
+          type: .value.locked.type,
+          rev: (.value.locked.rev // "n/a"),
+          narHash: (.value.locked.narHash // "n/a")
+        }
+      }) | add // {})
+    }'
 else
-    echo "  (skipped - network/SSL error, using cached inputs)"
+    echo "  (skipped - flake metadata failed)"
 fi
 
 echo ""
 echo "Flake outputs:"
-if ! nix flake show . --json 2>/dev/null | jq 'keys' 2>/dev/null; then
-    echo "  (skipped - network/SSL error)"
+if FLAKE_SHOW=$(nix flake show . --json 2>/dev/null); then
+    echo "$FLAKE_SHOW" | jq 'keys'
+else
+    echo "  (skipped - flake show failed)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────
@@ -623,6 +644,27 @@ printf "✓ SSH key: %s\n" "$SSH_PUBKEY"
 [ -r /dev/kvm ] && [ -w /dev/kvm ] && printf "✓ /dev/kvm accessible\n" || { printf "✗ /dev/kvm not accessible\n"; ((ERRORS++)); }
 
 # ─────────────────────────────────────────────────────────────────────
+# PORT AVAILABILITY
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Port availability:"
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+VSCODE_PORT="${QCOW2_VSCODE_PORT:-18080}"
+TTYD_PORT="${QCOW2_TTYD_PORT:-17681}"
+
+for port_var in "SSH_PORT:$SSH_PORT" "VSCODE_PORT:$VSCODE_PORT" "TTYD_PORT:$TTYD_PORT"; do
+    name="${port_var%%:*}"
+    port="${port_var##*:}"
+    if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+        proc=$(ss -tlnp 2>/dev/null | grep ":${port} " | sed 's/.*users:(("\([^"]*\)".*/\1/' | head -1)
+        printf "✗ %-12s port %s in use by %s\n" "$name" "$port" "$proc"
+        ((ERRORS++))
+    else
+        printf "✓ %-12s port %s available\n" "$name" "$port"
+    fi
+done
+
+# ─────────────────────────────────────────────────────────────────────
 # RESOURCES
 # ─────────────────────────────────────────────────────────────────────
 DISK_AVAIL_GB=$(df -BG --output=avail . | tail -1 | tr -d ' G')
@@ -641,7 +683,7 @@ echo ""
 
 Build NixOS closure and capture nix_drv.
 
-```sh {"name":"_oci:nix","tag":"requires:nix"}
+```bash {"name":"_oci:nix","tag":"requires:nix"}
 set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
@@ -657,8 +699,10 @@ fi
 # Update forked forgejo-runner to latest commit (optional - skip on network errors)
 echo "Updating forgejo-runner-src flake input..."
 if [ "${ALLOW_ONLINE_UPDATE:-false}" = "true" ]; then
-    if ! nix flake update forgejo-runner-src --no-warn-dirty 2>/dev/null; then
-        echo "  (skipped - network/SSL error, using cached input)"
+    if UPDATE_OUT=$(nix flake update forgejo-runner-src --no-warn-dirty 2>&1); then
+        echo "  Updated: $UPDATE_OUT"
+    else
+        echo "  (skipped - network/SSL error: ${UPDATE_OUT:0:100})"
     fi
 else
     echo "  (skipped - offline mode)"
@@ -669,8 +713,12 @@ echo "Building .#qcow2..."
 nix build .#qcow2 --no-warn-dirty
 
 # Get output path and derivation hash after build completes
-OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths 2>/dev/null | head -1)
-NIX_DRV_PATH=$(nix path-info --derivation "$OUT_PATH" 2>/dev/null | head -1 || true)
+OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths | head -1)
+if [ -z "$OUT_PATH" ]; then
+    echo "Error: nix build --print-out-paths returned empty"
+    exit 1
+fi
+NIX_DRV_PATH=$(nix path-info --derivation "$OUT_PATH" | head -1)
 if [ -z "$NIX_DRV_PATH" ]; then
     echo "Error: nix path-info --derivation failed for $OUT_PATH"
     exit 1
@@ -692,7 +740,7 @@ chown -R "$(id -u):$(id -g)" result.writable/
 
 Generate cloud-init ISO.
 
-```sh {"name":"_oci:cloudinit"}
+```bash {"name":"_oci:cloudinit"}
 set -e
 [ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set"; exit 1; }
 [ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
@@ -714,13 +762,6 @@ SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 cat > "$CLOUD_INIT_DIR/user-data" << EOF
 #cloud-config
 users:
-  - name: ${USER}
-    groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
-    ssh_authorized_keys:
-      - $(cat "$SSH_PUBKEY")
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -735,7 +776,7 @@ users:
     ssh_authorized_keys:
       - $(cat "$SSH_PUBKEY")
   - name: runner
-    groups: docker, libvirtd, kvm
+    groups: kc2, wheel, docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
     lock_passwd: true
     ssh_authorized_keys:
@@ -781,7 +822,7 @@ genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
 
 Reset image to pristine state.
 
-```sh {"name":"_oci:img:reset","tag":"requires:guestfs"}
+```bash {"name":"_oci:img:reset","tag":"requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
 MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
@@ -805,11 +846,14 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 Boot VM.
 
-```sh {"name":"_oci:vm:boot","tag":"requires:kvm"}
+```bash {"name":"_oci:vm:boot","tag":"requires:kvm"}
 set -e
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
-ss -tlnp 2>/dev/null | awk -v p=":${QCOW2_SSH_PORT:-2222} " '$0 ~ p {exit 0} END {exit 1}' && { echo "Error: Port ${QCOW2_SSH_PORT:-2222} in use"; exit 1; }
+# Ports (validated in preflight)
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+VSCODE_PORT="${QCOW2_VSCODE_PORT:-18080}"
+TTYD_PORT="${QCOW2_TTYD_PORT:-17681}"
 
 CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
@@ -825,7 +869,7 @@ qemu-system-x86_64 \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
     -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
     -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
-    -netdev user,id=net0,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22,hostfwd=tcp::8080-:8080,hostfwd=tcp::7681-:7681 \
+    -netdev user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
@@ -837,7 +881,9 @@ qemu-system-x86_64 \
 
 sleep 1
 [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null \
-    || { echo "QEMU failed"; exit 1; }
+    || { echo "QEMU failed to start"; tail -20 "${QCOW2_LOGFILE:-build-vm.log}"; exit 1; }
+
+echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
 ```
 
 ---
@@ -846,10 +892,11 @@ sleep 1
 
 Wait for SSH.
 
-```sh {"name":"_oci:vm:wait","tag":"duration:slow"}
+```bash {"name":"_oci:vm:wait","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh kc2admin@localhost true 2>/dev/null; do sleep 3; done' \
-    || { echo "SSH timeout"; exit 1; }
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c "until ssh -p $SSH_PORT -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost true 2>/dev/null; do sleep 3; done" \
+    || { echo "SSH timeout after ${QCOW2_SSH_TIMEOUT:-300}s on port $SSH_PORT"; exit 1; }
 ```
 
 ---
@@ -858,14 +905,17 @@ timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c 'until ssh kc2admin@localhost true 2
 
 Sync source to VM.
 
-```sh {"name":"_oci:vm:sync"}
+```bash {"name":"_oci:vm:sync"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
+
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 COMMIT=$(git rev-parse --short HEAD)
 BUNDLE="k9-${COMMIT}.bundle"
 
-ssh kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
+ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /opt/konductor'
 
 # git bundle: portable repo with full history
 echo "Creating bundle ${BUNDLE}..."
@@ -873,28 +923,28 @@ git bundle create "/tmp/${BUNDLE}" HEAD --all
 
 # Transfer bundle
 echo "Transferring bundle..."
-scp "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
-ssh kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
+scp -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
+ssh $SSH_OPTS kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
 # Clone from bundle (creates clean repo with history)
 echo "Cloning to /opt/konductor/src/..."
-ssh kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
+ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
 
 # Sync vendored inputs if present (required for offline flake evaluation)
 if [ -d _sources ]; then
-    rsync -a _sources/ "kc2admin@localhost:/tmp/_sources/"
-    ssh kc2admin@localhost 'sudo rm -rf /opt/konductor/src/_sources && sudo mv /tmp/_sources /opt/konductor/src/_sources'
+    rsync -e "ssh $SSH_OPTS" -a _sources/ "kc2admin@localhost:/tmp/_sources/"
+    ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /opt/konductor/src/_sources && sudo mv /tmp/_sources /opt/konductor/src/_sources'
 fi
 
 # Verify clean state
-DIRTY=$(ssh kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
+DIRTY=$(ssh $SSH_OPTS kc2admin@localhost 'cd /opt/konductor/src && git status --porcelain' || true)
 if [ -n "$DIRTY" ]; then
     echo "WARNING: Tree is dirty after sync"
     echo "$DIRTY"
 fi
 
-ssh kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
+ssh $SSH_OPTS kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
 rm -f "/tmp/${BUNDLE}"
 
 echo "✓ /opt/konductor/${BUNDLE} (bundle)"
@@ -913,27 +963,32 @@ This ensures:
 - All nix store paths are pre-cached for airgap use
 - The VM can reproduce itself from /opt/konductor/src
 
-```sh {"name":"_oci:vm:rebuild","tag":"duration:slow"}
+```bash {"name":"_oci:vm:rebuild","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
+
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 # Generate --override-input flags from _sources/ contents (offline builds)
 # This redirects github inputs in flake.nix to local vendored paths
 OVERRIDE_INPUTS=""
-if ssh kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
+if ssh $SSH_OPTS kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
     echo "Using vendored inputs from _sources/ for offline build..."
-    OVERRIDE_INPUTS=$(ssh kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:./_sources/$input"; done')
+    OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:./_sources/$input"; done')
 fi
 
 # Rebuild NixOS from the synced flake
 # path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures
-# This ensures `nix develop` works offline
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.default' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
-ssh kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1 || true"
+# This ensures `nix develop` works offline - failures here break offline support
+echo "Caching devshells for offline use..."
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.default' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.default failed"; exit 1; }
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.full failed"; exit 1; }
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache nix build --no-link 'path:.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.konductor failed"; exit 1; }
+echo "✓ Devshells cached"
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
@@ -944,12 +999,15 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 Run PKI tests inside VM.
 
-```sh {"name":"_oci:vm:pki:test"}
+```bash {"name":"_oci:vm:pki:test"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
 echo "Running PKI tests inside VM..."
-ssh -o ConnectTimeout=10 kc2admin@localhost \
+ssh $SSH_OPTS kc2admin@localhost \
   'cd /opt/konductor/src/src && python3 -m pytest pki/ -v --tb=short --override-ini cache_dir=/tmp/pytest-cache 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 echo "PKI tests complete"
@@ -961,12 +1019,15 @@ echo "PKI tests complete"
 
 Display PKI certificate status.
 
-```sh {"name":"_oci:vm:pki:status"}
+```bash {"name":"_oci:vm:pki:status"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
 echo "PKI certificate status:"
-ssh -o ConnectTimeout=10 kc2admin@localhost \
+ssh $SSH_OPTS kc2admin@localhost \
   'PYTHONPATH=/opt/konductor/src/src python3 -m pki status 2>&1' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
@@ -976,39 +1037,54 @@ ssh -o ConnectTimeout=10 kc2admin@localhost \
 
 Write `/.konductor` inside VM.
 
-```sh {"name":"_oci:vm:provenance"}
+```bash {"name":"_oci:vm:provenance"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -euo pipefail
 
-# Gather provenance
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+# Gather provenance - ORPHANED for missing git remote, FAIL HARD for broken tools
 GIT_COMMIT=$(git rev-parse HEAD) || { echo "✗ git rev-parse HEAD failed"; exit 1; }
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) || { echo "✗ git rev-parse --abbrev-ref HEAD failed"; exit 1; }
-GIT_REMOTE=$(git remote get-url origin 2>/dev/null) || GIT_REMOTE="local"
-NIX_VERSION=$(nix --version 2>/dev/null | head -1) || NIX_VERSION="unknown"
-NIX_HASH=$(nix flake metadata --json 2>/dev/null | jq -r '.locked.narHash // "unknown"') || NIX_HASH="unknown"
-NIX_DRV=$(cat .nix_drv 2>/dev/null) || NIX_DRV="unknown"
-FLAKE_LOCK_SHA=$(sha256sum flake.lock 2>/dev/null | cut -d' ' -f1) || FLAKE_LOCK_SHA="unknown"
-GIT_DIRTY=$(git status --porcelain | wc -l | tr -d ' ') || GIT_DIRTY="0"
+GIT_REMOTE=$(git remote get-url origin 2>/dev/null) || { echo "⚠ ORPHANED: no git remote origin"; GIT_REMOTE="ORPHANED"; }
+GIT_DIRTY=$(git status --porcelain | wc -l | tr -d ' ')
+
+# Nix provenance - MUST work or build is broken (stderr goes to log, stdout is JSON)
+NIX_VERSION=$(nix --version | head -1) || { echo "✗ nix --version failed"; exit 1; }
+NIX_META=$(nix flake metadata --json) || { echo "✗ nix flake metadata --json failed"; exit 1; }
+NIX_HASH=$(echo "$NIX_META" | jq -r '.locked.narHash') || { echo "✗ jq parse of flake metadata failed"; exit 1; }
+[ -n "$NIX_HASH" ] && [ "$NIX_HASH" != "null" ] || { echo "✗ narHash not found in flake metadata"; exit 1; }
+
+# Build artifacts - MUST exist from prior phases
+NIX_DRV=$(cat .nix_drv) || { echo "✗ .nix_drv not found (did _oci:nix run?)"; exit 1; }
+FLAKE_LOCK_SHA=$(sha256sum flake.lock | cut -d' ' -f1) || { echo "✗ sha256sum flake.lock failed"; exit 1; }
+
+# Build environment - MUST be available
 BUILD_DATE=$(date -Iseconds) || { echo "✗ date failed"; exit 1; }
 BUILD_HOST=$(hostname) || { echo "✗ hostname failed"; exit 1; }
 BUILD_USER="${USER:?✗ USER not set}"
-QEMU_VER=$(qemu-system-x86_64 --version 2>/dev/null | head -1 | sed 's/QEMU emulator version //') || QEMU_VER="unknown"
+QEMU_VER=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //') || { echo "✗ qemu-system-x86_64 --version failed"; exit 1; }
 
-# Build host hardware identity
+# Build host hardware identity - empty if inaccessible (VM/container builds)
 BUILD_HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || BUILD_HW_VENDOR=""
 BUILD_HW_PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || BUILD_HW_PRODUCT=""
 BUILD_HW_SERIAL=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || BUILD_HW_SERIAL=""
 
 OCI_IMAGE="${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-braincraft/konductor}"
 
-# Build tag list for provenance
+# Build tag list for provenance - full hashes, dirty indicator when tree is dirty
 OCI_TAGS="[\"${OCI_TAG:-latest-qcow2}\""
-[ "$GIT_DIRTY" = "0" ] && OCI_TAGS+=", \"qcow2-${GIT_COMMIT:0:12}\""
-OCI_TAGS+=", \"qcow2-${NIX_DRV:0:12}\""
+if [ "$GIT_DIRTY" = "0" ]; then
+    OCI_TAGS+=", \"qcow2-${GIT_COMMIT}\""
+else
+    OCI_TAGS+=", \"qcow2-dirty\""
+fi
+OCI_TAGS+=", \"qcow2-${NIX_DRV}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM
-ssh kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
+ssh $SSH_OPTS kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
 [konductor]
 git_commit = "$GIT_COMMIT"
 git_branch = "$GIT_BRANCH"
@@ -1029,18 +1105,18 @@ strict = ${KONDUCTOR_STRICT:-false}
 oci_image = "$OCI_IMAGE"
 oci_tags = $OCI_TAGS
 EOF
-ssh kc2admin@localhost 'sudo chmod 644 /.konductor'
+ssh $SSH_OPTS kc2admin@localhost 'sudo chmod 644 /.konductor'
 
 # Regenerate PKI certs with provenance
-ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
-ssh kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
-ssh kc2admin@localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+ssh $SSH_OPTS kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
+ssh $SSH_OPTS kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
+ssh $SSH_OPTS kc2admin@localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Copy to host
-ssh kc2admin@localhost 'cat /.konductor' > .konductor
+ssh $SSH_OPTS kc2admin@localhost 'cat /.konductor' > .konductor
 
-# Display system state
-ssh kc2admin@localhost 'ff 2>/dev/null || fastfetch 2>/dev/null || true'
+# Display system state - ff MUST exist in Konductor
+ssh $SSH_OPTS kc2admin@localhost 'ff' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
 ---
@@ -1049,12 +1125,14 @@ ssh kc2admin@localhost 'ff 2>/dev/null || fastfetch 2>/dev/null || true'
 
 Garbage collect.
 
-```sh {"name":"_oci:vm:gc"}
+```bash {"name":"_oci:vm:gc"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
-ssh kc2admin@localhost 'sudo nix-collect-garbage -d'
-ssh kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
-ssh kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d'
+ssh $SSH_OPTS kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
+ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
 
 ---
@@ -1063,9 +1141,11 @@ ssh kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null 
 
 Zero free space.
 
-```sh {"name":"_oci:vm:zero","tag":"duration:slow"}
+```bash {"name":"_oci:vm:zero","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-ssh kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+ssh $SSH_OPTS kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true; sudo rm -f /zero && sync'
 ```
 
 ---
@@ -1074,13 +1154,16 @@ ssh kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/null || true;
 
 Shutdown VM.
 
-```sh {"name":"_oci:vm:halt"}
+```bash {"name":"_oci:vm:halt"}
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 [ -f "$PIDFILE" ] || exit 0
 
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
+
 PID=$(cat "$PIDFILE")
 if kill -0 "$PID" 2>/dev/null; then
-    ssh kc2admin@localhost 'sudo poweroff' 2>/dev/null || true
+    ssh $SSH_OPTS kc2admin@localhost 'sudo poweroff' 2>/dev/null || true
     sleep 5
     kill "$PID" 2>/dev/null || true
 fi
@@ -1093,7 +1176,7 @@ rm -f "$PIDFILE"
 
 Clean credentials from image.
 
-```sh {"name":"_oci:img:clean","tag":"requires:guestfs"}
+```bash {"name":"_oci:img:clean","tag":"requires:guestfs"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 export LIBGUESTFS_BACKEND=direct
@@ -1118,28 +1201,39 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ### \_oci:img:compress
 
-ZSTD compress.
+ZSTD compress and sparsify image.
 
-```sh {"name":"_oci:img:compress","tag":"duration:slow"}
+Note: SKIP_COMPRESS=true produces a larger, uncompressed image (faster builds, larger output).
+
+```bash {"name":"_oci:img:compress","tag":"duration:slow"}
 set -e
+
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
+    echo "SKIP_COMPRESS: copying uncompressed image..."
     cp result/nixos.qcow2 konductor.qcow2
-    exit 0
+else
+    echo "Compressing with qemu-img (zstd)..."
+    qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
 fi
-qemu-img convert -c -p -m "$(nproc)" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
 ```
 
 ---
 
 ### \_oci:img:sparsify
 
-Sparsify image.
+Sparsify image (skipped if SKIP_COMPRESS=true).
 
-```sh {"name":"_oci:img:sparsify","tag":"duration:slow,requires:guestfs"}
+```bash {"name":"_oci:img:sparsify","tag":"duration:slow,requires:guestfs"}
 set -e
+
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
+    echo "SKIP_COMPRESS: skipping sparsify (image already final)"
     exit 0
 fi
+
+[ -f konductor.qcow2.tmp ] || { echo "Error: konductor.qcow2.tmp not found (compress phase failed?)"; exit 1; }
+
+echo "Sparsifying with virt-sparsify..."
 export LIBGUESTFS_BACKEND=direct
 sudo -E virt-sparsify --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
 rm -f konductor.qcow2.tmp
@@ -1151,7 +1245,7 @@ rm -f konductor.qcow2.tmp
 
 Remove temporary files.
 
-```sh {"name":"_oci:tmp:clean"}
+```bash {"name":"_oci:tmp:clean"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 rm -f .nix_drv .system-toplevel
 ```
@@ -1162,7 +1256,7 @@ rm -f .nix_drv .system-toplevel
 
 Append post-seal fields to .konductor.
 
-```sh {"name":"_oci:verify","tag":"type:readonly"}
+```bash {"name":"_oci:verify","tag":"type:readonly"}
 set -e
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
@@ -1185,8 +1279,8 @@ cat .konductor
 
 View boot log.
 
-```sh {"name":"oci:debug:log","excludeFromRunAll":"true","tag":"type:debug"}
-tail -100 "${QCOW2_LOGFILE:-build-vm.log}"
+```bash {"name":"oci:debug:log","excludeFromRunAll":"true","tag":"type:debug"}
+bat "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
 ---
@@ -1195,7 +1289,7 @@ tail -100 "${QCOW2_LOGFILE:-build-vm.log}"
 
 Force kill VM.
 
-```sh {"name":"oci:vm:kill","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"oci:vm:kill","excludeFromRunAll":"true","tag":"type:destructive"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 ```
