@@ -82,7 +82,11 @@ def _validate_provenance(fp: Fingerprint) -> None:
 
 
 def cmd_generate(args: list[str]) -> int:
-    """Generate self-signed CA and wildcard certificate.
+    """Generate CA and wildcard certificate with automatic trust tier detection.
+
+    Trust tier selection (automatic):
+    1. If hypervisor CA+key available at /mnt/pki/: cross-sign with hypervisor CA
+    2. Otherwise: self-sign (with loud warnings)
 
     Idempotent: skips if /etc/konductor/pki/vm/ca.crt already exists
     unless --force is passed.
@@ -112,7 +116,41 @@ def cmd_generate(args: list[str]) -> int:
     # Validate baked provenance against source tree
     _validate_provenance(identity.fingerprint)
 
-    trust_tier = TrustTier.SELF_SIGNED
+    # Detect hypervisor CA availability for cross-signing
+    hypervisor_ca_available = (
+        config.HYPERVISOR_MOUNT_CA.exists() and
+        config.HYPERVISOR_MOUNT_KEY.exists()
+    )
+    hypervisor_ca_cert = None
+    hypervisor_ca_key = None
+
+    if hypervisor_ca_available:
+        try:
+            hypervisor_ca_cert = x509.load_pem_x509_certificate(
+                config.HYPERVISOR_MOUNT_CA.read_bytes()
+            )
+            hypervisor_ca_key = load_private_key(config.HYPERVISOR_MOUNT_KEY)
+            trust_tier = TrustTier.HYPERVISOR
+        except Exception as exc:
+            # Cross-signing failed, fall back to self-signed
+            _warn_degraded_pki(
+                f"Hypervisor CA loading failed: {exc}",
+                "Falling back to SELF-SIGNED certificates",
+            )
+            hypervisor_ca_available = False
+            trust_tier = TrustTier.SELF_SIGNED
+    else:
+        trust_tier = TrustTier.SELF_SIGNED
+        # Warn about missing hypervisor CA
+        missing = []
+        if not config.HYPERVISOR_MOUNT_CA.exists():
+            missing.append(str(config.HYPERVISOR_MOUNT_CA))
+        if not config.HYPERVISOR_MOUNT_KEY.exists():
+            missing.append(str(config.HYPERVISOR_MOUNT_KEY))
+        _warn_degraded_pki(
+            f"Hypervisor CA not available: {', '.join(missing)}",
+            "Generating SELF-SIGNED certificates (Envoy Gateway will NOT trust these)",
+        )
 
     print(
         "═══════════════════════════════════════════════════════════════"
@@ -128,8 +166,13 @@ def cmd_generate(args: list[str]) -> int:
         err("These certs have NO provenance chain and CANNOT be audited")
         err("Run the build pipeline to write /.konductor and regenerate")
         print()
+    elif trust_tier == TrustTier.HYPERVISOR:
+        print("  Konductor PKI -- Hypervisor Cross-Signed Certificate Generation")
+        print(
+            "═══════════════════════════════════════════════════════════════"
+        )
     else:
-        print("  Konductor PKI -- Self-Signed Certificate Generation")
+        print("  ⚠ Konductor PKI -- Self-Signed Certificate Generation (DEGRADED)")
         print(
             "═══════════════════════════════════════════════════════════════"
         )
@@ -147,23 +190,66 @@ def cmd_generate(args: list[str]) -> int:
     # Ensure directories
     ensure_dir(config.PKI_VM_DIR, config.MODE_DIRECTORY)
 
-    # 1. CA key (P-384)
-    action("Generating CA key (P-384)")
-    ca_key = generate_ca_key()
-    write_private_key(config.VM_CA_KEY, ca_key, config.MODE_PRIVATE_KEY)
-    ok(f"CA key: {config.VM_CA_KEY}")
+    if hypervisor_ca_available and hypervisor_ca_cert and hypervisor_ca_key:
+        # Cross-sign path: use hypervisor CA to sign VM CA
+        action("Using hypervisor CA for cross-signing")
 
-    # 2. CA certificate
-    action("Building CA certificate")
-    ca_cert = build_ca_certificate(
-        ca_key, identity, trust_tier, validity_days=ca_days
-    )
-    atomic_write(
-        config.VM_CA_CERT,
-        ca_cert.public_bytes(Encoding.PEM),
-        config.MODE_CERTIFICATE,
-    )
-    ok(f"CA cert: {config.VM_CA_CERT}")
+        # Import hypervisor CA to standard location
+        ensure_dir(config.PKI_HYPERVISOR_DIR, config.MODE_PRIVATE_DIR)
+        atomic_write(
+            config.HYPERVISOR_CA_CERT,
+            config.HYPERVISOR_MOUNT_CA.read_bytes(),
+            config.MODE_CERTIFICATE,
+        )
+        atomic_write(
+            config.HYPERVISOR_CA_KEY,
+            config.HYPERVISOR_MOUNT_KEY.read_bytes(),
+            config.MODE_PRIVATE_KEY,
+        )
+        ok(f"Hypervisor CA imported: {config.HYPERVISOR_CA_CERT}")
+
+        # 1. Generate VM CA key
+        action("Generating VM CA key (P-384)")
+        ca_key = generate_ca_key()
+        write_private_key(config.VM_CA_KEY, ca_key, config.MODE_PRIVATE_KEY)
+        ok(f"VM CA key: {config.VM_CA_KEY}")
+
+        # 2. Build VM CA cert signed by hypervisor CA (intermediate CA)
+        action("Building VM CA certificate (signed by hypervisor)")
+        ca_cert = _build_cross_signed_ca(
+            ca_key, hypervisor_ca_key, hypervisor_ca_cert,
+            identity, trust_tier, validity_days=ca_days
+        )
+        atomic_write(
+            config.VM_CA_CERT,
+            ca_cert.public_bytes(Encoding.PEM),
+            config.MODE_CERTIFICATE,
+        )
+        ok(f"VM CA cert (hypervisor-signed): {config.VM_CA_CERT}")
+
+        # Use VM CA to sign wildcard (not hypervisor CA directly)
+        signing_key = ca_key
+        signing_cert = ca_cert
+    else:
+        # Self-sign path
+        action("Generating CA key (P-384)")
+        ca_key = generate_ca_key()
+        write_private_key(config.VM_CA_KEY, ca_key, config.MODE_PRIVATE_KEY)
+        ok(f"CA key: {config.VM_CA_KEY}")
+
+        action("Building CA certificate (self-signed)")
+        ca_cert = build_ca_certificate(
+            ca_key, identity, trust_tier, validity_days=ca_days
+        )
+        atomic_write(
+            config.VM_CA_CERT,
+            ca_cert.public_bytes(Encoding.PEM),
+            config.MODE_CERTIFICATE,
+        )
+        ok(f"CA cert: {config.VM_CA_CERT}")
+
+        signing_key = ca_key
+        signing_cert = ca_cert
 
     # 3. Wildcard key (P-256)
     action("Generating wildcard key (P-256)")
@@ -171,10 +257,10 @@ def cmd_generate(args: list[str]) -> int:
     write_private_key(config.VM_WILDCARD_KEY, leaf_key, config.MODE_SERVICE_KEY)
     ok(f"Wildcard key: {config.VM_WILDCARD_KEY}")
 
-    # 4. Wildcard certificate
+    # 4. Wildcard certificate (signed by VM CA)
     action("Building wildcard certificate")
     leaf_cert = build_leaf_certificate(
-        leaf_key, ca_key, ca_cert, identity, trust_tier, validity_days=cert_days
+        leaf_key, signing_key, signing_cert, identity, trust_tier, validity_days=cert_days
     )
     atomic_write(
         config.VM_WILDCARD_CERT,
@@ -187,9 +273,134 @@ def cmd_generate(args: list[str]) -> int:
     _print_cert_summary("CA", ca_cert)
     _print_cert_summary("Wildcard", leaf_cert)
 
+    # Final warning if degraded
+    if trust_tier == TrustTier.SELF_SIGNED:
+        print()
+        _warn_degraded_pki(
+            "PKI is SELF-SIGNED (degraded mode)",
+            "Services will NOT be accessible via Envoy Gateway until hypervisor CA is mounted",
+        )
+
     print()
     ok("PKI generation complete")
     return 0
+
+
+def _warn_degraded_pki(reason: str, consequence: str) -> None:
+    """Emit loud warnings to stdout, stderr, and console for degraded PKI."""
+    warning_block = f"""
+════════════════════════════════════════════════════════════════════════════════
+  ⚠⚠⚠  DEGRADED PKI WARNING  ⚠⚠⚠
+════════════════════════════════════════════════════════════════════════════════
+  Reason: {reason}
+  Impact: {consequence}
+════════════════════════════════════════════════════════════════════════════════
+"""
+    # stdout
+    print(warning_block)
+    # stderr (for log aggregators)
+    print(warning_block, file=sys.stderr)
+    # Try to write to console devices for boot-time visibility
+    for console in ["/dev/console", "/dev/ttyS0", "/dev/tty0"]:
+        try:
+            with open(console, "w") as f:
+                f.write(warning_block)
+        except (OSError, PermissionError):
+            pass  # Not available or no permission
+
+
+def _build_cross_signed_ca(
+    ca_key,
+    issuer_key,
+    issuer_cert: x509.Certificate,
+    identity: CertificateIdentity,
+    trust_tier: TrustTier,
+    validity_days: int = 3650,
+) -> x509.Certificate:
+    """Build VM CA certificate signed by hypervisor CA (intermediate CA).
+
+    Creates a valid intermediate CA that:
+    - Is signed by the hypervisor/platform CA
+    - Can sign leaf certificates (wildcard)
+    - Includes Authority Key Identifier linking to issuer
+    - Has pathLenConstraint=0 (can only sign end-entity certs)
+    """
+    import datetime
+    from cryptography.hazmat.primitives import hashes
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    subject = x509.Name([
+        x509.NameAttribute(x509.oid.NameOID.ORGANIZATION_NAME, identity.organization),
+        x509.NameAttribute(
+            x509.oid.NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit
+        ),
+        x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, identity.ca_common_name),
+        x509.NameAttribute(x509.oid.NameOID.SERIAL_NUMBER, identity.serial_hex),
+    ])
+
+    # Issuer is the hypervisor CA's subject
+    issuer = issuer_cert.subject
+
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(ca_key.public_key())
+        .serial_number(identity.deterministic_serial("ca"))
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=validity_days))
+        # CA:TRUE with pathLenConstraint=0 (can only sign leaf certs)
+        .add_extension(
+            x509.BasicConstraints(ca=True, path_length=0),
+            critical=True,
+        )
+        # Key usage for CA operations
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_cert_sign=True,
+                crl_sign=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        # Subject Key Identifier
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
+            critical=False,
+        )
+        # Authority Key Identifier (links to issuer)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                issuer_cert.public_key()
+            ),
+            critical=False,
+        )
+    )
+
+    # nsComment
+    from pki.crypto.extensions import build_provenance_extensions, der_ia5string
+    ns_comment = identity.ns_comment("Intermediate CA", trust_tier)
+    builder = builder.add_extension(
+        x509.UnrecognizedExtension(
+            oid=x509.ObjectIdentifier(config.NS_COMMENT_OID),
+            value=der_ia5string(ns_comment),
+        ),
+        critical=False,
+    )
+
+    # Custom OID provenance extensions
+    for ext in build_provenance_extensions(identity, trust_tier):
+        builder = builder.add_extension(ext.value, critical=False)
+
+    # Sign with issuer's key (hypervisor CA)
+    return builder.sign(issuer_key, hashes.SHA384())
 
 
 # =====================================================================

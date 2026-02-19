@@ -52,8 +52,9 @@ SOURCE_TREE = Path("/opt/konductor/src")
 OS_RELEASE_PATH = Path("/etc/os-release")
 
 # Hypervisor mount points (KubeVirt volume via konductor-mount@ template)
+# Infrastructure copies cert-manager secret keys: ca.crt, ca.key (not tls.key)
 HYPERVISOR_MOUNT_CA = Path("/mnt/pki/ca.crt")
-HYPERVISOR_MOUNT_KEY = Path("/mnt/pki/tls.key")
+HYPERVISOR_MOUNT_KEY = Path("/mnt/pki/ca.key")
 
 
 # =====================================================================
