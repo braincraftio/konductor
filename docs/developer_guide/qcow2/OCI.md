@@ -230,6 +230,7 @@ BASE_TAG="${OCI_TAG:-latest-qcow2}"
 git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
 git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
 nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
+flake_lock_sha=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' .konductor)
 
 # Build tag list - full hashes, dirty indicator when tree is dirty
 TAGS=("$BASE_TAG")
@@ -240,6 +241,9 @@ else
 fi
 if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
     TAGS+=("qcow2-${nix_drv}")
+fi
+if [ -n "$flake_lock_sha" ] && [ "$flake_lock_sha" != "unknown" ]; then
+    TAGS+=("qcow2-flake-${flake_lock_sha}")
 fi
 
 FULL_IMAGE="$REGISTRY/$IMAGE:$BASE_TAG"
@@ -933,11 +937,7 @@ qemu-system-x86_64 \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
     -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
     -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
-<<<<<<< HEAD
-    -netdev user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
-=======
-    -netdev user,id=net0,restrict=off,hostfwd=tcp::${QCOW2_SSH_PORT:-2222}-:22,hostfwd=tcp::8080-:8080,hostfwd=tcp::7681-:7681 \
->>>>>>> 215de1a (fix(qcow2): revert to user mode networking until passt available in image)
+    -netdev user,id=net0,restrict=off,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
@@ -962,28 +962,24 @@ Wait for SSH.
 
 ```bash {"name":"_oci:vm:wait","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-<<<<<<< HEAD
-SSH_PORT="${QCOW2_SSH_PORT:-2222}"
-timeout "${QCOW2_SSH_TIMEOUT:-300}" bash -c "until ssh -p $SSH_PORT -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost true 2>/dev/null; do sleep 3; done" \
-    || { echo "SSH timeout after ${QCOW2_SSH_TIMEOUT:-300}s on port $SSH_PORT"; exit 1; }
-=======
 
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 TIMEOUT="${QCOW2_SSH_TIMEOUT:-300}"
 START_TIME=$(date +%s)
 RETRY_COUNT=0
 
-echo "Waiting for SSH (timeout: ${TIMEOUT}s)..."
+echo "Waiting for SSH on port $SSH_PORT (timeout: ${TIMEOUT}s)..."
 echo "Start time: $(date '+%Y-%m-%d %H:%M:%S')"
 
 while true; do
-    if ssh kc2admin@localhost true 2>/dev/null; then
+    if ssh -p $SSH_PORT -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost true 2>/dev/null; then
         echo "SSH connection successful after ${RETRY_COUNT} retries ($(( $(date +%s) - START_TIME ))s elapsed)"
         break
     fi
 
     ELAPSED=$(( $(date +%s) - START_TIME ))
     if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-        echo "SSH timeout after ${TIMEOUT}s (${RETRY_COUNT} retries)"
+        echo "SSH timeout after ${TIMEOUT}s (${RETRY_COUNT} retries) on port $SSH_PORT"
         exit 1
     fi
 
@@ -991,7 +987,6 @@ while true; do
     echo "  Retry ${RETRY_COUNT}: SSH not ready yet (${ELAPSED}s elapsed, $(( TIMEOUT - ELAPSED ))s remaining)"
     sleep 3
 done
->>>>>>> eb78444 (fix(cloud-init): quote runcmd shell commands with colons for YAML parsing)
 ```
 
 ---
@@ -1181,6 +1176,7 @@ else
     OCI_TAGS+=", \"qcow2-dirty\""
 fi
 OCI_TAGS+=", \"qcow2-${NIX_DRV}\""
+[ -n "$FLAKE_LOCK_SHA" ] && [ "$FLAKE_LOCK_SHA" != "unknown" ] && OCI_TAGS+=", \"qcow2-flake-${FLAKE_LOCK_SHA}\""
 OCI_TAGS+="]"
 
 # Write /.konductor inside VM
