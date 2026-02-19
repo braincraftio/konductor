@@ -63,11 +63,12 @@ in
 pkgs.symlinkJoin {
   name = "pulumi-with-python";
   paths = [
-    pulumiWrapper # Wrapped pulumi CLI
+    pulumiWrapper # Wrapped pulumi CLI (uses pythonWithPulumi via PULUMI_PYTHON_CMD)
     pkgs.pulumi # Original pulumi (for other binaries)
     pkgs.pulumictl # Pulumi utilities
     pkgs.pulumiPackages.pulumi-python # Python language plugin
-    pythonWithPulumi # Python environment
+    # Note: pythonWithPulumi is NOT in paths to avoid shadowing system Python
+    # The wrapper script sets PULUMI_PYTHON_CMD to use it for pulumi operations only
   ];
   meta = with pkgs.lib; {
     description = "Pulumi IaC with NixOS-native Python environment";
