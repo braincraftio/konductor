@@ -40,7 +40,7 @@ let
       # pulumi-gcp
 
       # Dependencies with native extensions (ensure proper linking)
-      grpc # C++ extension - primary issue
+      grpcio # C++ extension - primary issue
       grpcio-tools
       protobuf
 
