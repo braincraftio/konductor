@@ -923,6 +923,8 @@ TOTAL_CPUS=$(nproc)
 VM_CPUS=$((TOTAL_CPUS - 2))
 [ "$VM_CPUS" -lt 2 ] && VM_CPUS=2
 
+echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
+
 # TODO: Switch to passt networking once the image includes it (konductor.nix has passt added)
 # passt provides better performance and modern rootless networking vs QEMU user mode
 # For now using user mode (restrict=off) since host VM doesn't have passt until next rebuild

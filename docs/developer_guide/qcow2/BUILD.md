@@ -1611,11 +1611,18 @@ ss -tlnp 2>/dev/null | awk -v p=":${QCOW2_SSH_PORT:-2222} " '$0 ~ p {exit 0} END
 CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
+# Calculate CPUs: all cores minus 2, minimum 2
+TOTAL_CPUS=$(nproc)
+VM_CPUS=$((TOTAL_CPUS - 2))
+[ "$VM_CPUS" -lt 2 ] && VM_CPUS=2
+
+echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
+
 qemu-system-x86_64 \
     -machine q35,accel=kvm,mem-merge=on \
     -m "${QCOW2_VM_MEMORY:-4096}" \
     -cpu host \
-    -smp "${QCOW2_VM_CPUS:-4}" \
+    -smp "${QCOW2_VM_CPUS:-$VM_CPUS}" \
     -rtc base=utc,clock=host \
     -boot order=c,menu=off \
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
