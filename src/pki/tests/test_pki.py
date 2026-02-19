@@ -670,7 +670,7 @@ class TestPKIStatus:
         monkeypatch.setattr(cfg, "VM_WILDCARD_CERT", vm_dir / "wildcard.crt")
         monkeypatch.setattr(cfg, "VM_WILDCARD_KEY", vm_dir / "wildcard.key")
         monkeypatch.setattr(cfg, "HYPERVISOR_CA_CERT", hyp_dir / "ca.crt")
-        monkeypatch.setattr(cfg, "HYPERVISOR_CA_KEY", hyp_dir / "ca.key")
+        monkeypatch.setattr(cfg, "HYPERVISOR_CA_KEY", hyp_dir / "tls.key")
         monkeypatch.setattr(cfg, "CA_BUNDLE", bundle_path)
         monkeypatch.setattr(cfg, "CLUSTER_CA", tmp_path / "cluster-ca.crt")
         monkeypatch.setattr(cfg, "HYPERVISOR_MOUNT_CA", tmp_path / "mnt-ca.crt")
