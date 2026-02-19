@@ -19,7 +19,7 @@
 #   │   └── wildcard.key    # Wildcard private key
 #   ├── hypervisor/         # Mounted from parent (optional)
 #   │   ├── ca.crt          # Parent cluster CA certificate
-#   │   └── ca.key          # Parent cluster CA key (optional)
+#   │   └── tls.key         # Parent cluster CA key (optional, cert-manager naming)
 #   └── bundle/
 #       └── ca-bundle.crt   # Combined: system + vm + hypervisor CAs
 #
@@ -184,7 +184,7 @@ in {
 
         # Only run if hypervisor CA key is mounted
         unitConfig = {
-          ConditionPathExists = "/mnt/pki/ca.key";
+          ConditionPathExists = "/mnt/pki/tls.key";
         };
 
         serviceConfig = {
@@ -200,7 +200,7 @@ in {
             PKI_ROOT="/etc/konductor/pki"
 
             # Verify hypervisor CA is available
-            if [ ! -f /mnt/pki/ca.key ] || [ ! -f /mnt/pki/ca.crt ]; then
+            if [ ! -f /mnt/pki/tls.key ] || [ ! -f /mnt/pki/ca.crt ]; then
               echo "✗ Hypervisor CA not available - skipping Tier 2"
               exit 0
             fi
@@ -230,7 +230,7 @@ in {
             ${pkgs.openssl}/bin/openssl x509 -req \
               -in /tmp/wildcard.csr \
               -CA /mnt/pki/ca.crt \
-              -CAkey /mnt/pki/ca.key \
+              -CAkey /mnt/pki/tls.key \
               -out "$PKI_ROOT/signed/wildcard.crt" \
               -days ${toString cfg.certValidityDays} \
               -sha256 \
