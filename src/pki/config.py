@@ -29,8 +29,9 @@ VM_WILDCARD_CERT = PKI_VM_DIR / "wildcard.crt"
 VM_WILDCARD_KEY = PKI_VM_DIR / "wildcard.key"
 
 # Hypervisor CA (imported from mount or cloud-init)
+# Uses cert-manager naming convention consistently
 HYPERVISOR_CA_CERT = PKI_HYPERVISOR_DIR / "ca.crt"
-HYPERVISOR_CA_KEY = PKI_HYPERVISOR_DIR / "ca.key"
+HYPERVISOR_CA_KEY = PKI_HYPERVISOR_DIR / "tls.key"
 
 # CA Bundle -- THE canonical path. No legacy alternatives.
 # All consumers (forgejo-runner, profile scripts, etc.) must use this path.
