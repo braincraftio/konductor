@@ -378,6 +378,100 @@ in {
           '';
         };
       };
+
+      # =====================================================================
+      # System Trust Installation
+      # =====================================================================
+      # Installs hypervisor CA to system trust store for Docker, Git, etc.
+      # Runs after bundle generation to ensure trust bundle is ready.
+      konductor-pki-trust = {
+        description = "Install Konductor CA to system trust store";
+        after = [ "konductor-pki-bundle.service" ];
+        wants = [ "konductor-pki-bundle.service" ];
+        wantedBy = [ "multi-user.target" ];
+
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          Environment = [
+            "PYTHONPATH=/opt/konductor/src/src"
+          ];
+          ExecStart = pkgs.writeShellScript "install-system-trust" ''
+            set -euo pipefail
+
+            echo "Installing hypervisor CA to system trust via python3 -m pki trust"
+
+            ${pythonPki} -m pki trust
+
+            echo "System trust installation complete"
+          '';
+        };
+      };
+
+      # =====================================================================
+      # PKI Refresh Service
+      # =====================================================================
+      # Triggered by path watcher when /mnt/pki certificates change.
+      # Regenerates all PKI and reloads dependent services.
+      konductor-pki-refresh = {
+        description = "Refresh Konductor PKI after certificate rotation";
+
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = pkgs.writeShellScript "refresh-pki" ''
+            set -euo pipefail
+
+            echo "=========================================="
+            echo "PKI Refresh: Certificate rotation detected"
+            echo "=========================================="
+
+            # Re-import hypervisor CA
+            echo "→ Restarting konductor-pki-hypervisor.service"
+            systemctl restart konductor-pki-hypervisor.service || true
+
+            # Re-sign wildcard cert
+            echo "→ Restarting konductor-pki-signed.service"
+            systemctl restart konductor-pki-signed.service || true
+
+            # Rebuild trust bundle
+            echo "→ Restarting konductor-pki-bundle.service"
+            systemctl restart konductor-pki-bundle.service || true
+
+            # Re-install system trust
+            echo "→ Restarting konductor-pki-trust.service"
+            systemctl restart konductor-pki-trust.service || true
+
+            # Reload services using certificates
+            echo "→ Reloading Docker daemon"
+            systemctl reload-or-restart docker.service || true
+
+            # Note: vscode/ttyd/restty services handle SIGHUP for cert reload
+            echo "→ Reloading user services"
+            systemctl reload-or-restart 'konductor-vscode@*.service' || true
+            systemctl reload-or-restart 'konductor-ttyd@*.service' || true
+            systemctl reload-or-restart 'konductor-restty@*.service' || true
+
+            echo "=========================================="
+            echo "PKI Refresh complete"
+            echo "=========================================="
+          '';
+          StandardOutput = "journal";
+          StandardError = "journal";
+        };
+      };
+    };
+
+    # Systemd path watcher for certificate rotation
+    systemd.paths.konductor-pki-trust = lib.mkIf (cfg.hypervisorCaPath != null) {
+      description = "Watch for PKI changes at mount point";
+      wantedBy = [ "multi-user.target" ];
+
+      pathConfig = {
+        PathChanged = [
+          (toString cfg.hypervisorCaPath)
+        ] ++ lib.optional (cfg.hypervisorKeyPath != null) (toString cfg.hypervisorKeyPath);
+        Unit = "konductor-pki-refresh.service";
+      };
     };
 
     # Environment variables pointing to PKI paths

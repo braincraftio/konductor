@@ -519,6 +519,283 @@ def cmd_bundle(args: list[str]) -> int:
 
 
 # =====================================================================
+# trust -- Install CA to system trust store
+# =====================================================================
+
+
+def cmd_trust(args: list[str]) -> int:
+    """Install hypervisor CA to system trust store.
+
+    Usage:
+        pki trust                              Install hypervisor CA (default)
+        pki trust --ca <path>                  Install specific CA file
+        pki trust --docker-registry <domain>   Configure Docker trust for registry (repeatable)
+        pki trust --remove                     Remove CA from system trust
+        pki trust --status                     Check trust status
+    """
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+    print("  Konductor PKI -- System Trust Management")
+    print(
+        "═══════════════════════════════════════════════════════════════"
+    )
+
+    # Parse arguments
+    ca_path = Path(_extract_flag(args, "--ca") or str(config.HYPERVISOR_CA_CERT))
+    remove = "--remove" in args
+    status = "--status" in args
+
+    # Extract all --docker-registry values
+    docker_registries = []
+    remaining_args = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--docker-registry" and i + 1 < len(args):
+            docker_registries.append(args[i + 1])
+            i += 2
+        else:
+            remaining_args.append(args[i])
+            i += 1
+
+    if status:
+        return _trust_status(docker_registries or None)
+
+    if remove:
+        return _trust_remove()
+
+    return _trust_install(ca_path, docker_registries)
+
+
+def _trust_status(docker_registries: list[str] | None = None) -> int:
+    """Check if hypervisor CA is trusted."""
+    import subprocess
+
+    bundle_path = config.CA_BUNDLE
+    hypervisor_ca_path = config.HYPERVISOR_CA_CERT
+
+    if not bundle_path.exists():
+        err(f"Trust bundle not found: {bundle_path}")
+        return 1
+
+    if not hypervisor_ca_path.exists():
+        info("Hypervisor CA not imported yet")
+        return 1
+
+    # Read hypervisor CA subject
+    result = subprocess.run(
+        ["openssl", "x509", "-in", str(hypervisor_ca_path), "-noout", "-subject"],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        err("Failed to read hypervisor CA")
+        return 1
+
+    ca_subject = result.stdout.strip()
+
+    # Check if CA is in bundle
+    bundle_content = bundle_path.read_text()
+    hypervisor_ca_content = hypervisor_ca_path.read_text()
+
+    print()
+    if hypervisor_ca_content in bundle_content:
+        ok(f"Hypervisor CA is in bundle: {ca_subject}")
+    else:
+        warn(f"Hypervisor CA NOT in bundle: {ca_subject}")
+        info("Run: python3 -m pki bundle")
+        return 1
+
+    # Check environment variables
+    env_vars = {
+        "SSL_CERT_FILE": os.environ.get("SSL_CERT_FILE"),
+        "CURL_CA_BUNDLE": os.environ.get("CURL_CA_BUNDLE"),
+        "GIT_SSL_CAINFO": os.environ.get("GIT_SSL_CAINFO"),
+    }
+
+    print()
+    print("  Environment Variables:")
+    for var, value in env_vars.items():
+        if value == str(bundle_path):
+            ok(f"  {var}={value}")
+        elif value:
+            warn(f"  {var}={value} (expected: {bundle_path})")
+        else:
+            info(f"  {var} not set")
+
+    # Check Docker registry trust
+    print()
+    print("  Docker Registry Trust:")
+
+    # If no registries specified, check CONTAINER_REGISTRY env or scan /etc/docker/certs.d/
+    if not docker_registries:
+        container_registry = os.environ.get("CONTAINER_REGISTRY")
+        if container_registry:
+            docker_registries = [container_registry]
+        else:
+            # Scan /etc/docker/certs.d/ for configured registries
+            certs_d = Path("/etc/docker/certs.d")
+            if certs_d.exists():
+                docker_registries = [d.name for d in certs_d.iterdir() if d.is_dir()]
+
+    if docker_registries:
+        for registry in docker_registries:
+            registry_ca_path = Path(f"/etc/docker/certs.d/{registry}/ca.crt")
+            if registry_ca_path.exists():
+                if registry_ca_path.is_symlink():
+                    target = registry_ca_path.resolve()
+                    if target == bundle_path:
+                        ok(f"  {registry}: {registry_ca_path} → {target}")
+                    else:
+                        warn(f"  {registry}: {registry_ca_path} → {target} (expected: {bundle_path})")
+                else:
+                    info(f"  {registry}: {registry_ca_path} (not a symlink)")
+            else:
+                info(f"  {registry}: not configured")
+    else:
+        info("  No Docker registries configured")
+
+    return 0
+
+
+def _trust_install(ca_path: Path, docker_registries: list[str] | None = None) -> int:
+    """Install CA to system trust."""
+    if not ca_path.exists():
+        err(f"CA file not found: {ca_path}")
+        return 1
+
+    print()
+    action(f"Installing CA to system trust: {ca_path}")
+
+    # 1. Ensure CA is in hypervisor directory
+    if ca_path != config.HYPERVISOR_CA_CERT:
+        action(f"Copying CA to {config.HYPERVISOR_CA_CERT}")
+        ensure_dir(config.PKI_HYPERVISOR_DIR, config.MODE_PRIVATE_DIR)
+        atomic_write(config.HYPERVISOR_CA_CERT, ca_path.read_bytes(), config.MODE_CERTIFICATE)
+        ok(f"CA copied: {config.HYPERVISOR_CA_CERT}")
+
+    # 2. Rebuild bundle (includes hypervisor CA)
+    action("Rebuilding trust bundle")
+    cert_count = build_bundle()
+    ok(f"Bundle updated: {cert_count} certificates")
+
+    # 3. Install environment variables
+    action("Installing environment variables")
+    _install_env_vars()
+    ok("Environment variables installed: /etc/profile.d/konductor-ca.sh")
+
+    # 4. Configure Docker registry trust (if registries specified or env set)
+    if not docker_registries:
+        container_registry = os.environ.get("CONTAINER_REGISTRY")
+        if container_registry:
+            docker_registries = [container_registry]
+
+    if docker_registries:
+        action(f"Configuring Docker registry trust for: {', '.join(docker_registries)}")
+        _install_docker_trust(docker_registries)
+        ok(f"Docker registry trust configured: {', '.join(docker_registries)}")
+
+        # Restart Docker daemon (if running)
+        import subprocess
+        result = subprocess.run(
+            ["systemctl", "is-active", "docker.service"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            action("Restarting Docker daemon")
+            try:
+                subprocess.run(["systemctl", "restart", "docker.service"], check=True)
+                ok("Docker daemon restarted")
+            except subprocess.CalledProcessError as exc:
+                warn(f"Failed to restart Docker: {exc}")
+    else:
+        info("No Docker registries specified (use --docker-registry or CONTAINER_REGISTRY env)")
+
+    print()
+    ok("System trust installation complete")
+    info("Restart shells to load new environment variables")
+
+    return 0
+
+
+def _trust_remove() -> int:
+    """Remove CA from system trust."""
+    print()
+    action("Removing CA from system trust")
+
+    # 1. Remove environment variables
+    env_file = Path("/etc/profile.d/konductor-ca.sh")
+    if env_file.exists():
+        env_file.unlink()
+        ok(f"Removed: {env_file}")
+
+    # 2. Remove Docker registry trust
+    registry_ca_dir = Path("/etc/docker/certs.d/registry.ucs.arpa")
+    if registry_ca_dir.exists():
+        import shutil
+        shutil.rmtree(registry_ca_dir)
+        ok(f"Removed: {registry_ca_dir}")
+
+    # 3. Rebuild bundle without hypervisor CA
+    if config.HYPERVISOR_CA_CERT.exists():
+        config.HYPERVISOR_CA_CERT.unlink()
+    cert_count = build_bundle()
+    ok(f"Bundle rebuilt without hypervisor CA: {cert_count} certificates")
+
+    print()
+    ok("System trust removal complete")
+
+    return 0
+
+
+def _install_env_vars() -> None:
+    """Install environment variables for TLS trust."""
+    bundle_path = config.CA_BUNDLE
+
+    env_script = f"""# Konductor PKI Trust Bundle
+# Auto-generated by konductor-pki-trust.service
+# Do not edit manually
+
+export SSL_CERT_FILE="${{SSL_CERT_FILE:-{bundle_path}}}"
+export NIX_SSL_CERT_FILE="${{NIX_SSL_CERT_FILE:-{bundle_path}}}"
+export CURL_CA_BUNDLE="${{CURL_CA_BUNDLE:-{bundle_path}}}"
+export REQUESTS_CA_BUNDLE="${{REQUESTS_CA_BUNDLE:-{bundle_path}}}"
+export NODE_EXTRA_CA_CERTS="${{NODE_EXTRA_CA_CERTS:-{bundle_path}}}"
+export GIT_SSL_CAINFO="${{GIT_SSL_CAINFO:-{bundle_path}}}"
+"""
+
+    env_file = Path("/etc/profile.d/konductor-ca.sh")
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    env_file.write_text(env_script)
+    env_file.chmod(0o644)
+
+
+def _install_docker_trust(docker_registries: list[str]) -> None:
+    """Configure Docker to trust registries with custom CA.
+
+    Args:
+        docker_registries: List of registry domains (e.g., ["registry.ucs.arpa", "docker.io"])
+    """
+    bundle_path = config.CA_BUNDLE
+
+    # Docker per-registry CA configuration
+    # https://docs.docker.com/engine/security/certificates/
+    for registry in docker_registries:
+        registry_ca_dir = Path(f"/etc/docker/certs.d/{registry}")
+        registry_ca_dir.mkdir(parents=True, exist_ok=True)
+
+        registry_ca_link = registry_ca_dir / "ca.crt"
+
+        # Remove old symlink if exists
+        if registry_ca_link.exists() or registry_ca_link.is_symlink():
+            registry_ca_link.unlink()
+
+        # Create symlink to bundle
+        registry_ca_link.symlink_to(bundle_path)
+
+
+# =====================================================================
 # inspect -- Show certificate provenance
 # =====================================================================
 
@@ -827,6 +1104,7 @@ Commands:
   generate    Generate CA + wildcard cert (idempotent)
   hypervisor  Import hypervisor-provided certificates
   bundle      Build CA trust bundle
+  trust       Install CA to system trust store (Docker, Git, etc.)
   inspect     Inspect certificate provenance
   status      Show PKI status summary
 
@@ -838,6 +1116,12 @@ Options (generate/hypervisor):
   --cert-days <days>    Leaf cert validity in days (default: 365)
   --force               Regenerate even if certs exist
 
+Options (trust):
+  --ca <path>                  CA file to install (default: hypervisor CA)
+  --docker-registry <domain>   Configure Docker trust for registry (repeatable)
+  --remove                     Remove CA from system trust
+  --status                     Check trust status
+
 Options (inspect):
   <path>                Certificate file to inspect (default: VM CA cert)
 """
@@ -846,6 +1130,7 @@ COMMANDS = {
     "generate": cmd_generate,
     "hypervisor": cmd_hypervisor,
     "bundle": cmd_bundle,
+    "trust": cmd_trust,
     "inspect": cmd_inspect,
     "status": cmd_status,
 }
