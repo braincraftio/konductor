@@ -390,6 +390,12 @@ in {
         wants = [ "konductor-pki-bundle.service" ];
         wantedBy = [ "multi-user.target" ];
 
+        unitConfig = {
+          # Only run if hypervisor CA exists (KubeVirt VMs with mounted CA)
+          # Build VMs don't have hypervisor CA, so this service is skipped
+          ConditionPathExists = "/etc/konductor/pki/hypervisor/ca.crt";
+        };
+
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
