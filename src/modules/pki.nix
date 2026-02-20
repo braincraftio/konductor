@@ -176,18 +176,17 @@ in {
       # is mounted at /mnt/pki/ca.{crt,key}.
       konductor-pki-signed = {
         description = "Generate Konductor Hypervisor-Signed Certificate";
-        # Wait for PKI mount from cloud-init using RequiresMountsFor
-        # This ensures /mnt/pki is fully mounted and accessible before condition checks
-        # Also wait for VM PKI to ensure Tier 3 fallback exists
-        after = [ "local-fs.target" "konductor-pki-vm.service" ];
-        before = [ "network.target" ];
+        # CRITICAL: Wait for cloud-init to complete mount operations
+        # Cloud-init mounts /mnt/pki via konductor-mount@ service in bootcmd/runcmd
+        # The ConditionPathExists check fails if evaluated before mount completes
+        # Previous attempts: RequiresMountsFor (doesn't work with service-based mounts)
+        # Solution: Wait for cloud-init.service before evaluating condition
+        after = [ "local-fs.target" "konductor-pki-vm.service" "cloud-init.service" ];
         wantedBy = [ "multi-user.target" ];
 
         # Only run if hypervisor CA key is mounted
-        # RequiresMountsFor ensures mount is complete before ConditionPathExists is evaluated
         unitConfig = {
           ConditionPathExists = "/mnt/pki/tls.key";
-          RequiresMountsFor = "/mnt/pki";
         };
 
         serviceConfig = {
