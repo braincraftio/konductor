@@ -49,9 +49,9 @@ Set these in `.env` or export before running:
 
 ```bash
 # Registry configuration
-export OCI_REGISTRY="registry.docker.arpa"
-export OCI_IMAGE="braincraft/konductor"
-export OCI_TAG="latest-qcow2"
+export CONTAINER_REGISTRY="registry.docker.arpa"
+export CONTAINER_IMAGE="braincraft/konductor"
+export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding (host ports, avoid conflicts with host services)
 export QCOW2_SSH_PORT=2222       # SSH access
@@ -101,7 +101,7 @@ echo "════════════════════════�
 echo "  oci:build - Standalone QCOW2 + OCI Build Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
-echo "  Target: ${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-braincraft/konductor}:${OCI_TAG:-latest-qcow2}"
+echo "  Target: ${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-braincraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 echo ""
 
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
@@ -178,9 +178,9 @@ fi
 echo "DEBUG: which docker=$(which docker)"
 echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
 echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
-REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
-IMAGE="${OCI_IMAGE:-braincraft/konductor}"
-TAG="${OCI_TAG:-latest-qcow2}"
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+TAG="${CONTAINER_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
@@ -197,9 +197,9 @@ docker buildx build -f Dockerfile.qcow2 \
 
 # Apply all tags from .konductor so CI output matches reality
 # Parse oci_tags array from .konductor TOML and create docker tags
-OCI_TAGS_LINE=$(grep '^oci_tags = ' .konductor | sed 's/^oci_tags = //')
+CONTAINER_TAGS_LINE=$(grep '^oci_tags = ' .konductor | sed 's/^oci_tags = //')
 # Extract tags from JSON array: ["tag1", "tag2", ...] -> tag1 tag2 ...
-TAGS=$(echo "$OCI_TAGS_LINE" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$')
+TAGS=$(echo "$CONTAINER_TAGS_LINE" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$')
 
 echo "Applying tags:"
 for tag in $TAGS; do
@@ -220,9 +220,9 @@ Push container with multi-tag (git/nix/latest).
 
 ```bash {"name":"oci:push","excludeFromRunAll":"true","tag":"requires:docker"}
 set -e
-REGISTRY="${OCI_REGISTRY:-registry.ucs.arpa}"
-IMAGE="${OCI_IMAGE:-braincraft/konductor}"
-BASE_TAG="${OCI_TAG:-latest-qcow2}"
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
 
@@ -615,14 +615,14 @@ if FLAKE_META=$(nix flake metadata . --no-write-lock-file --json 2>/dev/null); t
     echo "$FLAKE_META" | jq '{
       path,
       lastModified: .lastModified,
-      narHash: .locked.narHash // "unlocked",
-      inputs: (.locks.nodes | to_entries | map(select(.key != "root")) | map({
+      narHash: (.locked.narHash // "unlocked"),
+      inputs: ([.locks.nodes | to_entries[] | select(.key | test("^root$") | not) | {
         (.key): {
           type: .value.locked.type,
           rev: (.value.locked.rev // "n/a"),
           narHash: (.value.locked.narHash // "n/a")
         }
-      }) | add // {})
+      }] | add // {})
     }'
 else
     echo "  (skipped - flake metadata failed)"
@@ -1168,18 +1168,18 @@ BUILD_HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d
 BUILD_HW_PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || BUILD_HW_PRODUCT=""
 BUILD_HW_SERIAL=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || BUILD_HW_SERIAL=""
 
-OCI_IMAGE="${OCI_REGISTRY:-registry.ucs.arpa}/${OCI_IMAGE:-braincraft/konductor}"
+CONTAINER_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-braincraft/konductor}"
 
 # Build tag list for provenance - full hashes, dirty indicator when tree is dirty
-OCI_TAGS="[\"${OCI_TAG:-latest-qcow2}\""
+CONTAINER_TAGS="[\"${CONTAINER_TAG:-latest-qcow2}\""
 if [ "$GIT_DIRTY" = "0" ]; then
-    OCI_TAGS+=", \"qcow2-${GIT_COMMIT}\""
+    CONTAINER_TAGS+=", \"qcow2-${GIT_COMMIT}\""
 else
-    OCI_TAGS+=", \"qcow2-dirty\""
+    CONTAINER_TAGS+=", \"qcow2-dirty\""
 fi
-OCI_TAGS+=", \"qcow2-${NIX_DRV}\""
-[ -n "$FLAKE_LOCK_SHA" ] && [ "$FLAKE_LOCK_SHA" != "unknown" ] && OCI_TAGS+=", \"qcow2-flake-${FLAKE_LOCK_SHA}\""
-OCI_TAGS+="]"
+CONTAINER_TAGS+=", \"qcow2-${NIX_DRV}\""
+[ -n "$FLAKE_LOCK_SHA" ] && [ "$FLAKE_LOCK_SHA" != "unknown" ] && CONTAINER_TAGS+=", \"qcow2-flake-${FLAKE_LOCK_SHA}\""
+CONTAINER_TAGS+="]"
 
 # Write /.konductor inside VM
 ssh $SSH_OPTS kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
@@ -1200,8 +1200,8 @@ build_hw_vendor = "$BUILD_HW_VENDOR"
 build_hw_product = "$BUILD_HW_PRODUCT"
 build_hw_serial = "$BUILD_HW_SERIAL"
 strict = ${KONDUCTOR_STRICT:-false}
-oci_image = "$OCI_IMAGE"
-oci_tags = $OCI_TAGS
+oci_image = "$CONTAINER_IMAGE"
+oci_tags = $CONTAINER_TAGS
 EOF
 ssh $SSH_OPTS kc2admin@localhost 'sudo chmod 644 /.konductor'
 
