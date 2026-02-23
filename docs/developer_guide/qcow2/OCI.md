@@ -1284,10 +1284,31 @@ sudo mkdir -p "$MOUNT"
 sudo guestmount -a result/nixos.qcow2 -m /dev/sda2 "$MOUNT"
 trap 'sudo guestunmount "$MOUNT" 2>/dev/null || true; sudo rmdir "$MOUNT" 2>/dev/null || true' EXIT
 
+# Remove host keys, machine identity, cloud-init state, journal logs
 sudo rm -f "$MOUNT"/etc/ssh/ssh_host_* "$MOUNT"/etc/machine-id
 sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
+
+# Remove ALL credentials from ALL home directories (root + users)
 sudo rm -rf "$MOUNT"/root/.ssh "$MOUNT"/home/*/.ssh 2>/dev/null || true
 sudo rm -f "$MOUNT"/root/.gitconfig "$MOUNT"/home/*/.gitconfig 2>/dev/null || true
+
+# Remove build-time cloud-init user account and home directory
+# Baked-in users (kc2, kc2admin, runner, forgejo) are declarative in NixOS config.
+# The build user (e.g., usrbinkat) was created by cloud-init and must not ship.
+BUILD_USER="${USER:-}"
+BAKED_IN="kc2 kc2admin runner forgejo"
+if [ -n "$BUILD_USER" ]; then
+  echo "$BAKED_IN" | grep -qw "$BUILD_USER" || {
+    echo "Removing build-time user: $BUILD_USER"
+    sudo rm -rf "$MOUNT/home/$BUILD_USER"
+    # Remove user entry from passwd and shadow
+    for f in passwd shadow; do
+      sudo sed -i "/^${BUILD_USER}:/d" "$MOUNT/etc/$f" 2>/dev/null || true
+    done
+    # Remove user from group membership lists (e.g., wheel, docker, kvm, etc.)
+    sudo sed -i "s/,${BUILD_USER}\b//g; s/${BUILD_USER},//g; s/:${BUILD_USER}$/:/" "$MOUNT/etc/group" 2>/dev/null || true
+  }
+fi
 
 sudo guestunmount "$MOUNT"
 trap - EXIT
