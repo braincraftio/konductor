@@ -73,11 +73,10 @@ in
       packages = import ../packages { inherit pkgs lib config versions; };
     in
     packages.default
-    ++ lib.optionals cfg.enablePython [ pkgs.konductor.python pkgs.ruff pkgs.uv pkgs.poetry ]
-    ++ lib.optionals cfg.enableGo [ pkgs.konductor.go pkgs.gopls pkgs.golangci-lint pkgs.delve pkgs.gofumpt ]
-    ++ lib.optionals cfg.enableNode [ pkgs.konductor.nodejs pkgs.nodePackages.pnpm ]
-    ++ lib.optionals cfg.enableRust [ pkgs.konductor.rustc ]
-    ++ lib.optionals cfg.enableAI packages.ai.packages;
+    ++ lib.optionals cfg.enablePython packages.pythonPackages
+    ++ lib.optionals cfg.enableGo packages.goPackages
+    ++ lib.optionals cfg.enableNode packages.nodejsPackages
+    ++ lib.optionals cfg.enableRust packages.rustPackages;
 
   # ===========================================================================
   # Environment Variables (imported from SSOT)

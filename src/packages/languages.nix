@@ -1,6 +1,13 @@
 # src/packages/languages.nix
 # Version-locked language runtimes + package managers
 # Individual exports for each language to support per-devshell composition
+#
+# NOTE: Linters and formatters (ruff, mypy, bandit, black, isort, golangci-lint,
+# gofumpt, prettier, biome) are NOT included here. They are provided as wrapped
+# hermetic versions via src/config/ → src/packages/linters.nix and formatters.nix,
+# and aggregated into packages.default. This separation prevents buildEnv
+# collisions when these package sets are consumed by home-manager, nixos, or
+# nix-darwin modules (which use buildEnv, not mkShell PATH shadowing).
 
 { pkgs, lib, versions }:
 
@@ -23,13 +30,8 @@ rec {
     poetry
     uv
     pipx
-    ruff
-    mypy
-    bandit
-  ] ++ lib.optionals (!stdenv.isDarwin) [
-    # Darwin 25.x: black/isort pull setproctitle which fails tests in nix sandbox
-    black
-    isort
+    # ruff, mypy, bandit → wrapped in src/config/linters/ (in packages.default)
+    # black, isort → wrapped in src/packages/formatters.nix (in packages.default)
   ];
 
   # ===========================================================================
@@ -43,11 +45,8 @@ rec {
     gopls
     delve
 
-    # Linting (wrapped in src/config/linters/golangci-lint/)
-    golangci-lint
-
-    # Formatting
-    gofumpt
+    # golangci-lint → wrapped in src/config/linters/ (in packages.default)
+    # gofumpt → in src/packages/formatters.nix (in packages.default)
 
     # Go tools (stringer, guru, etc.)
     gotools
@@ -72,8 +71,8 @@ rec {
     nodePackages.yarn
     nodePackages.typescript
     nodePackages.typescript-language-server
-    nodePackages.prettier
-    biome
+    # prettier → wrapped in src/config/formatters/ (in packages.default)
+    # biome → wrapped in src/config/formatters/ (in packages.default)
   ];
 
   # ===========================================================================
