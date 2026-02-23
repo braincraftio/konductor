@@ -1,53 +1,22 @@
 # src/qcow2/konductor-mount-template.nix
-# Systemd template service for convention-based virtio disk mounting
+# TOML-based virtio disk mount service
 #
-# Serial ID Convention (≤20 chars, [A-Za-z0-9_.+-] only):
-#   Format: <fstype>-<user>-<mode>-<path>
-#
-#   Components:
-#     fstype = e4 (ext4), iso (iso9660), xfs, auto
-#     user   = owner username OR "root"
-#     mode   = 3-4 digit octal permissions (e.g., 775, 2775 for setgid)
-#     path   = mount point with "/" encoded as "." and abbreviations:
-#              h = home, m = mnt, w = workspace, u = $OWNER
-#
-#   Path Encoding (to fit 20 char limit):
-#     h.u       → /home/$OWNER (e.g., /home/kc2admin)
-#     m.kube    → /mnt/kube
-#     w         → /workspace
-#
-#   Workspace Convention:
-#     /workspace/<server_fqdn>/<namespace>/<repo_name>/
-#     Examples:
-#       /workspace/git.braincraft.io/braincraft/k9/
-#       /workspace/github.com/user/repo/
-#
-#   Examples (all use kc2 group GID 1001 for shared access):
-#     e4-kc2-2775-w          → ext4, kc2:kc2, 2775 (setgid), /workspace
-#     e4-kc2admin-700-h.u    → ext4, kc2admin:kc2, 700, /home/kc2admin
-#     iso-root-755-m.kube    → iso9660, root:root, 755 (ro), /mnt/kube
-#
-# The systemd unit parses and expands the serial string into mount instructions.
+# Serial IDs are opaque keys (ws, home-1000, pki, kube).
+# Mount configuration lives in /var/lib/konductor/services.toml [mounts.*].
+# Parsing uses yj (TOML->JSON) + jq -- same strategy as konductor-init.service.
 
 { pkgs, ... }:
 
 {
-  # udev rules to auto-start konductor-mount@ services for matching virtio disks
-  # Matches serial IDs with pattern: <fstype>-<user>-<mode>-<path>
-  # e.g., e4-kc2-2775-w, iso-root-755-m.kube
+  # Trigger konductor-mount@ for all virtio block devices with a serial ID.
+  # The mount service validates the serial against services.toml [mounts.*].
+  # Unknown serials fail cleanly with an explicit error.
   services.udev.extraRules = ''
-    # Auto-start konductor-mount@ for virtio disks with convention-based serials
-    # Pattern: (e4|iso|xfs|auto)-<user>-<mode>-<path>
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="e4-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="iso-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="xfs-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL}=="auto-*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
+    ACTION=="add", SUBSYSTEM=="block", KERNEL=="vd*", ENV{ID_SERIAL}=="?*", TAG+="systemd", ENV{SYSTEMD_WANTS}="konductor-mount@$env{ID_SERIAL}.service"
   '';
 
   systemd.services."konductor-mount@" = {
     description = "Mount virtio disk by serial ID: %i";
-    # Run after basic system is up - no 'before' constraint to avoid cycles
-    # when udev triggers this service after boot
     after = [ "sysinit.target" ];
 
     serviceConfig = let
@@ -56,190 +25,105 @@
 
         SERIAL="$1"
         DEVICE="/dev/disk/by-id/virtio-$SERIAL"
+        CONFIG_FILE="/var/lib/konductor/services.toml"
 
         echo "========================================="
         echo "konductor-mount@$SERIAL.service"
         echo "========================================="
-        echo "Serial ID: $SERIAL"
 
-        # Wait for device to appear (max 30s)
+        # Wait for device (max 30s)
         for i in {1..30}; do
-          if [ -e "$DEVICE" ]; then
-            break
-          fi
+          [ -e "$DEVICE" ] && break
           echo "Waiting for device $DEVICE... ($i/30)"
           sleep 1
         done
-
         if [ ! -e "$DEVICE" ]; then
           echo "ERROR: Device $DEVICE not found after 30s"
           exit 1
         fi
 
-        echo "Device: $DEVICE"
-
-        # =====================================================================
-        # Parse Serial ID: <fstype>-<user>-<mode>-<path>
-        # =====================================================================
-        IFS='-' read -r FSTYPE_CODE OWNER MODE PATH_ENCODED <<< "$SERIAL"
-
-        if [ -z "$FSTYPE_CODE" ] || [ -z "$OWNER" ] || [ -z "$MODE" ] || [ -z "$PATH_ENCODED" ]; then
-          echo "ERROR: Invalid serial format: $SERIAL"
-          echo "Expected: <fstype>-<user>-<mode>-<path>"
-          echo "Example: e4-kc2admin-700-h.u"
+        # Wait for config file (max 60s) -- handles udev vs cloud-init race
+        for i in {1..60}; do
+          [ -f "$CONFIG_FILE" ] && break
+          echo "Waiting for $CONFIG_FILE... ($i/60)"
+          sleep 1
+        done
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "ERROR: $CONFIG_FILE not found after 60s"
           exit 1
         fi
 
-        # Decode filesystem type
-        case "$FSTYPE_CODE" in
-          e4)   FS_TYPE="ext4" ;;
-          iso)  FS_TYPE="iso9660" ;;
-          xfs)  FS_TYPE="xfs" ;;
-          auto) FS_TYPE="auto" ;;
-          *)
-            echo "ERROR: Unknown filesystem type code: $FSTYPE_CODE"
-            echo "Allowed: e4 (ext4), iso (iso9660), xfs, auto"
-            exit 1
-            ;;
-        esac
+        # Parse TOML config -- same strategy as konductor-init.service (yj + jq)
+        CONFIG_JSON=$(${pkgs.yj}/bin/yj -t < "$CONFIG_FILE")
+        MOUNT_CONFIG=$(echo "$CONFIG_JSON" | ${pkgs.jq}/bin/jq -e --arg key "$SERIAL" '.mounts[$key] // empty' 2>/dev/null || true)
 
-        # Decode path: dots become slashes, expand abbreviations, prepend /
-        # Abbreviations: h=home, m=mnt, w=workspace, u=$OWNER
-        MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
-
-        # Expand abbreviations (order matters: do component expansions first)
-        # ^h/ or ^h$ → home
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
-        # ^m/ or ^m$ → mnt
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
-        # ^w/ or ^w$ → workspace
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^w(/|$)#workspace\1#')
-        # /u$ → /$OWNER (final component only)
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
-        # ^u$ → $OWNER (single component)
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#^u\$#$OWNER#")
-
-        if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then
-          MOUNT_POINT="/$MOUNT_POINT"
-        fi
-
-        # Validate mode is 3-4 digit octal (4-digit for setuid/setgid/sticky)
-        if ! [[ "$MODE" =~ ^[0-7]{3,4}$ ]]; then
-          echo "ERROR: Invalid mode: $MODE (must be 3-4 digit octal, e.g., 775 or 2775)"
+        if [ -z "$MOUNT_CONFIG" ]; then
+          echo "ERROR: No [mounts.$SERIAL] section in $CONFIG_FILE"
           exit 1
         fi
 
-        # Determine group based on filesystem type, owner, and path type
-        # Defense in depth: private paths use user's primary group, shared paths use kc2
+        FS_TYPE=$(echo "$MOUNT_CONFIG" | ${pkgs.jq}/bin/jq -r '.fstype')
+        OWNER=$(echo "$MOUNT_CONFIG" | ${pkgs.jq}/bin/jq -r '.owner')
+        GROUP=$(echo "$MOUNT_CONFIG" | ${pkgs.jq}/bin/jq -r '.group')
+        MODE=$(echo "$MOUNT_CONFIG" | ${pkgs.jq}/bin/jq -r '.mode')
+        MOUNT_POINT=$(echo "$MOUNT_CONFIG" | ${pkgs.jq}/bin/jq -r '.path')
+
         if [ "$FS_TYPE" = "iso9660" ]; then
-          # ISO9660 is always root:root (read-only secret volumes)
-          GROUP="root"
           FS_OPTS="ro,nofail"
-        elif [ "$OWNER" = "root" ]; then
-          # root-owned paths use root:kc2 (shared)
-          GROUP="kc2"
-          FS_OPTS="defaults,nofail"
         else
-          # Verify user exists
-          if ! ${pkgs.coreutils}/bin/id "$OWNER" &>/dev/null; then
-            echo "ERROR: User '$OWNER' does not exist"
-            echo "Create user in cloud-init before mounting:"
-            echo "  users:"
-            echo "    - name: $OWNER"
-            echo "      uid: XXXX"
-            echo "      groups: kc2"
-            exit 1
-          fi
-
-          # Determine group based on path type (security boundaries)
-          # DEFAULT: Private (user's primary group) - deny by default
-          # EXPLICIT: /workspace uses kc2 group for collaboration
-          if [ "$MOUNT_POINT" = "/workspace" ]; then
-            # Workspace - explicitly shared with kc2 group for multi-user collaboration
-            GROUP="kc2"
-            FS_OPTS="defaults,nofail"
-            echo "Shared workspace detected: using $OWNER:kc2"
-          else
-            # Everything else is private - use user's primary group (defense in depth)
-            GROUP=$(${pkgs.coreutils}/bin/id -gn "$OWNER")
-            FS_OPTS="defaults,nofail"
-            echo "Private path detected: using $OWNER:$GROUP"
-          fi
+          FS_OPTS="defaults,nofail"
         fi
 
+        echo "Device: $DEVICE"
         echo "Filesystem: $FS_TYPE"
         echo "Owner: $OWNER:$GROUP"
         echo "Permissions: $MODE"
         echo "Mount Point: $MOUNT_POINT"
-        echo "Mount Options: $FS_OPTS"
 
-        # Create mount point
         ${pkgs.coreutils}/bin/mkdir -p "$MOUNT_POINT"
 
-        # Check if already mounted
         if ${pkgs.util-linux}/bin/mountpoint -q "$MOUNT_POINT"; then
           echo "Already mounted: $MOUNT_POINT"
           exit 0
         fi
 
-        # Check if disk has a filesystem, format if empty
+        # Format if needed (empty block device)
         EXISTING_FS=$(${pkgs.util-linux}/bin/blkid -o value -s TYPE "$DEVICE" 2>/dev/null || echo "")
 
         if [ -z "$EXISTING_FS" ]; then
-          echo "No filesystem detected on $DEVICE"
-
           if [ "$FS_TYPE" = "iso9660" ]; then
-            echo "ERROR: Cannot format iso9660 filesystem (read-only)"
+            echo "ERROR: Cannot format iso9660 (read-only)"
             exit 1
           fi
 
-          # Determine filesystem to create
-          if [ "$FS_TYPE" = "auto" ]; then
-            FORMAT_FS="ext4"
-          else
-            FORMAT_FS="$FS_TYPE"
-          fi
+          FORMAT_FS="$FS_TYPE"
+          [ "$FORMAT_FS" = "auto" ] && FORMAT_FS="ext4"
 
           echo "Formatting $DEVICE as $FORMAT_FS..."
           case "$FORMAT_FS" in
-            ext4)
-              ${pkgs.e2fsprogs}/bin/mkfs.ext4 -L "$(basename "$MOUNT_POINT")" "$DEVICE"
-              ;;
-            xfs)
-              ${pkgs.xfsprogs}/bin/mkfs.xfs -L "$(basename "$MOUNT_POINT")" "$DEVICE"
-              ;;
-            *)
-              echo "ERROR: Cannot auto-format filesystem type: $FORMAT_FS"
-              exit 1
-              ;;
+            ext4) ${pkgs.e2fsprogs}/bin/mkfs.ext4 -L "$(basename "$MOUNT_POINT")" "$DEVICE" ;;
+            xfs)  ${pkgs.xfsprogs}/bin/mkfs.xfs -L "$(basename "$MOUNT_POINT")" "$DEVICE" ;;
+            *)    echo "ERROR: Cannot format: $FORMAT_FS"; exit 1 ;;
           esac
-          echo "Formatted $DEVICE as $FORMAT_FS"
         else
           echo "Existing filesystem: $EXISTING_FS"
         fi
 
-        # Mount with specified or auto-detected filesystem type
+        # Mount
         if [ "$FS_TYPE" = "auto" ]; then
-          # Re-detect filesystem type after potential format
-          DETECTED_FS=$(${pkgs.util-linux}/bin/blkid -o value -s TYPE "$DEVICE" || echo "unknown")
-          echo "Auto-detected filesystem: $DETECTED_FS"
           ${pkgs.util-linux}/bin/mount -o "$FS_OPTS" "$DEVICE" "$MOUNT_POINT"
         else
-          # Use specified filesystem type
           ${pkgs.util-linux}/bin/mount -t "$FS_TYPE" -o "$FS_OPTS" "$DEVICE" "$MOUNT_POINT"
         fi
 
-        echo "Mounted: $DEVICE → $MOUNT_POINT"
+        echo "Mounted: $DEVICE -> $MOUNT_POINT"
 
-        # Set ownership and permissions (skip for read-only filesystems like iso9660)
+        # Set ownership and permissions (skip for read-only iso9660)
         if [ "$FS_TYPE" != "iso9660" ]; then
           ${pkgs.coreutils}/bin/chown "$OWNER:$GROUP" "$MOUNT_POINT"
           ${pkgs.coreutils}/bin/chmod "$MODE" "$MOUNT_POINT"
-          echo "Ownership: $OWNER:$GROUP"
-          echo "Permissions: $MODE"
-        else
-          echo "Skipping chown/chmod for read-only filesystem"
         fi
+
         echo "========================================="
         echo "Mount complete: $MOUNT_POINT"
         echo "========================================="
@@ -249,24 +133,22 @@
         set -euo pipefail
 
         SERIAL="$1"
+        CONFIG_FILE="/var/lib/konductor/services.toml"
 
-        # Parse serial ID to get mount point
-        IFS='-' read -r FSTYPE_CODE OWNER MODE PATH_ENCODED <<< "$SERIAL"
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "No config file, nothing to unmount"
+          exit 0
+        fi
 
-        # Decode path: dots become slashes, expand abbreviations, prepend /
-        MOUNT_POINT=$(echo "$PATH_ENCODED" | ${pkgs.gnused}/bin/sed 's/\./\//g')
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^h(/|$)#home\1#')
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^m(/|$)#mnt\1#')
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E 's#^w(/|$)#workspace\1#')
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#/u\$#/$OWNER#")
-        MOUNT_POINT=$(echo "$MOUNT_POINT" | ${pkgs.gnused}/bin/sed -E "s#^u\$#$OWNER#")
-        if [[ ! "$MOUNT_POINT" =~ ^/ ]]; then
-          MOUNT_POINT="/$MOUNT_POINT"
+        CONFIG_JSON=$(${pkgs.yj}/bin/yj -t < "$CONFIG_FILE")
+        MOUNT_POINT=$(echo "$CONFIG_JSON" | ${pkgs.jq}/bin/jq -r --arg key "$SERIAL" '.mounts[$key].path // empty')
+
+        if [ -z "$MOUNT_POINT" ]; then
+          echo "No mount config for '$SERIAL', nothing to unmount"
+          exit 0
         fi
 
         echo "Unmounting: $MOUNT_POINT"
-
-        # Unmount if mounted
         if ${pkgs.util-linux}/bin/mountpoint -q "$MOUNT_POINT"; then
           ${pkgs.util-linux}/bin/umount "$MOUNT_POINT"
           echo "Unmounted: $MOUNT_POINT"
