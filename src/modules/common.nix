@@ -1,5 +1,8 @@
 # src/modules/common.nix
 # Shared module options and package logic
+#
+# Pattern: mirrors src/devshells/default.nix and src/qcow2/default.nix
+# catppuccinSources flows from flake inputs → module → mkPackages → config → packages
 
 { lib }:
 
@@ -57,18 +60,19 @@ in
   # ===========================================================================
   # Package Builder (called by platform modules)
   # ===========================================================================
+  # Mirrors the package composition in src/devshells/default.nix:
+  #   catppuccinSources → config → packages → composed list
 
-  mkPackages = { cfg, pkgs, lib, versions }:
+  mkPackages = { cfg, pkgs, lib, versions, catppuccinSources }:
     let
-      # Import packages with config wrappers
-      configDir = ./.config/cli;
-      config = import ../config { inherit pkgs configDir lib versions; };
+      # Config provides wrapped linters/formatters with hermetic configuration
+      # catppuccinSources enables k9s Catppuccin theme (same as devshells + qcow2)
+      config = import ../config { inherit pkgs lib versions catppuccinSources; };
+
+      # Single source of truth for package composition
       packages = import ../packages { inherit pkgs lib config versions; };
     in
-    packages.base
-    ++ packages.cli.packages
-    ++ packages.linters.packages
-    ++ packages.formatters.packages
+    packages.default
     ++ lib.optionals cfg.enablePython [ pkgs.konductor.python pkgs.ruff pkgs.uv pkgs.poetry ]
     ++ lib.optionals cfg.enableGo [ pkgs.konductor.go pkgs.gopls pkgs.golangci-lint pkgs.delve pkgs.gofumpt ]
     ++ lib.optionals cfg.enableNode [ pkgs.konductor.nodejs pkgs.nodePackages.pnpm ]
