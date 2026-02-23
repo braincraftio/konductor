@@ -243,7 +243,7 @@ if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
     TAGS+=("qcow2-${nix_drv}")
 fi
 if [ -n "$flake_lock_sha" ] && [ "$flake_lock_sha" != "unknown" ]; then
-    TAGS+=("qcow2-flake-${flake_lock_sha}")
+    TAGS+=("qcow2-${flake_lock_sha}")
 fi
 
 FULL_IMAGE="$REGISTRY/$IMAGE:$BASE_TAG"
@@ -1178,7 +1178,7 @@ else
     CONTAINER_TAGS+=", \"qcow2-dirty\""
 fi
 CONTAINER_TAGS+=", \"qcow2-${NIX_DRV}\""
-[ -n "$FLAKE_LOCK_SHA" ] && [ "$FLAKE_LOCK_SHA" != "unknown" ] && CONTAINER_TAGS+=", \"qcow2-flake-${FLAKE_LOCK_SHA}\""
+[ -n "$FLAKE_LOCK_SHA" ] && [ "$FLAKE_LOCK_SHA" != "unknown" ] && CONTAINER_TAGS+=", \"qcow2-${FLAKE_LOCK_SHA}\""
 CONTAINER_TAGS+="]"
 
 # Write /.konductor inside VM
