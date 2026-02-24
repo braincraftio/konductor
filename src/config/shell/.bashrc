@@ -7,12 +7,10 @@
 # - neovim terminals (via wrapped bash)
 
 # ===========================================================================
-# User Bashrc
+# User & System Extensions
 # ===========================================================================
-# Source user's bashrc to get their base settings
-# Skip for non-interactive shells (runme, scripts) to avoid brew/starship errors
-# Skip if bash is too old (macOS ships bash 3.2, modern features need 4.0+)
-# User's bashrc may use shopt dirspell, complete, etc. which require bash 4+
+# Source user's bashrc when this file is loaded via --rcfile (devshells, containers).
+# When home-manager manages ~/.bashrc (this IS ~/.bashrc), the guard prevents recursion.
 if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ] && [[ $- == *i* ]]; then
   if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
     export KONDUCTOR_BASHRC_SOURCED=1
@@ -20,6 +18,14 @@ if [ -f "$HOME/.bashrc" ] && [ -z "$KONDUCTOR_BASHRC_SOURCED" ] && [[ $- == *i* 
   else
     _trace_bashrc "SKIP: User .bashrc requires bash 4+, current: ${BASH_VERSION}"
   fi
+fi
+
+# Source *.sh from ~/.bashrc.d/ for host-specific configuration.
+# Example: echo '. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' > ~/.bashrc.d/nix.sh
+if [ -d "$HOME/.bashrc.d" ] && [[ $- == *i* ]]; then
+  for f in "$HOME/.bashrc.d"/*.sh; do
+    [ -f "$f" ] && source "$f"
+  done
 fi
 
 # Clear aliases that conflict with wrapper scripts in PATH

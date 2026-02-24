@@ -3,6 +3,15 @@
 #
 # Pattern: mirrors src/devshells/default.nix and src/qcow2/default.nix
 # catppuccinSources flows from flake inputs → module → mkPackages → config → packages
+#
+# Exports:
+#   mkOptions    - NixOS/HM/darwin option definitions
+#   mkPackages   - Base + language packages (for environment.systemPackages / home.packages)
+#   mkPrograms   - IDE program packages: neovim, tmux, ttyd (for home.packages)
+#   mkHomeFiles  - Config files for home.file (bashrc, starship, atuin, etc.)
+#   mkFullEnv    - All environment variables including tool config paths
+#   mkEnv        - Base environment variables (EDITOR, PAGER, etc.)
+#   mkAliases    - Shell aliases
 
 { lib }:
 
@@ -10,6 +19,7 @@ let
   # Import canonical sources
   versions = import ../lib/versions.nix;
   langs = versions.languages;
+  shellContent = import ../lib/shell-content.nix { inherit lib; };
 
 in
 {
@@ -79,7 +89,48 @@ in
     ++ lib.optionals cfg.enableRust packages.rustPackages;
 
   # ===========================================================================
-  # Environment Variables (imported from SSOT)
+  # Program Packages (IDE tools: neovim, tmux, ttyd)
+  # ===========================================================================
+  # Same composition as src/devshells/konductor.nix nativeBuildInputs
+  # Requires programs and packages from the caller (needs flake inputs for nixvim)
+
+  mkPrograms = { programs, packages }:
+    programs.neovim.packages
+    ++ programs.tmux.packages
+    ++ programs.ttyd.packages
+    ++ packages.idePackages;
+
+  # ===========================================================================
+  # Home Files (config files managed by home.file)
+  # ===========================================================================
+  # Same pattern as src/qcow2/default.nix homeManagerUserConfig (line 439-455)
+
+  mkHomeFiles = { config }:
+    {
+      ".bashrc".text = config.shell.bash.bashrcContent;
+      ".bash_profile".text = shellContent.bashProfileContent;
+      ".inputrc".text = shellContent.inputrcContent;
+      ".config/starship.toml".text = config.shell.starship.configContent;
+      ".config/atuin/config.toml" = {
+        text = config.shell.atuin.configContent;
+        force = true;
+      };
+    };
+
+  # ===========================================================================
+  # Full Environment Variables (base + tool config paths)
+  # ===========================================================================
+  # Merges env.nix (EDITOR, PAGER, etc.) with tool-specific config paths
+  # (BASH_ENV, ATUIN_CONFIG_DIR, KONDUCTOR_PREEXEC_PATH, etc.)
+
+  mkFullEnv = { config }:
+    import ../lib/env.nix
+    // config.shell.bash.env
+    // config.shell.atuin.env
+    // { KONDUCTOR = "true"; };
+
+  # ===========================================================================
+  # Base Environment Variables (imported from SSOT)
   # ===========================================================================
 
   mkEnv = import ../lib/env.nix;

@@ -1,5 +1,9 @@
 # src/modules/home-manager.nix
-# Home Manager module
+# Home Manager module - full konductor development environment
+#
+# Provides the complete konductor experience in a persistent user environment:
+# packages, IDE tools (neovim, tmux, ttyd), hermetic shell configuration
+# (bash, starship, atuin, git), and environment variables.
 #
 # Usage in consumer flake.nix:
 #   inputs.konductor.url = "github:braincraftio/konductor";
@@ -13,7 +17,7 @@
 #   };
 #
 # The konductor flake input is passed via extraSpecialArgs to provide
-# access to catppuccin theme sources (same pattern as devshells + qcow2).
+# access to catppuccin theme sources and nixvim (same pattern as devshells + qcow2).
 
 { config, pkgs, lib, konductor, ... }:
 
@@ -25,16 +29,38 @@ let
   # Catppuccin theme sources from catppuccin/nix flake
   # Same pattern as src/devshells/default.nix:34 and src/qcow2/default.nix:36
   catppuccinSources = konductor.inputs.catppuccin.packages.${pkgs.stdenv.hostPlatform.system};
+
+  # Config provides wrapped tools with hermetic configuration
+  konductorConfig = import ../config { inherit pkgs lib versions catppuccinSources; };
+
+  # Programs (neovim, tmux, ttyd) — needs flake inputs for nixvim
+  programs = import ../programs {
+    inherit pkgs;
+    inherit (konductor) inputs;
+    inherit (konductor.inputs.nixpkgs) lib;
+  };
+
+  # Packages for IDE tools
+  packages = import ../packages { inherit pkgs lib versions; config = konductorConfig; };
 in
 {
   options.konductor = common.mkOptions;
 
   config = lib.mkIf cfg.enable {
     home = {
+      # Base + language packages
       packages = common.mkPackages {
         inherit cfg pkgs lib versions catppuccinSources;
-      };
-      sessionVariables = common.mkEnv;
+      }
+      # IDE programs: neovim, tmux, ttyd
+      ++ common.mkPrograms { inherit programs packages; };
+
+      # Config files: bashrc, starship, atuin, inputrc, bash_profile
+      file = common.mkHomeFiles { config = konductorConfig; };
+
+      # Full environment: base (EDITOR, PAGER) + tool paths (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
+      sessionVariables = common.mkFullEnv { config = konductorConfig; };
+
       shellAliases = common.mkAliases;
     };
   };
