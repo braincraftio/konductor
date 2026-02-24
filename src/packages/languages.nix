@@ -69,8 +69,8 @@ rec {
     pkgs."nodejs_${langs.node.version}"
     nodePackages.pnpm
     nodePackages.yarn
-    nodePackages.typescript
     nodePackages.typescript-language-server
+    # typescript → bundled by wrangler in ide.nix, standalone causes buildEnv collision
     # prettier → wrapped in src/config/formatters/ (in packages.default)
     # biome → wrapped in src/config/formatters/ (in packages.default)
   ];
