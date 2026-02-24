@@ -83,6 +83,7 @@ in
       packages = import ../packages { inherit pkgs lib config versions; };
     in
     packages.default
+    ++ [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals cfg.enablePython packages.pythonPackages
     ++ lib.optionals cfg.enableGo packages.goPackages
     ++ lib.optionals cfg.enableNode packages.nodejsPackages
