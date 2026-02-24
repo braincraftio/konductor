@@ -130,11 +130,17 @@ in
   # QCOW2 sets BASH_ENV="/etc/set-environment" (NixOS-specific) instead.
   # For home-manager, .bash_profile → .bashrc handles interactive shells.
 
-  mkFullEnv = { config }:
+  mkFullEnv = { config, sslCertFile ? "/etc/ssl/certs/ca-certificates.crt" }:
     import ../lib/env.nix
     // (builtins.removeAttrs config.shell.bash.env [ "BASH_ENV" ])
     // config.shell.atuin.env
-    // { KONDUCTOR = "true"; };
+    // {
+      KONDUCTOR = "true";
+      # Override NixOS-specific ca-bundle.crt path from env.nix
+      # Non-NixOS distros (Ubuntu, Pop!_OS, Debian) use ca-certificates.crt
+      SSL_CERT_FILE = sslCertFile;
+      NIX_SSL_CERT_FILE = sslCertFile;
+    };
 
   # ===========================================================================
   # Base Environment Variables (imported from SSOT)
