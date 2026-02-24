@@ -30,7 +30,7 @@ in
     bat # cat with syntax highlighting
     eza # Modern ls
     dust # Disk usage analyzer
-    tree # Directory tree
+    # tree → wrapped in src/config/ (in packages.default via cli.nix)
 
     # AI coding agents (from unstable - fast-moving packages)
     # opencode: 1.0.184 (unstable) vs 1.0.105 (25.11)
