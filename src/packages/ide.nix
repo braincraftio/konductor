@@ -25,7 +25,7 @@ in
     lazygit # Git TUI
     htop # Process monitor
     btop
-    bottom # System monitor (btm)
+    # bottom → provided in cli.nix (in packages.default)
     macchina # System info fetcher
     bat # cat with syntax highlighting
     eza # Modern ls
@@ -59,16 +59,15 @@ in
 
     # Language Server Protocol (LSP) servers for Claude Code CLI code intelligence
     # https://docs.anthropic.com/en/docs/claude-code/settings#code-intelligence
-    gopls # Go LSP server
+    # gopls → provided in goPackages (languages.nix)
     lua-language-server # Lua LSP server
     pyright # Python LSP server
-    rust-analyzer # Rust LSP server
-    typescript-language-server # TypeScript/JavaScript LSP server
+    # rust-analyzer → provided as extension in rustPackages (languages.nix)
+    # typescript-language-server → provided in nodejsPackages (languages.nix)
     nil # Nix LSP server
 
     # Git forge CLI tools (used as git credential helpers)
-    gh # GitHub CLI (also used as git credential helper for GitHub)
-    tea # Gitea/Forgejo CLI client (also used as git credential helper)
+    # gh, tea, forgejo-cli → provided in cli.nix (in packages.default)
     # Note: forgejo-cli is provided by programs.forgejo.cliPackages
 
     # Model Context Protocol (MCP) servers for Claude Code
