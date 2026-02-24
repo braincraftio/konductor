@@ -122,11 +122,17 @@ in
   # Full Environment Variables (base + tool config paths)
   # ===========================================================================
   # Merges env.nix (EDITOR, PAGER, etc.) with tool-specific config paths
-  # (BASH_ENV, ATUIN_CONFIG_DIR, KONDUCTOR_PREEXEC_PATH, etc.)
+  # (KONDUCTOR_BASHRC, ATUIN_CONFIG_DIR, KONDUCTOR_PREEXEC_PATH, etc.)
+  #
+  # BASH_ENV is excluded: it points to the konductor bashrc which causes
+  # infinite recursion when tools like starship spawn non-interactive bash
+  # subprocesses (BASH_ENV → bashrc → starship init → bash → BASH_ENV → ...).
+  # QCOW2 sets BASH_ENV="/etc/set-environment" (NixOS-specific) instead.
+  # For home-manager, .bash_profile → .bashrc handles interactive shells.
 
   mkFullEnv = { config }:
     import ../lib/env.nix
-    // config.shell.bash.env
+    // (builtins.removeAttrs config.shell.bash.env [ "BASH_ENV" ])
     // config.shell.atuin.env
     // { KONDUCTOR = "true"; };
 
