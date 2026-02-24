@@ -81,6 +81,16 @@ in
       source /etc/profile
     fi
 
+    # Source home-manager session variables (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
+    # Required for standalone home-manager; NixOS/darwin set these via PAM
+    if [ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
+      source "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
+    elif [ -f "$HOME/.local/state/nix/profiles/profile/etc/profile.d/hm-session-vars.sh" ]; then
+      source "$HOME/.local/state/nix/profiles/profile/etc/profile.d/hm-session-vars.sh"
+    elif [ -f "/etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh" ]; then
+      source "/etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh"
+    fi
+
     # Source user bashrc for aliases and shell config
     if [ -f ~/.bashrc ]; then
       source ~/.bashrc
