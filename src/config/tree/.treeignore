@@ -1,6 +1,12 @@
 # .treeignore - patterns to hide from tree output for visibility
-# Used via: tree --gitfile=.treeignore (additive to --gitignore)
-# These are often TRACKED files that clutter tree visibility
+# Used via: eza -I flag (additive to --git-ignore)
+#
+# The Nix wrapper (default.nix) processes these patterns:
+#   - Strips trailing slashes
+#   - Prepends **/ to patterns not already starting with *
+#   - Joins with | for eza -I flag
+#
+# Write bare names here. The wrapper handles globbing.
 
 # Lock files (tracked but verbose/noisy)
 package-lock.json
@@ -15,30 +21,44 @@ composer.lock
 Gemfile.lock
 flake.lock
 
-# IDE/Editor (often in global gitignore, not project .gitignore)
-.idea/
-.vscode/
-.fleet/
+# IDE/Editor
+.idea
+.vscode
+.fleet
 *.swp
 *.swo
 *~
 
-# AI assistants (often in global gitignore)
-.claude/
-.gemini/
-.cursor/
-.copilot/
-.aider*/
+# AI assistants
+.claude
+.gemini
+.cursor
+.copilot
+.aider*
 
 # Nix build artifacts
-.direnv/
+.direnv
 result
 result-*
 
-# Dev tool caches (may not be in all .gitignores)
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-__pycache__/
-.cache/
-.turbo/
+# Node/JS ecosystem
+node_modules
+.slidev
+.nuxt
+.next
+.output
+.parcel-cache
+
+# Build output
+dist
+
+# Dev tool caches
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+.cache
+.turbo
+
+# Cloned source material (study repos, not project code)
+sources
