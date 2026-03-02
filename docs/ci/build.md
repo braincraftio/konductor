@@ -637,7 +637,7 @@ echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
 # For now using user mode (restrict=off) since host VM doesn't have passt until next rebuild
 qemu-system-x86_64 \
     -machine q35,accel=kvm,mem-merge=on \
-    -m "${QCOW2_VM_MEMORY:-8192}" \
+    -m "${QCOW2_VM_MEMORY:-16384}" \
     -cpu host \
     -smp "${QCOW2_VM_CPUS:-$VM_CPUS}" \
     -rtc base=utc,clock=host \
