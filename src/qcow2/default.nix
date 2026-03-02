@@ -2253,22 +2253,22 @@ EOF
               fi
 
               # Create overlay directories
-              mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
+              ${pkgs.coreutils}/bin/mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
 
               # Check if already mounted as overlay
-              if mount | grep -q "overlay on /nix/store"; then
+              if ${pkgs.util-linux}/bin/mount | ${pkgs.gnugrep}/bin/grep -q "overlay on /nix/store"; then
                 echo "Overlay already mounted"
                 exit 0
               fi
 
               # Bind mount original store to preserve it
               if [ ! -d /nix/.local-store ]; then
-                mkdir -p /nix/.local-store
-                mount --bind /nix/store /nix/.local-store
+                ${pkgs.coreutils}/bin/mkdir -p /nix/.local-store
+                ${pkgs.util-linux}/bin/mount --bind /nix/store /nix/.local-store
               fi
 
               # Mount overlay: host store (ro) + rw-store (rw) -> /nix/store
-              mount -t overlay overlay \
+              ${pkgs.util-linux}/bin/mount -t overlay overlay \
                 -o lowerdir=/nix/.host-store:/nix/.local-store,upperdir=/nix/.rw-store/upper,workdir=/nix/.rw-store/work \
                 /nix/store
 
@@ -2276,11 +2276,11 @@ EOF
             '';
             ExecStop = pkgs.writeShellScript "nix-store-overlay-teardown" ''
               # Unmount overlay and restore local store
-              if mount | grep -q "overlay on /nix/store"; then
-                umount /nix/store || true
+              if ${pkgs.util-linux}/bin/mount | ${pkgs.gnugrep}/bin/grep -q "overlay on /nix/store"; then
+                ${pkgs.util-linux}/bin/umount /nix/store || true
                 if [ -d /nix/.local-store ]; then
-                  mount --bind /nix/.local-store /nix/store || true
-                  umount /nix/.local-store || true
+                  ${pkgs.util-linux}/bin/mount --bind /nix/.local-store /nix/store || true
+                  ${pkgs.util-linux}/bin/umount /nix/.local-store || true
                 fi
               fi
             '';
