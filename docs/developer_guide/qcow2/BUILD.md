@@ -525,6 +525,7 @@ Full build pipeline: clean → image → container → push.
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
 set -e
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
+QCOW2_BUILD_FILE="${QCOW2_BUILD_FILE:-docs/developer_guide/qcow2/BUILD.md}"
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  build:qcow2:publish - Build + Package + Push Pipeline"
@@ -1164,6 +1165,7 @@ Complete end-to-end pipeline with validation.
 
 ```sh {"name":"build:qcow2:all","excludeFromRunAll":"true","tag":"type:entry,duration:very-slow"}
 set -e
+QCOW2_BUILD_FILE="${QCOW2_BUILD_FILE:-docs/developer_guide/qcow2/BUILD.md}"
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  build:qcow2:all - Complete End-to-End Pipeline"
