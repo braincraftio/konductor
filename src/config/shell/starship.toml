@@ -122,15 +122,15 @@ style = "bold peach"
 # ===========================================================================
 
 [username]
-# Only show for SSH or root (security awareness)
+# Always show user@host - critical for multi-host konductor environments
 style_user = "teal"
 style_root = "bold red"
 format = "[$user]($style)"
-show_always = false
+show_always = true
 
 [hostname]
-# SSH indicator - critical for nested sessions
-ssh_only = true
+# Always show hostname - critical for multi-host konductor environments
+ssh_only = false
 format = "[@$hostname]($style) "
 style = "teal"
 
