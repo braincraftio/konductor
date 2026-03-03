@@ -59,7 +59,9 @@ in
       file = common.mkHomeFiles { config = konductorConfig; };
 
       # Full environment: base (EDITOR, PAGER) + tool paths (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
-      sessionVariables = common.mkFullEnv { config = konductorConfig; };
+      # + konductor self-hosting env (OVMF_CODE, OVMF_VARS, DOCKER_BUILDKIT)
+      sessionVariables = common.mkFullEnv { config = konductorConfig; }
+        // (packages.konductor.env pkgs);
 
       shellAliases = common.mkAliases;
     };
