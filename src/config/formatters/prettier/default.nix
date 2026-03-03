@@ -5,8 +5,9 @@
 # The wrapper forces config via --config flag with no escape hatch.
 #
 # Includes prettier-plugin-slidev for Slidev presentation markdown files.
-# The plugin depends on @slidev/parser at runtime which must be available in
-# the project's node_modules (true for any Slidev project by definition).
+# The plugin is built from source via buildNpmPackage with @slidev/parser
+# vendored in node_modules/ so ESM bare specifier resolution works.
+# (ESM ignores NODE_PATH — it resolves relative to the importing file.)
 
 { pkgs, ... }:
 
@@ -18,39 +19,67 @@ let
     text = builtins.readFile ./.prettierrc.yaml;
   };
 
-  # prettier-plugin-slidev: handles multi-frontmatter --- blocks in Slidev markdown
+  # prettier-plugin-slidev: handles multi-frontmatter --- blocks in Slidev markdown.
   # Without this, prettier treats mid-file --- as horizontal rules and destroys
   # frontmatter by collapsing YAML keys onto single lines.
   # https://github.com/slidevjs/prettier-plugin
-  prettierPluginSlidev = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/prettier-plugin-slidev/-/prettier-plugin-slidev-1.0.5.tgz";
-    hash = "sha256-+2ued/XCn58+kt+BgWwWYXB/FJBnEVW0rz9EUefGkes=";
-  };
+  #
+  # Built from source so that buildNpmPackage vendors all dependencies
+  # (including @slidev/parser and prettier) into node_modules/ adjacent
+  # to the plugin's dist/index.js. ESM bare specifier resolution walks
+  # node_modules/ relative to the importing file, so this layout lets
+  # the plugin resolve its imports without NODE_PATH hacks.
+  prettierPluginSlidev = pkgs.buildNpmPackage {
+    pname = "prettier-plugin-slidev";
+    version = "1.0.5";
 
-  # Unpack the plugin tarball into a usable directory
-  pluginDir = pkgs.runCommand "prettier-plugin-slidev-1.0.5" {} ''
-    mkdir -p $out
-    tar xzf ${prettierPluginSlidev} -C $out --strip-components=1
-  '';
+    src = pkgs.fetchFromGitHub {
+      owner = "slidevjs";
+      repo = "prettier-plugin";
+      rev = "v1.0.5";
+      hash = "sha256-AIlOwylRuZ6/I4whoc/dJdGRQoldWVzTucABsnCEREo=";
+    };
+
+    npmDepsHash = "sha256-UaDGJPCFs0alYq9wOqkMtJZreQTFdhuIkF6pJaHb5x4=";
+
+    # The repo uses pnpm-lock.yaml but buildNpmPackage needs package-lock.json.
+    # We supply a generated one.
+    postPatch = ''
+      cp ${./prettier-plugin-slidev.package-lock.json} package-lock.json
+    '';
+
+    # Build produces dist/index.js via vite
+    npmBuildScript = "build";
+
+    # Keep node_modules in the output so ESM can resolve @slidev/parser and prettier
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out/lib/node_modules/prettier-plugin-slidev
+      cp -r dist package.json node_modules $out/lib/node_modules/prettier-plugin-slidev/
+      runHook postInstall
+    '';
+
+    meta = {
+      description = "Prettier plugin for Slidev multi-frontmatter markdown";
+      homepage = "https://github.com/slidevjs/prettier-plugin";
+      license = pkgs.lib.licenses.mit;
+    };
+  };
 in
 {
   package = pkgs.writeShellApplication {
     name = "prettier";
     runtimeInputs = [ pkgs.nodePackages.prettier ];
     text = ''
-      # NODE_PATH allows the plugin to resolve @slidev/parser from the project's node_modules
-      _cwd="$(pwd)"
-      NODE_PATH="''${NODE_PATH:+$NODE_PATH:}$_cwd/node_modules"
-      export NODE_PATH
       exec prettier \
         --config "${configFile}/.prettierrc.yaml" \
-        --plugin "${pluginDir}/dist/index.js" \
+        --plugin "${prettierPluginSlidev}/lib/node_modules/prettier-plugin-slidev/dist/index.js" \
         "$@"
     '';
   };
 
   unwrapped = pkgs.nodePackages.prettier;
-  inherit configFile pluginDir;
+  inherit configFile prettierPluginSlidev;
 
   meta = {
     description = "Code formatter with Slidev plugin";
