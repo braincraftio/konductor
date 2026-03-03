@@ -55,7 +55,14 @@ vueIndentScriptAndStyle: false
 
 # Language-specific overrides
 overrides:
-  # Markdown files
+  # Slidev presentation files — use the slidev parser to preserve multi-frontmatter blocks
+  # Without this, prettier treats mid-file --- as horizontal rules and destroys frontmatter
+  # Globs use ** prefix to match regardless of cwd depth
+  - files: ["**/slides.md", "**/pages/*.md", "**/decks/**/*.md", "**/shared/fragments/**/*.md"]
+    options:
+      parser: slidev
+
+  # Markdown files (non-Slidev)
   - files: ["*.md"]
     options:
       proseWrap: always
