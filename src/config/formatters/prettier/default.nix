@@ -39,9 +39,9 @@ in
     runtimeInputs = [ pkgs.nodePackages.prettier ];
     text = ''
       # NODE_PATH allows the plugin to resolve @slidev/parser from the project's node_modules
-      local cwd
-      cwd="$(pwd)"
-      export NODE_PATH="''${NODE_PATH:+$NODE_PATH:}$cwd/node_modules"
+      _cwd="$(pwd)"
+      NODE_PATH="''${NODE_PATH:+$NODE_PATH:}$_cwd/node_modules"
+      export NODE_PATH
       exec prettier \
         --config "${configFile}/.prettierrc.yaml" \
         --plugin "${pluginDir}/dist/index.js" \
