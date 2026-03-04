@@ -60,8 +60,12 @@ in
 
       # Full environment: base (EDITOR, PAGER) + tool paths (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
       # + konductor self-hosting env (OVMF_CODE, OVMF_VARS, DOCKER_BUILDKIT)
+      # + LD_LIBRARY_PATH for native extensions (grpcio, etc.) — mirrors konductor.nix:61-65
       sessionVariables = common.mkFullEnv { config = konductorConfig; }
-        // (packages.konductor.env pkgs);
+        // (packages.konductor.env pkgs)
+        // {
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+        };
 
       shellAliases = common.mkAliases;
     };
