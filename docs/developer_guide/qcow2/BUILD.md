@@ -931,7 +931,7 @@ Copy validated image to public registry (docker.io or ghcr.io).
 **Environment variables:**
 
 - `PROMOTE_REGISTRY` - Destination registry (default: `docker.io`)
-- `PROMOTE_IMAGE` - Destination image (default: `braincraft/konductor`)
+- `PROMOTE_IMAGE` - Destination image (default: `containercraft/konductor`)
 - `PROMOTE_TAG` - Base tag (default: `latest-qcow2`)
 - `DOCKER_TOKEN` - Docker Hub access token
 - `DOCKER_USERNAME` - Docker Hub username (default: `containercraft`)
@@ -962,7 +962,7 @@ SRC_CERT_DIR="${WORKSPACE_ROOT}/.certs/${SRC_REGISTRY}"
 [ -d "$SRC_CERT_DIR" ] || { echo "✗ Source cert dir not found"; exit 1; }
 
 DST_REGISTRY="${PROMOTE_REGISTRY:-docker.io}"
-DST_IMAGE="${PROMOTE_IMAGE:-braincraft/konductor}"
+DST_IMAGE="${PROMOTE_IMAGE:-containercraft/konductor}"
 DST_TAG="${PROMOTE_TAG:-latest-qcow2}"
 
 echo "Source: ${SRC_REGISTRY}/${SRC_IMAGE}:${SRC_TAG}"
@@ -1276,7 +1276,7 @@ cat .konductor
 [konductor]
 git_commit = "<40-char SHA>"
 git_branch = "main"
-git_remote = "https://github.com/braincraft/konductor.git"
+git_remote = "https://github.com/containercraft/konductor.git"
 git_dirty = 0
 nix_version = "2.24.0"
 nix_hash = "sha256-..."
@@ -1522,7 +1522,7 @@ export QCOW2_TTYD_PORT=17681     # TTYD port on host
 
 # Promotion
 export PROMOTE_REGISTRY="docker.io"
-export PROMOTE_IMAGE="braincraft/konductor"
+export PROMOTE_IMAGE="containercraft/konductor"
 export DOCKER_TOKEN="<your-token>"
 ```
 
