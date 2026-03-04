@@ -492,7 +492,7 @@ List tags for konductor image.
 
 ```sh {"name":"registry:tags","excludeFromRunAll":"true","tag":"type:entry,scope:registry,type:readonly"}
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
     "https://$REGISTRY/v2/$IMAGE/tags/list" | jq
 ```
@@ -516,7 +516,7 @@ Full build pipeline: clean → image → container.
 
 - `konductor.qcow2` - Compressed QCOW2 image
 - `.konductor` - Provenance file
-- OCI image loaded to local Docker daemon as `registry.docker.arpa/braincraft/konductor:latest-qcow2`
+- OCI image loaded to local Docker daemon as `registry.docker.arpa/containercraft/konductor:latest-qcow2`
 
 **Duration:** 30-60 minutes (depends on build host)
 
@@ -588,7 +588,7 @@ Push container with multi-tag (git commit, nix derivation, latest).
 ```sh {"name":"build:qcow2:push","excludeFromRunAll":"true","tag":"type:entry,requires:docker"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
@@ -956,7 +956,7 @@ PROVENANCE_FILE="${WORKSPACE_ROOT}/k9/.konductor"
 [ -f "$PROVENANCE_FILE" ] || { echo "✗ Provenance file not found"; exit 1; }
 
 SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-SRC_IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+SRC_IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 SRC_TAG="${CONTAINER_TAG:-latest-qcow2}"
 SRC_CERT_DIR="${WORKSPACE_ROOT}/.certs/${SRC_REGISTRY}"
 [ -d "$SRC_CERT_DIR" ] || { echo "✗ Source cert dir not found"; exit 1; }
@@ -1248,7 +1248,7 @@ cat .konductor
 
 ### OCI Container
 
-**Registry:** `registry.docker.arpa/braincraft/konductor`
+**Registry:** `registry.docker.arpa/containercraft/konductor`
 
 **Tags:**
 
@@ -1290,7 +1290,7 @@ build_hw_vendor = "Dell Inc."
 build_hw_product = "PowerEdge R730"
 build_hw_serial = "ABC123"
 strict = false
-oci_image = "registry.docker.arpa/braincraft/konductor"
+oci_image = "registry.docker.arpa/containercraft/konductor"
 oci_tags = ["latest-qcow2", "qcow2-abc123", "qcow2-def456"]
 image_sha256 = "def456..."
 image_size = "3.8G"
@@ -1359,7 +1359,7 @@ docker pull "${oci_image}:qcow2-${git_commit}"
 ```bash {"name":"verify:digest","excludeFromRunAll":"true","tag":"type:example"}
 # Compare digest from provenance with actual image
 expected=$(grep '^oci_digest = ' .konductor | cut -d'"' -f2)
-actual=$(skopeo inspect docker://registry.docker.arpa/braincraft/konductor:latest-qcow2 | jq -r '.Digest')
+actual=$(skopeo inspect docker://registry.docker.arpa/containercraft/konductor:latest-qcow2 | jq -r '.Digest')
 [ "$expected" = "$actual" ] && echo "✓ Digest match" || echo "✗ Digest mismatch"
 ```
 
@@ -1512,7 +1512,7 @@ export SKIP_COMPRESS=false       # Skip ZSTD compression (faster, larger image)
 
 # Registry configuration
 export CONTAINER_REGISTRY="registry.docker.arpa"
-export CONTAINER_IMAGE="braincraft/konductor"
+export CONTAINER_IMAGE="containercraft/konductor"
 export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding

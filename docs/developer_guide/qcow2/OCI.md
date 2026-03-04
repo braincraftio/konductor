@@ -47,7 +47,7 @@ Set these in `.env` or export before running:
 ```bash
 # Registry configuration
 export CONTAINER_REGISTRY="registry.docker.arpa"
-export CONTAINER_IMAGE="braincraft/konductor"
+export CONTAINER_IMAGE="containercraft/konductor"
 export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding (host ports, avoid conflicts with host services)
@@ -97,7 +97,7 @@ echo "════════════════════════�
 echo "  oci:build - Standalone QCOW2 + OCI Build Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
-echo "  Target: ${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-braincraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
+echo "  Target: ${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 echo ""
 
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
@@ -175,7 +175,7 @@ echo "DEBUG: which docker=$(which docker)"
 echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
 echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 TAG="${CONTAINER_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 
@@ -1117,7 +1117,7 @@ BUILD_HW_VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d
 BUILD_HW_PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || BUILD_HW_PRODUCT=""
 BUILD_HW_SERIAL=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || BUILD_HW_SERIAL=""
 
-CONTAINER_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-braincraft/konductor}"
+CONTAINER_IMAGE="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
 
 # Build tag list for provenance - full hashes, dirty indicator when tree is dirty
 CONTAINER_TAGS="[\"${CONTAINER_TAG:-latest-qcow2}\""
