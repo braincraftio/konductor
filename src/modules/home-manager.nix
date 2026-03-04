@@ -48,23 +48,41 @@ in
 
   config = lib.mkIf cfg.enable {
     home = {
-      # Base + language packages
+      # Base + language packages + atuin (mirrors konductor.nix nativeBuildInputs)
       packages = common.mkPackages {
         inherit cfg pkgs lib versions catppuccinSources;
       }
       # IDE programs: neovim, tmux, ttyd
-      ++ common.mkPrograms { inherit programs packages; };
+      ++ common.mkPrograms { inherit programs packages; }
+      # Atuin shell history (mirrors konductor.nix:47)
+      ++ konductorConfig.shell.atuin.packages;
 
       # Config files: bashrc, starship, atuin, inputrc, bash_profile
       file = common.mkHomeFiles { config = konductorConfig; };
 
-      # Full environment: base (EDITOR, PAGER) + tool paths (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
-      # + konductor self-hosting env (OVMF_CODE, OVMF_VARS, DOCKER_BUILDKIT)
-      # + LD_LIBRARY_PATH for native extensions (grpcio, etc.) — mirrors konductor.nix:61-65
+      # Full environment — mirrors konductor.nix env (lines 138-161) + shellHook exports (lines 60-110)
       sessionVariables = common.mkFullEnv { config = konductorConfig; }
         // (packages.konductor.env pkgs)
+        // konductorConfig.shell.ssh.env
+        // programs.tmux.env
         // {
-          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+          # LD_LIBRARY_PATH — mirrors konductor.nix:61-65 (all three libs)
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.xz
+            pkgs.zstd
+          ]}";
+          # Language env vars — mirrors konductor.nix:144-153
+          UV_SYSTEM_PYTHON = "1";
+          PYTHONDONTWRITEBYTECODE = "1";
+          GO111MODULE = "on";
+          CGO_ENABLED = "1";
+          NODE_ENV = "development";
+          RUST_BACKTRACE = "1";
+          # Docker — mirrors konductor.nix:101 and packages/konductor.nix:55
+          DOCKER_HOST = "unix:///var/run/docker.sock";
+          # Shell identity
+          KONDUCTOR_SHELL = "konductor";
         };
 
       shellAliases = common.mkAliases;
