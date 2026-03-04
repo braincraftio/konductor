@@ -11,6 +11,9 @@ runme:
 
 Verify this Konductor VM can reproduce its own build from `/.konductor` provenance.
 
+**Execution context:** This file runs INSIDE a built Konductor VM (`cwd: /opt/konductor`),
+not on the build host.
+
 ## Contents
 
 - [Quick Verify](#quick-verify)
@@ -23,7 +26,7 @@ Verify this Konductor VM can reproduce its own build from `/.konductor` provenan
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  verify:konductor                Show this help                             │
+│  verify:help                     Show this help                             │
 │    ├── :provenance               Display /.konductor                        │
 │    ├── :source                   Verify git commit matches                  │
 │    ├── :flake                    Verify flake.lock hash                     │
@@ -33,13 +36,13 @@ Verify this Konductor VM can reproduce its own build from `/.konductor` provenan
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### verify:konductor
+### verify:help
 
-```sh {"name":"verify:konductor","excludeFromRunAll":"true"}
+```sh {"name":"verify:help","excludeFromRunAll":"true"}
 cat << 'EOF'
-verify:konductor - Konductor Build Verification
+verify — Konductor Build Verification
 
-Usage: runme run verify:konductor:<task>
+Usage: runme run --filename docs/ci/verify.md verify:<task>
 
 Tasks:
   :provenance    Display /.konductor provenance
@@ -60,22 +63,22 @@ EOF
 
 ## Verification Tasks
 
-### verify:konductor:provenance
+### verify:provenance
 
 Display provenance from `/.konductor`.
 
-```sh {"name":"verify:konductor:provenance","excludeFromRunAll":"true"}
+```sh {"name":"verify:provenance","excludeFromRunAll":"true"}
 [ -f /.konductor ] || { echo "Error: /.konductor not found (not a Konductor VM?)"; exit 1; }
 cat /.konductor
 ```
 
 ---
 
-### verify:konductor:source
+### verify:source
 
 Verify git commit matches provenance.
 
-```sh {"name":"verify:konductor:source","excludeFromRunAll":"true"}
+```sh {"name":"verify:source","excludeFromRunAll":"true"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 
@@ -95,11 +98,11 @@ fi
 
 ---
 
-### verify:konductor:flake
+### verify:flake
 
 Verify flake.lock sha256 matches provenance.
 
-```sh {"name":"verify:konductor:flake","excludeFromRunAll":"true"}
+```sh {"name":"verify:flake","excludeFromRunAll":"true"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 [ -f flake.lock ] || { echo "Error: flake.lock not found"; exit 1; }
@@ -120,11 +123,11 @@ fi
 
 ---
 
-### verify:konductor:nix
+### verify:nix
 
 Verify nix derivation hash matches provenance.
 
-```sh {"name":"verify:konductor:nix","excludeFromRunAll":"true"}
+```sh {"name":"verify:nix","excludeFromRunAll":"true"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 
@@ -157,11 +160,11 @@ fi
 
 ---
 
-### verify:konductor:all
+### verify:all
 
 Run all verification checks.
 
-```sh {"name":"verify:konductor:all","excludeFromRunAll":"true"}
+```sh {"name":"verify:all","excludeFromRunAll":"true"}
 set -e
 echo "=== Konductor Build Verification ==="
 echo ""
@@ -237,11 +240,11 @@ fi
 
 ## Full Reproduction
 
-### verify:konductor:reproduce
+### verify:reproduce
 
-Full reproduction build - builds QCOW2 and compares image_sha256.
+Full reproduction build — builds QCOW2 and compares image_sha256.
 
-```sh {"name":"verify:konductor:reproduce","excludeFromRunAll":"true"}
+```sh {"name":"verify:reproduce","excludeFromRunAll":"true"}
 set -e
 echo "=== Full Reproduction Build ==="
 echo "This will build a new QCOW2 and compare sha256"
@@ -254,16 +257,16 @@ echo "Expected image_sha256: $EXPECTED_SHA"
 echo ""
 
 # Run verification first
-runme run verify:konductor:all
+runme run verify:all
 
 echo ""
 echo "=== Starting Build ==="
 echo "This may take 30+ minutes..."
 echo ""
 
-# Build using the same process
-export QCOW2_BUILD_FILE=docs/developer_guide/qcow2/BUILD.md
-runme run --filename "$QCOW2_BUILD_FILE" build:qcow2:image
+# Build using the image-only pipeline (no container packaging needed for reproduction)
+BUILD_FILE=docs/ci/build.md
+runme run --filename "$BUILD_FILE" build:image
 
 ACTUAL_SHA=$(sha256sum konductor.qcow2 | cut -d' ' -f1)
 

@@ -1,41 +1,37 @@
 ---
-cwd: ../../..
+cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: target:qcow2,scope:standalone
+tag: scope:ci,target:qcow2
 runme:
   version: v3
   debug: true
 ---
 
-# Konductor QCOW2 OCI Build (Standalone)
+# Konductor QCOW2 Build Pipeline
 
-Standalone offline build pipeline for QCOW2 VM image with OCI containerDisk packaging.
+Complete build pipeline: source → nix → VM configure → seal → compress → OCI containerDisk.
 
-This file is intended to be self-contained and should not require the parent workspace or mise
-tasks.
-
-Use directly from `${WORKSPACE_ROOT}/flake` or `/opt/konductor/src` without external dependencies.
+This file is self-contained. All 21 internal phases run sequentially within this file.
+No external file dependencies. Called by `ci:pipeline` (README.md) or directly.
 
 ## Contents
 
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
-- [Task Reference](#task-reference)
-- [Pipeline Tasks](#pipeline-tasks)
+- [Entry Points](#entry-points)
+- [Build Phases](#build-phases)
 
 ---
 
 ## Quick Start
 
 ```bash
-# Full build pipeline (clean → nix → vm → seal → container)
-runme run oci:build
+# Full build pipeline (clean → nix → VM → seal → container)
+runme run --filename docs/ci/build.md build:all
 
-# Or run individual steps
-runme run oci:clean
-runme run oci:image
-runme run oci:container
+# Build QCOW2 only (no container packaging)
+runme run --filename docs/ci/build.md build:image
 ```
 
 ---
@@ -67,51 +63,82 @@ export SKIP_NIX_BUILD=false
 
 ```text
 Entry Points:
-  oci:build              Full pipeline: clean → image → container
-  oci:image              Build QCOW2 only
-  oci:container          Package QCOW2 as containerDisk
-  oci:clean              Reset build state
+  build:all            Full pipeline: clean → nix → VM → seal → container
+  build:image          Build QCOW2 only (no container packaging)
+  build:preflight      Validate environment (standalone)
 
-Development:
-  oci:start              Boot VM for development
-  oci:ssh                SSH into running VM
-  oci:stop               Shutdown VM
-  oci:vendor:inputs           Vendor flake inputs into ./_sources (online)
-  oci:vendor:inputs:online    Refresh lock + vendor inputs from network (intermittent)
-
-Debug:
-  oci:debug:log          View boot log
-  oci:vm:kill            Force kill VM
+Internal Phases (called by entry points):
+  _build:clean              Reset build state
+  _build:nix                Nix build + writable overlay
+  _build:cloudinit          Generate cloud-init ISO
+  _build:img:reset          Reset image to pristine state
+  _build:vm:boot            Boot QEMU VM
+  _build:vm:wait            Wait for SSH
+  _build:vm:sync            Sync source to VM
+  _build:vm:rebuild         nixos-rebuild inside VM
+  _build:vm:pki:test        PKI tests
+  _build:vm:pki:status      PKI certificate status
+  _build:vm:provenance      Write /.konductor provenance
+  _build:vm:gc              Garbage collect
+  _build:vm:zero            Zero free space
+  _build:vm:halt            Shutdown VM
+  _build:img:clean          Clean credentials from image
+  _build:img:compress       ZSTD compress
+  _build:img:sparsify       Sparsify image
+  _build:tmp:clean          Remove temp files
+  _build:verify             Append post-seal fields
+  _build:container          Package as OCI containerDisk
 ```
 
 ---
 
-## oci:build
+## Entry Points
 
-Full pipeline: clean → image → container.
+### build:all
 
-```bash {"name":"oci:build","excludeFromRunAll":"true","tag":"type:entry"}
+Full pipeline: clean → nix → VM configure → seal → compress → containerDisk.
+
+```bash {"name":"build:all","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
 set -e
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  oci:build - Standalone QCOW2 + OCI Build Pipeline"
+echo "  build:all — Full QCOW2 + OCI Build Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Target: ${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
 echo ""
 
-OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
+BUILD_FILE="docs/ci/build.md"
 
-echo "▶ Phase 1: Clean..."
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" oci:clean
+PHASES=(
+    "_build:clean"
+    "build:preflight"
+    "_build:nix"
+    "_build:cloudinit"
+    "_build:img:reset"
+    "_build:vm:boot"
+    "_build:vm:wait"
+    "_build:vm:sync"
+    "_build:vm:rebuild"
+    "_build:vm:pki:test"
+    "_build:vm:pki:status"
+    "_build:vm:provenance"
+    "_build:vm:gc"
+    "_build:vm:zero"
+    "_build:vm:halt"
+    "_build:img:clean"
+    "_build:img:compress"
+    "_build:img:sparsify"
+    "_build:tmp:clean"
+    "_build:verify"
+    "_build:container"
+)
 
-echo ""
-echo "▶ Phase 2: Build QCOW2 image..."
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" oci:image
-
-echo ""
-echo "▶ Phase 3: Package as containerDisk..."
-runme run --direnv=true --load-env=true --filename "$OCI_BUILD_FILE" oci:container
+for phase in "${PHASES[@]}"; do
+    echo ""
+    echo "▶ ${phase}..."
+    runme run --direnv=true --load-env=false --filename "$BUILD_FILE" "$phase"
+done
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -122,101 +149,65 @@ cat .konductor
 
 ---
 
-## oci:image
+### build:image
 
-Build QCOW2: nix → VM configure → seal → verify.
+Build QCOW2 only (no container packaging). Used by `verify:reproduce` for image-only builds.
 
-```bash {"name":"oci:image","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"build:image","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
 set -e
-OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
 
-# Pipeline phases in order
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  build:image — QCOW2 Image Build (no container packaging)"
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+
+BUILD_FILE="docs/ci/build.md"
+
 PHASES=(
-    "_oci:preflight"
-    "_oci:nix"
-    "_oci:cloudinit"
-    "_oci:img:reset"
-    "_oci:vm:boot"
-    "_oci:vm:wait"
-    "_oci:vm:sync"
-    "_oci:vm:rebuild"
-    "_oci:vm:pki:test"
-    "_oci:vm:pki:status"
-    "_oci:vm:provenance"
-    "_oci:vm:gc"
-    "_oci:vm:zero"
-    "_oci:vm:halt"
-    "_oci:img:clean"
-    "_oci:img:compress"
-    "_oci:img:sparsify"
-    "_oci:tmp:clean"
-    "_oci:verify"
+    "_build:clean"
+    "build:preflight"
+    "_build:nix"
+    "_build:cloudinit"
+    "_build:img:reset"
+    "_build:vm:boot"
+    "_build:vm:wait"
+    "_build:vm:sync"
+    "_build:vm:rebuild"
+    "_build:vm:pki:test"
+    "_build:vm:pki:status"
+    "_build:vm:provenance"
+    "_build:vm:gc"
+    "_build:vm:zero"
+    "_build:vm:halt"
+    "_build:img:clean"
+    "_build:img:compress"
+    "_build:img:sparsify"
+    "_build:tmp:clean"
+    "_build:verify"
 )
 
 for phase in "${PHASES[@]}"; do
     echo ""
     echo "▶ ${phase}..."
-    runme run --direnv=true --filename "$OCI_BUILD_FILE" "$phase"
+    runme run --direnv=true --load-env=false --filename "$BUILD_FILE" "$phase"
 done
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "  ✓ Image build complete!"
+echo "═══════════════════════════════════════════════════════════════════════════"
+cat .konductor
 ```
 
 ---
 
-## oci:container
+## Build Phases
 
-Package QCOW2 as containerDisk.
-
-```bash {"name":"oci:container","excludeFromRunAll":"true","tag":"requires:docker"}
-set -e
-if ! eval "$(nix print-dev-env .#konductor)"; then
-    echo "Warning: nix print-dev-env failed, using current environment"
-fi
-echo "DEBUG: which docker=$(which docker)"
-echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
-echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
-REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
-TAG="${CONTAINER_TAG:-latest-qcow2}"
-FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
-
-[ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
-[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
-[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
-[ -f "${QCOW2_LOGFILE:-build-vm.log}" ] || echo "# VM phase skipped" > "${QCOW2_LOGFILE:-build-vm.log}"
-
-docker buildx build -f Dockerfile.qcow2 \
-    --build-arg QCOW2_FILE=konductor.qcow2 \
-    --build-arg BUILD_LOG="${QCOW2_LOGFILE:-build-vm.log}" \
-    --build-arg PROVENANCE=.konductor \
-    --provenance=false --sbom=false \
-    --load -t "$FULL_IMAGE" .
-
-# Apply all tags from .konductor so CI output matches reality
-# Parse oci_tags array from .konductor TOML and create docker tags
-CONTAINER_TAGS_LINE=$(grep '^oci_tags = ' .konductor | sed 's/^oci_tags = //')
-# Extract tags from JSON array: ["tag1", "tag2", ...] -> tag1 tag2 ...
-TAGS=$(echo "$CONTAINER_TAGS_LINE" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$')
-
-echo "Applying tags:"
-for tag in $TAGS; do
-    if [ "$tag" != "$TAG" ]; then
-        docker tag "$FULL_IMAGE" "$REGISTRY/$IMAGE:$tag"
-        echo "  ✓ $REGISTRY/$IMAGE:$tag"
-    fi
-done
-
-echo "✓ Built: $FULL_IMAGE"
-```
-
----
-
----
-
-## oci:clean
+### \_build:clean
 
 Reset build state.
 
-```bash {"name":"oci:clean","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"_build:clean","excludeFromRunAll":"true","tag":"type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -228,280 +219,11 @@ echo "✓ Clean"
 
 ---
 
-## oci:start
+### \_build:preflight
 
-Boot image for local development.
+Validate environment (standalone — no cluster required).
 
-```bash {"name":"oci:start","excludeFromRunAll":"true","tag":"type:entry"}
-set -e
-OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
-PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
-
-if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-    echo "VM running. Use: ssh -p ${QCOW2_SSH_PORT:-2222} kc2admin@localhost"
-    exit 0
-fi
-[ -f result/nixos.qcow2 ] || { echo "No image. Run oci:image first."; exit 1; }
-
-# Clean VM runtime state only (not the image)
-(pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
-rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
-sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
-
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:cloudinit
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:boot
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:wait
-echo "VM ready: ssh -p ${QCOW2_SSH_PORT:-2222} kc2admin@localhost"
-```
-
----
-
-## oci:ssh
-
-```bash {"name":"oci:ssh","excludeFromRunAll":"true","tag":"type:entry"}
-ssh -p "${QCOW2_SSH_PORT:-2222}" kc2admin@localhost
-```
-
----
-
-## oci:stop
-
-```bash {"name":"oci:stop","excludeFromRunAll":"true","tag":"type:entry"}
-OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
-runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" _oci:vm:halt
-```
-
----
-
-## oci:vendor:inputs
-
-Vendor all flake inputs into `./_sources` for fully offline builds.
-
-```bash {"name":"oci:vendor:inputs","excludeFromRunAll":"true","tag":"type:entry"}
-set -euo pipefail
-
-echo "Vendoring flake inputs into ./_sources ..."
-sudo -E rm -rf _sources
-mkdir -p _sources
-sudo -E chown -R "$(id -u):$(id -g)" _sources
-
-export XDG_CACHE_HOME="/tmp/konductor-nix-cache"
-export HOME="/tmp/konductor-nix-home"
-mkdir -p "$XDG_CACHE_HOME" "$HOME"
-
-# Read from committed flake.lock (has github refs), not working copy (may have path refs)
-# This ensures we always have fetchable URLs even after nixos-rebuild modifies the working copy
-git show HEAD:flake.lock > /tmp/flake.lock.reference
-
-jq -c '
-  .nodes as $nodes
-  | (.nodes.root.inputs | keys) as $roots
-  | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
-  | unique
-  | map(select($nodes[.] != null))
-  | .[]
-  | . as $k
-  | {name:$k} + ($nodes[$k])
-  | [
-      .name,
-      .locked.type,
-      (.locked.owner // null),
-      (.locked.repo // null),
-      (.locked.rev // null),
-      (.locked.ref // null),
-      (.locked.url // null)
-    ]
-' /tmp/flake.lock.reference > /tmp/vendor-lock.jsonl
-rm -f /tmp/flake.lock.reference
-
-while read -r row; do
-  name=$(jq -r '.[0]' <<<"$row")
-  typ=$(jq -r '.[1]' <<<"$row")
-  owner=$(jq -r '.[2] // empty' <<<"$row")
-  repo=$(jq -r '.[3] // empty' <<<"$row")
-  rev=$(jq -r '.[4] // empty' <<<"$row")
-  ref=$(jq -r '.[5] // empty' <<<"$row")
-  url=$(jq -r '.[6] // empty' <<<"$row")
-  [ -n "$name" ] || continue
-  case "$typ" in
-    github)
-      flakeref="github:${owner}/${repo}/${rev}"
-      ;;
-    git)
-      flakeref="git+${url}?rev=${rev}"
-      ;;
-    *)
-      echo "Skipping unsupported input type: $name ($typ)"
-      continue
-      ;;
-  esac
-  echo "  -> $name"
-  attempt=1
-  max_attempts=3
-  while :; do
-    if XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
-      nix --extra-experimental-features 'nix-command flakes' \
-      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null; then
-      break
-    fi
-    if [ "$attempt" -ge "$max_attempts" ]; then
-      echo "Error: prefetch failed for $name ($flakeref)"
-      cat /tmp/prefetch.json || true
-      exit 1
-    fi
-    echo "  retry ${attempt}/${max_attempts} for $name (clearing tarball cache)"
-    rm -rf "$XDG_CACHE_HOME/nix/tarball-cache" "$XDG_CACHE_HOME/nix/tarball-cache-"* || true
-    attempt=$((attempt + 1))
-  done
-  if ! store_path=$(jq -e -r '.storePath' /tmp/prefetch.json); then
-    echo "Error: failed to resolve store path for $name ($flakeref)"
-    cat /tmp/prefetch.json
-    rm -f /tmp/prefetch.json
-    exit 1
-  fi
-  if [[ "$store_path" != /nix/store/* ]]; then
-    echo "Error: invalid store path for $name ($flakeref): $store_path"
-    cat /tmp/prefetch.json
-    rm -f /tmp/prefetch.json
-    exit 1
-  fi
-  rm -f /tmp/prefetch.json
-  rsync -a --chmod=Du+w,Fu+w "$store_path/" "_sources/$name/"
-done < /tmp/vendor-lock.jsonl
-
-rm -f /tmp/vendor-lock.jsonl
-unset XDG_CACHE_HOME HOME
-
-# NOTE: We do NOT run 'nix flake lock' here.
-# The committed flake.lock has github refs; keep it that way for future vendor runs.
-# When building with 'path:.#konductor', nix resolves the path inputs from flake.nix
-# without needing to update flake.lock (use --no-write-lock-file to prevent changes).
-
-echo "✓ Vendored inputs into ./_sources"
-ls _sources/
-```
-
----
-
-## oci:vendor:inputs:online
-
-Intermittent online refresh: update lock from network, then vendor into `./_sources`, then re-lock
-to local paths for offline builds.
-
-```bash {"name":"oci:vendor:inputs:online","excludeFromRunAll":"true","tag":"type:entry"}
-set -euo pipefail
-
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
-
-echo "Refreshing flake.lock from network (temp flake in $tmpdir)..."
-
-cat > "$tmpdir/flake.nix" <<'EOF'
-{
-  description = "Konductor lock refresh (network)";
-  inputs = {
-EOF
-
-# Read from committed flake.lock (has github refs), not working copy
-git show HEAD:flake.lock > "$tmpdir/flake.lock.reference"
-
-# Build input list from committed lock (prefer original refs, fallback to locked).
-jq -c '
-  .nodes as $nodes
-  | (.nodes.root.inputs | keys) as $roots
-  | ($roots + ["flake-parts","nuschtosSearch","ixx","nixlib","systems"])
-  | unique
-  | map(select($nodes[.] != null))
-  | .[]
-  | . as $k
-  | {name:$k, locked:($nodes[$k].locked // {}), original:($nodes[$k].original // {}), flake:($nodes[$k].flake // true)}
-  | [
-      .name,
-      (.original.type // .locked.type // null),
-      (.original.owner // .locked.owner // null),
-      (.original.repo // .locked.repo // null),
-      (.original.ref // .locked.ref // null),
-      (.original.rev // .locked.rev // null),
-      (.original.url // .locked.url // null),
-      (.original.dir // .locked.dir // null),
-      (if .flake == false then "false" else "true" end)
-    ]
-' "$tmpdir/flake.lock.reference" > "$tmpdir/inputs.jsonl"
-
-while read -r row; do
-  name=$(jq -r '.[0]' <<<"$row")
-  typ=$(jq -r '.[1] // empty' <<<"$row")
-  owner=$(jq -r '.[2] // empty' <<<"$row")
-  repo=$(jq -r '.[3] // empty' <<<"$row")
-  ref=$(jq -r '.[4] // empty' <<<"$row")
-  rev=$(jq -r '.[5] // empty' <<<"$row")
-  url=$(jq -r '.[6] // empty' <<<"$row")
-  dir=$(jq -r '.[7] // empty' <<<"$row")
-  is_flake=$(jq -r '.[8] // "true"' <<<"$row")
-  [ -n "$name" ] || continue
-  case "$typ" in
-    github)
-      if [ -n "$ref" ] && [ "$ref" != "null" ]; then
-        flakeref="github:${owner}/${repo}/${ref}"
-      elif [ -n "$rev" ] && [ "$rev" != "null" ]; then
-        flakeref="github:${owner}/${repo}/${rev}"
-      else
-        flakeref="github:${owner}/${repo}"
-      fi
-      ;;
-    git)
-      if [ -n "$ref" ] && [ "$ref" != "null" ]; then
-        flakeref="git+${url}?ref=${ref}"
-      elif [ -n "$rev" ] && [ "$rev" != "null" ]; then
-        flakeref="git+${url}?rev=${rev}"
-      else
-        flakeref="git+${url}"
-      fi
-      ;;
-    *)
-      echo "Skipping unsupported input type: $name ($typ)"
-      continue
-      ;;
-  esac
-  if [ -n "$dir" ] && [ "$dir" != "null" ]; then
-    if [[ "$flakeref" == *"?"* ]]; then
-      flakeref="${flakeref}&dir=${dir}"
-    else
-      flakeref="${flakeref}?dir=${dir}"
-    fi
-  fi
-  echo "    ${name}.url = \"${flakeref}\";" >> "$tmpdir/flake.nix"
-  if [ "$is_flake" = "false" ]; then
-    echo "    ${name}.flake = false;" >> "$tmpdir/flake.nix"
-  fi
-done < "$tmpdir/inputs.jsonl"
-
-cat >> "$tmpdir/flake.nix" <<'EOF'
-  };
-  outputs = { self, ... }: { };
-}
-EOF
-
-nix --extra-experimental-features 'nix-command flakes' flake update --flake "$tmpdir"
-cp -f "$tmpdir/flake.lock" ./flake.lock
-
-echo "Vendoring refreshed inputs into ./_sources ..."
-runme run oci:vendor:inputs
-
-echo "✓ Online refresh complete: flake.lock + _sources updated for offline use"
-```
-
----
-
----
-
-## Pipeline Tasks
-
-### \_oci:preflight
-
-Validate environment (standalone - no cluster required).
-
-```bash {"name":"_oci:preflight"}
+```bash {"name":"build:preflight","excludeFromRunAll":"true"}
 set -e
 
 # Build host system state
@@ -525,7 +247,7 @@ ERRORS=0
 echo ""
 echo "Clean state validation:"
 
-[ ! -e result ] && printf "✓ no result/\n" || { printf "✗ stale result/ exists (run oci:clean)\n"; ((ERRORS++)); }
+[ ! -e result ] && printf "✓ no result/\n" || { printf "✗ stale result/ exists (run _build:clean)\n"; ((ERRORS++)); }
 [ ! -e result.writable ] && printf "✓ no result.writable/\n" || { printf "✗ stale result.writable/ exists\n"; ((ERRORS++)); }
 [ ! -e konductor.qcow2 ] && printf "✓ no konductor.qcow2\n" || { printf "✗ stale konductor.qcow2 exists\n"; ((ERRORS++)); }
 [ ! -e .konductor ] && printf "✓ no .konductor\n" || { printf "✗ stale .konductor exists\n"; ((ERRORS++)); }
@@ -586,12 +308,48 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────
-# OVMF FIRMWARE
+# RUNTIME ENVIRONMENT (fail-fast for late-stage failures)
 # ─────────────────────────────────────────────────────────────────────
+# These checks catch environment gaps that previously caused 160+ minute
+# build cycles to fail at post-build phases (cluster:up, push, etc.)
 echo ""
-echo "OVMF firmware:"
+echo "Runtime environment:"
+
+# OVMF firmware (required for QEMU VM boot)
 [ -n "$OVMF_CODE" ] && [ -f "$OVMF_CODE" ] && printf "✓ OVMF_CODE=%s\n" "$OVMF_CODE" || { printf "✗ OVMF_CODE not set or missing\n"; ((ERRORS++)); }
 [ -n "$OVMF_VARS" ] && [ -f "$OVMF_VARS" ] && printf "✓ OVMF_VARS=%s\n" "$OVMF_VARS" || { printf "✗ OVMF_VARS not set or missing\n"; ((ERRORS++)); }
+
+# LD_LIBRARY_PATH — grpcio/pulumi need libstdc++.so.6 (cluster:up fails without it)
+if [ -n "$LD_LIBRARY_PATH" ]; then
+    if ldconfig -p 2>/dev/null | grep -q libstdc++ || find ${LD_LIBRARY_PATH//:/ } -name 'libstdc++.so*' 2>/dev/null | grep -q .; then
+        printf "✓ LD_LIBRARY_PATH set, libstdc++.so found\n"
+    else
+        printf "✗ LD_LIBRARY_PATH set but libstdc++.so not found in paths\n"
+        ((ERRORS++))
+    fi
+else
+    printf "✗ LD_LIBRARY_PATH not set (pulumi/grpcio will fail at cluster:up)\n"
+    ((ERRORS++))
+fi
+
+# DOCKER_HOST — docker commands fail without explicit host
+if [ -n "$DOCKER_HOST" ]; then
+    printf "✓ DOCKER_HOST=%s\n" "$DOCKER_HOST"
+else
+    printf "⚠ DOCKER_HOST not set (defaulting to unix:///var/run/docker.sock)\n"
+fi
+
+# Docker daemon reachable
+if docker info &>/dev/null; then
+    printf "✓ Docker daemon reachable\n"
+else
+    printf "✗ Docker daemon not reachable\n"
+    ((ERRORS++))
+fi
+
+# DOCKER_BUILDKIT — required for multi-stage builds
+[ "${DOCKER_BUILDKIT:-0}" = "1" ] && printf "✓ DOCKER_BUILDKIT=1\n" || printf "⚠ DOCKER_BUILDKIT not set (may affect build performance)\n"
+
 
 # ─────────────────────────────────────────────────────────────────────
 # SSH KEY
@@ -646,11 +404,11 @@ echo ""
 
 ---
 
-### \_oci:nix
+### \_build:nix
 
 Build NixOS closure and capture nix_drv.
 
-```bash {"name":"_oci:nix","tag":"requires:nix"}
+```bash {"name":"_build:nix","excludeFromRunAll":"true","tag":"requires:nix"}
 set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
@@ -659,7 +417,7 @@ fi
 
 # Vendored inputs are required for offline builds.
 if [ ! -f "_sources/catppuccin/flake.nix" ]; then
-    echo "Error: vendored inputs missing. Run: runme run oci:vendor:inputs"
+    echo "Error: vendored inputs missing. Run: runme run --filename docs/ci/dev.md dev:vendor"
     exit 1
 fi
 
@@ -703,11 +461,11 @@ chown -R "$(id -u):$(id -g)" result.writable/
 
 ---
 
-### \_oci:cloudinit
+### \_build:cloudinit
 
 Generate cloud-init ISO.
 
-```bash {"name":"_oci:cloudinit"}
+```bash {"name":"_build:cloudinit","excludeFromRunAll":"true"}
 set -e
 [ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set"; exit 1; }
 [ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
@@ -827,11 +585,11 @@ genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
 
 ---
 
-### \_oci:img:reset
+### \_build:img:reset
 
 Reset image to pristine state.
 
-```bash {"name":"_oci:img:reset","tag":"requires:guestfs"}
+```bash {"name":"_build:img:reset","excludeFromRunAll":"true","tag":"requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
 MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
@@ -851,11 +609,11 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ---
 
-### \_oci:vm:boot
+### \_build:vm:boot
 
 Boot VM.
 
-```bash {"name":"_oci:vm:boot","tag":"requires:kvm"}
+```bash {"name":"_build:vm:boot","excludeFromRunAll":"true","tag":"requires:kvm"}
 set -e
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
@@ -907,11 +665,11 @@ echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
 
 ---
 
-### \_oci:vm:wait
+### \_build:vm:wait
 
 Wait for SSH.
 
-```bash {"name":"_oci:vm:wait","tag":"duration:slow"}
+```bash {"name":"_build:vm:wait","excludeFromRunAll":"true","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -942,11 +700,11 @@ done
 
 ---
 
-### \_oci:vm:sync
+### \_build:vm:sync
 
 Sync source to VM.
 
-```bash {"name":"_oci:vm:sync"}
+```bash {"name":"_build:vm:sync","excludeFromRunAll":"true"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -994,7 +752,7 @@ echo "✓ /opt/konductor/src/ (cloned)"
 
 ---
 
-### \_oci:vm:rebuild
+### \_build:vm:rebuild
 
 Run `nixos-rebuild switch` inside VM to build the environment natively.
 
@@ -1004,7 +762,7 @@ This ensures:
 - All nix store paths are pre-cached for airgap use
 - The VM can reproduce itself from /opt/konductor/src
 
-```bash {"name":"_oci:vm:rebuild","tag":"duration:slow"}
+```bash {"name":"_build:vm:rebuild","excludeFromRunAll":"true","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -1041,11 +799,11 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 ---
 
-### \_oci:vm:pki:test
+### \_build:vm:pki:test
 
 Run PKI tests inside VM.
 
-```bash {"name":"_oci:vm:pki:test"}
+```bash {"name":"_build:vm:pki:test","excludeFromRunAll":"true"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -1061,11 +819,11 @@ echo "PKI tests complete"
 
 ---
 
-### \_oci:vm:pki:status
+### \_build:vm:pki:status
 
 Display PKI certificate status.
 
-```bash {"name":"_oci:vm:pki:status"}
+```bash {"name":"_build:vm:pki:status","excludeFromRunAll":"true"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -1079,11 +837,11 @@ ssh $SSH_OPTS kc2admin@localhost \
 
 ---
 
-### \_oci:vm:provenance
+### \_build:vm:provenance
 
 Write `/.konductor` inside VM.
 
-```bash {"name":"_oci:vm:provenance"}
+```bash {"name":"_build:vm:provenance","excludeFromRunAll":"true"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -euo pipefail
 
@@ -1103,7 +861,7 @@ NIX_HASH=$(echo "$NIX_META" | jq -r '.locked.narHash') || { echo "✗ jq parse o
 [ -n "$NIX_HASH" ] && [ "$NIX_HASH" != "null" ] || { echo "✗ narHash not found in flake metadata"; exit 1; }
 
 # Build artifacts - MUST exist from prior phases
-NIX_DRV=$(cat .nix_drv) || { echo "✗ .nix_drv not found (did _oci:nix run?)"; exit 1; }
+NIX_DRV=$(cat .nix_drv) || { echo "✗ .nix_drv not found (did _build:nix run?)"; exit 1; }
 FLAKE_LOCK_SHA=$(sha256sum flake.lock | cut -d' ' -f1) || { echo "✗ sha256sum flake.lock failed"; exit 1; }
 
 # Build environment - MUST be available
@@ -1168,11 +926,11 @@ ssh $SSH_OPTS kc2admin@localhost 'ff' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 ---
 
-### \_oci:vm:gc
+### \_build:vm:gc
 
 Garbage collect.
 
-```bash {"name":"_oci:vm:gc"}
+```bash {"name":"_build:vm:gc","excludeFromRunAll":"true"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -1184,11 +942,11 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>
 
 ---
 
-### \_oci:vm:zero
+### \_build:vm:zero
 
 Zero free space.
 
-```bash {"name":"_oci:vm:zero","tag":"duration:slow"}
+```bash {"name":"_build:vm:zero","excludeFromRunAll":"true","tag":"duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -1197,11 +955,11 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/nul
 
 ---
 
-### \_oci:vm:halt
+### \_build:vm:halt
 
 Shutdown VM.
 
-```bash {"name":"_oci:vm:halt"}
+```bash {"name":"_build:vm:halt","excludeFromRunAll":"true"}
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 [ -f "$PIDFILE" ] || exit 0
 
@@ -1219,11 +977,11 @@ rm -f "$PIDFILE"
 
 ---
 
-### \_oci:img:clean
+### \_build:img:clean
 
 Clean credentials from image.
 
-```bash {"name":"_oci:img:clean","tag":"requires:guestfs"}
+```bash {"name":"_build:img:clean","excludeFromRunAll":"true","tag":"requires:guestfs"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 export LIBGUESTFS_BACKEND=direct
@@ -1267,13 +1025,13 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ---
 
-### \_oci:img:compress
+### \_build:img:compress
 
 ZSTD compress and sparsify image.
 
 Note: SKIP_COMPRESS=true produces a larger, uncompressed image (faster builds, larger output).
 
-```bash {"name":"_oci:img:compress","tag":"duration:slow"}
+```bash {"name":"_build:img:compress","excludeFromRunAll":"true","tag":"duration:slow"}
 set -e
 
 # Cap coroutines to prevent excessive memory usage on high-core systems
@@ -1291,11 +1049,11 @@ fi
 
 ---
 
-### \_oci:img:sparsify
+### \_build:img:sparsify
 
 Sparsify image (skipped if SKIP_COMPRESS=true).
 
-```bash {"name":"_oci:img:sparsify","tag":"duration:slow,requires:guestfs"}
+```bash {"name":"_build:img:sparsify","excludeFromRunAll":"true","tag":"duration:slow,requires:guestfs"}
 set -e
 
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
@@ -1313,22 +1071,22 @@ rm -f konductor.qcow2.tmp
 
 ---
 
-### \_oci:tmp:clean
+### \_build:tmp:clean
 
 Remove temporary files.
 
-```bash {"name":"_oci:tmp:clean"}
+```bash {"name":"_build:tmp:clean","excludeFromRunAll":"true"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 rm -f .nix_drv .system-toplevel
 ```
 
 ---
 
-### \_oci:verify
+### \_build:verify
 
 Append post-seal fields to .konductor.
 
-```bash {"name":"_oci:verify","tag":"type:readonly"}
+```bash {"name":"_build:verify","excludeFromRunAll":"true","tag":"type:readonly"}
 set -e
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
@@ -1345,23 +1103,48 @@ cat .konductor
 
 ---
 
-## Debug Tools
+### \_build:container
 
-### oci:debug:log
+Package QCOW2 as containerDisk.
 
-View boot log.
+```bash {"name":"_build:container","excludeFromRunAll":"true","tag":"requires:docker"}
+set -e
+if ! eval "$(nix print-dev-env .#konductor)"; then
+    echo "Warning: nix print-dev-env failed, using current environment"
+fi
+echo "DEBUG: which docker=$(which docker)"
+echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
+echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
+REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+TAG="${CONTAINER_TAG:-latest-qcow2}"
+FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 
-```bash {"name":"oci:debug:log","excludeFromRunAll":"true","tag":"type:debug"}
-bat "${QCOW2_LOGFILE:-build-vm.log}"
-```
+[ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
+[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
+[ -f Dockerfile.qcow2 ] || { echo "Error: Dockerfile.qcow2 not found"; exit 1; }
+[ -f "${QCOW2_LOGFILE:-build-vm.log}" ] || echo "# VM phase skipped" > "${QCOW2_LOGFILE:-build-vm.log}"
 
----
+docker buildx build -f Dockerfile.qcow2 \
+    --build-arg QCOW2_FILE=konductor.qcow2 \
+    --build-arg BUILD_LOG="${QCOW2_LOGFILE:-build-vm.log}" \
+    --build-arg PROVENANCE=.konductor \
+    --provenance=false --sbom=false \
+    --load -t "$FULL_IMAGE" .
 
-### oci:vm:kill
+# Apply all tags from .konductor so CI output matches reality
+# Parse oci_tags array from .konductor TOML and create docker tags
+CONTAINER_TAGS_LINE=$(grep '^oci_tags = ' .konductor | sed 's/^oci_tags = //')
+# Extract tags from JSON array: ["tag1", "tag2", ...] -> tag1 tag2 ...
+TAGS=$(echo "$CONTAINER_TAGS_LINE" | tr -d '[]"' | tr ',' '\n' | sed 's/^ *//' | grep -v '^$')
 
-Force kill VM.
+echo "Applying tags:"
+for tag in $TAGS; do
+    if [ "$tag" != "$TAG" ]; then
+        docker tag "$FULL_IMAGE" "$REGISTRY/$IMAGE:$tag"
+        echo "  ✓ $REGISTRY/$IMAGE:$tag"
+    fi
+done
 
-```bash {"name":"oci:vm:kill","excludeFromRunAll":"true","tag":"type:destructive"}
-pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
-rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
+echo "✓ Built: $FULL_IMAGE"
 ```
