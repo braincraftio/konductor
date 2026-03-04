@@ -36,9 +36,6 @@ runme run oci:build
 runme run oci:clean
 runme run oci:image
 runme run oci:container
-
-# Push to registry
-runme run oci:push
 ```
 
 ---
@@ -73,7 +70,6 @@ Entry Points:
   oci:build              Full pipeline: clean → image → container
   oci:image              Build QCOW2 only
   oci:container          Package QCOW2 as containerDisk
-  oci:push               Push to registry
   oci:clean              Reset build state
 
 Development:
@@ -213,53 +209,6 @@ echo "✓ Built: $FULL_IMAGE"
 ```
 
 ---
-
-## oci:push
-
-Push container with multi-tag (git/nix/latest).
-
-```bash {"name":"oci:push","excludeFromRunAll":"true","tag":"requires:docker"}
-set -e
-REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-braincraft/konductor}"
-BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
-
-[ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
-
-# Read provenance
-git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
-git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
-nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
-flake_lock_sha=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' .konductor)
-
-# Build tag list - full hashes, dirty indicator when tree is dirty
-TAGS=("$BASE_TAG")
-if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-    TAGS+=("qcow2-${git_commit}")
-else
-    TAGS+=("qcow2-dirty")
-fi
-if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-    TAGS+=("qcow2-${nix_drv}")
-fi
-if [ -n "$flake_lock_sha" ] && [ "$flake_lock_sha" != "unknown" ]; then
-    TAGS+=("qcow2-${flake_lock_sha}")
-fi
-
-FULL_IMAGE="$REGISTRY/$IMAGE:$BASE_TAG"
-docker image inspect "$FULL_IMAGE" &>/dev/null || { echo "Error: $FULL_IMAGE not found locally"; exit 1; }
-
-# Push with all tags
-for tag in "${TAGS[@]}"; do
-    echo "Pushing ${REGISTRY}/${IMAGE}:${tag}..."
-    docker tag "$FULL_IMAGE" "$REGISTRY/$IMAGE:$tag"
-    docker push "$REGISTRY/$IMAGE:$tag"
-done
-
-echo ""
-echo "Pushed: $REGISTRY/$IMAGE"
-printf "  %s\n" "${TAGS[@]}"
-```
 
 ---
 

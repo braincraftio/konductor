@@ -68,8 +68,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 │  │ build:qcow2:publish                                        │             │
 │  │   ├─ oci:clean      Reset build state                     │             │
 │  │   ├─ oci:image      Nix → VM configure → seal             │             │
-│  │   ├─ oci:container  Package as containerDisk              │             │
-│  │   └─ build:qcow2:push  Multi-tag push to local registry  │             │
+│  │   └─ oci:container  Package as containerDisk              │             │
 │  └────────────────────────────────────────────────────────────┘             │
 │                           ↓                                                  │
 │  INFRASTRUCTURE PHASE                                                        │
@@ -83,6 +82,12 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 │  │ registry:trust + registry:login                            │             │
 │  │   ├─ Install cluster CA for Docker/Skopeo                 │             │
 │  │   └─ Authenticate to registry.docker.arpa                 │             │
+│  └────────────────────────────────────────────────────────────┘             │
+│                           ↓                                                  │
+│  PUSH PHASE                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐             │
+│  │ build:qcow2:push                                          │             │
+│  │   └─ Multi-tag push to local registry (skopeo)            │             │
 │  └────────────────────────────────────────────────────────────┘             │
 │                           ↓                                                  │
 │  VALIDATION PHASE                                                            │
@@ -498,7 +503,7 @@ curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
 
 ### build:qcow2:publish
 
-Full build pipeline: clean → image → container → push.
+Full build pipeline: clean → image → container.
 
 **What it does:**
 
@@ -506,13 +511,12 @@ Full build pipeline: clean → image → container → push.
    - `oci:clean` - Reset build state
    - `oci:image` - Build QCOW2 image (nix → VM → seal)
    - `oci:container` - Package as containerDisk
-2. Pushes to local registry with multi-tag
 
 **Output:**
 
 - `konductor.qcow2` - Compressed QCOW2 image
 - `.konductor` - Provenance file
-- OCI image at `registry.docker.arpa/braincraft/konductor:latest-qcow2`
+- OCI image loaded to local Docker daemon as `registry.docker.arpa/braincraft/konductor:latest-qcow2`
 
 **Duration:** 30-60 minutes (depends on build host)
 
@@ -525,19 +529,14 @@ Full build pipeline: clean → image → container → push.
 ```sh {"name":"build:qcow2:publish","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
 set -e
 OCI_BUILD_FILE="${OCI_BUILD_FILE:-docs/developer_guide/qcow2/OCI.md}"
-QCOW2_BUILD_FILE="${QCOW2_BUILD_FILE:-docs/developer_guide/qcow2/BUILD.md}"
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  build:qcow2:publish - Build + Package + Push Pipeline"
+echo "  build:qcow2:publish - Build + Package Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 echo ""
-echo "▶ Phase 1: Build QCOW2 + containerDisk (oci:build)..."
+echo "▶ Build QCOW2 + containerDisk (oci:build)..."
 runme run --direnv=true --load-env=false --filename "$OCI_BUILD_FILE" oci:build
-
-echo ""
-echo "▶ Phase 2: Push to registry..."
-runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -1150,12 +1149,13 @@ Complete end-to-end pipeline with validation.
 
 **Pipeline stages:**
 
-1. **Build**: `build:qcow2:publish` - Build + package + push
+1. **Build**: `build:qcow2:publish` - Build + package (delegates to OCI.md)
 2. **Infrastructure**: `cluster:up` - Start Talos + deploy platform
 3. **Trust**: `registry:trust` - Install cluster CA
-4. **Validation**: `build:qcow2:validate` - Deploy to KubeVirt + SSH test
-5. **Runner Test**: `build:qcow2:runner-test` - Forgejo workflow validation
-6. **Verification**: `registry:tags` - Verify pushed tags
+4. **Push**: `build:qcow2:push` - Multi-tag push to local registry
+5. **Verification**: `registry:tags` - Verify pushed tags
+6. **Validation**: `build:qcow2:validate` - Deploy to KubeVirt + SSH test
+7. **Runner Test**: `build:qcow2:runner-test` - Forgejo workflow validation
 
 **Note:** Promotion (`build:qcow2:promote`) is NOT included. It's a manual gate after validation passes.
 
@@ -1172,12 +1172,13 @@ echo "  build:qcow2:all - Complete End-to-End Pipeline"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Pipeline stages:"
-echo "    1. Build + package + push"
+echo "    1. Build + package (oci:build)"
 echo "    2. Start cluster + deploy platform"
-echo "    3. Install cluster CA"
-echo "    4. Deploy to KubeVirt + validate"
-echo "    5. Test Forgejo runner workflow"
-echo "    6. Verify tags"
+echo "    3. Install cluster CA + authenticate"
+echo "    4. Push to registry"
+echo "    5. Verify pushed tags"
+echo "    6. Deploy to KubeVirt + validate"
+echo "    7. Test Forgejo runner workflow"
 echo ""
 echo "  Duration: 60-90 minutes"
 echo "  Prerequisites: Docker, 8GB RAM, 100GB disk"
@@ -1185,7 +1186,7 @@ echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 echo ""
-echo "▶ Phase 1: Build + package + push..."
+echo "▶ Phase 1: Build + package..."
 runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:publish
 
 echo ""
@@ -1197,15 +1198,19 @@ echo "▶ Phase 3: Install cluster CA..."
 runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" registry:trust
 
 echo ""
-echo "▶ Phase 4: Verify pushed tags..."
+echo "▶ Phase 4: Push to registry..."
+runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:push
+
+echo ""
+echo "▶ Phase 5: Verify pushed tags..."
 runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" registry:tags
 
 echo ""
-echo "▶ Phase 5: Deploy to KubeVirt + validate..."
+echo "▶ Phase 6: Deploy to KubeVirt + validate..."
 runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:validate
 
 echo ""
-echo "▶ Phase 6: Test Forgejo runner workflow..."
+echo "▶ Phase 7: Test Forgejo runner workflow..."
 runme run --direnv=true --load-env=false --filename "$QCOW2_BUILD_FILE" build:qcow2:runner-test
 
 echo ""
