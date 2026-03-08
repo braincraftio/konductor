@@ -67,6 +67,7 @@ rec {
   # ===========================================================================
   nodejsPackages = with pkgs; [
     pkgs."nodejs_${langs.node.version}"
+    bun
     nodePackages.pnpm
     nodePackages.yarn
     nodePackages.typescript-language-server
