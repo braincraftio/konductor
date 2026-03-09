@@ -21,7 +21,7 @@ let
 
   src = prev.fetchurl {
     url = "https://github.com/coder/code-server/releases/download/v${version}/code-server-${version}-linux-amd64.tar.gz";
-    hash = "sha256-8HNw/Tgy2mbPCCIE6IfzQh5INYWBy6Hbe4fOIt+pFuY=";
+    hash = "sha256-Fcp0cuRSLyFOARQ2c1WZOFNlcdcVLF/KPLQpZueaaIs=";
   };
 in
 {
