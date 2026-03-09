@@ -70,12 +70,25 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     exit 0
 fi
 
-[ -f result/nixos.qcow2 ] || { echo "No image. Run build:image first."; exit 1; }
+# Prefer final compressed image, fall back to build overlay
+if [ -f konductor.qcow2 ]; then
+    BACKING="$(readlink -f konductor.qcow2)"
+elif [ -f result/nixos.qcow2 ]; then
+    BACKING="$(readlink -f result/nixos.qcow2)"
+else
+    echo "No image. Run build:all or build:image first."
+    exit 1
+fi
 
 # Clean VM runtime state only
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+
+# Create writable overlay for dev use (preserves original image)
+rm -rf result.dev && mkdir -p result.dev
+qemu-img create -f qcow2 -b "$BACKING" -F qcow2 result.dev/nixos.qcow2
+rm -f result && ln -sf result.dev result
 
 runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:cloudinit
 runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:vm:boot

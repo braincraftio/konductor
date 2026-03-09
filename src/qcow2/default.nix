@@ -2612,12 +2612,13 @@ EOF
       # See: Pulumi.optiplex-rook-ceph.yaml ceph_config_override
 
       # I/O scheduler: none for virtio-blk (Ceph handles its own scheduling)
-      # Serial console for hypervisor log capture (KubeVirt, libvirt)
-      # NOTE: Linux uses LAST console= as primary. tty0 must be last for kbd_mode
-      # to work (serial consoles don't support keyboard ioctls).
+      # Serial console for hypervisor log capture (KubeVirt, libvirt, QEMU dev)
+      # NOTE: Linux uses LAST console= as primary stdout. ttyS0 must be last so
+      # serial captures all kernel/systemd output (needed for -display none builds
+      # and KubeVirt serial console). kbd_mode warning on serial is harmless.
       kernelParams = [
-        "console=ttyS0,115200"  # Serial console (receives all kernel messages)
-        "console=tty0"          # VGA console (primary - receives kbd_mode)
+        "console=tty0"          # VGA console (also receives output)
+        "console=ttyS0,115200"  # Serial console (primary — receives all output)
         "elevator=none"
         "scsi_mod.use_blk_mq=1"
       ];
