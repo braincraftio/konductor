@@ -697,7 +697,7 @@ qemu-system-x86_64 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
     -chardev socket,id=char-nixstore,path="$VIRTIOFS_SOCK" \
-    -device vhost-user-fs-pci,chardev=char-nixstore,tag=nixstore,num-request-queues=4,queue-size=512 \
+    -device vhost-user-fs-pci,chardev=char-nixstore,tag=nixstore,num-request-queues=2,queue-size=256 \
     -object memory-backend-memfd,id=mem,size=${VM_MEMORY}M,share=on \
     -numa node,memdev=mem \
     -daemonize \
