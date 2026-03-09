@@ -3,16 +3,20 @@
 #
 # Replaces the nixpkgs code-server (which builds VS Code from source via yarn,
 # taking 2-4 hours) with a pre-built standalone release tarball from GitHub.
-# This is the same pattern nixpkgs uses for VS Code itself (vscode.nix).
+# Aligned with the nixpkgs VSCode pattern (generic.nix / buildVscode):
+#   - autoPatchelfHook for ELF patching
+#   - buildInputs provide native libs autoPatchelf needs to resolve
+#   - preFixup removes musl-only prebuilds (we run glibc) and the MSAL
+#     desktop auth extension (headless code-server uses token auth, not
+#     native SSO via GTK/webkit/dbus)
 #
 # code-server publishes standalone tarballs at:
 #   https://github.com/coder/code-server/releases
 #
 # To update:
 #   1. Change version
-#   2. Run: nix-prefetch-url --unpack <new-url>
-#   3. Convert: nix hash to-sri --type sha256 <hash>
-#   4. Update hash
+#   2. Run: nix-prefetch-url <new-url>  (NOT --unpack; fetchurl hashes the raw tarball)
+#   3. Update hash with the sha256 nix reports on mismatch (already SRI format)
 
 _final: prev:
 
@@ -36,13 +40,39 @@ in
       makeWrapper
     ];
 
+    # Native libs that autoPatchelf resolves against.
+    # Mirrors buildVscode buildInputs for the subset code-server actually links.
     buildInputs = with prev; [
       nodejs
-      stdenv.cc.cc.lib
+      stdenv.cc.cc.lib  # libstdc++
       zlib
+      libsecret         # libsecret-1.so (keyring integration)
+      xorg.libX11       # libX11.so.6 (msal-node-runtime.node)
+      xorg.libxkbfile   # libxkbfile.so.1 (native keyboard module)
+      nss               # libnss3.so (crypto)
+      nspr              # libnspr4.so
+      alsa-lib          # libasound.so.2
+      systemdLibs       # libudev, libsystemd
+      dbus              # libdbus-1.so.3
+      util-linux.lib    # libuuid.so.1
+      curl              # libcurl.so.4
+      openssl           # libcrypto.so.3, libssl.so.3
     ];
 
     dontBuild = true;
+
+    preFixup = ''
+      # Remove musl-only prebuilds — we run glibc, these .node files would
+      # never be loaded but autoPatchelf fails trying to resolve musl libc.
+      find $out -name '*.musl.node' -delete
+      find $out -path '*linux-x64-musl*' -name '*.node' -delete
+
+      # Remove MSAL desktop-auth native extension — requires GTK3, webkit2gtk,
+      # libsoup, gobject, glib (heavy GUI stack). code-server is headless and
+      # uses password/token auth, never native desktop SSO.
+      rm -rf $out/lib/code-server/lib/vscode/extensions/microsoft-authentication/dist/libmsalruntime.so
+      rm -rf $out/lib/code-server/lib/vscode/extensions/microsoft-authentication/dist/msal-node-runtime.node
+    '';
 
     installPhase = ''
       runHook preInstall
