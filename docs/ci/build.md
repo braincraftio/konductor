@@ -321,7 +321,12 @@ echo "Runtime environment:"
 
 # LD_LIBRARY_PATH — grpcio/pulumi need libstdc++.so.6 (cluster:up fails without it)
 if [ -n "$LD_LIBRARY_PATH" ]; then
-    if ldconfig -p 2>/dev/null | grep -q libstdc++ || find ${LD_LIBRARY_PATH//:/ } -name 'libstdc++.so*' 2>/dev/null | grep -q .; then
+    _found_libstdcpp=false
+    IFS=: read -ra _ldpaths <<< "$LD_LIBRARY_PATH"
+    for _p in "${_ldpaths[@]}"; do
+        [ -d "$_p" ] && ls "$_p"/libstdc++.so* >/dev/null 2>&1 && _found_libstdcpp=true && break
+    done
+    if [ "$_found_libstdcpp" = true ] || /usr/sbin/ldconfig -p 2>/dev/null | grep -q libstdc++; then
         printf "✓ LD_LIBRARY_PATH set, libstdc++.so found\n"
     else
         printf "✗ LD_LIBRARY_PATH set but libstdc++.so not found in paths\n"
