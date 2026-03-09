@@ -786,6 +786,10 @@ fi
 # Cloud-init services are oneshot boot services that fail when reactivated
 ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.service cloud-init-local.service cloud-init.service 2>/dev/null || true"
 
+# Stop host-store mount before rebuild — already mounted by nix-store-overlay,
+# switch-to-configuration fails trying to restart it ("already mounted or busy")
+ssh $SSH_OPTS kc2admin@localhost "sudo systemctl stop nix-.host\\\\x2dstore.automount nix-.host\\\\x2dstore.mount 2>/dev/null || true"
+
 # Rebuild NixOS from the synced flake
 # path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
 # Rebuild NixOS with proxy support
