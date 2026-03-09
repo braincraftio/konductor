@@ -2726,8 +2726,7 @@ EOF
         "ro"
         "nofail"           # Don't fail boot if not available (production)
         "noauto"           # Don't mount at boot (prevents failed unit)
-        "x-systemd.automount"  # Mount on access
-        "x-systemd.idle-timeout=60"  # Unmount after 60s idle
+        "x-systemd.automount"  # Mount on access (no idle-timeout: overlay lowerdir access bypasses automount tracking)
         "x-systemd.device-timeout=5s"
       ];
       neededForBoot = false;  # Not required - graceful degradation
