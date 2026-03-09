@@ -209,6 +209,10 @@ Reset build state.
 
 ```bash {"name":"_build:clean","excludeFromRunAll":"true","tag":"type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
+# Stop virtiofsd daemon (started before QEMU for host nix store sharing)
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -258,7 +262,7 @@ echo "Clean state validation:"
 echo ""
 echo "Environment validation:"
 
-REQUIRED_BINS="${QCOW2_REQUIRED_BINS:-nix qemu-img qemu-system-x86_64 passt genisoimage guestmount guestunmount virt-sparsify ssh rsync timeout ss du sha256sum jq docker}"
+REQUIRED_BINS="${QCOW2_REQUIRED_BINS:-nix qemu-img qemu-system-x86_64 virtiofsd passt genisoimage guestmount guestunmount virt-sparsify ssh rsync timeout ss du sha256sum jq docker}"
 
 for cmd in $REQUIRED_BINS; do
     if command -v "$cmd" &>/dev/null; then
@@ -637,25 +641,65 @@ VM_CPUS=$((TOTAL_CPUS - 2))
 
 echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
 
+# ─────────────────────────────────────────────────────────────────────
+# Start virtiofsd for host nix store sharing (replaces 9p virtfs)
+# virtiofsd uses vhost-user protocol over Unix socket → QEMU presents
+# as vhost-user-fs-pci device → guest mounts as virtiofs.
+# 3-5x faster than 9p for metadata-heavy nix store (millions of small files).
+# ─────────────────────────────────────────────────────────────────────
+VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+rm -f "$VIRTIOFS_SOCK"
+virtiofsd \
+    --socket-path="$VIRTIOFS_SOCK" \
+    --shared-dir=/nix/store \
+    --sandbox=none \
+    --seccomp=none \
+    --readonly \
+    --cache=always \
+    --thread-pool-size=4 \
+    --inode-file-handles=mandatory \
+    --announce-submounts &
+VIRTIOFS_DAEMON_PID=$!
+echo "$VIRTIOFS_DAEMON_PID" > "$VIRTIOFS_PID"
+# Wait for socket to be ready
+for i in $(seq 1 10); do
+    [ -S "$VIRTIOFS_SOCK" ] && break
+    sleep 0.5
+done
+[ -S "$VIRTIOFS_SOCK" ] || { echo "✗ virtiofsd failed to create socket"; kill "$VIRTIOFS_DAEMON_PID" 2>/dev/null; exit 1; }
+echo "virtiofsd started: PID=$VIRTIOFS_DAEMON_PID, socket=$VIRTIOFS_SOCK"
+
+# ─────────────────────────────────────────────────────────────────────
+# Launch QEMU with:
+#   - iothread for virtio-blk (moves disk I/O off vCPU thread)
+#   - multi-queue virtio-blk (parallel I/O across vCPUs)
+#   - virtiofs for host nix store (replaces 9p, 3-5x faster)
+#   - 9p for workspace (low throughput, acceptable for source sync)
+# ─────────────────────────────────────────────────────────────────────
 # TODO: Switch to passt networking once the image includes it (konductor.nix has passt added)
-# passt provides better performance and modern rootless networking vs QEMU user mode
-# For now using user mode (restrict=off) since host VM doesn't have passt until next rebuild
+VM_MEMORY="${QCOW2_VM_MEMORY:-16384}"
 qemu-system-x86_64 \
     -machine q35,accel=kvm,mem-merge=on \
-    -m "${QCOW2_VM_MEMORY:-16384}" \
+    -m "$VM_MEMORY" \
     -cpu host \
     -smp "${QCOW2_VM_CPUS:-$VM_CPUS}" \
     -rtc base=utc,clock=host \
     -boot order=c,menu=off \
+    -object iothread,id=iot0 \
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
     -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
-    -drive file=result/nixos.qcow2,if=virtio,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
+    -drive file=result/nixos.qcow2,if=none,id=drive0,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
+    -device virtio-blk-pci,drive=drive0,iothread=iot0,num-queues=4 \
     -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
     -netdev user,id=net0,restrict=off,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
     -device virtio-net-pci,netdev=net0 \
     -device virtio-rng-pci \
     -virtfs local,path="$(pwd)",mount_tag=host,security_model=mapped-xattr,multidevs=remap \
-    -virtfs local,path=/nix/store,mount_tag=nixstore,security_model=none,readonly=on \
+    -chardev socket,id=char-nixstore,path="$VIRTIOFS_SOCK" \
+    -device vhost-user-fs-pci,chardev=char-nixstore,tag=nixstore,num-request-queues=4,queue-size=512 \
+    -object memory-backend-memfd,id=mem,size=${VM_MEMORY}M,share=on \
+    -numa node,memdev=mem \
     -daemonize \
     -pidfile "$PIDFILE" \
     -serial file:"${QCOW2_LOGFILE:-build-vm.log}" \
@@ -788,11 +832,8 @@ ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.ser
 
 # Rebuild NixOS from the synced flake
 # Use .#konductor (git-clean tree) so derivation hashes match the host build,
-# enabling cache hits via the 9p host-store overlay. Override-inputs use absolute
-# paths so _sources/ is found without path:. (which would dirty self narHash).
-# Note: Do NOT stop/restart host-store mount units — stopping kills the 9p virtio
-# channel permanently (cannot reconnect). The fstab entry is identical between the
-# baked image and rebuild, so switch-to-configuration leaves mount units alone.
+# enabling cache hits via the virtiofs host-store overlay. Override-inputs use
+# absolute paths so _sources/ is found without path:. (which would dirty self narHash).
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 # Pre-build devshells to cache their closures with proxy support
@@ -982,6 +1023,13 @@ if kill -0 "$PID" 2>/dev/null; then
     kill "$PID" 2>/dev/null || true
 fi
 rm -f "$PIDFILE"
+
+# Stop virtiofsd daemon (must outlive QEMU, safe to kill after VM halt)
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+if [ -f "$VIRTIOFS_PID" ]; then
+    kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+    rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+fi
 ```
 
 ---
@@ -1086,6 +1134,10 @@ Remove temporary files.
 
 ```bash {"name":"_build:tmp:clean","excludeFromRunAll":"true"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+# Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 rm -f .nix_drv .system-toplevel
 ```
 

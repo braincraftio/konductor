@@ -2196,9 +2196,10 @@ EOF
         # =====================================================================
         # Systemd service to set up nix store overlay when host store is available
         # This runs early in boot, before nix-daemon, and only activates during
-        # QCOW2 build when the host's /nix/store is mounted via 9p virtfs.
-        # Note: No ConditionPathIsMountPoint since we use automount - the script
-        # checks availability by accessing the path (triggering automount if device exists)
+        # QCOW2 build when the host's /nix/store is shared via virtiofs.
+        # The virtiofs mount is configured with x-systemd.automount; accessing
+        # /nix/.host-store triggers it. In production (no virtiofs device),
+        # the mount fails gracefully and we fall back to local store only.
         nix-store-overlay = {
           description = "Set up Nix store overlay with host cache";
           wantedBy = [ "nix-daemon.service" ];
@@ -2214,41 +2215,26 @@ EOF
               set -euo pipefail
 
               # =====================================================================
-              # Check for 9p device BEFORE triggering automount
+              # Check for virtiofs host-store (triggers automount on access)
               # =====================================================================
-              # The /nix/.host-store mount is configured with x-systemd.automount,
-              # which triggers on directory access. Checking the directory existence
-              # would trigger the automount and cause kernel errors if no 9p device.
+              # The /nix/.host-store mount uses x-systemd.automount + nofail.
+              # Accessing the directory triggers the automount; if no virtiofs
+              # device exists (production), the mount fails silently (nofail)
+              # and the directory stays empty.
               #
-              # Instead, check for virtio 9p devices by scanning mount_tag files.
-              # Each virtio 9p device exposes its tag in /sys/bus/virtio/devices/*/mount_tag
-              #
-              # Wait up to 10 seconds for virtio devices to enumerate (boot timing)
+              # Wait up to 10 seconds for the mount to succeed (boot timing)
               FOUND_NIXSTORE=0
               for i in $(${pkgs.coreutils}/bin/seq 1 10); do
-                # Use glob expansion instead of find - sysfs doesn't work well with find during early boot
-                VIRTIO_9P_DEVICES=""
-                for tag_file in /sys/bus/virtio/devices/virtio*/mount_tag; do
-                  if [ -f "$tag_file" ]; then
-                    VIRTIO_9P_DEVICES="$VIRTIO_9P_DEVICES $(${pkgs.coreutils}/bin/cat "$tag_file" 2>/dev/null || true)"
-                  fi
-                done
-                if echo "$VIRTIO_9P_DEVICES" | ${pkgs.gnugrep}/bin/grep -q "nixstore"; then
+                if [ -d /nix/.host-store ] && [ -n "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
                   FOUND_NIXSTORE=1
-                  echo "Found 9p device 'nixstore' after ''${i}s"
+                  echo "Host nix store available via virtiofs after ''${i}s"
                   break
                 fi
                 ${pkgs.coreutils}/bin/sleep 1
               done
 
               if [ "$FOUND_NIXSTORE" -eq 0 ]; then
-                echo "9p device 'nixstore' not available (production mode), using local store"
-                exit 0
-              fi
-
-              # Device exists, now safe to check host store content (will trigger automount)
-              if [ ! -d /nix/.host-store ] || [ -z "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
-                echo "Host store mounted but empty, using local store"
+                echo "Host nix store not available (production mode), using local store"
                 exit 0
               fi
 
@@ -2653,6 +2639,7 @@ EOF
           "virtio_scsi"
           "virtio_balloon"
           "virtio_console"
+          "virtiofs"
           "9p"
           "9pnet_virtio"
         ];
@@ -2701,32 +2688,30 @@ EOF
     # =====================================================================
     # Host Nix Store Overlay (Build Acceleration)
     # =====================================================================
-    # During QCOW2 build, the host's /nix/store is mounted via 9p virtfs.
+    # During QCOW2 build, the host's /nix/store is shared via virtiofs
+    # (vhost-user-fs-pci backed by virtiofsd daemon on the host).
     # An overlay filesystem makes it writable while using host paths as cache.
-    # In production (no host mount), these mounts fail gracefully (nofail).
+    # In production (no virtiofs device), the mount fails gracefully (nofail).
     #
     # Architecture:
-    #   /nix/.host-store (9p, ro) ─┐
-    #                              ├─► overlay ─► /nix/store (rw)
-    #   /nix/.rw-store (tmpfs)  ───┘
+    #   /nix/.host-store (virtiofs, ro) ─┐
+    #                                    ├─► overlay ─► /nix/store (rw)
+    #   /nix/.rw-store (root fs)  ───────┘
     #
     # This reduces build time by avoiding re-download of paths that exist
-    # on the build host. New/modified paths go to the tmpfs upper layer.
+    # on the build host. New/modified paths go to the upper layer on root fs.
 
-    # Mount host's nix store read-only via 9p (only during build)
-    # Uses automount to avoid "failed" status when virtfs device doesn't exist
-    # The mount only triggers when /nix/.host-store is accessed
+    # Mount host's nix store read-only via virtiofs (only during build)
+    # virtiofsd daemon runs on the host, QEMU exposes it as vhost-user-fs-pci
+    # In production (no virtiofs device), nofail prevents boot failure
     fileSystems."/nix/.host-store" = {
       device = "nixstore";
-      fsType = "9p";
+      fsType = "virtiofs";
       options = [
-        "trans=virtio"
-        "version=9p2000.L"
-        "cache=loose"      # Aggressive caching for read-only mount
         "ro"
         "nofail"           # Don't fail boot if not available (production)
-        "noauto"           # Don't mount at boot (prevents failed unit)
-        "x-systemd.automount"  # Mount on access (no idle-timeout: overlay lowerdir access bypasses automount tracking)
+        "noauto"           # Don't mount at boot (overlay service handles it)
+        "x-systemd.automount"  # Mount on access (triggered by overlay service)
         "x-systemd.device-timeout=5s"
       ];
       neededForBoot = false;  # Not required - graceful degradation

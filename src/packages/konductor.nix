@@ -32,6 +32,7 @@
     libguestfs-with-appliance # guestmount, guestunmount (includes appliance)
     guestfs-tools # virt-sparsify
     OVMF # EFI firmware for QEMU
+    virtiofsd # User-space virtio-fs daemon for fast host→guest nix store sharing
 
     # Cloud-init ISO creation
     cdrkit
