@@ -658,7 +658,7 @@ virtiofsd \
     --readonly \
     --cache=always \
     --thread-pool-size=4 \
-    --inode-file-handles=mandatory \
+    --inode-file-handles=prefer \
     --announce-submounts &
 VIRTIOFS_DAEMON_PID=$!
 echo "$VIRTIOFS_DAEMON_PID" > "$VIRTIOFS_PID"
