@@ -13,6 +13,9 @@
   # ttyd with embedded Nerd Fonts for web terminal
   (import ./ttyd.nix)
 
+  # Pre-built code-server binary (avoids 2-4 hour source build)
+  (import ./code-server.nix)
+
   # Unstable packages overlay
   (_final: prev: {
     unstable = import nixpkgs-unstable {
