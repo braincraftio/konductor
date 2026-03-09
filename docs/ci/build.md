@@ -787,13 +787,17 @@ fi
 ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.service cloud-init-local.service cloud-init.service 2>/dev/null || true"
 
 # Stop host-store mount before rebuild — already mounted by nix-store-overlay,
-# switch-to-configuration fails trying to restart it ("already mounted or busy")
+# switch-to-configuration fails trying to restart it ("already mounted or busy").
+# Restart automount after rebuild so devshell caching can use host store overlay.
 ssh $SSH_OPTS kc2admin@localhost "sudo systemctl stop nix-.host\\\\x2dstore.automount nix-.host\\\\x2dstore.mount 2>/dev/null || true"
 
 # Rebuild NixOS from the synced flake
 # path:. includes gitignored _sources/, --no-write-lock-file preserves committed lock
 # Rebuild NixOS with proxy support
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nixos-rebuild switch --flake 'path:.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+
+# Restart host-store automount + overlay so subsequent builds use host cache
+ssh $SSH_OPTS kc2admin@localhost "sudo systemctl restart nix-.host\\\\x2dstore.automount 2>/dev/null || true; sudo systemctl restart nix-store-overlay.service 2>/dev/null || true"
 
 # Pre-build devshells to cache their closures with proxy support
 # This ensures `nix develop` works offline - failures here break offline support
