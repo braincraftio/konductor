@@ -50,7 +50,7 @@ in
     python312Packages.pylatexenc # utftex for latex-to-unicode conversion
 
     # Cloudflare developer platform CLI tools
-    wrangler # CLI for Cloudflare Workers, Pages, KV, R2, D1, Workflows
+    # wrangler # CLI for Cloudflare Workers, Pages, KV, R2, D1, Workflows (122K files in node_modules — re-enable when needed)
     cloudflared # Cloudflare Tunnel, Access, DNS over HTTPS
     flarectl # CLI for interacting with Cloudflare account
 

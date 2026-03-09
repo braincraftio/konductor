@@ -71,7 +71,7 @@ rec {
     nodePackages.pnpm
     nodePackages.yarn
     nodePackages.typescript-language-server
-    # typescript → bundled by wrangler in ide.nix, standalone causes buildEnv collision
+    # typescript → standalone causes buildEnv collision (wrangler bundled it when enabled)
     # prettier → wrapped in src/config/formatters/ (in packages.default)
     # biome → wrapped in src/config/formatters/ (in packages.default)
   ];
