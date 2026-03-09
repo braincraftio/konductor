@@ -659,7 +659,9 @@ virtiofsd \
     --cache=always \
     --thread-pool-size=4 \
     --inode-file-handles=prefer \
-    --announce-submounts &
+    --announce-submounts \
+    >>"${QCOW2_LOGFILE:-build-vm.log}" 2>&1 &
+disown
 VIRTIOFS_DAEMON_PID=$!
 echo "$VIRTIOFS_DAEMON_PID" > "$VIRTIOFS_PID"
 # Wait for socket to be ready
