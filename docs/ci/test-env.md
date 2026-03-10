@@ -6,7 +6,7 @@ runme:
   version: v3
 ---
 
-# Test: provenance env corruption with SSH
+# Test: provenance → gc env corruption
 
 ```bash {"name":"test:before","tag":"test:env"}
 echo "BEFORE: HOME=$HOME"
@@ -19,42 +19,56 @@ SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 SCP_OPTS="-P $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
+_commit=$(git rev-parse HEAD)
+_branch=$(git rev-parse --abbrev-ref HEAD)
+_remote=$(git remote get-url origin 2>/dev/null || echo ORPHANED)
+_dirty=$(git status --porcelain | wc -l | tr -d ' ')
+_nix_ver=$(nix --version | head -1)
+_nix_hash=$(nix flake metadata --json | jq -r '.locked.narHash')
+_nix_drv=$(cat .nix_drv 2>/dev/null || echo test)
+_lock_sha=$(sha256sum flake.lock | cut -d' ' -f1)
+_build_date=$(date -Iseconds)
+_build_host=$(hostname)
+_qemu_ver=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //')
+_hw_vendor=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || _hw_vendor=""
+_hw_product=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || _hw_product=""
+_hw_serial=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || _hw_serial=""
+_oci_image="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
+
+_tags="[\"${CONTAINER_TAG:-latest-qcow2}\""
+[ "$_dirty" = "0" ] && _tags+=", \"qcow2-${_commit}\"" || _tags+=", \"qcow2-dirty\""
+_tags+=", \"qcow2-${_nix_drv}\""
+[ -n "$_lock_sha" ] && [ "$_lock_sha" != "unknown" ] && _tags+=", \"qcow2-${_lock_sha}\""
+_tags+="]"
+
 cat > .konductor << PROVENANCE_EOF
 [konductor]
-git_commit = "$(git rev-parse HEAD)"
-git_branch = "$(git rev-parse --abbrev-ref HEAD)"
-git_remote = "$(git remote get-url origin 2>/dev/null || echo ORPHANED)"
-git_dirty = $(git status --porcelain | wc -l | tr -d ' ')
-nix_version = "$(nix --version | head -1)"
-nix_hash = "$(nix flake metadata --json | jq -r '.locked.narHash')"
-nix_drv = "$(cat .nix_drv 2>/dev/null || echo test)"
-flake_lock_sha256 = "$(sha256sum flake.lock | cut -d' ' -f1)"
-build_date = "$(date -Iseconds)"
-build_host = "$(hostname)"
-build_user = "${USER}"
-qemu = "$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator version //')"
-build_hw_vendor = "$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n')"
-build_hw_product = "$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n')"
-build_hw_serial = "$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n')"
+git_commit = "$_commit"
+git_branch = "$_branch"
+git_remote = "$_remote"
+git_dirty = $_dirty
+nix_version = "$_nix_ver"
+nix_hash = "$_nix_hash"
+nix_drv = "$_nix_drv"
+flake_lock_sha256 = "$_lock_sha"
+build_date = "$_build_date"
+build_host = "$_build_host"
+build_user = "$USER"
+qemu = "$_qemu_ver"
+build_hw_vendor = "$_hw_vendor"
+build_hw_product = "$_hw_product"
+build_hw_serial = "$_hw_serial"
 strict = false
-oci_image = "registry.docker.arpa/containercraft/konductor"
-oci_tags = ["latest-qcow2"]
+oci_image = "$_oci_image"
+oci_tags = $_tags
 PROVENANCE_EOF
 
 cat .konductor
-
-scp $SCP_OPTS .konductor kc2admin@localhost:/tmp/.konductor
-ssh $SSH_OPTS kc2admin@localhost 'sudo mv /tmp/.konductor /.konductor && sudo chmod 644 /.konductor'
-ssh $SSH_OPTS kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki generate --force'
-ssh $SSH_OPTS kc2admin@localhost 'sudo PYTHONPATH=/opt/konductor/src/src python3 -m pki bundle'
-ssh $SSH_OPTS kc2admin@localhost 'PYTHONPATH=/opt/konductor/src/src python3 -m pki status' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
-ssh $SSH_OPTS kc2admin@localhost 'cat /.konductor' > .konductor
-ssh $SSH_OPTS kc2admin@localhost 'ff' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 echo "PROVENANCE DONE"
 ```
 
-```bash {"name":"test:after","tag":"test:env"}
-echo "AFTER: HOME=$HOME"
-echo "AFTER: PATH=$PATH"
-echo "AFTER: which ssh=$(which ssh 2>&1 || echo NOT_FOUND)"
+```bash {"name":"test:gc","tag":"test:env"}
+echo "GC: HOME=$HOME"
+echo "GC: PATH=$PATH"
+echo "GC: which ssh=$(which ssh 2>&1 || echo NOT_FOUND)"
 ```
