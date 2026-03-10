@@ -911,11 +911,15 @@ set -ex
 echo "DEBUG gc: HOME=$HOME PATH=$PATH"
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-# On an overlayfs nix store, gc deletes upper-layer paths and creates whiteouts
-# for lower-layer paths. Large trees (nixpkgs) can strain virtiofsd fd limits.
-# --max-freed caps effort; tolerate partial gc since the goal is image size.
-ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d --max-freed $((150 * 1024**3))' \
-    || echo "WARNING: gc exited $? — partial collection accepted"
+# On an overlayfs nix store, gc can hit virtiofsd fd limits when deleting
+# large lower-layer trees (whiteout creation). Retry up to 3 times.
+max_attempts=3
+attempt=1
+while [ "$attempt" -le "$max_attempts" ]; do
+    ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d' && break
+    echo "gc: attempt ${attempt}/${max_attempts} failed, retrying..."
+    attempt=$((attempt + 1))
+done
 ssh $SSH_OPTS kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
 ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
