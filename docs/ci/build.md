@@ -12,14 +12,15 @@ runme:
 
 Complete build pipeline: source → nix → VM configure → seal → compress → OCI containerDisk.
 
-This file is self-contained. All 21 internal phases run sequentially within this file.
-No external file dependencies. Called by `ci:pipeline` (README.md) or directly.
+Phases run sequentially in document order via `runme run --all --tag=pipeline:all`.
+Each phase is a named code block tagged for pipeline membership. Background daemons
+use `background:true` for proper process lifecycle in runme's single-session mode.
 
 ## Contents
 
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
-- [Entry Points](#entry-points)
+- [Task Reference](#task-reference)
 - [Build Phases](#build-phases)
 
 ---
@@ -28,10 +29,13 @@ No external file dependencies. Called by `ci:pipeline` (README.md) or directly.
 
 ```bash
 # Full build pipeline (clean → nix → VM → seal → container)
-runme run --filename docs/ci/build.md build:all
+runme run --all --tag=pipeline:all --filename docs/ci/build.md
 
 # Build QCOW2 only (no container packaging)
-runme run --filename docs/ci/build.md build:image
+runme run --all --tag=pipeline:image --filename docs/ci/build.md
+
+# Standalone preflight check
+runme run --filename docs/ci/build.md build:preflight
 ```
 
 ---
@@ -62,144 +66,37 @@ export SKIP_NIX_BUILD=false
 ## Task Reference
 
 ```text
-Entry Points:
-  build:all            Full pipeline: clean → nix → VM → seal → container
-  build:image          Build QCOW2 only (no container packaging)
-  build:preflight      Validate environment (standalone)
+Invocation:
+  runme run --all --tag=pipeline:all --filename docs/ci/build.md    # Full pipeline
+  runme run --all --tag=pipeline:image --filename docs/ci/build.md  # Image only (no container)
+  runme run --filename docs/ci/build.md build:preflight             # Standalone preflight
 
-Internal Phases (called by entry points):
-  _build:clean              Reset build state
-  _build:nix                Nix build + writable overlay
-  _build:cloudinit          Generate cloud-init ISO
-  _build:img:reset          Reset image to pristine state
-  _build:vm:virtiofsd       Start virtiofsd daemon (background)
-  _build:vm:boot            Boot QEMU VM
-  _build:vm:wait            Wait for SSH
-  _build:vm:sync            Sync source to VM
-  _build:vm:rebuild         nixos-rebuild inside VM
-  _build:vm:pki:test        PKI tests
-  _build:vm:pki:status      PKI certificate status
-  _build:vm:provenance      Write /.konductor provenance
-  _build:vm:gc              Garbage collect
-  _build:vm:zero            Zero free space
-  _build:vm:halt            Shutdown VM
-  _build:img:clean          Clean credentials from image
-  _build:img:compress       ZSTD compress
-  _build:img:sparsify       Sparsify image
-  _build:tmp:clean          Remove temp files
-  _build:verify             Append post-seal fields
-  _build:container          Package as OCI containerDisk
-```
+Pipeline phases (document order, tag-selected):
+  Tag: pipeline:all,pipeline:image
+    _build:clean              Reset build state
+    build:preflight           Validate environment
+    _build:nix                Nix build + writable overlay
+    _build:cloudinit          Generate cloud-init ISO
+    _build:img:reset          Reset image to pristine state
+    _build:vm:virtiofsd       Start virtiofsd daemon (background:true)
+    _build:vm:boot            Boot QEMU VM
+    _build:vm:wait            Wait for SSH
+    _build:vm:sync            Sync source to VM
+    _build:vm:rebuild         nixos-rebuild inside VM
+    _build:vm:pki:test        PKI tests
+    _build:vm:pki:status      PKI certificate status
+    _build:vm:provenance      Write /.konductor provenance
+    _build:vm:gc              Garbage collect
+    _build:vm:zero            Zero free space
+    _build:vm:halt            Shutdown VM
+    _build:img:clean          Clean credentials from image
+    _build:img:compress       ZSTD compress
+    _build:img:sparsify       Sparsify image
+    _build:tmp:clean          Remove temp files
+    _build:verify             Append post-seal fields
 
----
-
-## Entry Points
-
-### build:all
-
-Full pipeline: clean → nix → VM configure → seal → compress → containerDisk.
-
-```bash {"name":"build:all","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
-set -e
-
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  build:all — Full QCOW2 + OCI Build Pipeline"
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo ""
-echo "  Target: ${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}:${CONTAINER_TAG:-latest-qcow2}"
-echo ""
-
-BUILD_FILE="docs/ci/build.md"
-
-PHASES=(
-    "_build:clean"
-    "build:preflight"
-    "_build:nix"
-    "_build:cloudinit"
-    "_build:img:reset"
-    "_build:vm:virtiofsd"
-    "_build:vm:boot"
-    "_build:vm:wait"
-    "_build:vm:sync"
-    "_build:vm:rebuild"
-    "_build:vm:pki:test"
-    "_build:vm:pki:status"
-    "_build:vm:provenance"
-    "_build:vm:gc"
-    "_build:vm:zero"
-    "_build:vm:halt"
-    "_build:img:clean"
-    "_build:img:compress"
-    "_build:img:sparsify"
-    "_build:tmp:clean"
-    "_build:verify"
-    "_build:container"
-)
-
-for phase in "${PHASES[@]}"; do
-    echo ""
-    echo "▶ ${phase}..."
-    runme run --direnv=true --load-env=false --filename "$BUILD_FILE" "$phase"
-done
-
-echo ""
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  ✓ Build complete!"
-echo "═══════════════════════════════════════════════════════════════════════════"
-cat .konductor
-```
-
----
-
-### build:image
-
-Build QCOW2 only (no container packaging). Used by `verify:reproduce` for image-only builds.
-
-```bash {"name":"build:image","excludeFromRunAll":"true","tag":"type:entry,duration:slow"}
-set -e
-
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  build:image — QCOW2 Image Build (no container packaging)"
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo ""
-
-BUILD_FILE="docs/ci/build.md"
-
-PHASES=(
-    "_build:clean"
-    "build:preflight"
-    "_build:nix"
-    "_build:cloudinit"
-    "_build:img:reset"
-    "_build:vm:virtiofsd"
-    "_build:vm:boot"
-    "_build:vm:wait"
-    "_build:vm:sync"
-    "_build:vm:rebuild"
-    "_build:vm:pki:test"
-    "_build:vm:pki:status"
-    "_build:vm:provenance"
-    "_build:vm:gc"
-    "_build:vm:zero"
-    "_build:vm:halt"
-    "_build:img:clean"
-    "_build:img:compress"
-    "_build:img:sparsify"
-    "_build:tmp:clean"
-    "_build:verify"
-)
-
-for phase in "${PHASES[@]}"; do
-    echo ""
-    echo "▶ ${phase}..."
-    runme run --direnv=true --load-env=false --filename "$BUILD_FILE" "$phase"
-done
-
-echo ""
-echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  ✓ Image build complete!"
-echo "═══════════════════════════════════════════════════════════════════════════"
-cat .konductor
+  Tag: pipeline:all only
+    _build:container          Package as OCI containerDisk
 ```
 
 ---
@@ -210,12 +107,13 @@ cat .konductor
 
 Reset build state.
 
-```bash {"name":"_build:clean","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"_build:clean","tag":"pipeline:all,pipeline:image,type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 # Stop virtiofsd daemon (started as background block by _build:vm:virtiofsd)
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
-rm -f "$VIRTIOFS_SOCK"
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+rm -f "$VIRTIOFS_PID" "$VIRTIOFS_SOCK"
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -230,7 +128,7 @@ echo "✓ Clean"
 
 Validate environment (standalone — no cluster required).
 
-```bash {"name":"build:preflight","excludeFromRunAll":"true"}
+```bash {"name":"build:preflight","tag":"pipeline:all,pipeline:image"}
 set -e
 
 # Build host system state
@@ -420,7 +318,7 @@ echo ""
 
 Build NixOS closure and capture nix_drv.
 
-```bash {"name":"_build:nix","excludeFromRunAll":"true","tag":"requires:nix"}
+```bash {"name":"_build:nix","tag":"pipeline:all,pipeline:image,requires:nix"}
 set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
@@ -477,7 +375,7 @@ chown -R "$(id -u):$(id -g)" result.writable/
 
 Generate cloud-init ISO.
 
-```bash {"name":"_build:cloudinit","excludeFromRunAll":"true"}
+```bash {"name":"_build:cloudinit","tag":"pipeline:all,pipeline:image"}
 set -e
 [ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set"; exit 1; }
 [ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
@@ -601,7 +499,7 @@ genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
 
 Reset image to pristine state.
 
-```bash {"name":"_build:img:reset","excludeFromRunAll":"true","tag":"requires:guestfs"}
+```bash {"name":"_build:img:reset","tag":"pipeline:all,pipeline:image,requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
 MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
@@ -626,7 +524,7 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 Start virtiofsd daemon for host nix store sharing. Runs as `background=true` so
 runme doesn't wait for the long-running daemon — it proceeds to `_build:vm:boot` immediately.
 
-```bash {"name":"_build:vm:virtiofsd","excludeFromRunAll":"true","background":"true","tag":"requires:kvm"}
+```bash {"name":"_build:vm:virtiofsd","background":true,"tag":"pipeline:all,pipeline:image,requires:kvm"}
 set -e
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
@@ -637,9 +535,11 @@ set -e
 # 3-5x faster than 9p for metadata-heavy nix store (millions of small files).
 # ─────────────────────────────────────────────────────────────────────
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
 rm -f "$VIRTIOFS_SOCK"
 
-virtiofsd \
+echo $$ > "$VIRTIOFS_PID"
+exec virtiofsd \
     --socket-path="$VIRTIOFS_SOCK" \
     --shared-dir=/nix/store \
     --sandbox=none \
@@ -657,7 +557,7 @@ virtiofsd \
 
 Boot VM.
 
-```bash {"name":"_build:vm:boot","excludeFromRunAll":"true","tag":"requires:kvm"}
+```bash {"name":"_build:vm:boot","tag":"pipeline:all,pipeline:image,requires:kvm"}
 set -e
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
@@ -733,7 +633,7 @@ echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
 
 Wait for SSH.
 
-```bash {"name":"_build:vm:wait","excludeFromRunAll":"true","tag":"duration:slow"}
+```bash {"name":"_build:vm:wait","tag":"pipeline:all,pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -768,7 +668,7 @@ done
 
 Sync source to VM.
 
-```bash {"name":"_build:vm:sync","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:sync","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -826,7 +726,7 @@ This ensures:
 - All nix store paths are pre-cached for airgap use
 - The VM can reproduce itself from /opt/konductor/src
 
-```bash {"name":"_build:vm:rebuild","excludeFromRunAll":"true","tag":"duration:slow"}
+```bash {"name":"_build:vm:rebuild","tag":"pipeline:all,pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -868,7 +768,7 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 Run PKI tests inside VM.
 
-```bash {"name":"_build:vm:pki:test","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:pki:test","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -888,7 +788,7 @@ echo "PKI tests complete"
 
 Display PKI certificate status.
 
-```bash {"name":"_build:vm:pki:status","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:pki:status","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -906,7 +806,7 @@ ssh $SSH_OPTS kc2admin@localhost \
 
 Write `/.konductor` inside VM.
 
-```bash {"name":"_build:vm:provenance","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:provenance","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -euo pipefail
 
@@ -995,7 +895,7 @@ ssh $SSH_OPTS kc2admin@localhost 'ff' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 Garbage collect.
 
-```bash {"name":"_build:vm:gc","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:gc","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -1011,7 +911,7 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>
 
 Zero free space.
 
-```bash {"name":"_build:vm:zero","excludeFromRunAll":"true","tag":"duration:slow"}
+```bash {"name":"_build:vm:zero","tag":"pipeline:all,pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -1024,7 +924,7 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/nul
 
 Shutdown VM.
 
-```bash {"name":"_build:vm:halt","excludeFromRunAll":"true"}
+```bash {"name":"_build:vm:halt","tag":"pipeline:all,pipeline:image"}
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 [ -f "$PIDFILE" ] || exit 0
 
@@ -1041,8 +941,9 @@ rm -f "$PIDFILE"
 
 # Stop virtiofsd daemon (must outlive QEMU, safe to kill after VM halt)
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
-rm -f "$VIRTIOFS_SOCK"
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+rm -f "$VIRTIOFS_PID" "$VIRTIOFS_SOCK"
 ```
 
 ---
@@ -1051,7 +952,7 @@ rm -f "$VIRTIOFS_SOCK"
 
 Clean credentials from image.
 
-```bash {"name":"_build:img:clean","excludeFromRunAll":"true","tag":"requires:guestfs"}
+```bash {"name":"_build:img:clean","tag":"pipeline:all,pipeline:image,requires:guestfs"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 export LIBGUESTFS_BACKEND=direct
@@ -1101,7 +1002,7 @@ ZSTD compress and sparsify image.
 
 Note: SKIP_COMPRESS=true produces a larger, uncompressed image (faster builds, larger output).
 
-```bash {"name":"_build:img:compress","excludeFromRunAll":"true","tag":"duration:slow"}
+```bash {"name":"_build:img:compress","tag":"pipeline:all,pipeline:image,duration:slow"}
 set -e
 
 # Cap coroutines to prevent excessive memory usage on high-core systems
@@ -1123,7 +1024,7 @@ fi
 
 Sparsify image (skipped if SKIP_COMPRESS=true).
 
-```bash {"name":"_build:img:sparsify","excludeFromRunAll":"true","tag":"duration:slow,requires:guestfs"}
+```bash {"name":"_build:img:sparsify","tag":"pipeline:all,pipeline:image,duration:slow,requires:guestfs"}
 set -e
 
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
@@ -1145,12 +1046,13 @@ rm -f konductor.qcow2.tmp
 
 Remove temporary files.
 
-```bash {"name":"_build:tmp:clean","excludeFromRunAll":"true"}
+```bash {"name":"_build:tmp:clean","tag":"pipeline:all,pipeline:image"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 # Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
-rm -f "$VIRTIOFS_SOCK"
+VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
+[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
+rm -f "$VIRTIOFS_PID" "$VIRTIOFS_SOCK"
 rm -f .nix_drv .system-toplevel
 ```
 
@@ -1160,7 +1062,7 @@ rm -f .nix_drv .system-toplevel
 
 Append post-seal fields to .konductor.
 
-```bash {"name":"_build:verify","excludeFromRunAll":"true","tag":"type:readonly"}
+```bash {"name":"_build:verify","tag":"pipeline:all,pipeline:image,type:readonly"}
 set -e
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
@@ -1181,7 +1083,7 @@ cat .konductor
 
 Package QCOW2 as containerDisk.
 
-```bash {"name":"_build:container","excludeFromRunAll":"true","tag":"requires:docker"}
+```bash {"name":"_build:container","tag":"pipeline:all,requires:docker"}
 set -e
 if ! eval "$(nix print-dev-env .#konductor)"; then
     echo "Warning: nix print-dev-env failed, using current environment"

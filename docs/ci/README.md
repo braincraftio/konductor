@@ -134,7 +134,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 | File | Role | Tasks |
 |------|------|-------|
 | `README.md` | Sole orchestrator + pipeline docs | `ci:pipeline` |
-| `build.md` | Source → sealed QCOW2 → OCI containerDisk | `build:all`, `build:image`, 21 internal `_build:*` |
+| `build.md` | Source → sealed QCOW2 → OCI containerDisk | `--tag=pipeline:all`, `--tag=pipeline:image`, 22 `_build:*` phases |
 | `platform.md` | Cluster lifecycle (Talos + Pulumi) | `platform:up`, `platform:down`, `platform:status` |
 | `registry.md` | Registry trust, auth, inspection | `registry:trust`, `registry:login`, `registry:list`, `registry:tags` |
 | `push.md` | Push to local registry | `push:image` |
@@ -161,7 +161,7 @@ runme run --filename docs/ci/README.md ci:pipeline
 
 ```bash {"name":"quickstart:dev","excludeFromRunAll":"true","tag":"type:example"}
 # Build image + containerDisk
-runme run --filename docs/ci/build.md build:all
+runme run --all --tag=pipeline:all --filename docs/ci/build.md
 
 # Interactive development: boot VM for testing
 runme run --filename docs/ci/dev.md dev:start
@@ -320,7 +320,7 @@ Fast iteration cycle for development.
 
 ```bash {"name":"workflow:dev","excludeFromRunAll":"true","tag":"type:example"}
 # Build and package
-runme run --filename docs/ci/build.md build:all
+runme run --all --tag=pipeline:all --filename docs/ci/build.md
 
 # Optional: boot VM for testing
 runme run --filename docs/ci/dev.md dev:start
@@ -464,7 +464,7 @@ echo "════════════════════════�
 echo ""
 echo "▶ Phase 1+2: Build + package ║ Start cluster + deploy platform (PARALLEL)..."
 
-runme run --direnv=true --load-env=false --filename "$CI_DIR/build.md" build:all &
+runme run --all --tag=pipeline:all --filename "$CI_DIR/build.md" &
 BUILD_PID=$!
 
 runme run --direnv=true --load-env=false --filename "$CI_DIR/platform.md" platform:up &

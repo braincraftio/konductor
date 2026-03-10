@@ -265,8 +265,7 @@ echo "This may take 30+ minutes..."
 echo ""
 
 # Build using the image-only pipeline (no container packaging needed for reproduction)
-BUILD_FILE=docs/ci/build.md
-runme run --filename "$BUILD_FILE" build:image
+runme run --all --tag=pipeline:image --filename docs/ci/build.md
 
 ACTUAL_SHA=$(sha256sum konductor.qcow2 | cut -d' ' -f1)
 
