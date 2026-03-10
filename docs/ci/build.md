@@ -72,6 +72,7 @@ Internal Phases (called by entry points):
   _build:nix                Nix build + writable overlay
   _build:cloudinit          Generate cloud-init ISO
   _build:img:reset          Reset image to pristine state
+  _build:vm:virtiofsd       Start virtiofsd daemon (background)
   _build:vm:boot            Boot QEMU VM
   _build:vm:wait            Wait for SSH
   _build:vm:sync            Sync source to VM
@@ -116,6 +117,7 @@ PHASES=(
     "_build:nix"
     "_build:cloudinit"
     "_build:img:reset"
+    "_build:vm:virtiofsd"
     "_build:vm:boot"
     "_build:vm:wait"
     "_build:vm:sync"
@@ -169,6 +171,7 @@ PHASES=(
     "_build:nix"
     "_build:cloudinit"
     "_build:img:reset"
+    "_build:vm:virtiofsd"
     "_build:vm:boot"
     "_build:vm:wait"
     "_build:vm:sync"
@@ -209,10 +212,10 @@ Reset build state.
 
 ```bash {"name":"_build:clean","excludeFromRunAll":"true","tag":"type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
-# Stop virtiofsd daemon (started before QEMU for host nix store sharing)
-VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
-[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
-rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+# Stop virtiofsd daemon (started as background block by _build:vm:virtiofsd)
+VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
+rm -f "$VIRTIOFS_SOCK"
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -618,6 +621,38 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 ---
 
+### \_build:vm:virtiofsd
+
+Start virtiofsd daemon for host nix store sharing. Runs as `background=true` so
+runme doesn't wait for the long-running daemon — it proceeds to `_build:vm:boot` immediately.
+
+```bash {"name":"_build:vm:virtiofsd","excludeFromRunAll":"true","background":"true","tag":"requires:kvm"}
+set -e
+[ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
+
+# ─────────────────────────────────────────────────────────────────────
+# Start virtiofsd for host nix store sharing (replaces 9p virtfs)
+# virtiofsd uses vhost-user protocol over Unix socket → QEMU presents
+# as vhost-user-fs-pci device → guest mounts as virtiofs.
+# 3-5x faster than 9p for metadata-heavy nix store (millions of small files).
+# ─────────────────────────────────────────────────────────────────────
+VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+rm -f "$VIRTIOFS_SOCK"
+
+virtiofsd \
+    --socket-path="$VIRTIOFS_SOCK" \
+    --shared-dir=/nix/store \
+    --sandbox=none \
+    --seccomp=none \
+    --readonly \
+    --cache=always \
+    --thread-pool-size=4 \
+    --inode-file-handles=prefer \
+    --announce-submounts
+```
+
+---
+
 ### \_build:vm:boot
 
 Boot VM.
@@ -641,36 +676,14 @@ VM_CPUS=$((TOTAL_CPUS - 2))
 
 echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
 
-# ─────────────────────────────────────────────────────────────────────
-# Start virtiofsd for host nix store sharing (replaces 9p virtfs)
-# virtiofsd uses vhost-user protocol over Unix socket → QEMU presents
-# as vhost-user-fs-pci device → guest mounts as virtiofs.
-# 3-5x faster than 9p for metadata-heavy nix store (millions of small files).
-# ─────────────────────────────────────────────────────────────────────
+# Wait for virtiofsd socket (started in background by _build:vm:virtiofsd)
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
-rm -f "$VIRTIOFS_SOCK"
-# Launch virtiofsd fully detached (setsid) so runme doesn't track it as a child
-setsid virtiofsd \
-    --socket-path="$VIRTIOFS_SOCK" \
-    --shared-dir=/nix/store \
-    --sandbox=none \
-    --seccomp=none \
-    --readonly \
-    --cache=always \
-    --thread-pool-size=4 \
-    --inode-file-handles=prefer \
-    --announce-submounts \
-    >>"${QCOW2_LOGFILE:-build-vm.log}" 2>&1 &
-VIRTIOFS_DAEMON_PID=$!
-echo "$VIRTIOFS_DAEMON_PID" > "$VIRTIOFS_PID"
-# Wait for socket to be ready
-for i in $(seq 1 10); do
+for i in $(seq 1 20); do
     [ -S "$VIRTIOFS_SOCK" ] && break
     sleep 0.5
 done
-[ -S "$VIRTIOFS_SOCK" ] || { echo "✗ virtiofsd failed to create socket"; kill "$VIRTIOFS_DAEMON_PID" 2>/dev/null; exit 1; }
-echo "virtiofsd started: PID=$VIRTIOFS_DAEMON_PID, socket=$VIRTIOFS_SOCK"
+[ -S "$VIRTIOFS_SOCK" ] || { echo "✗ virtiofsd socket not found at $VIRTIOFS_SOCK"; exit 1; }
+echo "virtiofsd socket ready: $VIRTIOFS_SOCK"
 
 # ─────────────────────────────────────────────────────────────────────
 # Launch QEMU with:
@@ -1027,11 +1040,9 @@ fi
 rm -f "$PIDFILE"
 
 # Stop virtiofsd daemon (must outlive QEMU, safe to kill after VM halt)
-VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
-if [ -f "$VIRTIOFS_PID" ]; then
-    kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
-    rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-fi
+VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
+rm -f "$VIRTIOFS_SOCK"
 ```
 
 ---
@@ -1137,9 +1148,9 @@ Remove temporary files.
 ```bash {"name":"_build:tmp:clean","excludeFromRunAll":"true"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 # Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
-VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
-[ -f "$VIRTIOFS_PID" ] && kill "$(cat "$VIRTIOFS_PID")" 2>/dev/null || true
-rm -f "$VIRTIOFS_PID" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+pgrep -af "virtiofsd.*--socket-path=${VIRTIOFS_SOCK}" | awk '{print $1}' | xargs -r kill 2>/dev/null || true
+rm -f "$VIRTIOFS_SOCK"
 rm -f .nix_drv .system-toplevel
 ```
 
