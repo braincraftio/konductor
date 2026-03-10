@@ -569,6 +569,7 @@ rm -f "$VIRTIOFS_SOCK"
 
 systemd-run --user --unit=virtiofsd-nixstore \
     --description="virtiofsd for konductor build" \
+    --property=LimitNOFILE=1048576 \
     -- virtiofsd \
     --socket-path="$VIRTIOFS_SOCK" \
     --shared-dir=/nix/store \
@@ -910,7 +911,11 @@ set -ex
 echo "DEBUG gc: HOME=$HOME PATH=$PATH"
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d'
+# On an overlayfs nix store, gc deletes upper-layer paths and creates whiteouts
+# for lower-layer paths. Large trees (nixpkgs) can strain virtiofsd fd limits.
+# --max-freed caps effort; tolerate partial gc since the goal is image size.
+ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d --max-freed $((150 * 1024**3))' \
+    || echo "WARNING: gc exited $? — partial collection accepted"
 ssh $SSH_OPTS kc2admin@localhost 'sudo journalctl --vacuum-size=1M && sudo rm -rf /var/log/journal/* /nix/var/log/nix/drvs/*'
 ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>/dev/null || true'
 ```
