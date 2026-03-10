@@ -347,11 +347,25 @@ fi
 echo "Building .#qcow2..."
 nix build .#qcow2 --no-warn-dirty
 
-# Pre-build the system toplevel so its closure lands in the host nix store.
-# The VM's nixos-rebuild switch uses the same derivation — virtiofs overlay
-# serves these paths instantly instead of downloading from cache.nixos.org.
+# Pre-build system toplevel + devshells with the SAME --override-input flags
+# the VM will use. This is critical: without matching flags, the derivation
+# hashes differ (path: vs github: inputs) and the VM gets zero cache hits
+# from the virtiofs host store overlay, causing a full rebuild (~60 min).
+# With matching flags, the VM reuses the host store via overlay (~2 min).
+OVERRIDE_INPUTS=""
+if [ -d "_sources/nixpkgs" ]; then
+    echo "Generating --override-input flags from _sources/..."
+    for dir in _sources/*/; do
+        input=$(basename "$dir")
+        OVERRIDE_INPUTS+=" --override-input $input path:$PWD/_sources/$input"
+    done
+fi
 echo "Pre-building system toplevel for VM cache..."
-nix build '.#nixosConfigurations.konductor.config.system.build.toplevel' --no-warn-dirty --no-link
+nix build '.#nixosConfigurations.konductor.config.system.build.toplevel' --no-warn-dirty --no-link $OVERRIDE_INPUTS
+echo "Pre-building devshells for VM cache..."
+nix build --no-link '.#devShells.x86_64-linux.default' --no-warn-dirty $OVERRIDE_INPUTS
+nix build --no-link '.#devShells.x86_64-linux.full' --no-warn-dirty $OVERRIDE_INPUTS
+nix build --no-link '.#devShells.x86_64-linux.konductor' --no-warn-dirty $OVERRIDE_INPUTS
 
 # Get output path and derivation hash after build completes
 OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths | head -1)
