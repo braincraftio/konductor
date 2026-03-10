@@ -1,6 +1,6 @@
 ---
 cwd: ../..
-shell: /run/current-system/sw/bin/bash
+shell: bash
 skipPrompts: true
 tag: scope:ci,target:qcow2
 runme:
@@ -128,6 +128,8 @@ Validate environment (standalone — no cluster required).
 
 ```bash {"name":"build:preflight","tag":"pipeline:all,pipeline:image"}
 set -e
+
+echo "bash: $(which bash) (${BASH_VERSION})"
 
 # Build host system state
 if command -v ff &>/dev/null; then
@@ -345,6 +347,12 @@ fi
 echo "Building .#qcow2..."
 nix build .#qcow2 --no-warn-dirty
 
+# Pre-build the system toplevel so its closure lands in the host nix store.
+# The VM's nixos-rebuild switch uses the same derivation — virtiofs overlay
+# serves these paths instantly instead of downloading from cache.nixos.org.
+echo "Pre-building system toplevel for VM cache..."
+nix build '.#nixosConfigurations.konductor.config.system.build.toplevel' --no-warn-dirty --no-link
+
 # Get output path and derivation hash after build completes
 OUT_PATH=$(nix build .#qcow2 --no-warn-dirty --no-link --print-out-paths | head -1)
 if [ -z "$OUT_PATH" ]; then
@@ -398,27 +406,27 @@ cat > "$CLOUD_INIT_DIR/user-data" << 'EOF'
 users:
   - name: PLACEHOLDER_USER
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
+    shell: bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: kc2
     groups: docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
+    shell: bash
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: kc2admin
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
+    shell: bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: runner
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
+    shell: bash
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
@@ -848,27 +856,26 @@ CONTAINER_TAGS+=", \"qcow2-${NIX_DRV}\""
 CONTAINER_TAGS+="]"
 
 # Write /.konductor inside VM
-ssh $SSH_OPTS kc2admin@localhost "sudo tee /.konductor > /dev/null" << EOF
-[konductor]
-git_commit = "$GIT_COMMIT"
-git_branch = "$GIT_BRANCH"
-git_remote = "$GIT_REMOTE"
+KONDUCTOR_TOML="[konductor]
+git_commit = \"$GIT_COMMIT\"
+git_branch = \"$GIT_BRANCH\"
+git_remote = \"$GIT_REMOTE\"
 git_dirty = $GIT_DIRTY
-nix_version = "$NIX_VERSION"
-nix_hash = "$NIX_HASH"
-nix_drv = "$NIX_DRV"
-flake_lock_sha256 = "$FLAKE_LOCK_SHA"
-build_date = "$BUILD_DATE"
-build_host = "$BUILD_HOST"
-build_user = "$BUILD_USER"
-qemu = "$QEMU_VER"
-build_hw_vendor = "$BUILD_HW_VENDOR"
-build_hw_product = "$BUILD_HW_PRODUCT"
-build_hw_serial = "$BUILD_HW_SERIAL"
+nix_version = \"$NIX_VERSION\"
+nix_hash = \"$NIX_HASH\"
+nix_drv = \"$NIX_DRV\"
+flake_lock_sha256 = \"$FLAKE_LOCK_SHA\"
+build_date = \"$BUILD_DATE\"
+build_host = \"$BUILD_HOST\"
+build_user = \"$BUILD_USER\"
+qemu = \"$QEMU_VER\"
+build_hw_vendor = \"$BUILD_HW_VENDOR\"
+build_hw_product = \"$BUILD_HW_PRODUCT\"
+build_hw_serial = \"$BUILD_HW_SERIAL\"
 strict = ${KONDUCTOR_STRICT:-false}
-oci_image = "$CONTAINER_IMAGE"
-oci_tags = $CONTAINER_TAGS
-EOF
+oci_image = \"$CONTAINER_IMAGE\"
+oci_tags = $CONTAINER_TAGS"
+printf '%s\n' "$KONDUCTOR_TOML" | ssh $SSH_OPTS kc2admin@localhost "sudo tee /.konductor > /dev/null"
 ssh $SSH_OPTS kc2admin@localhost 'sudo chmod 644 /.konductor'
 
 # Regenerate PKI certs with provenance
