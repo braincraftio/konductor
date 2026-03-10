@@ -234,6 +234,10 @@ while read -r row; do
     exit 1
   fi
   rm -f /tmp/prefetch.json
+
+  # Record store path for this input (used by --override-input in VM builds).
+  # Also rsync a working copy for tools that need a writable tree.
+  echo "$name $store_path" >> _sources/manifest.txt
   rsync -a --chmod=Du+w,Fu+w "$store_path/" "_sources/$name/"
 done < /tmp/vendor-lock.jsonl
 
@@ -242,10 +246,12 @@ unset XDG_CACHE_HOME HOME
 
 # NOTE: We do NOT run 'nix flake lock' here.
 # The committed flake.lock has github refs; keep it that way for future vendor runs.
-# When building with 'path:.#konductor', nix resolves the path inputs from flake.nix
-# without needing to update flake.lock (use --no-write-lock-file to prevent changes).
+# The VM build uses store paths from manifest.txt for --override-input flags,
+# which preserves exact narHashes and matches the host's derivation hashes.
 
 echo "✓ Vendored inputs into ./_sources"
+echo "  Manifest:"
+cat _sources/manifest.txt
 ls _sources/
 ```
 

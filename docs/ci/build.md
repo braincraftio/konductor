@@ -347,22 +347,19 @@ fi
 echo "Building .#qcow2..."
 nix build .#qcow2 --no-warn-dirty
 
-# Pre-build system toplevel + devshells with the SAME --override-input flags
-# the VM will use. This is critical: without matching flags, the derivation
-# hashes differ (path: vs github: inputs) and the VM gets zero cache hits
-# from the virtiofs host store overlay, causing a full rebuild (~60 min).
-# With matching flags, the VM reuses the host store via overlay (~2 min).
-OVERRIDE_INPUTS=""
-if [ -d "_sources/nixpkgs" ]; then
-    echo "Generating --override-input flags from _sources/..."
-    for dir in _sources/*/; do
-        input=$(basename "$dir")
-        OVERRIDE_INPUTS+=" --override-input $input path:$PWD/_sources/$input"
-    done
-fi
+# Pre-build system toplevel so its closure is in the host nix store.
+# When dev:vendor has been run, manifest.txt maps input names to nix store paths.
+# The VM's --override-input uses those same store paths (via virtiofs overlay),
+# so derivation hashes match and the VM gets full cache hits.
 echo "Pre-building system toplevel for VM cache..."
+OVERRIDE_INPUTS=""
+if [ -f "_sources/manifest.txt" ]; then
+    echo "Using vendored store paths from manifest.txt..."
+    while read -r name spath; do
+        OVERRIDE_INPUTS+=" --override-input $name path:$spath"
+    done < _sources/manifest.txt
+fi
 nix build '.#nixosConfigurations.konductor.config.system.build.toplevel' --no-warn-dirty --no-link $OVERRIDE_INPUTS
-echo "Pre-building devshells for VM cache..."
 nix build --no-link '.#devShells.x86_64-linux.default' --no-warn-dirty $OVERRIDE_INPUTS
 nix build --no-link '.#devShells.x86_64-linux.full' --no-warn-dirty $OVERRIDE_INPUTS
 nix build --no-link '.#devShells.x86_64-linux.konductor' --no-warn-dirty $OVERRIDE_INPUTS
@@ -739,11 +736,17 @@ set -e
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-# Generate --override-input flags from _sources/ contents (offline builds)
-# This redirects github inputs in flake.nix to local vendored paths
+# Generate --override-input flags from vendored inputs.
+# If manifest.txt exists (written by dev:vendor), use nix store paths directly.
+# Store paths have exact narHashes matching flake.lock, so derivation hashes
+# match the host build and the VM gets full cache hits via virtiofs overlay.
+# Falls back to path:_sources/ if no manifest (slower, hash mismatch).
 OVERRIDE_INPUTS=""
-if ssh $SSH_OPTS kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
-    echo "Using vendored inputs from _sources/ for offline build..."
+if ssh $SSH_OPTS kc2admin@localhost '[ -f /opt/konductor/src/_sources/manifest.txt ]'; then
+    echo "Using vendored store paths from manifest.txt..."
+    OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'while read name spath; do echo -n " --override-input $name path:$spath"; done < /opt/konductor/src/_sources/manifest.txt')
+elif ssh $SSH_OPTS kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
+    echo "WARNING: No manifest.txt, falling back to path:_sources/ (slow, hash mismatch)..."
     OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:/opt/konductor/src/_sources/$input"; done')
 fi
 
