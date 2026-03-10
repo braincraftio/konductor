@@ -110,6 +110,7 @@ Reset build state.
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 # Stop virtiofsd daemon (started as background block by _build:vm:virtiofsd)
 systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
+systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
 rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -934,6 +935,7 @@ rm -f "$PIDFILE"
 
 # Stop virtiofsd daemon (must outlive QEMU, safe to kill after VM halt)
 systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
+systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
 rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 ```
 
@@ -1041,6 +1043,7 @@ Remove temporary files.
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 # Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
 systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
+systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
 rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 rm -f .nix_drv .system-toplevel
 ```
