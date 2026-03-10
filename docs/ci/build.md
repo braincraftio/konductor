@@ -898,7 +898,10 @@ Garbage collect.
 
 ```bash {"name":"_build:vm:gc","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -e
+set -ex
+echo "DEBUG gc: PATH=$PATH"
+echo "DEBUG gc: which ssh=$(which ssh 2>&1 || echo 'NOT FOUND')"
+echo "DEBUG gc: shell=$BASH $(bash --version | head -1)"
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 ssh $SSH_OPTS kc2admin@localhost 'sudo nix-collect-garbage -d'
