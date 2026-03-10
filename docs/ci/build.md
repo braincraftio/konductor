@@ -650,7 +650,8 @@ echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 VIRTIOFS_PID="${QCOW2_VIRTIOFS_PID:-/tmp/virtiofsd-nixstore.pid}"
 rm -f "$VIRTIOFS_SOCK"
-virtiofsd \
+# Launch virtiofsd fully detached (setsid) so runme doesn't track it as a child
+setsid virtiofsd \
     --socket-path="$VIRTIOFS_SOCK" \
     --shared-dir=/nix/store \
     --sandbox=none \
@@ -661,7 +662,6 @@ virtiofsd \
     --inode-file-handles=prefer \
     --announce-submounts \
     >>"${QCOW2_LOGFILE:-build-vm.log}" 2>&1 &
-disown
 VIRTIOFS_DAEMON_PID=$!
 echo "$VIRTIOFS_DAEMON_PID" > "$VIRTIOFS_PID"
 # Wait for socket to be ready
