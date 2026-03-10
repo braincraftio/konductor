@@ -406,27 +406,27 @@ cat > "$CLOUD_INIT_DIR/user-data" << 'EOF'
 users:
   - name: PLACEHOLDER_USER
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: bash
+    shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: kc2
     groups: docker, libvirtd, kvm
-    shell: bash
+    shell: /run/current-system/sw/bin/bash
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: kc2admin
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: bash
+    shell: /run/current-system/sw/bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
   - name: runner
     groups: kc2, wheel, docker, libvirtd, kvm
-    shell: bash
+    shell: /run/current-system/sw/bin/bash
     lock_passwd: true
     ssh_authorized_keys:
       - PLACEHOLDER_PUBKEY
