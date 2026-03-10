@@ -466,8 +466,10 @@ let
     # NOTE: Do NOT include konductor-init.service here - creates circular dependency!
     # konductor-init starts these services, so they can't wait for init to complete.
     # The drop-in config is written BEFORE init calls systemctl start.
-    # Use konductor-pki-permissions.service (the last PKI service) to ensure certs are ready.
-    afterServices ? [ "network.target" "konductor-pki-permissions.service" ],
+    # Wait for both cert generation AND permissions. konductor-pki-permissions alone
+    # is not a reliable gate — its ConditionPathExists skips silently if certs don't
+    # exist yet, satisfying After= without certs actually being ready.
+    afterServices ? [ "network.target" "konductor-pki-vm.service" "konductor-pki-permissions.service" ],
     documentation ? [],
     workingDirectory ? "/workspace",
     extraServiceConfig ? {},  # Additional serviceConfig options

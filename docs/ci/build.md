@@ -732,7 +732,17 @@ ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.ser
 # Use .#konductor (git-clean tree) so derivation hashes match the host build,
 # enabling cache hits via the virtiofs host-store overlay. Override-inputs use
 # absolute paths so _sources/ is found without path:. (which would dirty self narHash).
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
+# nixos-rebuild switch exit codes:
+#   0 = success
+#   4 = switch succeeded but some units failed to start (transient races, self-healing)
+#   other = real failure
+REBUILD_RC=0
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || REBUILD_RC=$?
+if [ "$REBUILD_RC" -ne 0 ] && [ "$REBUILD_RC" -ne 4 ]; then
+    echo "✗ nixos-rebuild failed with exit code $REBUILD_RC"
+    exit "$REBUILD_RC"
+fi
+[ "$REBUILD_RC" -eq 4 ] && echo "⚠ nixos-rebuild switch: some units failed to start (exit 4, non-fatal)"
 
 # Pre-build devshells to cache their closures with proxy support
 # This ensures `nix develop` works offline - failures here break offline support
