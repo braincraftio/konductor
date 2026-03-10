@@ -810,7 +810,7 @@ Write `/.konductor` inside VM.
 
 ```bash {"name":"_build:vm:provenance","tag":"pipeline:all,pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -eo pipefail
+set -exo pipefail
 
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
