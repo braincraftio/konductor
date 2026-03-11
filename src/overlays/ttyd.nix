@@ -14,7 +14,7 @@
 # When nerd-fonts updates, rebuilding ttyd picks up new version automatically.
 
 self: super:
-
+if !super.stdenv.isLinux then {} else
 let
   # Nerd Font package from nixpkgs
   nerdFont = self.nerd-fonts.jetbrains-mono;

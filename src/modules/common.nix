@@ -83,7 +83,7 @@ in
       packages = import ../packages { inherit pkgs lib config versions; };
     in
     packages.default
-    ++ packages.konductor.packages
+    ++ lib.optionals pkgs.stdenv.isLinux packages.konductor.packages
     ++ [ pkgs.nerd-fonts.jetbrains-mono ]
     ++ lib.optionals cfg.enablePython packages.pythonPackages
     ++ lib.optionals cfg.enableGo packages.goPackages
