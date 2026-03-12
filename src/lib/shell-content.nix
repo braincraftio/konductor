@@ -77,11 +77,7 @@ in
   # Bash profile content
   bashProfileContent = ''
     # Source system profile for environment setup (proxy, paths, etc.)
-    # On macOS, nix-darwin's /etc/bashrc already sources set-environment.
-    # Re-sourcing /etc/profile would re-run /usr/libexec/path_helper which
-    # rearranges PATH to put /usr/bin:/bin before Nix profile paths, breaking
-    # konductor wrapper scripts (cat→bat, vi→nvim, grep→rg, find→fd, etc.).
-    if [ -f /etc/profile ] && [ "$(uname)" != "Darwin" ]; then
+    if [ -f /etc/profile ]; then
       source /etc/profile
     fi
 
