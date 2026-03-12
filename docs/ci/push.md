@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:ci
+tag: k9:ci:qcow2:push
 runme:
   version: v3
 ---
@@ -29,7 +29,7 @@ Push container with multi-tag (git commit, nix derivation, latest).
 
 **Prerequisites:** Container image built (`build:all`), registry trust configured
 
-```sh {"name":"push:image","excludeFromRunAll":"true","tag":"type:entry,requires:docker"}
+```sh {"name":"k9:ci:qcow2:push:image","excludeFromRunAll":"true","tag":"k9:ci:qcow2:push,k9:ci:pipeline:all,type:entry,requires:docker"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"

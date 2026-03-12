@@ -2193,87 +2193,6 @@ EOF
           };
         };
 
-        # =====================================================================
-        # Nix Store Overlay Service
-        # =====================================================================
-        # Systemd service to set up nix store overlay when host store is available
-        # This runs early in boot, before nix-daemon, and only activates during
-        # QCOW2 build when the host's /nix/store is shared via virtiofs.
-        # The virtiofs mount is configured with x-systemd.automount; accessing
-        # /nix/.host-store triggers it. In production (no virtiofs device),
-        # the mount fails gracefully and we fall back to local store only.
-        nix-store-overlay = {
-          description = "Set up Nix store overlay with host cache";
-          wantedBy = [ "nix-daemon.service" ];
-          before = [ "nix-daemon.service" ];
-          after = [ "local-fs.target" "nix-.host\\x2dstore.automount" ];
-          unitConfig = {
-            DefaultDependencies = false;
-          };
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            ExecStart = pkgs.writeShellScript "nix-store-overlay-setup" ''
-              set -euo pipefail
-
-              # =====================================================================
-              # Check for virtiofs host-store (triggers automount on access)
-              # =====================================================================
-              # The /nix/.host-store mount uses x-systemd.automount + nofail.
-              # Accessing the directory triggers the automount; if no virtiofs
-              # device exists (production), the mount fails silently (nofail)
-              # and the directory stays empty.
-              #
-              # Wait up to 10 seconds for the mount to succeed (boot timing)
-              FOUND_NIXSTORE=0
-              for i in $(${pkgs.coreutils}/bin/seq 1 10); do
-                if [ -d /nix/.host-store ] && [ -n "$(${pkgs.coreutils}/bin/ls -A /nix/.host-store 2>/dev/null)" ]; then
-                  FOUND_NIXSTORE=1
-                  echo "Host nix store available via virtiofs after ''${i}s"
-                  break
-                fi
-                ${pkgs.coreutils}/bin/sleep 1
-              done
-
-              if [ "$FOUND_NIXSTORE" -eq 0 ]; then
-                echo "Host nix store not available (production mode), using local store"
-                exit 0
-              fi
-
-              # Create overlay directories
-              ${pkgs.coreutils}/bin/mkdir -p /nix/.rw-store/upper /nix/.rw-store/work
-
-              # Check if already mounted as overlay
-              if ${pkgs.util-linux}/bin/mount | ${pkgs.gnugrep}/bin/grep -q "overlay on /nix/store"; then
-                echo "Overlay already mounted"
-                exit 0
-              fi
-
-              # Bind mount original store to preserve it
-              if [ ! -d /nix/.local-store ]; then
-                ${pkgs.coreutils}/bin/mkdir -p /nix/.local-store
-                ${pkgs.util-linux}/bin/mount --bind /nix/store /nix/.local-store
-              fi
-
-              # Mount overlay: host store (ro) + rw-store (rw) -> /nix/store
-              ${pkgs.util-linux}/bin/mount -t overlay overlay \
-                -o lowerdir=/nix/.host-store:/nix/.local-store,upperdir=/nix/.rw-store/upper,workdir=/nix/.rw-store/work \
-                /nix/store
-
-              echo "Nix store overlay activated with host cache"
-            '';
-            ExecStop = pkgs.writeShellScript "nix-store-overlay-teardown" ''
-              # Unmount overlay and restore local store
-              if ${pkgs.util-linux}/bin/mount | ${pkgs.gnugrep}/bin/grep -q "overlay on /nix/store"; then
-                ${pkgs.util-linux}/bin/umount /nix/store || true
-                if [ -d /nix/.local-store ]; then
-                  ${pkgs.util-linux}/bin/mount --bind /nix/.local-store /nix/store || true
-                  ${pkgs.util-linux}/bin/umount /nix/.local-store || true
-                fi
-              fi
-            '';
-          };
-        };
       };
     };
 
@@ -2688,41 +2607,41 @@ EOF
     };
 
     # =====================================================================
-    # Host Nix Store Overlay (Build Acceleration)
+    # Host Nix Store Substituter (Build & Deploy Acceleration)
     # =====================================================================
-    # During QCOW2 build, the host's /nix/store is shared via virtiofs
-    # (vhost-user-fs-pci backed by virtiofsd daemon on the host).
-    # An overlay filesystem makes it writable while using host paths as cache.
-    # In production (no virtiofs device), the mount fails gracefully (nofail).
+    # A read-only host nix store can be mounted via virtiofs at /nix/.host-store.
+    # Nix treats it as a local substituter (binary cache), so nixos-rebuild and
+    # nix-build copy needed paths into the VM's real /nix/store on disk.
     #
     # Architecture:
-    #   /nix/.host-store (virtiofs, ro) ─┐
-    #                                    ├─► overlay ─► /nix/store (rw)
-    #   /nix/.rw-store (root fs)  ───────┘
+    #   /nix/.host-store (virtiofs, ro) ──► nix substituter (local?root=)
+    #   /nix/store (real on-disk ext4)  ──► nix writes here directly
     #
-    # This reduces build time by avoiding re-download of paths that exist
-    # on the build host. New/modified paths go to the upper layer on root fs.
+    # Use cases:
+    #   CI build:   host shares its /nix/store via virtiofs for cache hits
+    #   Deploy:     many VMs share one read-only host store (single builder,
+    #               many consumers) for efficient fleet-wide nix operations
+    #   Standalone: no host store present — nix falls back to remote caches
+    #
+    # No overlayfs, no seal step, no teardown. Paths are always materialized
+    # on the real local disk. The image boots standalone without any host mounts.
 
-    # Mount host's nix store read-only via virtiofs (only during build)
+    # Mount host's nix store read-only via virtiofs (optional at boot and deploy)
     # virtiofsd daemon runs on the host, QEMU exposes it as vhost-user-fs-pci
-    # In production (no virtiofs device), nofail prevents boot failure
+    # In standalone mode (no virtiofs device), nofail prevents boot failure
     fileSystems."/nix/.host-store" = {
       device = "nixstore";
       fsType = "virtiofs";
       options = [
         "ro"
-        "nofail"           # Don't fail boot if not available (production)
-        "noauto"           # Don't mount at boot (overlay service handles it)
-        "x-systemd.automount"  # Mount on access (triggered by overlay service)
+        "nofail"           # Don't fail boot if not available (standalone)
+        "noauto"           # Don't mount at boot
+        "x-systemd.automount"  # Mount on first access by nix substituter
         "x-systemd.device-timeout=5s"
       ];
       neededForBoot = false;  # Not required - graceful degradation
     };
 
-    # Writable layer for overlay (persistent on root fs)
-    # Using root fs instead of tmpfs ensures overlay writes survive shutdown.
-    # This enables nixos-rebuild results to persist in the final image.
-    # The overlay service creates /nix/.rw-store/{upper,work} as needed.
 
     # =====================================================================
     # QCOW2 Image Builder (Fast - no cptofs)
@@ -2765,6 +2684,11 @@ EOF
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
         ];
+        # Host store as local substituter — virtiofs mount at /nix/.host-store.
+        # Nix copies paths from here into the real /nix/store on disk.
+        # When no host store is mounted (standalone), this silently has no paths.
+        extra-substituters = [ "local?root=/nix/.host-store" ];
+        require-sigs = false;  # Host store paths are unsigned local builds
         trusted-substituters = [
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"

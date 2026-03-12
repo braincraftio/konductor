@@ -39,9 +39,9 @@ This document defines the systemd service ordering, dependency chain, and valida
 │     ├─ Runs bootcmd                                                         │
 │     └─ BEFORE: systemd-networkd.service                                     │
 │                                                                             │
-│  ② nix-store-overlay.service (if host cache available)                      │
-│     ├─ Mounts /nix/.host-store from 9p virtfs                               │
-│     └─ Sets up overlay for shared nix store cache                           │
+│  ② /nix/.host-store automount (if virtiofs available)                       │
+│     ├─ Triggered on first access by nix substituter                         │
+│     └─ Provides read-only host nix store as local binary cache              │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │

@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:ci,scope:registry
+tag: k9:ci:registry
 runme:
   version: v3
 ---
@@ -34,7 +34,7 @@ Install cluster CA certificate for Docker daemon and Skopeo.
 
 **Prerequisites:** Cluster running, kubectl configured
 
-```sh {"name":"registry:trust","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+```sh {"name":"k9:ci:registry:trust","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
 set -e
 
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
@@ -76,7 +76,7 @@ Authenticate Docker and Skopeo to registry.
 
 **Credentials:** Default `admin:admin` (configurable via `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`)
 
-```sh {"name":"registry:login","excludeFromRunAll":"true","tag":"type:entry,scope:registry"}
+```sh {"name":"k9:ci:registry:login","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 USERNAME="${REGISTRY_USERNAME:-admin}"
@@ -100,7 +100,8 @@ echo "✓ Logged in to $REGISTRY"
 
 List images in registry.
 
-```sh {"name":"registry:list","excludeFromRunAll":"true","tag":"type:entry,scope:registry,type:readonly"}
+```sh {"name":"k9:ci:registry:list","excludeFromRunAll":"true","tag":"k9:ci:registry,type:entry,type:readonly"}
+set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
     "https://$REGISTRY/v2/_catalog" | jq
@@ -112,7 +113,8 @@ curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
 
 List tags for konductor image.
 
-```sh {"name":"registry:tags","excludeFromRunAll":"true","tag":"type:entry,scope:registry,type:readonly"}
+```sh {"name":"k9:ci:registry:tags","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry,type:readonly"}
+set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \

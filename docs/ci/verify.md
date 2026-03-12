@@ -2,7 +2,7 @@
 cwd: /opt/konductor
 shell: bash
 skipPrompts: true
-tag: target:qcow2,scope:verify
+tag: k9:ci:qcow2:verify,k9:ci:qcow2:verify:qcow2
 runme:
   version: v3
 ---
@@ -38,7 +38,7 @@ not on the build host.
 
 ### verify:help
 
-```sh {"name":"verify:help","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:help","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 cat << 'EOF'
 verify — Konductor Build Verification
 
@@ -67,7 +67,7 @@ EOF
 
 Display provenance from `/.konductor`.
 
-```sh {"name":"verify:provenance","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:provenance","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 [ -f /.konductor ] || { echo "Error: /.konductor not found (not a Konductor VM?)"; exit 1; }
 cat /.konductor
 ```
@@ -78,7 +78,7 @@ cat /.konductor
 
 Verify git commit matches provenance.
 
-```sh {"name":"verify:source","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:git-commit","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 
@@ -102,7 +102,7 @@ fi
 
 Verify flake.lock sha256 matches provenance.
 
-```sh {"name":"verify:flake","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:flake","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 [ -f flake.lock ] || { echo "Error: flake.lock not found"; exit 1; }
@@ -127,7 +127,7 @@ fi
 
 Verify nix derivation hash matches provenance.
 
-```sh {"name":"verify:nix","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:nix","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 set -e
 [ -f /.konductor ] || { echo "Error: /.konductor not found"; exit 1; }
 
@@ -164,7 +164,7 @@ fi
 
 Run all verification checks.
 
-```sh {"name":"verify:all","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:all","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 set -e
 echo "=== Konductor Build Verification ==="
 echo ""
@@ -244,7 +244,7 @@ fi
 
 Full reproduction build — builds QCOW2 and compares image_sha256.
 
-```sh {"name":"verify:reproduce","excludeFromRunAll":"true"}
+```sh {"name":"k9:ci:qcow2:verify:reproduce","excludeFromRunAll":"true","tag":"k9:ci:qcow2:verify"}
 set -e
 echo "=== Full Reproduction Build ==="
 echo "This will build a new QCOW2 and compare sha256"
@@ -257,7 +257,7 @@ echo "Expected image_sha256: $EXPECTED_SHA"
 echo ""
 
 # Run verification first
-runme run verify:all
+runme run k9:ci:qcow2:verify:all
 
 echo ""
 echo "=== Starting Build ==="
@@ -265,7 +265,7 @@ echo "This may take 30+ minutes..."
 echo ""
 
 # Build using the image-only pipeline (no container packaging needed for reproduction)
-runme run --all --tag=pipeline:image --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:image --filename docs/ci/build.md
 
 ACTUAL_SHA=$(sha256sum konductor.qcow2 | cut -d' ' -f1)
 

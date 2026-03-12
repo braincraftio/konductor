@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:ci,scope:promotion
+tag: k9:ci:qcow2:promote
 runme:
   version: v3
 ---
@@ -47,7 +47,7 @@ Copy validated image to public registry (docker.io or ghcr.io).
 
 **Duration:** 2-5 minutes
 
-```sh {"name":"promote:image","excludeFromRunAll":"true","tag":"type:entry,scope:promotion,duration:slow"}
+```sh {"name":"k9:ci:qcow2:promote","excludeFromRunAll":"true","tag":"k9:ci:qcow2:promote,k9:ci:qcow2,type:entry,duration:slow"}
 set -e
 
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -141,14 +141,19 @@ echo "Copying with tags:"
 printf "  %s\n" "${TAGS[@]}"
 echo ""
 
+_failed=0
 for tag in "${TAGS[@]}"; do
     echo "▶ ${DST_REGISTRY}/${DST_IMAGE}:${tag}"
-    skopeo copy \
+    if ! skopeo copy \
         --src-cert-dir "$SRC_CERT_DIR" \
         --dest-authfile "$DEST_AUTH_FILE" \
         docker://"$SRC_REGISTRY/$SRC_IMAGE:$SRC_TAG" \
-        docker://"$DST_REGISTRY/$DST_IMAGE:$tag"
+        docker://"$DST_REGISTRY/$DST_IMAGE:$tag"; then
+        echo "FAIL: Failed to copy tag: $tag"
+        _failed=$((_failed + 1))
+    fi
 done
+[ "$_failed" -eq 0 ] || { echo "FAIL: $_failed tag(s) failed to promote"; exit 1; }
 
 echo ""
 echo "✓ Promoted to ${DST_REGISTRY}/${DST_IMAGE}"

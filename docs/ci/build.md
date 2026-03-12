@@ -2,7 +2,7 @@
 cwd: ../..
 shell: bash
 skipPrompts: true
-tag: scope:ci,target:qcow2
+tag: k9:ci:qcow2:build,k9:ci:qcow2:build:qcow2
 runme:
   version: v3
   debug: true
@@ -12,7 +12,7 @@ runme:
 
 Complete build pipeline: source → nix → VM configure → seal → compress → OCI containerDisk.
 
-Phases run sequentially in document order via `runme run --all --tag=pipeline:all`.
+Phases run sequentially in document order via `runme run --all --tag=k9:ci:pipeline:all`.
 Each phase is a named code block tagged for pipeline membership. Background daemons
 use `background:true` for proper process lifecycle in runme's single-session mode.
 
@@ -29,13 +29,13 @@ use `background:true` for proper process lifecycle in runme's single-session mod
 
 ```bash
 # Full build pipeline (clean → nix → VM → seal → container)
-runme run --all --tag=pipeline:all --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
 
 # Build QCOW2 only (no container packaging)
-runme run --all --tag=pipeline:image --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:image --filename docs/ci/build.md
 
 # Standalone preflight check
-runme run --filename docs/ci/build.md build:preflight
+runme run --filename docs/ci/build.md k9:ci:qcow2:build:preflight
 ```
 
 ---
@@ -106,7 +106,7 @@ Pipeline phases (document order, tag-selected):
 
 Reset build state.
 
-```bash {"name":"_build:clean","tag":"pipeline:all,pipeline:image,type:destructive"}
+```bash {"name":"k9:ci:qcow2:build:_clean","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 # Stop virtiofsd daemon (started as background block by _build:vm:virtiofsd)
 systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
@@ -126,7 +126,7 @@ echo "✓ Clean"
 
 Validate environment (standalone — no cluster required).
 
-```bash {"name":"build:preflight","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:preflight","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 set -e
 
 echo "bash: $(which bash) (${BASH_VERSION})"
@@ -318,7 +318,7 @@ echo ""
 
 Build NixOS closure and capture nix_drv.
 
-```bash {"name":"_build:nix","tag":"pipeline:all,pipeline:image,requires:nix"}
+```bash {"name":"k9:ci:qcow2:build:_nix","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:nix"}
 set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
@@ -392,7 +392,7 @@ chown -R "$(id -u):$(id -g)" result.writable/
 
 Generate cloud-init ISO.
 
-```bash {"name":"_build:cloudinit","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_cloudinit","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 set -e
 [ -n "$OVMF_CODE" ] || { echo "Error: OVMF_CODE not set"; exit 1; }
 [ -n "$OVMF_VARS" ] || { echo "Error: OVMF_VARS not set"; exit 1; }
@@ -516,7 +516,7 @@ genisoimage -output "$CLOUD_INIT_DIR/seed.iso" \
 
 Reset image to pristine state.
 
-```bash {"name":"_build:img:reset","tag":"pipeline:all,pipeline:image,requires:guestfs"}
+```bash {"name":"k9:ci:qcow2:build:_img-reset","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:guestfs"}
 set -e
 export LIBGUESTFS_BACKEND=direct
 MOUNT="${QCOW2_MOUNT:-/tmp/nixmount}"
@@ -540,7 +540,7 @@ sudo rmdir "$MOUNT" 2>/dev/null || true
 
 Boot VM with virtiofsd + QEMU.
 
-```bash {"name":"_build:vm:boot","tag":"pipeline:all,pipeline:image,requires:kvm"}
+```bash {"name":"k9:ci:qcow2:build:_vm-boot","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:kvm"}
 set -e
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
@@ -572,7 +572,7 @@ systemd-run --user --unit=virtiofsd-nixstore \
     --property=LimitNOFILE=1048576 \
     -- virtiofsd \
     --socket-path="$VIRTIOFS_SOCK" \
-    --shared-dir=/nix/store \
+    --shared-dir=/nix \
     --sandbox=none \
     --seccomp=none \
     --readonly \
@@ -637,7 +637,7 @@ echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
 
 Wait for SSH.
 
-```bash {"name":"_build:vm:wait","tag":"pipeline:all,pipeline:image,duration:slow"}
+```bash {"name":"k9:ci:qcow2:build:_vm-wait","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -672,7 +672,7 @@ done
 
 Sync source to VM.
 
-```bash {"name":"_build:vm:sync","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-sync","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -727,10 +727,10 @@ Run `nixos-rebuild switch` inside VM to build the environment natively.
 This ensures:
 
 - Full Konductor environment is built natively inside the VM
-- All nix store paths are pre-cached for airgap use
+- All nix store paths are materialized on disk (via host-store substituter)
 - The VM can reproduce itself from /opt/konductor/src
 
-```bash {"name":"_build:vm:rebuild","tag":"pipeline:all,pipeline:image,duration:slow"}
+```bash {"name":"k9:ci:qcow2:build:_vm-rebuild","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -740,7 +740,7 @@ SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/nu
 # Generate --override-input flags from vendored inputs.
 # If manifest.txt exists (written by dev:vendor), use nix store paths directly.
 # Store paths have exact narHashes matching flake.lock, so derivation hashes
-# match the host build and the VM gets full cache hits via virtiofs overlay.
+# match the host build and the VM gets full cache hits via host-store substituter.
 # Falls back to path:_sources/ if no manifest (slower, hash mismatch).
 OVERRIDE_INPUTS=""
 if ssh $SSH_OPTS kc2admin@localhost '[ -f /opt/konductor/src/_sources/manifest.txt ]'; then
@@ -757,7 +757,7 @@ ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.ser
 
 # Rebuild NixOS from the synced flake
 # Use .#konductor (git-clean tree) so derivation hashes match the host build,
-# enabling cache hits via the virtiofs host-store overlay. Override-inputs use
+# enabling cache hits via the host-store substituter. Override-inputs use
 # absolute paths so _sources/ is found without path:. (which would dirty self narHash).
 # nixos-rebuild switch exit codes:
 #   0 = success
@@ -788,7 +788,7 @@ echo "VM rebuilt from /opt/konductor/src flake"
 
 Run PKI tests inside VM.
 
-```bash {"name":"_build:vm:pki:test","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-pki-test","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -808,7 +808,7 @@ echo "PKI tests complete"
 
 Display PKI certificate status.
 
-```bash {"name":"_build:vm:pki:status","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-pki-status","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 
@@ -826,7 +826,7 @@ ssh $SSH_OPTS kc2admin@localhost \
 
 Write `/.konductor` inside VM.
 
-```bash {"name":"_build:vm:provenance","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-provenance","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -eo pipefail
 
@@ -905,14 +905,15 @@ ssh $SSH_OPTS kc2admin@localhost 'ff' | tee -a "${QCOW2_LOGFILE:-build-vm.log}"
 
 Garbage collect.
 
-```bash {"name":"_build:vm:gc","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-gc","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -ex
 echo "DEBUG gc: HOME=$HOME PATH=$PATH"
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-# On an overlayfs nix store, gc can hit virtiofsd fd limits when deleting
-# large lower-layer trees (whiteout creation). Retry up to 3 times.
+# No overlay — /nix/store is the real on-disk store.
+# nixos-rebuild materialized all paths via the host-store substituter.
+# Retry up to 3 times in case of transient fd exhaustion.
 max_attempts=3
 attempt=1
 while [ "$attempt" -le "$max_attempts" ]; do
@@ -930,7 +931,7 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /root/.cache/* /home/*/.cache/* 2>
 
 Zero free space.
 
-```bash {"name":"_build:vm:zero","tag":"pipeline:all,pipeline:image,duration:slow"}
+```bash {"name":"k9:ci:qcow2:build:_vm-zero","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,duration:slow"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -943,7 +944,7 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo dd if=/dev/zero of=/zero bs=1M 2>/dev/nul
 
 Shutdown VM.
 
-```bash {"name":"_build:vm:halt","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_vm-halt","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 [ -f "$PIDFILE" ] || exit 0
 
@@ -970,7 +971,7 @@ rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
 
 Clean credentials from image.
 
-```bash {"name":"_build:img:clean","tag":"pipeline:all,pipeline:image,requires:guestfs"}
+```bash {"name":"k9:ci:qcow2:build:_img-clean","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:guestfs"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
 set -e
 export LIBGUESTFS_BACKEND=direct
@@ -1020,7 +1021,7 @@ ZSTD compress and sparsify image.
 
 Note: SKIP_COMPRESS=true produces a larger, uncompressed image (faster builds, larger output).
 
-```bash {"name":"_build:img:compress","tag":"pipeline:all,pipeline:image,duration:slow"}
+```bash {"name":"k9:ci:qcow2:build:_img-compress","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,duration:slow"}
 set -e
 
 # Cap coroutines to prevent excessive memory usage on high-core systems
@@ -1042,7 +1043,7 @@ fi
 
 Sparsify image (skipped if SKIP_COMPRESS=true).
 
-```bash {"name":"_build:img:sparsify","tag":"pipeline:all,pipeline:image,duration:slow,requires:guestfs"}
+```bash {"name":"k9:ci:qcow2:build:_img-sparsify","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,duration:slow,requires:guestfs"}
 set -e
 
 if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
@@ -1064,7 +1065,7 @@ rm -f konductor.qcow2.tmp
 
 Remove temporary files.
 
-```bash {"name":"_build:tmp:clean","tag":"pipeline:all,pipeline:image"}
+```bash {"name":"k9:ci:qcow2:build:_tmp-clean","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 # Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
 systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
@@ -1079,7 +1080,7 @@ rm -f .nix_drv .system-toplevel
 
 Append post-seal fields to .konductor.
 
-```bash {"name":"_build:verify","tag":"pipeline:all,pipeline:image,type:readonly"}
+```bash {"name":"k9:ci:qcow2:build:_verify","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,type:readonly"}
 set -e
 [ -f konductor.qcow2 ] || { echo "Error: konductor.qcow2 not found"; exit 1; }
 [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
@@ -1100,7 +1101,7 @@ cat .konductor
 
 Package QCOW2 as containerDisk.
 
-```bash {"name":"_build:container","tag":"pipeline:all,requires:docker"}
+```bash {"name":"k9:ci:qcow2:build:_container","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,requires:docker"}
 set -e
 if ! eval "$(nix print-dev-env .#konductor)"; then
     echo "Warning: nix print-dev-env failed, using current environment"

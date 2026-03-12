@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:dev,target:qcow2
+tag: k9:ci:dev,k9:ci:dev:qcow2
 runme:
   version: v3
 ---
@@ -29,7 +29,7 @@ Human-in-the-loop development workflow tools. Not called by `ci:pipeline`.
 
 Reset build state.
 
-```bash {"name":"dev:clean","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"k9:ci:dev:clean","excludeFromRunAll":"true","tag":"k9:ci:dev,type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -60,9 +60,8 @@ Boot VM for local development and testing.
 
 **Prerequisites:** `result/nixos.qcow2` exists (run `build:image` first)
 
-```sh {"name":"dev:start","excludeFromRunAll":"true","tag":"type:entry,scope:dev,requires:kvm"}
-set -e
-BUILD_FILE="docs/ci/build.md"
+```sh {"name":"k9:ci:dev:start","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:kvm"}
+set -ex
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
@@ -80,9 +79,12 @@ else
     exit 1
 fi
 
-# Clean VM runtime state only
-(pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
-rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
+# Clean VM runtime state only — kill by PID file, not by pattern match
+# (pkill -f can match the script's own process and self-kill)
+if [ -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" ]; then
+    kill -9 "$(cat "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}")" 2>/dev/null || true
+fi
+rm -f "$PIDFILE" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 
 # Create writable overlay for dev use (preserves original image)
@@ -90,14 +92,62 @@ rm -rf result.dev && mkdir -p result.dev
 qemu-img create -f qcow2 -b "$BACKING" -F qcow2 result.dev/nixos.qcow2
 rm -f result && ln -sf result.dev result
 
-runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:cloudinit
-runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:vm:boot
-runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:vm:wait
+# Generate cloud-init ISO (reuse build block)
+runme run --direnv=true --load-env=false --filename docs/ci/build.md k9:ci:qcow2:build:_cloudinit
+
+# Ports
+SSH_PORT="${QCOW2_SSH_PORT:-2222}"
+VSCODE_PORT="${QCOW2_VSCODE_PORT:-18080}"
+TTYD_PORT="${QCOW2_TTYD_PORT:-17681}"
+CLOUD_INIT_DIR="${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
+
+# Calculate CPUs: all cores minus 2, minimum 2
+TOTAL_CPUS=$(nproc)
+VM_CPUS=$((TOTAL_CPUS - 2))
+[ "$VM_CPUS" -lt 2 ] && VM_CPUS=2
+
+echo "Booting sealed image standalone (no virtiofs, no host mounts)"
+echo "  Image: $BACKING"
+echo "  CPUs: $VM_CPUS / $TOTAL_CPUS"
+
+# Standalone QEMU — no virtiofs, no 9p, no host dependencies.
+# The sealed konductor.qcow2 has a complete self-contained nix store.
+# This proves the image can boot on any hypervisor, KubeVirt, or bare metal.
+VM_MEMORY="${QCOW2_VM_MEMORY:-16384}"
+qemu-system-x86_64 \
+    -machine q35,accel=kvm,mem-merge=on \
+    -m "$VM_MEMORY" \
+    -cpu host \
+    -smp "${QCOW2_VM_CPUS:-$VM_CPUS}" \
+    -rtc base=utc,clock=host \
+    -boot order=c,menu=off \
+    -object iothread,id=iot0 \
+    -drive if=pflash,format=raw,unit=0,readonly=on,file="$OVMF_CODE" \
+    -drive if=pflash,format=raw,unit=1,file="$CLOUD_INIT_DIR/OVMF_VARS.fd" \
+    -drive file=result/nixos.qcow2,if=none,id=drive0,format=qcow2,cache=writeback,aio=io_uring,discard=unmap,detect-zeroes=unmap \
+    -device virtio-blk-pci,drive=drive0,iothread=iot0,num-queues=4 \
+    -drive file="$CLOUD_INIT_DIR/seed.iso",media=cdrom \
+    -netdev user,id=net0,restrict=off,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${VSCODE_PORT}-:8080,hostfwd=tcp::${TTYD_PORT}-:7681 \
+    -device virtio-net-pci,netdev=net0 \
+    -device virtio-rng-pci \
+    -daemonize \
+    -pidfile "$PIDFILE" \
+    -serial file:"${QCOW2_LOGFILE:-build-vm.log}" \
+    -display none
+
+sleep 1
+[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null \
+    || { echo "QEMU failed to start"; tail -20 "${QCOW2_LOGFILE:-build-vm.log}"; exit 1; }
+
+echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
+
+# Wait for SSH
+runme run --direnv=true --load-env=false --filename docs/ci/build.md k9:ci:qcow2:build:_vm-wait
 
 echo "VM ready:"
-echo "  SSH:     ssh -p ${QCOW2_SSH_PORT:-2222} kc2admin@localhost"
-echo "  VS Code: http://localhost:${QCOW2_VSCODE_PORT:-18080}"
-echo "  TTYD:    http://localhost:${QCOW2_TTYD_PORT:-17681}"
+echo "  SSH:     ssh -p $SSH_PORT kc2admin@localhost"
+echo "  VS Code: http://localhost:$VSCODE_PORT"
+echo "  TTYD:    http://localhost:$TTYD_PORT"
 ```
 
 ---
@@ -108,8 +158,8 @@ SSH into running VM.
 
 **Default port:** 2222 (configurable via `QCOW2_SSH_PORT`)
 
-```sh {"name":"dev:ssh","excludeFromRunAll":"true","tag":"type:entry,scope:dev,interactive:true"}
-ssh -p "${QCOW2_SSH_PORT:-2222}" kc2admin@localhost
+```sh {"name":"k9:ci:dev:ssh","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,interactive:true"}
+ssh -p "${QCOW2_SSH_PORT:-2222}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost
 ```
 
 ---
@@ -118,9 +168,9 @@ ssh -p "${QCOW2_SSH_PORT:-2222}" kc2admin@localhost
 
 Gracefully shutdown running VM.
 
-```sh {"name":"dev:stop","excludeFromRunAll":"true","tag":"type:entry,scope:dev"}
+```sh {"name":"k9:ci:dev:stop","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 BUILD_FILE="docs/ci/build.md"
-runme run --direnv=true --load-env=false --filename "$BUILD_FILE" _build:vm:halt
+runme run --direnv=true --load-env=false --filename "$BUILD_FILE" k9:ci:qcow2:build:_vm-halt
 ```
 
 ---
@@ -133,7 +183,7 @@ Rebuild NixOS host from flake (dogfooding).
 
 **Warning:** This rebuilds the NixOS system running the build. Only use on NixOS hosts.
 
-```sh {"name":"dev:rebase","excludeFromRunAll":"true","tag":"type:entry,scope:dev,requires:nixos"}
+```sh {"name":"k9:ci:dev:rebase","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:nixos"}
 set -e
 sudo nixos-rebuild switch --flake .#konductor
 echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
@@ -145,7 +195,7 @@ echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
-```bash {"name":"dev:vendor","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
 
 echo "Vendoring flake inputs into ./_sources ..."
@@ -262,7 +312,7 @@ ls _sources/
 Intermittent online refresh: update lock from network, then vendor into `./_sources`, then re-lock
 to local paths for offline builds.
 
-```bash {"name":"dev:vendor:online","excludeFromRunAll":"true","tag":"type:entry"}
+```bash {"name":"k9:ci:dev:vendor-online","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
 
 tmpdir="$(mktemp -d)"
@@ -360,7 +410,7 @@ nix --extra-experimental-features 'nix-command flakes' flake update --flake "$tm
 cp -f "$tmpdir/flake.lock" ./flake.lock
 
 echo "Vendoring refreshed inputs into ./_sources ..."
-runme run --filename docs/ci/dev.md dev:vendor
+runme run --filename docs/ci/dev.md k9:ci:dev:vendor
 
 echo "✓ Online refresh complete: flake.lock + _sources updated for offline use"
 ```
@@ -371,7 +421,7 @@ echo "✓ Online refresh complete: flake.lock + _sources updated for offline use
 
 View boot log.
 
-```bash {"name":"dev:log","excludeFromRunAll":"true","tag":"type:debug"}
+```bash {"name":"k9:ci:dev:log","excludeFromRunAll":"true","tag":"k9:ci:dev,type:debug"}
 bat "${QCOW2_LOGFILE:-build-vm.log}"
 ```
 
@@ -381,7 +431,7 @@ bat "${QCOW2_LOGFILE:-build-vm.log}"
 
 Force kill VM.
 
-```bash {"name":"dev:kill","excludeFromRunAll":"true","tag":"type:destructive"}
+```bash {"name":"k9:ci:dev:kill","excludeFromRunAll":"true","tag":"k9:ci:dev,type:destructive"}
 pkill -f "qemu-system.*nixos.qcow2" 2>/dev/null || true
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 ```

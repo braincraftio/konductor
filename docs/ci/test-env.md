@@ -2,18 +2,19 @@
 cwd: ../..
 shell: bash
 skipPrompts: true
+tag: k9:ci:test
 runme:
   version: v3
 ---
 
 # Test: provenance → gc env corruption
 
-```bash {"name":"test:before","tag":"test:env"}
+```bash {"name":"k9:ci:test:before","tag":"k9:ci:test,test:env"}
 echo "BEFORE: HOME=$HOME"
 echo "BEFORE: PATH=$PATH"
 ```
 
-```bash {"name":"test:provenance","tag":"test:env"}
+```bash {"name":"k9:ci:test:provenance","tag":"k9:ci:test,test:env"}
 set -eo pipefail
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -67,7 +68,7 @@ cat .konductor
 echo "PROVENANCE DONE"
 ```
 
-```bash {"name":"test:gc","tag":"test:env"}
+```bash {"name":"k9:ci:test:gc","tag":"k9:ci:test,test:env"}
 echo "GC: HOME=$HOME"
 echo "GC: PATH=$PATH"
 echo "GC: which ssh=$(which ssh 2>&1 || echo NOT_FOUND)"

@@ -25,7 +25,9 @@ project:
     - .git
     - .claude
     - "docs/TASKS.*"
+    - "docs/ci/TASKS.*.md"
     - "docs/*.md"
+    - "AGENT_ANALYSIS.*.md"
     # Reference docs contain example code blocks, not executable tasks
     - "docs/developer_guide/runme/*.md"
     - "docs/developer_guide/runme/RUNME.md"

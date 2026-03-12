@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:ci,target:qcow2
+tag: k9:ci,k9:ci:qcow2
 runme:
   version: v3
 ---
@@ -133,17 +133,17 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 
 | File | Role | Tasks |
 |------|------|-------|
-| `README.md` | Sole orchestrator + pipeline docs | `ci:pipeline` |
-| `build.md` | Source → sealed QCOW2 → OCI containerDisk | `--tag=pipeline:all`, `--tag=pipeline:image`, 22 `_build:*` phases |
-| `platform.md` | Cluster lifecycle (Talos + Pulumi) | `platform:up`, `platform:down`, `platform:status` |
-| `registry.md` | Registry trust, auth, inspection | `registry:trust`, `registry:login`, `registry:list`, `registry:tags` |
-| `push.md` | Push to local registry | `push:image` |
-| `validate.md` | KubeVirt deploy + service checks + runner test | `validate:deploy`, `validate:services`, `validate:runner` |
-| `promote.md` | Manual gate → public registry copy | `promote:image` |
-| `verify.md` | Build verification (runs inside VM) | `verify:help`, `verify:provenance`, `verify:source`, `verify:flake`, `verify:nix`, `verify:all`, `verify:reproduce` |
-| `dev.md` | Developer workflow tools | `dev:clean`, `dev:start`, `dev:ssh`, `dev:stop`, `dev:rebase`, `dev:vendor`, `dev:vendor:online`, `dev:log`, `dev:kill` |
+| `README.md` | Sole orchestrator + pipeline docs | `k9:ci:qcow2:pipeline` |
+| `build.md` | Source → sealed QCOW2 → OCI containerDisk | `--tag=k9:ci:pipeline:all`, `--tag=k9:ci:pipeline:image` |
+| `platform.md` | Cluster lifecycle (Talos + Pulumi) | `k9:ci:platform:up`, `k9:ci:platform:down`, `k9:ci:platform:status` |
+| `registry.md` | Registry trust, auth, inspection | `k9:ci:registry:trust`, `k9:ci:registry:login`, `k9:ci:registry:list`, `k9:ci:registry:tags` |
+| `push.md` | Push to local registry | `k9:ci:qcow2:push:image` |
+| `validate.md` | KubeVirt deploy + service checks + runner test | `k9:ci:qcow2:validate:deploy`, `k9:ci:qcow2:validate:services`, `k9:ci:qcow2:validate:runner` |
+| `promote.md` | Manual gate → public registry copy | `k9:ci:qcow2:promote` |
+| `verify.md` | Build verification (runs inside VM) | `k9:ci:qcow2:verify:*` |
+| `dev.md` | Developer workflow tools | `k9:ci:dev:*` |
 
-No file ever calls another file. Only `ci:pipeline` orchestrates cross-file execution.
+No file ever calls another file. Only `k9:ci:qcow2:pipeline` orchestrates cross-file execution.
 Exception: `dev.md` calls `build.md` internal tasks for VM lifecycle (dev-only, never CI).
 
 ---
@@ -152,38 +152,38 @@ Exception: `dev.md` calls `build.md` internal tasks for VM lifecycle (dev-only, 
 
 ### One-Command Full Pipeline
 
-```bash {"name":"quickstart:pipeline","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:quickstart:pipeline","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Complete end-to-end: build → cluster → validate (parallel build+platform)
-runme run --filename docs/ci/README.md ci:pipeline
+runme run --filename docs/ci/README.md k9:ci:qcow2:pipeline
 ```
 
 ### Development Iteration
 
-```bash {"name":"quickstart:dev","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:quickstart:dev","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Build image + containerDisk
-runme run --all --tag=pipeline:all --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
 
 # Interactive development: boot VM for testing
-runme run --filename docs/ci/dev.md dev:start
-runme run --filename docs/ci/dev.md dev:ssh
-runme run --filename docs/ci/dev.md dev:stop
+runme run --filename docs/ci/dev.md k9:ci:dev:start
+runme run --filename docs/ci/dev.md k9:ci:dev:ssh
+runme run --filename docs/ci/dev.md k9:ci:dev:stop
 ```
 
 ### Validation Only
 
-```bash {"name":"quickstart:validate","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:quickstart:validate","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Validate existing image in cluster
-runme run --filename docs/ci/validate.md validate:deploy
-runme run --filename docs/ci/validate.md validate:services
-runme run --filename docs/ci/validate.md validate:runner
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:deploy
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:services
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:runner
 ```
 
 ### Promotion
 
-```bash {"name":"quickstart:promote","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:quickstart:promote","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Copy validated image to public registry
 export DOCKER_TOKEN="<your-token>"
-runme run --filename docs/ci/promote.md promote:image
+runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
 ```
 
 ---
@@ -194,77 +194,77 @@ runme run --filename docs/ci/promote.md promote:image
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `build:all` | build.md | Full pipeline: clean → nix → VM → seal → container | 30-60 min |
-| `build:image` | build.md | Build QCOW2 only (no container packaging) | 30-60 min |
+| `--tag=k9:ci:pipeline:all` | build.md | Full pipeline: clean → nix → VM → seal → container | 30-60 min |
+| `--tag=k9:ci:pipeline:image` | build.md | Build QCOW2 only (no container packaging) | 30-60 min |
 
 ### Platform Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `platform:up` | platform.md | Start Talos + deploy platform | 5-10 min |
-| `platform:down` | platform.md | Destroy cluster | 1-2 min |
-| `platform:status` | platform.md | Check cluster health | <1 min |
+| `k9:ci:platform:up` | platform.md | Start Talos + deploy platform | 5-10 min |
+| `k9:ci:platform:down` | platform.md | Destroy cluster | 1-2 min |
+| `k9:ci:platform:status` | platform.md | Check cluster health | <1 min |
 
 ### Registry Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `registry:trust` | registry.md | Install cluster CA | <1 min |
-| `registry:login` | registry.md | Authenticate to registry | <1 min |
-| `registry:list` | registry.md | List images in registry | <1 min |
-| `registry:tags` | registry.md | List tags for konductor image | <1 min |
+| `k9:ci:registry:trust` | registry.md | Install cluster CA | <1 min |
+| `k9:ci:registry:login` | registry.md | Authenticate to registry | <1 min |
+| `k9:ci:registry:list` | registry.md | List images in registry | <1 min |
+| `k9:ci:registry:tags` | registry.md | List tags for konductor image | <1 min |
 
 ### Push Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `push:image` | push.md | Multi-tag push to local registry | 1-2 min |
+| `k9:ci:qcow2:push:image` | push.md | Multi-tag push to local registry | 1-2 min |
 
 ### Validation Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `validate:deploy` | validate.md | Deploy to KubeVirt + SSH test | 3-5 min |
-| `validate:services` | validate.md | Test web terminals (non-blocking) | 1-2 min |
-| `validate:runner` | validate.md | Forgejo runner workflow test | 5-10 min |
+| `k9:ci:qcow2:validate:deploy` | validate.md | Deploy to KubeVirt + SSH test | 3-5 min |
+| `k9:ci:qcow2:validate:services` | validate.md | Test web terminals (non-blocking) | 1-2 min |
+| `k9:ci:qcow2:validate:runner` | validate.md | Forgejo runner workflow test | 5-10 min |
 
 ### Promotion Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `promote:image` | promote.md | Copy to public registry | 2-5 min |
+| `k9:ci:qcow2:promote` | promote.md | Copy to public registry | 2-5 min |
 
 ### Development Tasks
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `dev:clean` | dev.md | Reset build state | <1 min |
-| `dev:start` | dev.md | Boot VM for development | 2-3 min |
-| `dev:ssh` | dev.md | SSH into running VM | instant |
-| `dev:stop` | dev.md | Shutdown VM | <1 min |
-| `dev:rebase` | dev.md | Rebuild NixOS host from flake | 5-10 min |
-| `dev:vendor` | dev.md | Vendor flake inputs offline | 2-5 min |
-| `dev:vendor:online` | dev.md | Online refresh + vendor | 2-5 min |
-| `dev:log` | dev.md | View serial console log | instant |
-| `dev:kill` | dev.md | Force kill QEMU process | instant |
+| `k9:ci:dev:clean` | dev.md | Reset build state | <1 min |
+| `k9:ci:dev:start` | dev.md | Boot VM for development | 2-3 min |
+| `k9:ci:dev:ssh` | dev.md | SSH into running VM | instant |
+| `k9:ci:dev:stop` | dev.md | Shutdown VM | <1 min |
+| `k9:ci:dev:rebase` | dev.md | Rebuild NixOS host from flake | 5-10 min |
+| `k9:ci:dev:vendor` | dev.md | Vendor flake inputs offline | 2-5 min |
+| `k9:ci:dev:vendor-online` | dev.md | Online refresh + vendor | 2-5 min |
+| `k9:ci:dev:log` | dev.md | View serial console log | instant |
+| `k9:ci:dev:kill` | dev.md | Force kill QEMU process | instant |
 
 ### Verification Tasks (runs inside built VM)
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `verify:help` | verify.md | Usage text | instant |
-| `verify:provenance` | verify.md | Display /.konductor | instant |
-| `verify:source` | verify.md | Verify git commit | instant |
-| `verify:flake` | verify.md | Verify flake.lock sha256 | instant |
-| `verify:nix` | verify.md | Verify nix derivation | <1 min |
-| `verify:all` | verify.md | All verification checks | <1 min |
-| `verify:reproduce` | verify.md | Full reproduction build | 30-60 min |
+| `k9:ci:qcow2:verify:help` | verify.md | Usage text | instant |
+| `k9:ci:qcow2:verify:provenance` | verify.md | Display /.konductor | instant |
+| `k9:ci:qcow2:verify:git-commit` | verify.md | Verify git commit | instant |
+| `k9:ci:qcow2:verify:flake` | verify.md | Verify flake.lock sha256 | instant |
+| `k9:ci:qcow2:verify:nix` | verify.md | Verify nix derivation | <1 min |
+| `k9:ci:qcow2:verify:all` | verify.md | All verification checks | <1 min |
+| `k9:ci:qcow2:verify:reproduce` | verify.md | Full reproduction build | 30-60 min |
 
 ### Complete Pipeline
 
 | Task | File | Description | Duration |
 |------|------|-------------|----------|
-| `ci:pipeline` | README.md | Full end-to-end with parallel build+platform | 45-75 min |
+| `k9:ci:qcow2:pipeline` | README.md | Full end-to-end with parallel build+platform | 45-75 min |
 
 ---
 
@@ -293,9 +293,9 @@ Complete end-to-end with cluster validation and parallel execution.
 
 **Use case:** Release builds, CI/CD pipelines.
 
-```bash {"name":"workflow:full","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:workflow:full","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # One command runs entire pipeline (parallel build+platform)
-runme run --filename docs/ci/README.md ci:pipeline
+runme run --filename docs/ci/README.md k9:ci:qcow2:pipeline
 ```
 
 ---
@@ -318,14 +318,14 @@ Fast iteration cycle for development.
 
 **Use case:** Iterating on flake changes, testing builds locally.
 
-```bash {"name":"workflow:dev","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:workflow:dev","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # Build and package
-runme run --all --tag=pipeline:all --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
 
 # Optional: boot VM for testing
-runme run --filename docs/ci/dev.md dev:start
+runme run --filename docs/ci/dev.md k9:ci:dev:start
 ssh -p 2222 kc2admin@localhost
-runme run --filename docs/ci/dev.md dev:stop
+runme run --filename docs/ci/dev.md k9:ci:dev:stop
 ```
 
 ---
@@ -349,11 +349,11 @@ Validate existing image without rebuilding.
 
 **Use case:** Testing existing image, debugging cluster issues.
 
-```bash {"name":"workflow:validate","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:workflow:validate","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # Validate existing image
-runme run --filename docs/ci/validate.md validate:deploy
-runme run --filename docs/ci/validate.md validate:services
-runme run --filename docs/ci/validate.md validate:runner
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:deploy
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:services
+runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:runner
 ```
 
 ---
@@ -375,47 +375,47 @@ Promote validated image to public registry.
 
 **Use case:** Publishing releases to docker.io or ghcr.io.
 
-```bash {"name":"workflow:promote","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:workflow:promote","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # Set credentials
 export DOCKER_TOKEN="<your-docker-hub-token>"
 
 # Promote to docker.io
-runme run --filename docs/ci/promote.md promote:image
+runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
 
 # Or promote to ghcr.io
 export GITHUB_TOKEN="<your-github-token>"
 export PROMOTE_REGISTRY="ghcr.io"
 export PROMOTE_IMAGE="your-org/konductor"
-runme run --filename docs/ci/promote.md promote:image
+runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
 ```
 
 ---
 
 ## Pipeline Orchestrator
 
-### ci:pipeline
+### k9:ci:qcow2:pipeline
 
 Complete end-to-end pipeline with parallel build and platform deployment.
 
 **Pipeline stages:**
 
 1. **Preflight**: Fail-fast environment checks (LD_LIBRARY_PATH, Docker, OVMF)
-2. **Build** (parallel): `build:all` — Full QCOW2 + containerDisk build
-3. **Platform** (parallel): `platform:up` — Start Talos + deploy platform
-4. **Registry**: `registry:trust` + `registry:login` — Install CA + authenticate
-5. **Push**: `push:image` — Multi-tag push to local registry
-6. **Verify push**: `registry:tags` — Confirm tags landed
-7. **Validate**: `validate:deploy` — Deploy to KubeVirt + SSH test
-8. **Services**: `validate:services` — Web terminal health checks
-9. **Runner**: `validate:runner` — Forgejo workflow validation
+2. **Build** (parallel): `--tag=k9:ci:pipeline:all` — Full QCOW2 + containerDisk build
+3. **Platform** (parallel): `k9:ci:platform:up` — Start Talos + deploy platform
+4. **Registry**: `k9:ci:registry:trust` + `k9:ci:registry:login` — Install CA + authenticate
+5. **Push**: `k9:ci:qcow2:push:image` — Multi-tag push to local registry
+6. **Verify push**: `k9:ci:registry:tags` — Confirm tags landed
+7. **Validate**: `k9:ci:qcow2:validate:deploy` — Deploy to KubeVirt + SSH test
+8. **Services**: `k9:ci:qcow2:validate:services` — Web terminal health checks
+9. **Runner**: `k9:ci:qcow2:validate:runner` — Forgejo workflow validation
 
-**Note:** Promotion (`promote:image`) is NOT included. It is a manual gate after validation passes.
+**Note:** Promotion (`k9:ci:qcow2:promote`) is NOT included. It is a manual gate after validation passes.
 
 **Duration:** 45-75 minutes (parallel build+platform saves 5-10 min vs sequential)
 
 **Prerequisites:** Docker running, sufficient resources (8GB RAM, 100GB disk)
 
-```sh {"name":"ci:pipeline","excludeFromRunAll":"true","tag":"type:entry,duration:very-slow"}
+```sh {"name":"k9:ci:qcow2:pipeline","excludeFromRunAll":"true","tag":"k9:ci,k9:ci:qcow2,type:entry,duration:very-slow"}
 set -e
 CI_DIR="docs/ci"
 
@@ -441,7 +441,7 @@ docker info &>/dev/null && echo "✓ Docker daemon reachable" || { echo "✗ Doc
 [ "$ERRORS" -eq 0 ] || { echo "✗ $ERRORS preflight error(s)"; exit 1; }
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  ci:pipeline — Complete End-to-End Pipeline (Parallel Build + Platform)"
+echo "  k9:ci:qcow2:pipeline — Complete End-to-End Pipeline (Parallel Build + Platform)"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Pipeline stages:"
@@ -464,10 +464,10 @@ echo "════════════════════════�
 echo ""
 echo "▶ Phase 1+2: Build + package ║ Start cluster + deploy platform (PARALLEL)..."
 
-runme run --all --tag=pipeline:all --filename "$CI_DIR/build.md" &
+runme run --all --tag=k9:ci:pipeline:all --filename "$CI_DIR/build.md" &
 BUILD_PID=$!
 
-runme run --direnv=true --load-env=false --filename "$CI_DIR/platform.md" platform:up &
+runme run --direnv=true --load-env=false --filename "$CI_DIR/platform.md" k9:ci:platform:up &
 PLATFORM_PID=$!
 
 # Wait for both — fail-fast on either
@@ -494,43 +494,43 @@ echo "✓ Build + platform complete"
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 3: Install cluster CA + authenticate..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" registry:trust
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" registry:login
+runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:trust
+runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:login
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 4: Push to registry
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 4: Push to registry..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/push.md" push:image
+runme run --direnv=true --load-env=false --filename "$CI_DIR/push.md" k9:ci:qcow2:push:image
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 5: Verify pushed tags
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 5: Verify pushed tags..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" registry:tags
+runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:tags
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 6: Deploy to KubeVirt + validate
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 6: Deploy to KubeVirt + validate..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" validate:deploy
+runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:deploy
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 7: Test web terminal services
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 7: Test web terminal services..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" validate:services
+runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:services
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 8: Test Forgejo runner workflow
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 8: Test Forgejo runner workflow..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" validate:runner
+runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:runner
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -540,7 +540,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Review validation results above"
 echo "  2. Set credentials: export DOCKER_TOKEN=<your-token>"
-echo "  3. Promote: runme run --filename docs/ci/promote.md promote:image"
+echo "  3. Promote: runme run --filename docs/ci/promote.md k9:ci:qcow2:promote"
 echo ""
 cat .konductor
 ```
@@ -648,13 +648,13 @@ SOURCE ──► NIX ──► BUILD ──► SEAL ──► OCI ──► PUSH
 - Dirty trees get `qcow2-dirty` tag
 - Prevents accidental promotion of unreproducible builds
 
-**Validation gate:** `validate:deploy` + `validate:runner`
+**Validation gate:** `k9:ci:qcow2:validate:deploy` + `k9:ci:qcow2:validate:runner`
 
 - SSH access must succeed
 - Runner workflow must complete successfully
 - Prevents promotion of broken images
 
-**Promotion gate:** Manual (`promote:image`)
+**Promotion gate:** Manual (`k9:ci:qcow2:promote`)
 
 - Requires explicit credentials (DOCKER_TOKEN or GITHUB_TOKEN)
 - Requires validation to have passed
@@ -664,7 +664,7 @@ SOURCE ──► NIX ──► BUILD ──► SEAL ──► OCI ──► PUSH
 
 **From running VM:**
 
-```bash {"name":"example:verify-self-pull","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:example:verify-self-pull","excludeFromRunAll":"true","tag":"k9:ci:example,type:example"}
 # Parse provenance
 oci_image=$(sed -n 's/^oci_image = "\(.*\)"$/\1/p' /.konductor)
 git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' /.konductor)
@@ -675,7 +675,7 @@ docker pull "${oci_image}:qcow2-${git_commit}"
 
 **Verify image matches build:**
 
-```bash {"name":"example:verify-digest","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:example:verify-digest","excludeFromRunAll":"true","tag":"k9:ci:example,type:example"}
 # Compare digest from provenance with actual image
 expected=$(grep '^oci_digest = ' .konductor | cut -d'"' -f2)
 actual=$(skopeo inspect docker://registry.docker.arpa/containercraft/konductor:latest-qcow2 | jq -r '.Digest')
@@ -692,7 +692,7 @@ actual=$(skopeo inspect docker://registry.docker.arpa/containercraft/konductor:l
 
 **Solution:**
 
-```bash {"name":"troubleshoot:disk-space","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:disk-space","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Clean nix store
 nix-collect-garbage -d
 
@@ -706,7 +706,7 @@ df -h .
 
 **Solution:**
 
-```bash {"name":"troubleshoot:vm-boot","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:vm-boot","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Check VM log for errors
 tail -100 build-vm.log
 
@@ -721,7 +721,7 @@ grep -i fail build-vm.log
 
 **Solution:**
 
-```bash {"name":"troubleshoot:kvm","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:kvm","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Add user to kvm group
 sudo usermod -aG kvm $USER
 
@@ -737,9 +737,9 @@ newgrp kvm
 
 **Solution:**
 
-```bash {"name":"troubleshoot:registry-tls","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:registry-tls","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Reinstall cluster CA
-runme run --filename docs/ci/registry.md registry:trust
+runme run --filename docs/ci/registry.md k9:ci:registry:trust
 
 # Verify CA is installed
 ls -l /etc/docker/certs.d/registry.docker.arpa/ca.crt
@@ -751,9 +751,9 @@ ls -l /etc/docker/certs.d/registry.docker.arpa/ca.crt
 
 **Solution:**
 
-```bash {"name":"troubleshoot:registry-auth","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:registry-auth","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Re-authenticate
-runme run --filename docs/ci/registry.md registry:login
+runme run --filename docs/ci/registry.md k9:ci:registry:login
 
 # Verify credentials
 jq '.auths["registry.docker.arpa"]' ${WORKSPACE_ROOT}/.docker/config.json
@@ -767,9 +767,9 @@ jq '.auths["registry.docker.arpa"]' ${WORKSPACE_ROOT}/.docker/config.json
 
 **Solution:**
 
-```bash {"name":"troubleshoot:cluster-ports","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:cluster-ports","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Clean existing cluster
-runme run --filename docs/ci/platform.md platform:down
+runme run --filename docs/ci/platform.md k9:ci:platform:down
 
 # Check for stale containers
 docker ps -a | grep talos
@@ -784,7 +784,7 @@ docker rm -f $(docker ps -a -q --filter "name=talos")
 
 **Solution:**
 
-```bash {"name":"troubleshoot:kubevirt","excludeFromRunAll":"true","tag":"type:example"}
+```bash {"name":"k9:ci:troubleshoot:kubevirt","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Check VMI status
 kubectl get vmi -n konductor
 

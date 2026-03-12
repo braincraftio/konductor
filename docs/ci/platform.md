@@ -2,7 +2,7 @@
 cwd: ../..
 shell: /run/current-system/sw/bin/bash
 skipPrompts: true
-tag: scope:ci,scope:cluster
+tag: k9:ci:platform
 runme:
   version: v3
 ---
@@ -36,7 +36,9 @@ Start Talos Kubernetes cluster in Docker and deploy platform services.
 
 **Prerequisites:** Docker running, sufficient resources (8GB RAM, 100GB disk)
 
-```sh {"name":"platform:up","excludeFromRunAll":"true","tag":"type:entry,scope:cluster,duration:slow"}
+```sh {"name":"k9:ci:platform:up","excludeFromRunAll":"true","tag":"k9:ci:platform,k9:ci:pipeline:all,type:entry,duration:slow"}
+set -e
+[ "${SKIP_PLATFORM_PHASE:-false}" = "true" ] && exit 0
 # Clean any existing cluster
 mise run dev:k8s:compose:clean
 
@@ -55,7 +57,8 @@ Destroy the cluster.
 
 **Warning:** This is destructive. All cluster data will be lost.
 
-```sh {"name":"platform:down","excludeFromRunAll":"true","tag":"type:entry,type:destructive,scope:cluster"}
+```sh {"name":"k9:ci:platform:down","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:destructive"}
+set -e
 mise run dev:k8s:compose:clean
 ```
 
@@ -65,9 +68,10 @@ mise run dev:k8s:compose:clean
 
 Check cluster and registry status.
 
-```sh {"name":"platform:status","excludeFromRunAll":"true","tag":"type:entry,scope:cluster,type:readonly"}
+```sh {"name":"k9:ci:platform:status","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:readonly"}
+set -e
 kubectl get nodes
 kubectl get po -n registry
 kubectl get httproute -n registry
-curl -sk -u admin:admin https://registry.docker.arpa/v2/_catalog | jq
+curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" "https://${CONTAINER_REGISTRY:-registry.docker.arpa}/v2/_catalog" | jq
 ```
