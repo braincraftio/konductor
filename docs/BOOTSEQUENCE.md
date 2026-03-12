@@ -39,9 +39,9 @@ This document defines the systemd service ordering, dependency chain, and valida
 │     ├─ Runs bootcmd                                                         │
 │     └─ BEFORE: systemd-networkd.service                                     │
 │                                                                             │
-│  ② /nix/.host-store automount (if virtiofs available)                       │
+│  ② /mnt/host-nix automount (if virtiofs available)                          │
 │     ├─ Triggered on first access by nix substituter                         │
-│     └─ Provides read-only host nix store as local binary cache              │
+│     └─ Provides read-only host nix store (local?root= substituter)          │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │

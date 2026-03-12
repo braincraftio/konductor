@@ -2607,29 +2607,59 @@ EOF
     };
 
     # =====================================================================
-    # Host Nix Store Substituter (Build & Deploy Acceleration)
+    # Vendored Flake Input Sources (Baked into Image)
     # =====================================================================
-    # A read-only host nix store can be mounted via virtiofs at /nix/.host-store.
-    # Nix treats it as a local substituter (binary cache), so nixos-rebuild and
+    # Every flake input's outPath is referenced here, which pulls it into
+    # the system closure. nixos-install copies them to the image's /nix/store.
+    # This means --override-input path:/nix/store/xxx works on a sealed image
+    # because the exact store paths from flake.lock are on disk.
+    #
+    # /etc/konductor/input-sources.env maps input names to store paths.
+    # nixos-rebuild scripts source this to generate --override-input flags.
+    # Devs can also use path:_sources/name for modified inputs (hash mismatch
+    # but functional — nix re-imports the tree under a new store path).
+    environment.etc."konductor/input-sources.env".text = let
+      # Filter to inputs that have outPath (excludes 'self' and non-flake attrs)
+      inputsWithPath = lib.filterAttrs
+        (name: input: name != "self" && (input ? outPath || (builtins.isAttrs input && input ? sourceInfo)))
+        inputs;
+    in lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: input: "${name}=${input.outPath or input}")
+        inputsWithPath
+    ) + "\n";
+
+    # =====================================================================
+    # Host Nix Store (Read-Only Substituter for Build & Fleet Acceleration)
+    # =====================================================================
+    # A read-only host nix store can be mounted via virtiofs at /mnt/host-nix.
+    # virtiofsd shares the host's /nix directory. The mount point is chosen
+    # so that local?root=/mnt/host-nix finds the store at /mnt/host-nix/nix/store
+    # and the DB at /mnt/host-nix/nix/var/nix/db — matching nix's convention
+    # of root + /nix/store and root + /nix/var/nix.
+    #
+    # Nix opens this as a read-only local store (experimental feature
+    # read-only-local-store) and uses it as a substituter. nixos-rebuild and
     # nix-build copy needed paths into the VM's real /nix/store on disk.
     #
     # Architecture:
-    #   /nix/.host-store (virtiofs, ro) ──► nix substituter (local?root=)
-    #   /nix/store (real on-disk ext4)  ──► nix writes here directly
+    #   /mnt/host-nix/nix/store (virtiofs, ro) ──► nix substituter
+    #   /mnt/host-nix/nix/var/nix/db (virtiofs, ro) ──► path metadata
+    #   /nix/store (real on-disk ext4) ──► nix writes here directly
     #
     # Use cases:
-    #   CI build:   host shares its /nix/store via virtiofs for cache hits
-    #   Deploy:     many VMs share one read-only host store (single builder,
+    #   CI build:   host shares its /nix via virtiofs for cache hits
+    #   Deploy:     many VMs share one read-only host nix (single builder,
     #               many consumers) for efficient fleet-wide nix operations
-    #   Standalone: no host store present — nix falls back to remote caches
+    #   Standalone: no host mount present — substituter silently fails,
+    #               nix falls back to cache.nixos.org
     #
-    # No overlayfs, no seal step, no teardown. Paths are always materialized
-    # on the real local disk. The image boots standalone without any host mounts.
+    # Paths are always materialized on the real local disk. The image boots
+    # standalone without any host mounts.
 
-    # Mount host's nix store read-only via virtiofs (optional at boot and deploy)
-    # virtiofsd daemon runs on the host, QEMU exposes it as vhost-user-fs-pci
+    # Mount host's /nix read-only via virtiofs (optional at boot and deploy)
+    # virtiofsd shares host /nix, QEMU exposes it as vhost-user-fs-pci tag=nixstore
     # In standalone mode (no virtiofs device), nofail prevents boot failure
-    fileSystems."/nix/.host-store" = {
+    fileSystems."/mnt/host-nix" = {
       device = "nixstore";
       fsType = "virtiofs";
       options = [
@@ -2673,6 +2703,7 @@ EOF
         experimental-features = [
           "nix-command"
           "flakes"
+          "read-only-local-store"  # Required for host store substituter on read-only virtiofs
         ];
         auto-optimise-store = true;
         accept-flake-config = true;
@@ -2684,14 +2715,19 @@ EOF
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
         ];
-        # Host store as local substituter — virtiofs mount at /nix/.host-store.
-        # Nix copies paths from here into the real /nix/store on disk.
-        # When no host store is mounted (standalone), this silently has no paths.
-        extra-substituters = [ "local?root=/nix/.host-store" ];
+        # Host nix store as read-only local substituter.
+        # virtiofs mounts host /nix at /mnt/host-nix (ro).
+        # local?root=/mnt/host-nix finds store at /mnt/host-nix/nix/store
+        # and DB at /mnt/host-nix/nix/var/nix/db — matching nix convention.
+        # read-only=true opens the store without write attempts (locks, gc, etc).
+        # When no host mount is present (standalone), the substituter has no
+        # paths and nix falls back to the next substituter in the list.
+        extra-substituters = [ "local?root=/mnt/host-nix&read-only=true" ];
         require-sigs = false;  # Host store paths are unsigned local builds
         trusted-substituters = [
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
+          "local?root=/mnt/host-nix&read-only=true"
         ];
         trusted-public-keys = [
           "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="

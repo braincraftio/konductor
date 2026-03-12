@@ -737,17 +737,20 @@ set -e
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-# Generate --override-input flags from vendored inputs.
-# If manifest.txt exists (written by dev:vendor), use nix store paths directly.
-# Store paths have exact narHashes matching flake.lock, so derivation hashes
-# match the host build and the VM gets full cache hits via host-store substituter.
-# Falls back to path:_sources/ if no manifest (slower, hash mismatch).
+# Generate --override-input flags from vendored input sources.
+# /etc/konductor/input-sources.env is baked into the image at build time.
+# It maps flake input names to their exact /nix/store paths, which are
+# part of the system closure (copied by nixos-install). These paths exist
+# on disk from initial image creation — no host mount dependency.
+# narHashes match flake.lock exactly → derivation hash match → cache hits.
 OVERRIDE_INPUTS=""
-if ssh $SSH_OPTS kc2admin@localhost '[ -f /opt/konductor/src/_sources/manifest.txt ]'; then
-    echo "Using vendored store paths from manifest.txt..."
-    OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'while read name spath; do echo -n " --override-input $name path:$spath"; done < /opt/konductor/src/_sources/manifest.txt')
+if ssh $SSH_OPTS kc2admin@localhost '[ -f /etc/konductor/input-sources.env ]'; then
+    echo "Using baked-in input sources from /etc/konductor/input-sources.env..."
+    OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'while IFS="=" read -r name spath; do
+        [ -n "$name" ] && [ -n "$spath" ] && echo -n " --override-input $name path:$spath"
+    done < /etc/konductor/input-sources.env')
 elif ssh $SSH_OPTS kc2admin@localhost '[ -d /opt/konductor/src/_sources/nixpkgs ]'; then
-    echo "WARNING: No manifest.txt, falling back to path:_sources/ (slow, hash mismatch)..."
+    echo "WARNING: No input-sources.env, falling back to path:_sources/ (hash mismatch)..."
     OVERRIDE_INPUTS=$(ssh $SSH_OPTS kc2admin@localhost 'for dir in /opt/konductor/src/_sources/*/; do input=$(basename "$dir"); echo -n " --override-input $input path:/opt/konductor/src/_sources/$input"; done')
 fi
 
@@ -756,9 +759,10 @@ fi
 ssh kc2admin@localhost "sudo systemctl stop cloud-config.service cloud-final.service cloud-init-local.service cloud-init.service 2>/dev/null || true"
 
 # Rebuild NixOS from the synced flake
-# Use .#konductor (git-clean tree) so derivation hashes match the host build,
-# enabling cache hits via the host-store substituter. Override-inputs use
-# absolute paths so _sources/ is found without path:. (which would dirty self narHash).
+# Use .#konductor (git-clean tree) so derivation hashes match the host build.
+# Override-inputs use baked-in store paths from /etc/konductor/input-sources.env,
+# ensuring exact narHash match. The host store substituter (local?root=/mnt/host-nix)
+# provides build dependencies via read-only virtiofs — nix copies them to local disk.
 # nixos-rebuild switch exit codes:
 #   0 = success
 #   4 = switch succeeded but some units failed to start (transient races, self-healing)
