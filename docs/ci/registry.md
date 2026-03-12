@@ -34,7 +34,7 @@ Install cluster CA certificate for Docker daemon and Skopeo.
 
 **Prerequisites:** Cluster running, kubectl configured
 
-```sh {"name":"k9:ci:registry:trust","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
+```bash {"name":"k9:ci:registry:trust","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
 set -e
 
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
@@ -76,7 +76,7 @@ Authenticate Docker and Skopeo to registry.
 
 **Credentials:** Default `admin:admin` (configurable via `REGISTRY_USERNAME`/`REGISTRY_PASSWORD`)
 
-```sh {"name":"k9:ci:registry:login","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
+```bash {"name":"k9:ci:registry:login","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 USERNAME="${REGISTRY_USERNAME:-admin}"
@@ -100,7 +100,7 @@ echo "✓ Logged in to $REGISTRY"
 
 List images in registry.
 
-```sh {"name":"k9:ci:registry:list","excludeFromRunAll":"true","tag":"k9:ci:registry,type:entry,type:readonly"}
+```bash {"name":"k9:ci:registry:list","excludeFromRunAll":"true","tag":"k9:ci:registry,type:entry,type:readonly"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
@@ -113,7 +113,7 @@ curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
 
 List tags for konductor image.
 
-```sh {"name":"k9:ci:registry:tags","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry,type:readonly"}
+```bash {"name":"k9:ci:registry:tags","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry,type:readonly"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"

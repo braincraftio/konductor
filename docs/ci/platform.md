@@ -36,7 +36,7 @@ Start Talos Kubernetes cluster in Docker and deploy platform services.
 
 **Prerequisites:** Docker running, sufficient resources (8GB RAM, 100GB disk)
 
-```sh {"name":"k9:ci:platform:up","excludeFromRunAll":"true","tag":"k9:ci:platform,k9:ci:pipeline:all,type:entry,duration:slow"}
+```bash {"name":"k9:ci:platform:up","excludeFromRunAll":"true","tag":"k9:ci:platform,k9:ci:pipeline:all,type:entry,duration:slow"}
 set -e
 [ "${SKIP_PLATFORM_PHASE:-false}" = "true" ] && exit 0
 # Clean any existing cluster
@@ -57,7 +57,7 @@ Destroy the cluster.
 
 **Warning:** This is destructive. All cluster data will be lost.
 
-```sh {"name":"k9:ci:platform:down","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:destructive"}
+```bash {"name":"k9:ci:platform:down","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:destructive"}
 set -e
 mise run dev:k8s:compose:clean
 ```
@@ -68,7 +68,7 @@ mise run dev:k8s:compose:clean
 
 Check cluster and registry status.
 
-```sh {"name":"k9:ci:platform:status","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:readonly"}
+```bash {"name":"k9:ci:platform:status","excludeFromRunAll":"true","tag":"k9:ci:platform,type:entry,type:readonly"}
 set -e
 kubectl get nodes
 kubectl get po -n registry

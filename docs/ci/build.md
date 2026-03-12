@@ -327,7 +327,7 @@ fi
 
 # Vendored inputs are required for offline builds.
 if [ ! -f "_sources/catppuccin/flake.nix" ]; then
-    echo "Error: vendored inputs missing. Run: runme run --filename docs/ci/dev.md dev:vendor"
+    echo "Error: vendored inputs missing. Run: runme run k9:ci:dev:vendor"
     exit 1
 fi
 

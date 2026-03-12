@@ -154,28 +154,28 @@ Exception: `dev.md` calls `build.md` internal tasks for VM lifecycle (dev-only, 
 
 ```bash {"name":"k9:ci:quickstart:pipeline","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Complete end-to-end: build → cluster → validate (parallel build+platform)
-runme run --filename docs/ci/README.md k9:ci:qcow2:pipeline
+runme run k9:ci:qcow2:pipeline
 ```
 
 ### Development Iteration
 
 ```bash {"name":"k9:ci:quickstart:dev","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Build image + containerDisk
-runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:all
 
 # Interactive development: boot VM for testing
-runme run --filename docs/ci/dev.md k9:ci:dev:start
-runme run --filename docs/ci/dev.md k9:ci:dev:ssh
-runme run --filename docs/ci/dev.md k9:ci:dev:stop
+runme run k9:ci:dev:start
+runme run k9:ci:dev:ssh
+runme run k9:ci:dev:stop
 ```
 
 ### Validation Only
 
 ```bash {"name":"k9:ci:quickstart:validate","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Validate existing image in cluster
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:deploy
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:services
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:runner
+runme run k9:ci:qcow2:validate:deploy
+runme run k9:ci:qcow2:validate:services
+runme run k9:ci:qcow2:validate:runner
 ```
 
 ### Promotion
@@ -183,7 +183,7 @@ runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:runner
 ```bash {"name":"k9:ci:quickstart:promote","excludeFromRunAll":"true","tag":"k9:ci:quickstart,type:example"}
 # Copy validated image to public registry
 export DOCKER_TOKEN="<your-token>"
-runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
+runme run k9:ci:qcow2:promote
 ```
 
 ---
@@ -295,7 +295,7 @@ Complete end-to-end with cluster validation and parallel execution.
 
 ```bash {"name":"k9:ci:workflow:full","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # One command runs entire pipeline (parallel build+platform)
-runme run --filename docs/ci/README.md k9:ci:qcow2:pipeline
+runme run k9:ci:qcow2:pipeline
 ```
 
 ---
@@ -320,12 +320,12 @@ Fast iteration cycle for development.
 
 ```bash {"name":"k9:ci:workflow:dev","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # Build and package
-runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
+runme run --all --tag=k9:ci:pipeline:all
 
 # Optional: boot VM for testing
-runme run --filename docs/ci/dev.md k9:ci:dev:start
+runme run k9:ci:dev:start
 ssh -p 2222 kc2admin@localhost
-runme run --filename docs/ci/dev.md k9:ci:dev:stop
+runme run k9:ci:dev:stop
 ```
 
 ---
@@ -351,9 +351,9 @@ Validate existing image without rebuilding.
 
 ```bash {"name":"k9:ci:workflow:validate","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
 # Validate existing image
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:deploy
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:services
-runme run --filename docs/ci/validate.md k9:ci:qcow2:validate:runner
+runme run k9:ci:qcow2:validate:deploy
+runme run k9:ci:qcow2:validate:services
+runme run k9:ci:qcow2:validate:runner
 ```
 
 ---
@@ -380,13 +380,13 @@ Promote validated image to public registry.
 export DOCKER_TOKEN="<your-docker-hub-token>"
 
 # Promote to docker.io
-runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
+runme run k9:ci:qcow2:promote
 
 # Or promote to ghcr.io
 export GITHUB_TOKEN="<your-github-token>"
 export PROMOTE_REGISTRY="ghcr.io"
 export PROMOTE_IMAGE="your-org/konductor"
-runme run --filename docs/ci/promote.md k9:ci:qcow2:promote
+runme run k9:ci:qcow2:promote
 ```
 
 ---
@@ -415,20 +415,29 @@ Complete end-to-end pipeline with parallel build and platform deployment.
 
 **Prerequisites:** Docker running, sufficient resources (8GB RAM, 100GB disk)
 
-```sh {"name":"k9:ci:qcow2:pipeline","excludeFromRunAll":"true","tag":"k9:ci,k9:ci:qcow2,type:entry,duration:very-slow"}
+```bash {"name":"k9:ci:qcow2:pipeline","excludeFromRunAll":"true","tag":"k9:ci,k9:ci:qcow2,type:entry,duration:very-slow"}
 set -e
-CI_DIR="docs/ci"
 
 # ─────────────────────────────────────────────────────────────────────
 # PREFLIGHT — fail-fast for env gaps that waste 60+ minute build cycles
 # ─────────────────────────────────────────────────────────────────────
 ERRORS=0
 
-# LD_LIBRARY_PATH — pulumi/grpcio ImportError: libstdc++.so.6 at platform:up
-if [ -n "$LD_LIBRARY_PATH" ] && find ${LD_LIBRARY_PATH//:/ } -name 'libstdc++.so*' 2>/dev/null | grep -q .; then
-    echo "✓ libstdc++.so reachable"
+# LD_LIBRARY_PATH — grpcio/pulumi need libstdc++.so.6 (platform:up fails without it)
+if [ -n "$LD_LIBRARY_PATH" ]; then
+    _found_libstdcpp=false
+    IFS=: read -ra _ldpaths <<< "$LD_LIBRARY_PATH"
+    for _p in "${_ldpaths[@]}"; do
+        [ -d "$_p" ] && ls "$_p"/libstdc++.so* >/dev/null 2>&1 && _found_libstdcpp=true && break
+    done
+    if [ "$_found_libstdcpp" = true ]; then
+        echo "✓ libstdc++.so reachable"
+    else
+        echo "✗ LD_LIBRARY_PATH set but libstdc++.so not found in paths"
+        ((ERRORS++))
+    fi
 else
-    echo "✗ libstdc++.so not found in LD_LIBRARY_PATH (pulumi/grpcio will fail at platform:up)"
+    echo "✗ LD_LIBRARY_PATH not set (pulumi/grpcio will fail at platform:up)"
     ((ERRORS++))
 fi
 
@@ -445,102 +454,90 @@ echo "  k9:ci:qcow2:pipeline — Complete End-to-End Pipeline (Parallel Build + 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Pipeline stages:"
-echo "    1+2. Build + package ║ Start cluster + deploy platform  (PARALLEL)"
-echo "    3.   Install cluster CA + authenticate"
-echo "    4.   Push to registry"
-echo "    5.   Verify pushed tags"
-echo "    6.   Deploy to KubeVirt + validate"
-echo "    7.   Test web terminal services"
-echo "    8.   Test Forgejo runner workflow"
+echo "    1. Build + package"
+echo "    2. Start cluster + deploy platform"
+echo "    3. Install cluster CA + authenticate"
+echo "    4. Push to registry"
+echo "    5. Verify pushed tags"
+echo "    6. Deploy to KubeVirt + validate"
+echo "    7. Test web terminal services"
+echo "    8. Test Forgejo runner workflow (disabled — runner not deployed)"
 echo ""
-echo "  Duration: 45-75 minutes (parallel build+platform)"
+echo "  Duration: 45-75 minutes"
 echo "  Prerequisites: Docker, 8GB RAM, 100GB disk"
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # ─────────────────────────────────────────────────────────────────────
-# PHASE 1+2: Build image + Deploy platform IN PARALLEL
+# PHASE 1: Build image + containerDisk
 # ─────────────────────────────────────────────────────────────────────
 echo ""
-echo "▶ Phase 1+2: Build + package ║ Start cluster + deploy platform (PARALLEL)..."
+echo "▶ Phase 1: Build + package..."
+runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
+echo "✓ Build complete"
 
-runme run --all --tag=k9:ci:pipeline:all --filename "$CI_DIR/build.md" &
-BUILD_PID=$!
-
-runme run --direnv=true --load-env=false --filename "$CI_DIR/platform.md" k9:ci:platform:up &
-PLATFORM_PID=$!
-
-# Wait for both — fail-fast on either
-BUILD_OK=0
-PLATFORM_OK=0
-
-wait $BUILD_PID || BUILD_OK=1
-wait $PLATFORM_PID || PLATFORM_OK=1
-
-if [ "$BUILD_OK" -ne 0 ]; then
-    echo "✗ Image build failed"
-    # If platform is still running, let it finish (don't orphan)
-    exit 1
-fi
-if [ "$PLATFORM_OK" -ne 0 ]; then
-    echo "✗ Platform deploy failed"
-    exit 1
-fi
-
-echo "✓ Build + platform complete"
+# ─────────────────────────────────────────────────────────────────────
+# PHASE 2: Deploy platform
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "▶ Phase 2: Start cluster + deploy platform..."
+runme run k9:ci:platform:up
+echo "✓ Platform complete"
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 3: Registry trust + login
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 3: Install cluster CA + authenticate..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:trust
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:login
+runme run k9:ci:registry:trust
+runme run k9:ci:registry:login
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 4: Push to registry
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 4: Push to registry..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/push.md" k9:ci:qcow2:push:image
+runme run k9:ci:qcow2:push:image
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 5: Verify pushed tags
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 5: Verify pushed tags..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/registry.md" k9:ci:registry:tags
+runme run k9:ci:registry:tags
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 6: Deploy to KubeVirt + validate
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 6: Deploy to KubeVirt + validate..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:deploy
+runme run k9:ci:qcow2:validate:deploy
 
 # ─────────────────────────────────────────────────────────────────────
 # PHASE 7: Test web terminal services
 # ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "▶ Phase 7: Test web terminal services..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:services
+runme run k9:ci:qcow2:validate:services
 
 # ─────────────────────────────────────────────────────────────────────
-# PHASE 8: Test Forgejo runner workflow
+# PHASE 8: Test Forgejo runner workflow (DISABLED)
+# Requires forgejo_runner component enabled in operations stack.
+# See: infrastructure/pulumi/stacks/Pulumi.docker-dev-operations.yaml
 # ─────────────────────────────────────────────────────────────────────
-echo ""
-echo "▶ Phase 8: Test Forgejo runner workflow..."
-runme run --direnv=true --load-env=false --filename "$CI_DIR/validate.md" k9:ci:qcow2:validate:runner
+# echo ""
+# echo "▶ Phase 8: Test Forgejo runner workflow..."
+# runme run k9:ci:qcow2:validate:runner
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  ✅ Pipeline complete! Image validated and ready for promotion."
+echo "  Pipeline complete. Image validated and ready for promotion."
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "Next steps:"
 echo "  1. Review validation results above"
 echo "  2. Set credentials: export DOCKER_TOKEN=<your-token>"
-echo "  3. Promote: runme run --filename docs/ci/promote.md k9:ci:qcow2:promote"
+echo "  3. Promote: runme run k9:ci:qcow2:promote"
 echo ""
 cat .konductor
 ```
@@ -739,7 +736,7 @@ newgrp kvm
 
 ```bash {"name":"k9:ci:troubleshoot:registry-tls","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Reinstall cluster CA
-runme run --filename docs/ci/registry.md k9:ci:registry:trust
+runme run k9:ci:registry:trust
 
 # Verify CA is installed
 ls -l /etc/docker/certs.d/registry.docker.arpa/ca.crt
@@ -753,7 +750,7 @@ ls -l /etc/docker/certs.d/registry.docker.arpa/ca.crt
 
 ```bash {"name":"k9:ci:troubleshoot:registry-auth","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Re-authenticate
-runme run --filename docs/ci/registry.md k9:ci:registry:login
+runme run k9:ci:registry:login
 
 # Verify credentials
 jq '.auths["registry.docker.arpa"]' ${WORKSPACE_ROOT}/.docker/config.json
@@ -769,7 +766,7 @@ jq '.auths["registry.docker.arpa"]' ${WORKSPACE_ROOT}/.docker/config.json
 
 ```bash {"name":"k9:ci:troubleshoot:cluster-ports","excludeFromRunAll":"true","tag":"k9:ci:troubleshoot,type:example"}
 # Clean existing cluster
-runme run --filename docs/ci/platform.md k9:ci:platform:down
+runme run k9:ci:platform:down
 
 # Check for stale containers
 docker ps -a | grep talos

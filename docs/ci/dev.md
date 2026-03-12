@@ -60,7 +60,7 @@ Boot VM for local development and testing.
 
 **Prerequisites:** `result/nixos.qcow2` exists (run `build:image` first)
 
-```sh {"name":"k9:ci:dev:start","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:kvm"}
+```bash {"name":"k9:ci:dev:start","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:kvm"}
 set -ex
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
@@ -93,7 +93,7 @@ qemu-img create -f qcow2 -b "$BACKING" -F qcow2 result.dev/nixos.qcow2
 rm -f result && ln -sf result.dev result
 
 # Generate cloud-init ISO (reuse build block)
-runme run --direnv=true --load-env=false --filename docs/ci/build.md k9:ci:qcow2:build:_cloudinit
+runme run k9:ci:qcow2:build:_cloudinit
 
 # Ports
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
@@ -142,7 +142,7 @@ sleep 1
 echo "VM started: SSH=$SSH_PORT, VSCode=$VSCODE_PORT, TTYD=$TTYD_PORT"
 
 # Wait for SSH
-runme run --direnv=true --load-env=false --filename docs/ci/build.md k9:ci:qcow2:build:_vm-wait
+runme run k9:ci:qcow2:build:_vm-wait
 
 echo "VM ready:"
 echo "  SSH:     ssh -p $SSH_PORT kc2admin@localhost"
@@ -158,7 +158,7 @@ SSH into running VM.
 
 **Default port:** 2222 (configurable via `QCOW2_SSH_PORT`)
 
-```sh {"name":"k9:ci:dev:ssh","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,interactive:true"}
+```bash {"name":"k9:ci:dev:ssh","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,interactive:true"}
 ssh -p "${QCOW2_SSH_PORT:-2222}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null kc2admin@localhost
 ```
 
@@ -168,9 +168,8 @@ ssh -p "${QCOW2_SSH_PORT:-2222}" -o StrictHostKeyChecking=no -o UserKnownHostsFi
 
 Gracefully shutdown running VM.
 
-```sh {"name":"k9:ci:dev:stop","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
-BUILD_FILE="docs/ci/build.md"
-runme run --direnv=true --load-env=false --filename "$BUILD_FILE" k9:ci:qcow2:build:_vm-halt
+```bash {"name":"k9:ci:dev:stop","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
+runme run k9:ci:qcow2:build:_vm-halt
 ```
 
 ---
@@ -183,7 +182,7 @@ Rebuild NixOS host from flake (dogfooding).
 
 **Warning:** This rebuilds the NixOS system running the build. Only use on NixOS hosts.
 
-```sh {"name":"k9:ci:dev:rebase","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:nixos"}
+```bash {"name":"k9:ci:dev:rebase","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:nixos"}
 set -e
 sudo nixos-rebuild switch --flake .#konductor
 echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
@@ -410,7 +409,7 @@ nix --extra-experimental-features 'nix-command flakes' flake update --flake "$tm
 cp -f "$tmpdir/flake.lock" ./flake.lock
 
 echo "Vendoring refreshed inputs into ./_sources ..."
-runme run --filename docs/ci/dev.md k9:ci:dev:vendor
+runme run k9:ci:dev:vendor
 
 echo "✓ Online refresh complete: flake.lock + _sources updated for offline use"
 ```

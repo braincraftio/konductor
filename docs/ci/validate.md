@@ -34,7 +34,7 @@ Deploy VM to KubeVirt and validate SSH access.
 
 **Duration:** 3-5 minutes
 
-```sh {"name":"k9:ci:qcow2:validate:deploy","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
+```bash {"name":"k9:ci:qcow2:validate:deploy","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
 set -e
 mise run dev:k8s:konductor:up
 mise run dev:k8s:konductor:validate
@@ -57,7 +57,7 @@ Test web terminal services via port-forward (non-blocking).
 
 **Prerequisites:** VM deployed to KubeVirt (`validate:deploy`)
 
-```sh {"name":"k9:ci:qcow2:validate:services","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s"}
+```bash {"name":"k9:ci:qcow2:validate:services","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s"}
 set -eo pipefail
 
 pkill -f "virtctl port-forward.*konductor" 2>/dev/null || true
@@ -147,7 +147,7 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 
 **Duration:** 5-10 minutes
 
-```sh {"name":"k9:ci:qcow2:validate:runner","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
+```bash {"name":"k9:ci:qcow2:validate:runner","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
 set -eo pipefail
 
 echo "═══════════════════════════════════════════════════════════════════════════"

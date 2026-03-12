@@ -47,7 +47,7 @@ Copy validated image to public registry (docker.io or ghcr.io).
 
 **Duration:** 2-5 minutes
 
-```sh {"name":"k9:ci:qcow2:promote","excludeFromRunAll":"true","tag":"k9:ci:qcow2:promote,k9:ci:qcow2,type:entry,duration:slow"}
+```bash {"name":"k9:ci:qcow2:promote","excludeFromRunAll":"true","tag":"k9:ci:qcow2:promote,k9:ci:qcow2,type:entry,duration:slow"}
 set -e
 
 echo "═══════════════════════════════════════════════════════════════════════════"
