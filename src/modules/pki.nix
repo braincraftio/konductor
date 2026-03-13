@@ -176,12 +176,10 @@ in {
       # is mounted at /mnt/pki/ca.{crt,key}.
       konductor-pki-signed = {
         description = "Generate Konductor Hypervisor-Signed Certificate";
-        # CRITICAL: Wait for cloud-init to complete mount operations
-        # Cloud-init mounts /mnt/pki via konductor-mount@ service in bootcmd/runcmd
-        # The ConditionPathExists check fails if evaluated before mount completes
-        # Previous attempts: RequiresMountsFor (doesn't work with service-based mounts)
-        # Solution: Wait for cloud-init.service before evaluating condition
-        after = [ "local-fs.target" "konductor-pki-vm.service" "cloud-init.service" ];
+        # Wait for PKI disk mount before evaluating ConditionPathExists.
+        # udev triggers konductor-mount@pki.service when the virtio disk appears;
+        # After= ensures this service starts only once the mount completes.
+        after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
         wantedBy = [ "multi-user.target" ];
 
         # Only run if hypervisor CA key is mounted
@@ -317,7 +315,7 @@ in {
       # Runs after cloud-init in case CA is injected via user-data.
       konductor-pki-hypervisor = lib.mkIf (cfg.hypervisorCaPath != null) {
         description = "Import Konductor hypervisor CA";
-        after = [ "local-fs.target" "cloud-init.service" ];
+        after = [ "local-fs.target" "konductor-mount@pki.service" ];
         wantedBy = [ "multi-user.target" ];
 
         unitConfig = {
