@@ -127,7 +127,7 @@ echo "✓ Clean"
 Validate environment (standalone — no cluster required).
 
 ```bash {"name":"k9:ci:qcow2:build:preflight","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
-set -e
+set -ex
 
 echo "bash: $(which bash) (${BASH_VERSION})"
 
@@ -319,7 +319,7 @@ echo ""
 Build NixOS closure and capture nix_drv.
 
 ```bash {"name":"k9:ci:qcow2:build:_nix","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:nix"}
-set -e
+set -ex
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
     exit 0

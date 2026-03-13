@@ -195,7 +195,7 @@ echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
-set -euo pipefail
+set -euxo pipefail
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
@@ -258,11 +258,14 @@ while read -r row; do
   while :; do
     if XDG_CACHE_HOME="$XDG_CACHE_HOME" HOME="$HOME" \
       nix --extra-experimental-features 'nix-command flakes' \
-      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/dev/null; then
+      flake prefetch --no-use-registries --refresh --json "$flakeref" > /tmp/prefetch.json 2>/tmp/prefetch.err; then
       break
     fi
     if [ "$attempt" -ge "$max_attempts" ]; then
       echo "Error: prefetch failed for $name ($flakeref)"
+      echo "--- stderr ---"
+      cat /tmp/prefetch.err || true
+      echo "--- stdout ---"
       cat /tmp/prefetch.json || true
       exit 1
     fi
