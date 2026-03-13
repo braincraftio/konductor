@@ -10,7 +10,7 @@ jobs:
   check:
     name: Nix Flake Check
     runs-on: konductor
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Flake Check

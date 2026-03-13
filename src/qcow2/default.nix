@@ -1086,8 +1086,8 @@ let
         OVMF_VARS = "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd";
         # Docker buildkit
         DOCKER_BUILDKIT = "1";
-        # Library path for CI runner (xz, zstd for nix operations)
-        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}";
+        # Library path for CI runner (libstdc++ for grpcio/pulumi, xz/zstd for nix)
+        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.xz pkgs.zstd ]}";
       };
 
       # /etc/skel - Shell Configuration (copied to new user home dirs)
