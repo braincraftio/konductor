@@ -1,12 +1,11 @@
 # src/config/default.nix
 # Aggregates all wrapped tools
 
-{
-  pkgs,
-  lib,
-  versions,
-  catppuccinSources ? null,
-  ...
+{ pkgs
+, lib
+, versions
+, catppuccinSources ? null
+, ...
 }:
 
 {
@@ -65,7 +64,7 @@
     biome = import ./formatters/biome { inherit pkgs; };
   };
 }
-# k9s with Catppuccin Frappe theme (requires catppuccin/nix flake)
-// lib.optionalAttrs (catppuccinSources != null) {
+  # k9s with Catppuccin Frappe theme (requires catppuccin/nix flake)
+  // lib.optionalAttrs (catppuccinSources != null) {
   k9s = import ./k9s { inherit pkgs catppuccinSources; };
 }

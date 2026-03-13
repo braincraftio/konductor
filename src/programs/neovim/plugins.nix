@@ -1,6 +1,6 @@
 # src/programs/neovim/plugins.nix
 # All plugin configurations using nixvim native options
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 let
   banner = import ./banner.nix { };
@@ -975,28 +975,28 @@ in
             sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
           };
         }).overrideAttrs
-        (old: {
-          doCheck = false;
-          postInstall = (old.postInstall or "") + ''
-                          mkdir -p $out/plugin
-                          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
-            -- Auto-initialize render-markdown on plugin load
-            local ok, render_markdown = pcall(require, "render-markdown")
-            if ok then
-              render_markdown.setup({
-                enabled = true,
-                preset = "obsidian",
-                render_modes = { "n", "c", "t" },
-                anti_conceal = { enabled = true },
-                heading = { enabled = true },
-                code = { enabled = true, style = "full" },
-                -- Disable latex rendering (requires latex treesitter parser)
-                latex = { enabled = false },
-              })
-            end
-            EOF
-          '';
-        })
+          (old: {
+            doCheck = false;
+            postInstall = (old.postInstall or "") + ''
+                            mkdir -p $out/plugin
+                            cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+              -- Auto-initialize render-markdown on plugin load
+              local ok, render_markdown = pcall(require, "render-markdown")
+              if ok then
+                render_markdown.setup({
+                  enabled = true,
+                  preset = "obsidian",
+                  render_modes = { "n", "c", "t" },
+                  anti_conceal = { enabled = true },
+                  heading = { enabled = true },
+                  code = { enabled = true, style = "full" },
+                  -- Disable latex rendering (requires latex treesitter parser)
+                  latex = { enabled = false },
+                })
+              end
+              EOF
+            '';
+          })
       )
     ];
 

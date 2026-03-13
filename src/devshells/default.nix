@@ -19,13 +19,12 @@
 #   All shells work on Linux and macOS except konductor and ci which require
 #   Linux-specific virtualization packages (qemu_kvm, libvirt, OVMF, etc.)
 
-{
-  pkgs,
-  lib,
-  versions,
-  programs,
-  inputs,
-  ...
+{ pkgs
+, lib
+, versions
+, programs
+, inputs
+, ...
 }:
 
 let

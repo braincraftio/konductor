@@ -34,7 +34,8 @@ let
   cfg = config.konductor.pki;
 
   # Default domain based on hostname or fallback
-  defaultDomain = if config.networking.hostName != "localhost"
+  defaultDomain =
+    if config.networking.hostName != "localhost"
     then "${config.networking.hostName}.arpa"
     else "konductor.arpa";
 
@@ -42,7 +43,8 @@ let
   pythonWithCrypto = pkgs.python3.withPackages (ps: [ ps.cryptography ]);
   pythonPki = "${pythonWithCrypto}/bin/python3";
 
-in {
+in
+{
   options.konductor.pki = {
     enable = lib.mkEnableOption "Konductor PKI provisioning";
 
@@ -70,13 +72,13 @@ in {
 
     caValidityDays = lib.mkOption {
       type = lib.types.int;
-      default = 3650;  # 10 years
+      default = 3650; # 10 years
       description = "Validity period for CA certificate in days";
     };
 
     certValidityDays = lib.mkOption {
       type = lib.types.int;
-      default = 365;  # 1 year
+      default = 365; # 1 year
       description = "Validity period for wildcard certificate in days";
     };
 
@@ -107,409 +109,413 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    # Keep openssl for manual debugging; cryptography comes via languages.nix
-    environment.systemPackages = [ pkgs.openssl ];
+    environment = {
+      # Keep openssl for manual debugging; cryptography comes via languages.nix
+      systemPackages = [ pkgs.openssl ];
 
-    # Create PKI directory structure
-    systemd.tmpfiles.rules = [
-      "d /etc/konductor/pki 0755 root root -"
-      "d /etc/konductor/pki/vm 0755 root root -"
-      "d /etc/konductor/pki/signed 0755 root root -"
-      "d /etc/konductor/pki/hypervisor 0755 root root -"
-      "d /etc/konductor/pki/bundle 0755 root root -"
-    ];
+      # Environment variables pointing to PKI paths
+      variables = {
+        KONDUCTOR_VM_CA_CERT = "/etc/konductor/pki/vm/ca.crt";
+        KONDUCTOR_VM_CA_KEY = "/etc/konductor/pki/vm/ca.key";
+        KONDUCTOR_VM_WILDCARD_CERT = "/etc/konductor/pki/vm/wildcard.crt";
+        KONDUCTOR_VM_WILDCARD_KEY = "/etc/konductor/pki/vm/wildcard.key";
+        KONDUCTOR_CA_BUNDLE = "/etc/konductor/pki/bundle/ca-bundle.crt";
+      };
 
-    systemd.services = {
-      # =====================================================================
-      # VM-local CA Generation
-      # =====================================================================
-      # Generates self-signed CA and wildcard certificate on first boot.
-      # Uses Python PKI package with cryptography library.
-      # Idempotent: only runs if ca.crt doesn't exist.
-      konductor-pki-vm = {
-        description = "Generate Konductor VM-local PKI";
-        after = [ "local-fs.target" ];
-        before = [ "network.target" ];
+      # Profile script for easy access
+      etc."profile.d/konductor-pki.sh".text = ''
+        # Konductor PKI environment
+        export KONDUCTOR_VM_CA_CERT="/etc/konductor/pki/vm/ca.crt"
+        export KONDUCTOR_VM_CA_KEY="/etc/konductor/pki/vm/ca.key"
+        export KONDUCTOR_VM_WILDCARD_CERT="/etc/konductor/pki/vm/wildcard.crt"
+        export KONDUCTOR_VM_WILDCARD_KEY="/etc/konductor/pki/vm/wildcard.key"
+        export KONDUCTOR_CA_BUNDLE="/etc/konductor/pki/bundle/ca-bundle.crt"
+
+        # Helpers for Pulumi integration
+        konductor-ca-base64() {
+          if [ -f "$KONDUCTOR_VM_CA_CERT" ] && [ -f "$KONDUCTOR_VM_CA_KEY" ]; then
+            echo "ca_certificate_base64: $(base64 -w0 "$KONDUCTOR_VM_CA_CERT")"
+            echo "ca_private_key_base64: $(base64 -w0 "$KONDUCTOR_VM_CA_KEY")"
+          else
+            echo "Error: VM CA not generated yet" >&2
+            return 1
+          fi
+        }
+
+        konductor-ca-status() {
+          PYTHONPATH=/opt/konductor/src/src python3 -m pki status
+        }
+      '';
+    };
+
+    systemd = {
+      # Create PKI directory structure
+      tmpfiles.rules = [
+        "d /etc/konductor/pki 0755 root root -"
+        "d /etc/konductor/pki/vm 0755 root root -"
+        "d /etc/konductor/pki/signed 0755 root root -"
+        "d /etc/konductor/pki/hypervisor 0755 root root -"
+        "d /etc/konductor/pki/bundle 0755 root root -"
+      ];
+
+      # Systemd path watcher for certificate rotation
+      paths.konductor-pki-trust = lib.mkIf (cfg.hypervisorCaPath != null) {
+        description = "Watch for PKI changes at mount point";
         wantedBy = [ "multi-user.target" ];
 
-        unitConfig = {
-          ConditionPathExists = "!/etc/konductor/pki/vm/ca.crt";
-        };
-
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          Environment = [
-            "PYTHONPATH=/opt/konductor/src/src"
-          ];
-          ExecStart = pkgs.writeShellScript "generate-vm-pki" ''
-            set -euo pipefail
-
-            echo "Generating Konductor VM PKI via python3 -m pki generate"
-
-            ${pythonPki} -m pki generate \
-              --domain "${cfg.domain}" \
-              --org "${cfg.organization}" \
-              --ou "${cfg.organizationalUnit}" \
-              --ca-days ${toString cfg.caValidityDays} \
-              --cert-days ${toString cfg.certValidityDays}
-
-            echo "VM PKI generation complete"
-
-            # Output status to serial console for build attestation
-            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
-          '';
+        pathConfig = {
+          PathChanged = [
+            (toString cfg.hypervisorCaPath)
+          ] ++ lib.optional (cfg.hypervisorKeyPath != null) (toString cfg.hypervisorKeyPath);
+          Unit = "konductor-pki-refresh.service";
         };
       };
 
-      # =====================================================================
-      # Tier 2: Hypervisor-Signed Certificate Generation
-      # =====================================================================
-      # Generates wildcard certificate signed by hypervisor CA (if available).
-      # This is Tier 2 in the certificate precedence hierarchy:
-      #   Tier 1: Cluster-provided (future)
-      #   Tier 2: Hypervisor-signed (this service)
-      #   Tier 3: Self-signed (konductor-pki-vm above)
-      #
-      # Runs after VM PKI generation to ensure Tier 3 fallback always exists.
-      # Creates /etc/konductor/pki/signed/wildcard.{crt,key} if hypervisor CA
-      # is mounted at /mnt/pki/ca.{crt,key}.
-      konductor-pki-signed = {
-        description = "Generate Konductor Hypervisor-Signed Certificate";
-        # Wait for PKI disk mount before evaluating ConditionPathExists.
-        # udev triggers konductor-mount@pki.service when the virtio disk appears;
-        # After= ensures this service starts only once the mount completes.
-        after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
-        wantedBy = [ "multi-user.target" ];
+      services = {
+        # =====================================================================
+        # VM-local CA Generation
+        # =====================================================================
+        # Generates self-signed CA and wildcard certificate on first boot.
+        # Uses Python PKI package with cryptography library.
+        # Idempotent: only runs if ca.crt doesn't exist.
+        konductor-pki-vm = {
+          description = "Generate Konductor VM-local PKI";
+          after = [ "local-fs.target" ];
+          before = [ "network.target" ];
+          wantedBy = [ "multi-user.target" ];
 
-        # Only run if hypervisor CA key is mounted
-        unitConfig = {
-          ConditionPathExists = "/mnt/pki/tls.key";
+          unitConfig = {
+            ConditionPathExists = "!/etc/konductor/pki/vm/ca.crt";
+          };
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Environment = [
+              "PYTHONPATH=/opt/konductor/src/src"
+            ];
+            ExecStart = pkgs.writeShellScript "generate-vm-pki" ''
+              set -euo pipefail
+
+              echo "Generating Konductor VM PKI via python3 -m pki generate"
+
+              ${pythonPki} -m pki generate \
+                --domain "${cfg.domain}" \
+                --org "${cfg.organization}" \
+                --ou "${cfg.organizationalUnit}" \
+                --ca-days ${toString cfg.caValidityDays} \
+                --cert-days ${toString cfg.certValidityDays}
+
+              echo "VM PKI generation complete"
+
+              # Output status to serial console for build attestation
+              ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
+            '';
+          };
         };
 
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = pkgs.writeShellScript "generate-signed-pki" ''
-            set -euo pipefail
+        # =====================================================================
+        # Tier 2: Hypervisor-Signed Certificate Generation
+        # =====================================================================
+        # Generates wildcard certificate signed by hypervisor CA (if available).
+        # This is Tier 2 in the certificate precedence hierarchy:
+        #   Tier 1: Cluster-provided (future)
+        #   Tier 2: Hypervisor-signed (this service)
+        #   Tier 3: Self-signed (konductor-pki-vm above)
+        #
+        # Runs after VM PKI generation to ensure Tier 3 fallback always exists.
+        # Creates /etc/konductor/pki/signed/wildcard.{crt,key} if hypervisor CA
+        # is mounted at /mnt/pki/ca.{crt,key}.
+        konductor-pki-signed = {
+          description = "Generate Konductor Hypervisor-Signed Certificate";
+          # Wait for PKI disk mount before evaluating ConditionPathExists.
+          # udev triggers konductor-mount@pki.service when the virtio disk appears;
+          # After= ensures this service starts only once the mount completes.
+          after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
+          wantedBy = [ "multi-user.target" ];
 
-            echo "=========================================="
-            echo "Konductor Tier 2 Certificate Generation"
-            echo "=========================================="
+          # Only run if hypervisor CA key is mounted
+          unitConfig = {
+            ConditionPathExists = "/mnt/pki/tls.key";
+          };
 
-            PKI_ROOT="/etc/konductor/pki"
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "generate-signed-pki" ''
+              set -euo pipefail
 
-            # Verify hypervisor CA is available
-            if [ ! -f /mnt/pki/tls.key ] || [ ! -f /mnt/pki/ca.crt ]; then
-              echo "✗ Hypervisor CA not available - skipping Tier 2"
-              exit 0
-            fi
+              echo "=========================================="
+              echo "Konductor Tier 2 Certificate Generation"
+              echo "=========================================="
 
-            echo "✓ Hypervisor CA available - generating signed certificate"
+              PKI_ROOT="/etc/konductor/pki"
 
-            # Generate private key (EC secp256r1 for performance)
-            ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 \
-              -out "$PKI_ROOT/signed/wildcard.key"
-            chmod 640 "$PKI_ROOT/signed/wildcard.key"
+              # Verify hypervisor CA is available
+              if [ ! -f /mnt/pki/tls.key ] || [ ! -f /mnt/pki/ca.crt ]; then
+                echo "✗ Hypervisor CA not available - skipping Tier 2"
+                exit 0
+              fi
 
-            # Create CSR with proper subject
-            ${pkgs.openssl}/bin/openssl req -new \
-              -key "$PKI_ROOT/signed/wildcard.key" \
-              -out /tmp/wildcard.csr \
-              -subj "/O=${cfg.organization}/OU=${cfg.organizationalUnit}/CN=*.${cfg.domain}"
+              echo "✓ Hypervisor CA available - generating signed certificate"
 
-            # Create SAN extensions file
-            cat > /tmp/san.ext << 'EOF'
-            subjectAltName=DNS:*.${cfg.domain},DNS:${cfg.domain},DNS:*.docker.${cfg.domain},DNS:docker.${cfg.domain}
-            basicConstraints=CA:FALSE
-            keyUsage=digitalSignature,keyEncipherment
-            extendedKeyUsage=serverAuth,clientAuth
-            EOF
-
-            # Sign with hypervisor CA
-            ${pkgs.openssl}/bin/openssl x509 -req \
-              -in /tmp/wildcard.csr \
-              -CA /mnt/pki/ca.crt \
-              -CAkey /mnt/pki/tls.key \
-              -out "$PKI_ROOT/signed/wildcard.crt" \
-              -days ${toString cfg.certValidityDays} \
-              -sha256 \
-              -extfile /tmp/san.ext \
-              -set_serial "0x$(${pkgs.openssl}/bin/openssl rand -hex 20)"
-
-            # Copy hypervisor CA for reference
-            cp /mnt/pki/ca.crt "$PKI_ROOT/hypervisor/ca.crt"
-
-            # Verify certificate
-            if ${pkgs.openssl}/bin/openssl verify -CAfile /mnt/pki/ca.crt "$PKI_ROOT/signed/wildcard.crt" >/dev/null 2>&1; then
-              echo "✓ Certificate signed by hypervisor CA"
-              ISSUER=$(${pkgs.openssl}/bin/openssl x509 -in "$PKI_ROOT/signed/wildcard.crt" -noout -issuer | sed 's/issuer=//')
-              echo "  Issuer: $ISSUER"
-
-              # Set permissions (readable by kc2 group)
-              chgrp kc2 "$PKI_ROOT/signed/wildcard.key" "$PKI_ROOT/signed/wildcard.crt"
+              # Generate private key (EC secp256r1 for performance)
+              ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 \
+                -out "$PKI_ROOT/signed/wildcard.key"
               chmod 640 "$PKI_ROOT/signed/wildcard.key"
-              chmod 644 "$PKI_ROOT/signed/wildcard.crt"
-            else
-              echo "✗ Certificate verification failed - removing Tier 2 certs"
-              rm -f "$PKI_ROOT/signed/wildcard."{crt,key}
-              exit 1
-            fi
 
-            # Cleanup temp files
-            rm -f /tmp/wildcard.csr /tmp/san.ext
+              # Create CSR with proper subject
+              ${pkgs.openssl}/bin/openssl req -new \
+                -key "$PKI_ROOT/signed/wildcard.key" \
+                -out /tmp/wildcard.csr \
+                -subj "/O=${cfg.organization}/OU=${cfg.organizationalUnit}/CN=*.${cfg.domain}"
 
-            echo "=========================================="
-            echo "Tier 2 Certificate Generation Complete"
-            echo "=========================================="
-          '';
-        };
-      };
+              # Create SAN extensions file
+              cat > /tmp/san.ext << 'EOF'
+              subjectAltName=DNS:*.${cfg.domain},DNS:${cfg.domain},DNS:*.docker.${cfg.domain},DNS:docker.${cfg.domain}
+              basicConstraints=CA:FALSE
+              keyUsage=digitalSignature,keyEncipherment
+              extendedKeyUsage=serverAuth,clientAuth
+              EOF
 
-      # =====================================================================
-      # PKI Permissions
-      # =====================================================================
-      # Sets wildcard cert/key group to kc2 so per-user services can read them.
-      # Runs unconditionally (no ConditionPathExists guard) because certs may
-      # be baked into the image at build time, skipping konductor-pki-vm.
-      konductor-pki-permissions = {
-        description = "Set Konductor PKI file permissions";
-        after = [ "konductor-pki-vm.service" "konductor-pki-signed.service" ];
-        wantedBy = [ "multi-user.target" ];
+              # Sign with hypervisor CA
+              ${pkgs.openssl}/bin/openssl x509 -req \
+                -in /tmp/wildcard.csr \
+                -CA /mnt/pki/ca.crt \
+                -CAkey /mnt/pki/tls.key \
+                -out "$PKI_ROOT/signed/wildcard.crt" \
+                -days ${toString cfg.certValidityDays} \
+                -sha256 \
+                -extfile /tmp/san.ext \
+                -set_serial "0x$(${pkgs.openssl}/bin/openssl rand -hex 20)"
 
-        unitConfig = {
-          ConditionPathExists = "/etc/konductor/pki/vm/wildcard.key";
-        };
+              # Copy hypervisor CA for reference
+              cp /mnt/pki/ca.crt "$PKI_ROOT/hypervisor/ca.crt"
 
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = pkgs.writeShellScript "set-pki-permissions" ''
-            set -euo pipefail
+              # Verify certificate
+              if ${pkgs.openssl}/bin/openssl verify -CAfile /mnt/pki/ca.crt "$PKI_ROOT/signed/wildcard.crt" >/dev/null 2>&1; then
+                echo "✓ Certificate signed by hypervisor CA"
+                ISSUER=$(${pkgs.openssl}/bin/openssl x509 -in "$PKI_ROOT/signed/wildcard.crt" -noout -issuer | sed 's/issuer=//')
+                echo "  Issuer: $ISSUER"
 
-            # Tier 3: VM self-signed (always present)
-            if [ -f /etc/konductor/pki/vm/wildcard.key ]; then
-              chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
-              chmod 640 /etc/konductor/pki/vm/wildcard.key
-              chmod 644 /etc/konductor/pki/vm/wildcard.crt
-              echo "✓ Tier 3 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
-            fi
+                # Set permissions (readable by kc2 group)
+                chgrp kc2 "$PKI_ROOT/signed/wildcard.key" "$PKI_ROOT/signed/wildcard.crt"
+                chmod 640 "$PKI_ROOT/signed/wildcard.key"
+                chmod 644 "$PKI_ROOT/signed/wildcard.crt"
+              else
+                echo "✗ Certificate verification failed - removing Tier 2 certs"
+                rm -f "$PKI_ROOT/signed/wildcard."{crt,key}
+                exit 1
+              fi
 
-            # Tier 2: Hypervisor-signed (if present)
-            if [ -f /etc/konductor/pki/signed/wildcard.key ]; then
-              chgrp kc2 /etc/konductor/pki/signed/wildcard.key /etc/konductor/pki/signed/wildcard.crt
-              chmod 640 /etc/konductor/pki/signed/wildcard.key
-              chmod 644 /etc/konductor/pki/signed/wildcard.crt
-              echo "✓ Tier 2 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
-            fi
+              # Cleanup temp files
+              rm -f /tmp/wildcard.csr /tmp/san.ext
 
-            echo "PKI permissions set complete"
-          '';
-        };
-      };
-
-      # =====================================================================
-      # Hypervisor CA Import (if mounted)
-      # =====================================================================
-      # Imports hypervisor CA from mount point using Python PKI package.
-      # Runs after cloud-init in case CA is injected via user-data.
-      konductor-pki-hypervisor = lib.mkIf (cfg.hypervisorCaPath != null) {
-        description = "Import Konductor hypervisor CA";
-        after = [ "local-fs.target" "konductor-mount@pki.service" ];
-        wantedBy = [ "multi-user.target" ];
-
-        unitConfig = {
-          ConditionPathExists = toString cfg.hypervisorCaPath;
+              echo "=========================================="
+              echo "Tier 2 Certificate Generation Complete"
+              echo "=========================================="
+            '';
+          };
         };
 
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          Environment = [
-            "PYTHONPATH=/opt/konductor/src/src"
-          ];
-          ExecStart = pkgs.writeShellScript "import-hypervisor-pki" ''
-            set -euo pipefail
+        # =====================================================================
+        # PKI Permissions
+        # =====================================================================
+        # Sets wildcard cert/key group to kc2 so per-user services can read them.
+        # Runs unconditionally (no ConditionPathExists guard) because certs may
+        # be baked into the image at build time, skipping konductor-pki-vm.
+        konductor-pki-permissions = {
+          description = "Set Konductor PKI file permissions";
+          after = [ "konductor-pki-vm.service" "konductor-pki-signed.service" ];
+          wantedBy = [ "multi-user.target" ];
 
-            echo "Importing hypervisor CA via python3 -m pki hypervisor"
+          unitConfig = {
+            ConditionPathExists = "/etc/konductor/pki/vm/wildcard.key";
+          };
 
-            ${pythonPki} -m pki hypervisor \
-              --ca "${toString cfg.hypervisorCaPath}" \
-              ${lib.optionalString (cfg.hypervisorKeyPath != null)
-                "--key \"${toString cfg.hypervisorKeyPath}\""
-              }
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "set-pki-permissions" ''
+              set -euo pipefail
 
-            echo "Hypervisor CA import complete"
+              # Tier 3: VM self-signed (always present)
+              if [ -f /etc/konductor/pki/vm/wildcard.key ]; then
+                chgrp kc2 /etc/konductor/pki/vm/wildcard.key /etc/konductor/pki/vm/wildcard.crt
+                chmod 640 /etc/konductor/pki/vm/wildcard.key
+                chmod 644 /etc/konductor/pki/vm/wildcard.crt
+                echo "✓ Tier 3 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
+              fi
 
-            # Output status to serial console for build attestation
-            ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
-          '';
-        };
-      };
+              # Tier 2: Hypervisor-signed (if present)
+              if [ -f /etc/konductor/pki/signed/wildcard.key ]; then
+                chgrp kc2 /etc/konductor/pki/signed/wildcard.key /etc/konductor/pki/signed/wildcard.crt
+                chmod 640 /etc/konductor/pki/signed/wildcard.key
+                chmod 644 /etc/konductor/pki/signed/wildcard.crt
+                echo "✓ Tier 2 permissions: wildcard.key 640 root:kc2, wildcard.crt 644 root:kc2"
+              fi
 
-      # =====================================================================
-      # CA Bundle Generation
-      # =====================================================================
-      # Creates combined trust bundle from all available CAs.
-      # Runs after VM and hypervisor CA services.
-      konductor-pki-bundle = {
-        description = "Generate Konductor CA bundle";
-        after = [
-          "konductor-pki-vm.service"
-        ] ++ lib.optional (cfg.hypervisorCaPath != null) "konductor-pki-hypervisor.service";
-        wantedBy = [ "multi-user.target" ];
-
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          Environment = [
-            "PYTHONPATH=/opt/konductor/src/src"
-          ];
-          ExecStart = pkgs.writeShellScript "generate-ca-bundle" ''
-            set -euo pipefail
-
-            echo "Generating Konductor CA bundle via python3 -m pki bundle"
-
-            ${pythonPki} -m pki bundle
-
-            echo "CA bundle generation complete"
-          '';
-        };
-      };
-
-      # =====================================================================
-      # System Trust Installation
-      # =====================================================================
-      # Installs hypervisor CA to system trust store for Docker, Git, etc.
-      # Runs after bundle generation to ensure trust bundle is ready.
-      konductor-pki-trust = {
-        description = "Install Konductor CA to system trust store";
-        after = [ "konductor-pki-bundle.service" ];
-        wants = [ "konductor-pki-bundle.service" ];
-        wantedBy = [ "multi-user.target" ];
-
-        unitConfig = {
-          # Only run if hypervisor CA exists (KubeVirt VMs with mounted CA)
-          # Build VMs don't have hypervisor CA, so this service is skipped
-          ConditionPathExists = "/etc/konductor/pki/hypervisor/ca.crt";
+              echo "PKI permissions set complete"
+            '';
+          };
         };
 
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          Environment = [
-            "PYTHONPATH=/opt/konductor/src/src"
-          ];
-          ExecStart = pkgs.writeShellScript "install-system-trust" ''
-            set -euo pipefail
+        # =====================================================================
+        # Hypervisor CA Import (if mounted)
+        # =====================================================================
+        # Imports hypervisor CA from mount point using Python PKI package.
+        # Runs after cloud-init in case CA is injected via user-data.
+        konductor-pki-hypervisor = lib.mkIf (cfg.hypervisorCaPath != null) {
+          description = "Import Konductor hypervisor CA";
+          after = [ "local-fs.target" "konductor-mount@pki.service" ];
+          wantedBy = [ "multi-user.target" ];
 
-            echo "Installing hypervisor CA to system trust via python3 -m pki trust"
+          unitConfig = {
+            ConditionPathExists = toString cfg.hypervisorCaPath;
+          };
 
-            ${pythonPki} -m pki trust
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Environment = [
+              "PYTHONPATH=/opt/konductor/src/src"
+            ];
+            ExecStart = pkgs.writeShellScript "import-hypervisor-pki" ''
+              set -euo pipefail
 
-            echo "System trust installation complete"
-          '';
+              echo "Importing hypervisor CA via python3 -m pki hypervisor"
+
+              ${pythonPki} -m pki hypervisor \
+                --ca "${toString cfg.hypervisorCaPath}" \
+                ${lib.optionalString (cfg.hypervisorKeyPath != null)
+                  "--key \"${toString cfg.hypervisorKeyPath}\""
+                }
+
+              echo "Hypervisor CA import complete"
+
+              # Output status to serial console for build attestation
+              ${pythonPki} -m pki status | tee /dev/ttyS0 2>/dev/null || true
+            '';
+          };
         };
-      };
 
-      # =====================================================================
-      # PKI Refresh Service
-      # =====================================================================
-      # Triggered by path watcher when /mnt/pki certificates change.
-      # Regenerates all PKI and reloads dependent services.
-      konductor-pki-refresh = {
-        description = "Refresh Konductor PKI after certificate rotation";
+        # =====================================================================
+        # CA Bundle Generation
+        # =====================================================================
+        # Creates combined trust bundle from all available CAs.
+        # Runs after VM and hypervisor CA services.
+        konductor-pki-bundle = {
+          description = "Generate Konductor CA bundle";
+          after = [
+            "konductor-pki-vm.service"
+          ] ++ lib.optional (cfg.hypervisorCaPath != null) "konductor-pki-hypervisor.service";
+          wantedBy = [ "multi-user.target" ];
 
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = pkgs.writeShellScript "refresh-pki" ''
-            set -euo pipefail
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Environment = [
+              "PYTHONPATH=/opt/konductor/src/src"
+            ];
+            ExecStart = pkgs.writeShellScript "generate-ca-bundle" ''
+              set -euo pipefail
 
-            echo "=========================================="
-            echo "PKI Refresh: Certificate rotation detected"
-            echo "=========================================="
+              echo "Generating Konductor CA bundle via python3 -m pki bundle"
 
-            # Re-import hypervisor CA
-            echo "→ Restarting konductor-pki-hypervisor.service"
-            systemctl restart konductor-pki-hypervisor.service || true
+              ${pythonPki} -m pki bundle
 
-            # Re-sign wildcard cert
-            echo "→ Restarting konductor-pki-signed.service"
-            systemctl restart konductor-pki-signed.service || true
+              echo "CA bundle generation complete"
+            '';
+          };
+        };
 
-            # Rebuild trust bundle
-            echo "→ Restarting konductor-pki-bundle.service"
-            systemctl restart konductor-pki-bundle.service || true
+        # =====================================================================
+        # System Trust Installation
+        # =====================================================================
+        # Installs hypervisor CA to system trust store for Docker, Git, etc.
+        # Runs after bundle generation to ensure trust bundle is ready.
+        konductor-pki-trust = {
+          description = "Install Konductor CA to system trust store";
+          after = [ "konductor-pki-bundle.service" ];
+          wants = [ "konductor-pki-bundle.service" ];
+          wantedBy = [ "multi-user.target" ];
 
-            # Re-install system trust
-            echo "→ Restarting konductor-pki-trust.service"
-            systemctl restart konductor-pki-trust.service || true
+          unitConfig = {
+            # Only run if hypervisor CA exists (KubeVirt VMs with mounted CA)
+            # Build VMs don't have hypervisor CA, so this service is skipped
+            ConditionPathExists = "/etc/konductor/pki/hypervisor/ca.crt";
+          };
 
-            # Reload services using certificates
-            echo "→ Reloading Docker daemon"
-            systemctl reload-or-restart docker.service || true
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Environment = [
+              "PYTHONPATH=/opt/konductor/src/src"
+            ];
+            ExecStart = pkgs.writeShellScript "install-system-trust" ''
+              set -euo pipefail
 
-            # Note: vscode/ttyd/restty services handle SIGHUP for cert reload
-            echo "→ Reloading user services"
-            systemctl reload-or-restart 'konductor-vscode@*.service' || true
-            systemctl reload-or-restart 'konductor-ttyd@*.service' || true
-            systemctl reload-or-restart 'konductor-restty@*.service' || true
+              echo "Installing hypervisor CA to system trust via python3 -m pki trust"
 
-            echo "=========================================="
-            echo "PKI Refresh complete"
-            echo "=========================================="
-          '';
-          StandardOutput = "journal";
-          StandardError = "journal";
+              ${pythonPki} -m pki trust
+
+              echo "System trust installation complete"
+            '';
+          };
+        };
+
+        # =====================================================================
+        # PKI Refresh Service
+        # =====================================================================
+        # Triggered by path watcher when /mnt/pki certificates change.
+        # Regenerates all PKI and reloads dependent services.
+        konductor-pki-refresh = {
+          description = "Refresh Konductor PKI after certificate rotation";
+
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "refresh-pki" ''
+              set -euo pipefail
+
+              echo "=========================================="
+              echo "PKI Refresh: Certificate rotation detected"
+              echo "=========================================="
+
+              # Re-import hypervisor CA
+              echo "→ Restarting konductor-pki-hypervisor.service"
+              systemctl restart konductor-pki-hypervisor.service || true
+
+              # Re-sign wildcard cert
+              echo "→ Restarting konductor-pki-signed.service"
+              systemctl restart konductor-pki-signed.service || true
+
+              # Rebuild trust bundle
+              echo "→ Restarting konductor-pki-bundle.service"
+              systemctl restart konductor-pki-bundle.service || true
+
+              # Re-install system trust
+              echo "→ Restarting konductor-pki-trust.service"
+              systemctl restart konductor-pki-trust.service || true
+
+              # Reload services using certificates
+              echo "→ Reloading Docker daemon"
+              systemctl reload-or-restart docker.service || true
+
+              # Note: vscode/ttyd/restty services handle SIGHUP for cert reload
+              echo "→ Reloading user services"
+              systemctl reload-or-restart 'konductor-vscode@*.service' || true
+              systemctl reload-or-restart 'konductor-ttyd@*.service' || true
+              systemctl reload-or-restart 'konductor-restty@*.service' || true
+
+              echo "=========================================="
+              echo "PKI Refresh complete"
+              echo "=========================================="
+            '';
+            StandardOutput = "journal";
+            StandardError = "journal";
+          };
         };
       };
     };
-
-    # Systemd path watcher for certificate rotation
-    systemd.paths.konductor-pki-trust = lib.mkIf (cfg.hypervisorCaPath != null) {
-      description = "Watch for PKI changes at mount point";
-      wantedBy = [ "multi-user.target" ];
-
-      pathConfig = {
-        PathChanged = [
-          (toString cfg.hypervisorCaPath)
-        ] ++ lib.optional (cfg.hypervisorKeyPath != null) (toString cfg.hypervisorKeyPath);
-        Unit = "konductor-pki-refresh.service";
-      };
-    };
-
-    # Environment variables pointing to PKI paths
-    environment.variables = {
-      KONDUCTOR_VM_CA_CERT = "/etc/konductor/pki/vm/ca.crt";
-      KONDUCTOR_VM_CA_KEY = "/etc/konductor/pki/vm/ca.key";
-      KONDUCTOR_VM_WILDCARD_CERT = "/etc/konductor/pki/vm/wildcard.crt";
-      KONDUCTOR_VM_WILDCARD_KEY = "/etc/konductor/pki/vm/wildcard.key";
-      KONDUCTOR_CA_BUNDLE = "/etc/konductor/pki/bundle/ca-bundle.crt";
-    };
-
-    # Profile script for easy access
-    environment.etc."profile.d/konductor-pki.sh".text = ''
-      # Konductor PKI environment
-      export KONDUCTOR_VM_CA_CERT="/etc/konductor/pki/vm/ca.crt"
-      export KONDUCTOR_VM_CA_KEY="/etc/konductor/pki/vm/ca.key"
-      export KONDUCTOR_VM_WILDCARD_CERT="/etc/konductor/pki/vm/wildcard.crt"
-      export KONDUCTOR_VM_WILDCARD_KEY="/etc/konductor/pki/vm/wildcard.key"
-      export KONDUCTOR_CA_BUNDLE="/etc/konductor/pki/bundle/ca-bundle.crt"
-
-      # Helpers for Pulumi integration
-      konductor-ca-base64() {
-        if [ -f "$KONDUCTOR_VM_CA_CERT" ] && [ -f "$KONDUCTOR_VM_CA_KEY" ]; then
-          echo "ca_certificate_base64: $(base64 -w0 "$KONDUCTOR_VM_CA_CERT")"
-          echo "ca_private_key_base64: $(base64 -w0 "$KONDUCTOR_VM_CA_KEY")"
-        else
-          echo "Error: VM CA not generated yet" >&2
-          return 1
-        fi
-      }
-
-      konductor-ca-status() {
-        PYTHONPATH=/opt/konductor/src/src python3 -m pki status
-      }
-    '';
   };
 }

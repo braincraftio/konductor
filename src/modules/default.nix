@@ -7,5 +7,5 @@
   darwin = import ./darwin.nix;
 
   # Konductor-specific modules
-  pki = import ./pki.nix;           # VM identity and certificate chain of trust
+  pki = import ./pki.nix; # VM identity and certificate chain of trust
 }

@@ -7,14 +7,13 @@
 # OpenCode theme from: ../config/opencode/
 # Atuin shell history from: ../config/shell/atuin.nix
 
-{
-  baseShell,
-  packages,
-  versions,
-  programs,
-  config,
-  pkgs,
-  ...
+{ baseShell
+, packages
+, versions
+, programs
+, config
+, pkgs
+, ...
 }:
 
 let

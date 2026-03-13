@@ -9,11 +9,10 @@
 # collisions when these package sets are consumed by home-manager, nixos, or
 # nix-darwin modules (which use buildEnv, not mkShell PATH shadowing).
 
-{ pkgs, lib, versions }:
+{ pkgs, versions, ... }:
 
 let
   langs = versions.languages;
-  inherit (pkgs) stdenv;
 in
 
 rec {

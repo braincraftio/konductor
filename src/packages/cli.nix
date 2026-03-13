@@ -4,9 +4,9 @@
 # Shell tools (git, ssh, k9s) use hermetic wrappers from src/config/
 # when config is provided.
 
-{
-  pkgs,
-  config ? null,
+{ pkgs
+, config ? null
+,
 }:
 
 let

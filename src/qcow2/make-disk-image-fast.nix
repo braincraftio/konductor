@@ -13,57 +13,53 @@
 # - Uses real ext4 with proper I/O scheduling and caching
 # - 5-10x faster for large file counts
 
-{
-  pkgs,
-  lib,
-  config,
-
-  # Disk configuration
-  diskSize ? "auto",
-  additionalSpace ? "512M",
-  bootSize ? "256M",
-
-  # Partition table: "efi", "hybrid", "legacy", "legacy+boot", "legacy+gpt", "none"
-  partitionTableType ? "efi",
-
-  # Filesystem
-  fsType ? "ext4",
-  label ? "nixos",
-
-  # Output format: "raw", "qcow2", "qcow2-compressed"
-  format ? "qcow2",
-
-  # Image name
-  name ? "nixos-disk-image",
-  baseName ? "nixos",
-
-  # Boot
-  installBootLoader ? true,
-  touchEFIVars ? false,
-  OVMF ? pkgs.OVMF.fd,
-  efiFirmware ? OVMF.firmware,
-  efiVariables ? OVMF.variables,
-
-  # VM resources
-  memSize ? 4096,
-
-  # Additional content
-  contents ? [],
-  additionalPaths ? [],
-  copyChannel ? false,
-  configFile ? null,
-
-  # Determinism
-  deterministic ? true,
-  rootGPUID ? "F222513B-DED1-49FA-B591-20CE86A2FE7F",
-  rootFSUID ? (if fsType == "ext4" then rootGPUID else null),
-
-  # Post-processing
-  postVM ? "",
+{ pkgs
+, lib
+, config
+, # Disk configuration
+  diskSize ? "auto"
+, additionalSpace ? "512M"
+, bootSize ? "256M"
+, # Partition table: "efi", "hybrid", "legacy", "legacy+boot", "legacy+gpt", "none"
+  partitionTableType ? "efi"
+, # Filesystem
+  fsType ? "ext4"
+, label ? "nixos"
+, # Output format: "raw", "qcow2", "qcow2-compressed"
+  format ? "qcow2"
+, # Image name
+  name ? "nixos-disk-image"
+, baseName ? "nixos"
+, # Boot
+  installBootLoader ? true
+, touchEFIVars ? false
+, OVMF ? pkgs.OVMF.fd
+, efiFirmware ? OVMF.firmware
+, efiVariables ? OVMF.variables
+, # VM resources
+  memSize ? 4096
+, # Additional content
+  contents ? [ ]
+, additionalPaths ? [ ]
+, copyChannel ? false
+, configFile ? null
+, # Determinism
+  deterministic ? true
+, rootGPUID ? "F222513B-DED1-49FA-B591-20CE86A2FE7F"
+, rootFSUID ? (if fsType == "ext4" then rootGPUID else null)
+, # Post-processing
+  postVM ? ""
+,
 }:
 
 assert (lib.assertOneOf "partitionTableType" partitionTableType [
-  "legacy" "legacy+boot" "legacy+gpt" "efi" "efixbootldr" "hybrid" "none"
+  "legacy"
+  "legacy+boot"
+  "legacy+gpt"
+  "efi"
+  "efixbootldr"
+  "hybrid"
+  "none"
 ]);
 
 let
@@ -90,7 +86,7 @@ let
   useEFIBoot = touchEFIVars;
   nixpkgs = lib.cleanSource pkgs.path;
 
-  channelSources = pkgs.runCommand "nixos-${config.system.nixos.version}" {} ''
+  channelSources = pkgs.runCommand "nixos-${config.system.nixos.version}" { } ''
     mkdir -p $out
     cp -prd ${nixpkgs.outPath} $out/nixos
     chmod -R u+w $out/nixos
@@ -118,14 +114,14 @@ let
     e2fsprogs
     dosfstools
     config.system.build.nixos-install
-    nixos-enter  # standalone package, not config.system.build
+    nixos-enter # standalone package, not config.system.build
     nix
     coreutils
     gnutar
     gzip
     systemdMinimal
   ] ++ lib.optional deterministic gptfdisk
-    ++ stdenv.initialPath);
+  ++ stdenv.initialPath);
 
   # Partition scripts
   partitionDiskScript = {
@@ -255,37 +251,39 @@ let
 in
 pkgs.vmTools.runInLinuxVM (
   pkgs.runCommand name
-    {
-      preVM = preVM;
-      postVM = finalPostVM;
-      inherit memSize;
+  {
+    inherit preVM;
+    postVM = finalPostVM;
+    inherit memSize;
 
-      passthru = { inherit closureInfo; };
+    passthru = { inherit closureInfo; };
 
-      buildInputs = with pkgs; [
-        util-linux
-        e2fsprogs
-        dosfstools
-        rsync
-        coreutils
-        config.system.build.nixos-install
-        nixos-enter
-        nix
-      ];
+    buildInputs = with pkgs; [
+      util-linux
+      e2fsprogs
+      dosfstools
+      rsync
+      coreutils
+      config.system.build.nixos-install
+      nixos-enter
+      nix
+    ];
 
-      QEMU_OPTS = lib.concatStringsSep " " (
-        lib.optional useEFIBoot "-drive if=pflash,format=raw,unit=0,readonly=on,file=${efiFirmware}"
-        ++ lib.optionals touchEFIVars [
-          "-drive if=pflash,format=raw,unit=1,file=$efiVars"
-        ]
-        ++ lib.optionals (OVMF.systemManagementModeRequired or false) [
-          "-machine" "q35,smm=on"
-          "-global" "driver=cfi.pflash01,property=secure,value=on"
-        ]
-      );
+    QEMU_OPTS = lib.concatStringsSep " " (
+      lib.optional useEFIBoot "-drive if=pflash,format=raw,unit=0,readonly=on,file=${efiFirmware}"
+      ++ lib.optionals touchEFIVars [
+        "-drive if=pflash,format=raw,unit=1,file=$efiVars"
+      ]
+      ++ lib.optionals (OVMF.systemManagementModeRequired or false) [
+        "-machine"
+        "q35,smm=on"
+        "-global"
+        "driver=cfi.pflash01,property=secure,value=on"
+      ]
+    );
 
-      enableParallelBuilding = true;
-    }
+    enableParallelBuilding = true;
+  }
     ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail

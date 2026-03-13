@@ -16,15 +16,16 @@
 # Services installed but not auto-started (lean boot).
 # Start via cloud-init or: systemctl start docker libvirtd
 
-{
-  pkgs,
-  lib,
-  nixpkgs,  # For lib.nixosSystem
-  inputs,
-  system,
-  versions,
-  programs,
-  devshells, # CI devshell closure baked into image
+{ pkgs
+, lib
+, nixpkgs
+, # For lib.nixosSystem
+  inputs
+, system
+, versions
+, programs
+, devshells
+, # CI devshell closure baked into image
   ...
 }:
 
@@ -61,82 +62,82 @@ let
   # Symlinked into each user's extensions dir at service start
   vscodeExtensionsList = with pkgs.vscode-extensions; [
     # Theme
-    catppuccin.catppuccin-vsc            # Catppuccin theme (default)
-    catppuccin.catppuccin-vsc-icons      # Catppuccin file icons
+    catppuccin.catppuccin-vsc # Catppuccin theme (default)
+    catppuccin.catppuccin-vsc-icons # Catppuccin file icons
 
     # Language support — Python
-    ms-python.python                     # Python language server + debugging
-    ms-python.vscode-pylance             # Pylance type checker
-    ms-python.debugpy                    # Python debugger
-    charliermarsh.ruff                   # Ruff linter/formatter
+    ms-python.python # Python language server + debugging
+    ms-python.vscode-pylance # Pylance type checker
+    ms-python.debugpy # Python debugger
+    charliermarsh.ruff # Ruff linter/formatter
 
     # Language support — Go
-    golang.go                            # Go language server (gopls)
+    golang.go # Go language server (gopls)
 
     # Language support — Rust
-    rust-lang.rust-analyzer              # Rust analyzer
+    rust-lang.rust-analyzer # Rust analyzer
 
     # Language support — JavaScript/TypeScript
-    dbaeumer.vscode-eslint               # ESLint integration
+    dbaeumer.vscode-eslint # ESLint integration
 
     # Language support — Nix
-    jnoortheen.nix-ide                   # Nix language support
-    mkhl.direnv                          # direnv integration
+    jnoortheen.nix-ide # Nix language support
+    mkhl.direnv # direnv integration
 
     # Language support — Shell
-    timonwong.shellcheck                 # ShellCheck linter
-    foxundermoon.shell-format            # Shell script formatter
+    timonwong.shellcheck # ShellCheck linter
+    foxundermoon.shell-format # Shell script formatter
 
     # Config file support
-    redhat.vscode-yaml                   # YAML language server
-    tamasfe.even-better-toml             # TOML language server
-    ms-azuretools.vscode-docker          # Dockerfile + Compose
+    redhat.vscode-yaml # YAML language server
+    tamasfe.even-better-toml # TOML language server
+    ms-azuretools.vscode-docker # Dockerfile + Compose
 
     # Editor tools
-    editorconfig.editorconfig            # EditorConfig support
-    esbenp.prettier-vscode               # Prettier formatter
-    christian-kohler.path-intellisense   # Path autocompletion
-    gruntfuggly.todo-tree                # TODO/FIXME tree view
-    usernamehw.errorlens                 # Inline error/warning display
-    vscodevim.vim                        # Vim keybindings
+    editorconfig.editorconfig # EditorConfig support
+    esbenp.prettier-vscode # Prettier formatter
+    christian-kohler.path-intellisense # Path autocompletion
+    gruntfuggly.todo-tree # TODO/FIXME tree view
+    usernamehw.errorlens # Inline error/warning display
+    vscodevim.vim # Vim keybindings
     streetsidesoftware.code-spell-checker # Spell checking
-    alefragnani.bookmarks                # Bookmarkable lines
-    formulahendry.auto-rename-tag        # Auto-rename paired HTML/XML tags
+    alefragnani.bookmarks # Bookmarkable lines
+    formulahendry.auto-rename-tag # Auto-rename paired HTML/XML tags
 
     # Markdown
-    bierner.github-markdown-preview      # GitHub-flavored markdown preview
-    bierner.markdown-mermaid             # Mermaid diagram support
-    davidanson.vscode-markdownlint       # Markdown linting
-    yzhang.markdown-all-in-one           # Markdown TOC, preview, shortcuts
+    bierner.github-markdown-preview # GitHub-flavored markdown preview
+    bierner.markdown-mermaid # Mermaid diagram support
+    davidanson.vscode-markdownlint # Markdown linting
+    yzhang.markdown-all-in-one # Markdown TOC, preview, shortcuts
 
     # Remote development
-    ms-vscode-remote.remote-ssh          # SSH into remote hosts
-    ms-vscode-remote.remote-ssh-edit     # Edit SSH config
-    ms-vscode-remote.remote-containers   # Dev containers support
-    ms-vscode.remote-explorer            # Remote explorer UI
+    ms-vscode-remote.remote-ssh # SSH into remote hosts
+    ms-vscode-remote.remote-ssh-edit # Edit SSH config
+    ms-vscode-remote.remote-containers # Dev containers support
+    ms-vscode.remote-explorer # Remote explorer UI
 
     # Infrastructure
-    ms-kubernetes-tools.vscode-kubernetes-tools  # Kubernetes cluster management
+    ms-kubernetes-tools.vscode-kubernetes-tools # Kubernetes cluster management
 
     # Nix (additional)
-    bbenoist.nix                          # Nix syntax highlighting
-    arrterian.nix-env-selector           # Nix environment selector
+    bbenoist.nix # Nix syntax highlighting
+    arrterian.nix-env-selector # Nix environment selector
 
     # Debugging
-    vadimcn.vscode-lldb                  # LLDB debugger (Rust/C/C++)
+    vadimcn.vscode-lldb # LLDB debugger (Rust/C/C++)
 
     # Collaboration
-    ms-vsliveshare.vsliveshare           # Live Share real-time collaboration
+    ms-vsliveshare.vsliveshare # Live Share real-time collaboration
 
     # Git & GitHub
-    eamodio.gitlens                      # Git blame, history, annotations
-    mhutchie.git-graph                   # Git commit graph visualization
-    github.vscode-github-actions         # GitHub Actions workflow support
-    github.vscode-pull-request-github    # GitHub PR and issue integration
+    eamodio.gitlens # Git blame, history, annotations
+    mhutchie.git-graph # Git commit graph visualization
+    github.vscode-github-actions # GitHub Actions workflow support
+    github.vscode-pull-request-github # GitHub PR and issue integration
 
     # AI
-    github.copilot                       # GitHub Copilot
-    github.copilot-chat                  # GitHub Copilot Chat
+    github.copilot # GitHub Copilot
+    github.copilot-chat # GitHub Copilot Chat
   ] ++ [
     # Extensions not in nixpkgs or with stale nixpkgs hashes — fetched from VS Code Marketplace
     (pkgs.vscode-utils.extensionFromVscodeMarketplace {
@@ -219,7 +220,7 @@ let
     "terminal.integrated.fontSize" = 14;
     "terminal.integrated.defaultProfile.linux" = "bash";
     "terminal.integrated.profiles.linux" = {
-      bash = { path = "/bin/bash"; args = ["-l"]; };
+      bash = { path = "/bin/bash"; args = [ "-l" ]; };
     };
 
     # Editor
@@ -228,7 +229,7 @@ let
     "editor.lineNumbers" = "relative";
     "editor.formatOnSave" = true;
     "editor.formatOnPaste" = true;
-    "editor.rulers" = [80 120];
+    "editor.rulers" = [ 80 120 ];
     "editor.bracketPairColorization.enabled" = true;
     "editor.guides.bracketPairs" = true;
 
@@ -280,17 +281,17 @@ let
     targetPkgs = pkgs: with pkgs; [
       # Core runtime
       nodejs_20
-      stdenv.cc.libc      # glibc (libc.so, ld-linux)
-      stdenv.cc.cc.lib    # libstdc++, libgcc_s
+      stdenv.cc.libc # glibc (libc.so, ld-linux)
+      stdenv.cc.cc.lib # libstdc++, libgcc_s
 
       # Libraries VS Code and extensions commonly need
-      zlib                # Compression
-      openssl             # SSL/TLS
-      icu                 # Unicode/i18n
-      curl                # HTTP client
-      libsecret           # Secret storage
-      xorg.libX11         # X11 (for clipboard, etc.)
-      xorg.libxcb         # XCB
+      zlib # Compression
+      openssl # SSL/TLS
+      icu # Unicode/i18n
+      curl # HTTP client
+      libsecret # Secret storage
+      xorg.libX11 # X11 (for clipboard, etc.)
+      xorg.libxcb # XCB
     ];
     runScript = "${pkgs.nodejs_20}/bin/node";
   };
@@ -438,21 +439,25 @@ let
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
-    home.file.".bashrc".text = konductorConfig.shell.bash.bashrcContent;
-    home.file.".bash_profile".text = shellContent.bashProfileContent;
-    home.file.".inputrc".text = shellContent.inputrcContent;
-    home.file.".config/starship.toml".text = konductorConfig.shell.starship.configContent;
-    home.file.".config/atuin/config.toml" = {
-      text = konductorConfig.shell.atuin.configContent;
-      force = true;  # Overwrite existing atuin config
+    home = {
+      inherit (versions.nixos) stateVersion;
+      file = {
+        ".bashrc".text = konductorConfig.shell.bash.bashrcContent;
+        ".bash_profile".text = shellContent.bashProfileContent;
+        ".inputrc".text = shellContent.inputrcContent;
+        ".config/starship.toml".text = konductorConfig.shell.starship.configContent;
+        ".config/atuin/config.toml" = {
+          text = konductorConfig.shell.atuin.configContent;
+          force = true; # Overwrite existing atuin config
+        };
+        ".envrc".text = ''
+          # Konductor VM - all packages pre-installed system-wide
+          # This .envrc is for project-specific env vars only
+          dotenv_if_exists .env
+          dotenv_if_exists "$HOME/.env"
+        '';
+      };
     };
-    home.file.".envrc".text = ''
-      # Konductor VM - all packages pre-installed system-wide
-      # This .envrc is for project-specific env vars only
-      dotenv_if_exists .env
-      dotenv_if_exists "$HOME/.env"
-    '';
-    home.stateVersion = versions.nixos.stateVersion;
   };
 
   # Service template generator for konductor multi-user services
@@ -461,41 +466,43 @@ let
   # - Certificate precedence detection (Tier 1→2→3 fallback)
   # - RuntimeDirectory for /run/konductor state
   # - EnvironmentFile pattern for PORT and cert variables
-  mkKonductorService = {
-    serviceName,     # Service name (ttyd, vscode, restty, ghostty)
-    basePort,        # Base port for port calculation (e.g., 8000 for vscode)
-    # NOTE: Do NOT include konductor-init.service here - creates circular dependency!
-    # konductor-init starts these services, so they can't wait for init to complete.
-    # The drop-in config is written BEFORE init calls systemctl start.
-    # Wait for both cert generation AND permissions. konductor-pki-permissions alone
-    # is not a reliable gate — its ConditionPathExists skips silently if certs don't
-    # exist yet, satisfying After= without certs actually being ready.
-    afterServices ? [ "network.target" "konductor-pki-vm.service" "konductor-pki-permissions.service" ],
-    documentation ? [],
-    workingDirectory ? "/workspace",
-    extraServiceConfig ? {},  # Additional serviceConfig options
-  }: {
-    "konductor-${serviceName}@" = {
-      description = "Konductor ${lib.toUpper (builtins.substring 0 1 serviceName)}${builtins.substring 1 (builtins.stringLength serviceName) serviceName} for %i";
-      inherit documentation;
-      after = afterServices;
+  mkKonductorService =
+    { serviceName
+    , # Service name (ttyd, vscode, restty, ghostty)
+      # NOTE: Do NOT include konductor-init.service here - creates circular dependency!
+      # konductor-init starts these services, so they can't wait for init to complete.
+      # The drop-in config is written BEFORE init calls systemctl start.
+      # Wait for both cert generation AND permissions. konductor-pki-permissions alone
+      # is not a reliable gate — its ConditionPathExists skips silently if certs don't
+      # exist yet, satisfying After= without certs actually being ready.
+      afterServices ? [ "network.target" "konductor-pki-vm.service" "konductor-pki-permissions.service" ]
+    , documentation ? [ ]
+    , workingDirectory ? "/workspace"
+    , extraServiceConfig ? { }
+    , # Additional serviceConfig options
+      ...
+    }: {
+      "konductor-${serviceName}@" = {
+        description = "Konductor ${lib.toUpper (builtins.substring 0 1 serviceName)}${builtins.substring 1 (builtins.stringLength serviceName) serviceName} for %i";
+        inherit documentation;
+        after = afterServices;
 
-      serviceConfig = {
-        Type = "simple";
-        User = "%i";
-        Group = "users";
-        WorkingDirectory = workingDirectory;
+        serviceConfig = {
+          Type = "simple";
+          User = "%i";
+          Group = "users";
+          WorkingDirectory = workingDirectory;
 
-        # RuntimeDirectory creates /run/konductor with proper permissions
-        # Automatically cleaned up when last service stops
-        RuntimeDirectory = "konductor";
+          # RuntimeDirectory creates /run/konductor with proper permissions
+          # Automatically cleaned up when last service stops
+          RuntimeDirectory = "konductor";
 
-        ExecStartPre = [
-          # Step 1: Find best available certificate (Tier 1→2→3)
-          # Writes CERT_PATH, KEY_PATH, CERT_TIER to /run/konductor/konductor-SERVICE@USER.cert-env
-          # Exits non-zero if no valid cert found (prevents service start)
-          # NOTE: %i is passed as $1 because systemd specifiers aren't expanded inside scripts
-          "+${pkgs.writeShellScript "find-cert-${serviceName}" ''
+          ExecStartPre = [
+            # Step 1: Find best available certificate (Tier 1→2→3)
+            # Writes CERT_PATH, KEY_PATH, CERT_TIER to /run/konductor/konductor-SERVICE@USER.cert-env
+            # Exits non-zero if no valid cert found (prevents service start)
+            # NOTE: %i is passed as $1 because systemd specifiers aren't expanded inside scripts
+            "+${pkgs.writeShellScript "find-cert-${serviceName}" ''
             set -euo pipefail
             INSTANCE="$1"
 
@@ -513,28 +520,28 @@ let
             echo "✓ Using certificate tier: $TIER"
           ''} %i"
 
-          # Step 2: Open firewall port
-          # PORT variable from EnvironmentFile (written by konductor-init.service)
-          ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment \"konductor-${serviceName}@%i-port''${PORT}\"''
-        ];
+            # Step 2: Open firewall port
+            # PORT variable from EnvironmentFile (written by konductor-init.service)
+            ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment \"konductor-${serviceName}@%i-port''${PORT}\"''
+          ];
 
-        # Environment files (merged at runtime)
-        # EnvironmentFile variables are expanded in ExecStart
-        # NOTE: cert-env is optional (-) because it's created by ExecStartPre AFTER
-        # systemd loads EnvironmentFile. ExecStart wrapper sources it directly.
-        EnvironmentFile = [
-          "/var/lib/konductor/env/konductor-${serviceName}@%i.env"  # PORT, USER_UID
-          "-/run/konductor/konductor-${serviceName}@%i.cert-env"    # CERT_PATH, KEY_PATH, CERT_TIER (optional)
-        ];
+          # Environment files (merged at runtime)
+          # EnvironmentFile variables are expanded in ExecStart
+          # NOTE: cert-env is optional (-) because it's created by ExecStartPre AFTER
+          # systemd loads EnvironmentFile. ExecStart wrapper sources it directly.
+          EnvironmentFile = [
+            "/var/lib/konductor/env/konductor-${serviceName}@%i.env" # PORT, USER_UID
+            "-/run/konductor/konductor-${serviceName}@%i.cert-env" # CERT_PATH, KEY_PATH, CERT_TIER (optional)
+          ];
 
-        # Placeholder ExecStart - konductor-init.service drop-in overrides with actual command
-        # Using /usr/bin/false ensures service fails if drop-in not generated (fail-safe)
-        ExecStart = "${pkgs.coreutils}/bin/false";
+          # Placeholder ExecStart - konductor-init.service drop-in overrides with actual command
+          # Using /usr/bin/false ensures service fails if drop-in not generated (fail-safe)
+          ExecStart = "${pkgs.coreutils}/bin/false";
 
-        # Close firewall port on stop
-        # Parse nftables output to find rule handle by comment, then delete by handle
-        # NOTE: %i is passed as $1, PORT as $2 because systemd specifiers aren't expanded inside scripts
-        ExecStopPost = "+${pkgs.writeShellScript "cleanup-firewall-${serviceName}" ''
+          # Close firewall port on stop
+          # Parse nftables output to find rule handle by comment, then delete by handle
+          # NOTE: %i is passed as $1, PORT as $2 because systemd specifiers aren't expanded inside scripts
+          ExecStopPost = "+${pkgs.writeShellScript "cleanup-firewall-${serviceName}" ''
           INSTANCE="$1"
           PORT="$2"
           HANDLE=$(${pkgs.nftables}/bin/nft --handle list chain inet nixos-fw input-allow | \
@@ -546,13 +553,13 @@ let
           fi
         ''} %i \${PORT}";
 
-        Restart = "on-failure";
-        RestartSec = 10;
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-      } // extraServiceConfig;
+          Restart = "on-failure";
+          RestartSec = 10;
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+        } // extraServiceConfig;
+      };
     };
-  };
 
   # Nix daemon wrapper that sources proxy environment at runtime
   # This is the correct approach for optional runtime proxy configuration (not EnvironmentFile in drop-ins)
@@ -582,33 +589,35 @@ let
     ];
 
     # Basic system configuration
-    # stateVersion from src/lib/versions.nix nixos.stateVersion
-    system.stateVersion = versions.nixos.stateVersion;
+    system = {
+      # stateVersion from src/lib/versions.nix nixos.stateVersion
+      inherit (versions.nixos) stateVersion;
 
-    # Include build dependencies in the system closure (~117GB) so the VM
-    # can nixos-rebuild switch and nix build offline in airgapped environments.
-    # Future: investigate nix-copy-closure of runtime-only closures (~5-15GB)
-    # as a lightweight alternative, but this requires solving build dep caching
-    # separately (see OCI.md _oci:vm:sync for prior art).
-    # TODO: support separate online (runtime-only ~5-15GB) and offline (~117GB)
-    # derivations before re-enabling. Currently disabled to unblock dev iteration.
-    system.includeBuildDependencies = false;
+      # Include build dependencies in the system closure (~117GB) so the VM
+      # can nixos-rebuild switch and nix build offline in airgapped environments.
+      # Future: investigate nix-copy-closure of runtime-only closures (~5-15GB)
+      # as a lightweight alternative, but this requires solving build dep caching
+      # separately (see OCI.md _oci:vm:sync for prior art).
+      # TODO: support separate online (runtime-only ~5-15GB) and offline (~117GB)
+      # derivations before re-enabling. Currently disabled to unblock dev iteration.
+      includeBuildDependencies = false;
 
-    # =====================================================================
-    # /etc Overlay Filesystem (Runtime Mutability)
-    # =====================================================================
-    # Enable overlay filesystem for /etc to allow runtime modifications.
-    # This is REQUIRED for cloud-init to write to /etc/hosts at deploy time
-    # for static host entries (e.g., proxy hostname bootstrap before DNS).
-    #
-    # With mutable overlay (the default when enabled):
-    # - cloud-init can append to /etc/hosts via runcmd
-    # - Modifications persist in /.rw-etc/upper
-    # - Changes survive reboots but NOT nixos-rebuild
-    #
-    # Requires kernel >= 6.6 (we use linuxPackages_latest)
-    # See: https://nixos.wiki/wiki/Etc_overlay
-    system.etc.overlay.enable = true;
+      # =====================================================================
+      # /etc Overlay Filesystem (Runtime Mutability)
+      # =====================================================================
+      # Enable overlay filesystem for /etc to allow runtime modifications.
+      # This is REQUIRED for cloud-init to write to /etc/hosts at deploy time
+      # for static host entries (e.g., proxy hostname bootstrap before DNS).
+      #
+      # With mutable overlay (the default when enabled):
+      # - cloud-init can append to /etc/hosts via runcmd
+      # - Modifications persist in /.rw-etc/upper
+      # - Changes survive reboots but NOT nixos-rebuild
+      #
+      # Requires kernel >= 6.6 (we use linuxPackages_latest)
+      # See: https://nixos.wiki/wiki/Etc_overlay
+      etc.overlay.enable = true;
+    };
 
     # Disable nixpkgs source in registry to prevent 50,000+ file closure bloat
     # nixos/modules/misc/nixpkgs-flake.nix auto-adds nixpkgs to /etc/nix/registry.json
@@ -691,9 +700,9 @@ let
       firewall = {
         enable = true;
         allowedTCPPorts = [
-          22    # SSH
-          80    # HTTP (forwarded to Envoy Gateway)
-          443   # HTTPS (forwarded to Envoy Gateway)
+          22 # SSH
+          80 # HTTP (forwarded to Envoy Gateway)
+          443 # HTTPS (forwarded to Envoy Gateway)
           # Multi-user web service ports (7000-10499) are dynamically managed
           # by systemd service templates (konductor-{ttyd,vscode,restty,ghostty}@)
           # via ExecStartPre/ExecStopPost nftables rules
@@ -743,21 +752,21 @@ let
       enable = true;
       libraries = with pkgs; [
         # C/C++ runtime (both for maximum compatibility)
-        stdenv.cc.cc.lib   # C standard library from stdenv
-        gcc-unwrapped.lib  # GCC runtime (libstdc++, libgcc_s)
+        stdenv.cc.cc.lib # C standard library from stdenv
+        gcc-unwrapped.lib # GCC runtime (libstdc++, libgcc_s)
 
         # Core libraries for VS Code, language servers, and dev tools
-        zlib               # Compression (VS Code, many tools)
-        openssl            # SSL/TLS (network tools, language servers)
-        icu                # Unicode/i18n (VS Code, text processing)
-        curl               # HTTP client (some extensions, tools)
-        sqlite             # Embedded database (some extensions)
-        ncurses            # Terminal UI (TUI tools, debugging)
-        readline           # Line editing (interactive CLIs)
-        libffi             # FFI (Python extensions, etc.)
-        expat              # XML parser (some language servers)
-        xz                 # LZMA compression (archives)
-        bzip2              # Compression (archives)
+        zlib # Compression (VS Code, many tools)
+        openssl # SSL/TLS (network tools, language servers)
+        icu # Unicode/i18n (VS Code, text processing)
+        curl # HTTP client (some extensions, tools)
+        sqlite # Embedded database (some extensions)
+        ncurses # Terminal UI (TUI tools, debugging)
+        readline # Line editing (interactive CLIs)
+        libffi # FFI (Python extensions, etc.)
+        expat # XML parser (some language servers)
+        xz # LZMA compression (archives)
+        bzip2 # Compression (archives)
       ];
     };
 
@@ -806,14 +815,6 @@ let
       ln -sf /run/current-system/sw/bin/ldconfig /sbin/ldconfig
     '';
 
-    # Layer 2: ldconfig Wrapper - forcibly replace glibc's ldconfig
-    # meta.priority doesn't work because glibc is a dependency, not a systemPackage
-    # environment.extraSetup runs in postBuild and can replace the symlink
-    environment.extraSetup = ''
-      rm -f $out/bin/ldconfig
-      ln -s ${vscodeLdconfigWrapper}/bin/ldconfig $out/bin/ldconfig
-    '';
-
     # =====================================================================
     # Image Size Optimization
     # =====================================================================
@@ -835,63 +836,64 @@ let
     # - See: nixos/lib/make-disk-image.nix in nixpkgs
 
     # =====================================================================
-    # MOTD (Message of the Day)
+    # MOTD and Users
     # =====================================================================
     # Dynamic MOTD generated by konductor.service on boot.
     # Shows provenance identity and verification status.
     # Designed to be informative for newcomers, unimposing for daily users.
-    users.motdFile = "/run/konductor/motd";
+    users = {
+      motdFile = "/run/konductor/motd";
 
-    # Users
-    # All users in 'kc2' group (GID 1001) for shared directory access
-    # Group must be defined BEFORE users reference it in extraGroups
-    users.groups.kc2 = {
-      gid = 1001;
-      members = [ "kc2" "kc2admin" "runner" ];
-    };
+      # All users in 'kc2' group (GID 1001) for shared directory access
+      # Group must be defined BEFORE users reference it in extraGroups
+      groups.kc2 = {
+        gid = 1001;
+        members = [ "kc2" "kc2admin" "runner" ];
+      };
 
-    users.users = {
-      kc2 = {
-        isNormalUser = true;
-        inherit (users.kc2) uid home;
-        description = users.kc2.gecos;
-        extraGroups = [
-          "kc2"
-          "docker"
-          "libvirtd"
-          "kvm"
-        ];
-      };
-      kc2admin = {
-        isNormalUser = true;
-        inherit (users.kc2admin) uid home;
-        description = users.kc2admin.gecos;
-        extraGroups = [
-          "kc2"
-          "wheel"
-          "docker"
-          "libvirtd"
-          "kvm"
-        ];
-      };
-      runner = {
-        isNormalUser = true;
-        inherit (users.runner) uid home;
-        description = users.runner.gecos;
-        # wheel needed for QCOW2 build (guestmount, virt-sparsify)
-        extraGroups = [
-          "kc2"
-          "wheel"
-          "docker"
-          "libvirtd"
-          "kvm"
-        ];
-        # CI toolchain in runner's user profile (/nix/var/nix/profiles/per-user/runner)
-        # Defense in depth: packages available even if systemPackages changes
-        packages = devshellPackages.ciPackages
-          ++ programs.forgejo.runnerPackages
-          ++ programs.forgejo.cliPackages
-          ++ konductor.packages;
+      users = {
+        kc2 = {
+          isNormalUser = true;
+          inherit (users.kc2) uid home;
+          description = users.kc2.gecos;
+          extraGroups = [
+            "kc2"
+            "docker"
+            "libvirtd"
+            "kvm"
+          ];
+        };
+        kc2admin = {
+          isNormalUser = true;
+          inherit (users.kc2admin) uid home;
+          description = users.kc2admin.gecos;
+          extraGroups = [
+            "kc2"
+            "wheel"
+            "docker"
+            "libvirtd"
+            "kvm"
+          ];
+        };
+        runner = {
+          isNormalUser = true;
+          inherit (users.runner) uid home;
+          description = users.runner.gecos;
+          # wheel needed for QCOW2 build (guestmount, virt-sparsify)
+          extraGroups = [
+            "kc2"
+            "wheel"
+            "docker"
+            "libvirtd"
+            "kvm"
+          ];
+          # CI toolchain in runner's user profile (/nix/var/nix/profiles/per-user/runner)
+          # Defense in depth: packages available even if systemPackages changes
+          packages = devshellPackages.ciPackages
+            ++ programs.forgejo.runnerPackages
+            ++ programs.forgejo.cliPackages
+            ++ konductor.packages;
+        };
       };
     };
 
@@ -1055,6 +1057,14 @@ let
     # Environment Configuration
     # =====================================================================
     environment = {
+      # Layer 2: ldconfig Wrapper - forcibly replace glibc's ldconfig
+      # meta.priority doesn't work because glibc is a dependency, not a systemPackage
+      # environment.extraSetup runs in postBuild and can replace the symlink
+      extraSetup = ''
+        rm -f $out/bin/ldconfig
+        ln -s ${vscodeLdconfigWrapper}/bin/ldconfig $out/bin/ldconfig
+      '';
+
       # Don't include default packages (nano, perl, rsync, strace)
       defaultPackages = lib.mkForce [ ];
 
@@ -1064,11 +1074,9 @@ let
         # CI environment marker
         CI = "true";
         # Hermetic bash configuration (from devshell)
-        KONDUCTOR_BASHRC = konductorConfig.shell.bash.env.KONDUCTOR_BASHRC;
-        KONDUCTOR_INPUTRC = konductorConfig.shell.bash.env.KONDUCTOR_INPUTRC;
+        inherit (konductorConfig.shell.bash.env) KONDUCTOR_BASHRC KONDUCTOR_INPUTRC;
         # Atuin shell history (config + bash-preexec for hooks)
-        ATUIN_CONFIG_DIR = konductorConfig.shell.atuin.env.ATUIN_CONFIG_DIR;
-        KONDUCTOR_PREEXEC_PATH = konductorConfig.shell.atuin.env.KONDUCTOR_PREEXEC_PATH;
+        inherit (konductorConfig.shell.atuin.env) ATUIN_CONFIG_DIR KONDUCTOR_PREEXEC_PATH;
         # Language paths (PAM @{HOME} expansion)
         GOPATH = "@{HOME}/go";
         CARGO_HOME = "@{HOME}/.cargo";
@@ -1078,6 +1086,8 @@ let
         OVMF_VARS = "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd";
         # Docker buildkit
         DOCKER_BUILDKIT = "1";
+        # Library path for CI runner (xz, zstd for nix operations)
+        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}";
       };
 
       # /etc/skel - Shell Configuration (copied to new user home dirs)
@@ -1169,6 +1179,34 @@ let
             eval "$(direnv hook bash)"
           fi
         '';
+
+        # PKI Trust Configuration (Git CA Trust)
+        # Configure global git settings for all users
+        # Points directly to mounted hypervisor CA (available at runtime)
+        # If CA not mounted, git will fall back to system CA bundle
+        "gitconfig".text = ''
+          [http]
+            sslCAInfo = /mnt/pki/ca.crt
+          [safe]
+            directory = /workspace
+        '';
+
+        # Vendored Flake Input Sources (Baked into Image)
+        # Every flake input's outPath is referenced here, which pulls it into
+        # the system closure. nixos-install copies them to the image's /nix/store.
+        # /etc/konductor/input-sources.env maps input names to store paths.
+        "konductor/input-sources.env".text =
+          let
+            # Filter to inputs that have outPath (excludes 'self' and non-flake attrs)
+            inputsWithPath = lib.filterAttrs
+              (name: input: name != "self" && (input ? outPath || (builtins.isAttrs input && input ? sourceInfo)))
+              inputs;
+          in
+          lib.concatStringsSep "\n"
+            (
+              lib.mapAttrsToList (name: input: "${name}=${input.outPath or input}")
+                inputsWithPath
+            ) + "\n";
       };
 
       # Full Konductor Package Set
@@ -1199,8 +1237,8 @@ let
           gnumake
           cachix
           # Multi-user service infrastructure
-          yj           # TOML to JSON converter (for konductor-init.service)
-          yq-go        # YAML/TOML/JSON processor
+          yj # TOML to JSON converter (for konductor-init.service)
+          yq-go # YAML/TOML/JSON processor
         ])
         # Certificate precedence detection for multi-user services
         ++ [ certPrecedenceScript ]
@@ -1208,7 +1246,7 @@ let
         # Shadows glibc's ldconfig to satisfy pre-flight checks
         ++ [
           (vscodeLdconfigWrapper.overrideAttrs (old: {
-            meta = (old.meta or {}) // {
+            meta = (old.meta or { }) // {
               # Lower number = higher priority = appears first in PATH
               # glibc has default priority (0), so -10 ensures we win
               priority = -10;
@@ -1761,7 +1799,7 @@ let
         basePort = 8000;
         documentation = [ "https://github.com/coder/code-server" ];
         extraServiceConfig = {
-          Restart = "no";  # Don't restart on failure - requires intervention
+          Restart = "no"; # Don't restart on failure - requires intervention
         };
       })
       // (mkKonductorService {
@@ -1835,225 +1873,225 @@ let
         konductor-init =
           let
             orchestratorScript = pkgs.writeShellScript "konductor-init-start" ''
-              set -euo pipefail
+                            set -euo pipefail
 
-              CONFIG_FILE="/var/lib/konductor/services.toml"
-              DROPIN_BASE="/run/systemd/system"
-              ENV_DIR="/var/lib/konductor/env"
-              STATE_DIR="/var/lib/konductor/state"
+                            CONFIG_FILE="/var/lib/konductor/services.toml"
+                            DROPIN_BASE="/run/systemd/system"
+                            ENV_DIR="/var/lib/konductor/env"
+                            STATE_DIR="/var/lib/konductor/state"
 
-              mkdir -p "$ENV_DIR" "$STATE_DIR" "$DROPIN_BASE"
+                            mkdir -p "$ENV_DIR" "$STATE_DIR" "$DROPIN_BASE"
 
-              echo "═══════════════════════════════════════════════════════════════════════════════"
-              echo "                    Konductor Service Orchestrator"
-              echo "═══════════════════════════════════════════════════════════════════════════════"
+                            echo "═══════════════════════════════════════════════════════════════════════════════"
+                            echo "                    Konductor Service Orchestrator"
+                            echo "═══════════════════════════════════════════════════════════════════════════════"
 
-              if [ ! -f "$CONFIG_FILE" ]; then
-                echo "⚠  Configuration not found: $CONFIG_FILE"
-                echo "   Skipping service orchestration (deploy-time config not provided)"
-                echo "═══════════════════════════════════════════════════════════════════════════════"
-                exit 0
-              fi
+                            if [ ! -f "$CONFIG_FILE" ]; then
+                              echo "⚠  Configuration not found: $CONFIG_FILE"
+                              echo "   Skipping service orchestration (deploy-time config not provided)"
+                              echo "═══════════════════════════════════════════════════════════════════════════════"
+                              exit 0
+                            fi
 
-              echo "✓  Configuration found: $CONFIG_FILE"
+                            echo "✓  Configuration found: $CONFIG_FILE"
 
-              # Parse TOML to JSON using yj with validation
-              if ! CONFIG_JSON=$(yj -t < "$CONFIG_FILE" 2>&1); then
-                echo "✗  Failed to parse TOML configuration:"
-                echo "   $CONFIG_JSON"
-                echo "   Syntax error in $CONFIG_FILE"
-                echo "═══════════════════════════════════════════════════════════════════════════════"
-                exit 1
-              fi
+                            # Parse TOML to JSON using yj with validation
+                            if ! CONFIG_JSON=$(yj -t < "$CONFIG_FILE" 2>&1); then
+                              echo "✗  Failed to parse TOML configuration:"
+                              echo "   $CONFIG_JSON"
+                              echo "   Syntax error in $CONFIG_FILE"
+                              echo "═══════════════════════════════════════════════════════════════════════════════"
+                              exit 1
+                            fi
 
-              if [ -z "$CONFIG_JSON" ]; then
-                echo "✗  Parsed configuration is empty"
-                echo "═══════════════════════════════════════════════════════════════════════════════"
-                exit 1
-              fi
+                            if [ -z "$CONFIG_JSON" ]; then
+                              echo "✗  Parsed configuration is empty"
+                              echo "═══════════════════════════════════════════════════════════════════════════════"
+                              exit 1
+                            fi
 
-              # Initialize state files on first boot
-              touch "$STATE_DIR/enabled.list"
+                            # Initialize state files on first boot
+                            touch "$STATE_DIR/enabled.list"
 
-              # Clear new enabled list
-              > "$STATE_DIR/enabled.list.new"
+                            # Clear new enabled list
+                            > "$STATE_DIR/enabled.list.new"
 
-              # ─────────────────────────────────────────────────────────────────────
-              # Process Per-User Services (ALL users via templates)
-              # ─────────────────────────────────────────────────────────────────────
-              echo ""
-              echo "┌─ Per-User Services ───────────────────────────────────────────────────────────┐"
+                            # ─────────────────────────────────────────────────────────────────────
+                            # Process Per-User Services (ALL users via templates)
+                            # ─────────────────────────────────────────────────────────────────────
+                            echo ""
+                            echo "┌─ Per-User Services ───────────────────────────────────────────────────────────┐"
 
-              # Extract port_bases for calculations
-              PORT_BASES=$(echo "$CONFIG_JSON" | jq -r '.port_bases // {}')
+                            # Extract port_bases for calculations
+                            PORT_BASES=$(echo "$CONFIG_JSON" | jq -r '.port_bases // {}')
 
-              # Extract user_services section
-              USER_SERVICES=$(echo "$CONFIG_JSON" | jq -r '
-                .user_services // {} |
-                to_entries[] |
-                .key as $user |
-                .value |
-                to_entries[] |
-                select(.value == true) |
-                "\($user)|\(.key)"
-              ')
+                            # Extract user_services section
+                            USER_SERVICES=$(echo "$CONFIG_JSON" | jq -r '
+                              .user_services // {} |
+                              to_entries[] |
+                              .key as $user |
+                              .value |
+                              to_entries[] |
+                              select(.value == true) |
+                              "\($user)|\(.key)"
+                            ')
 
-              if [ -z "$USER_SERVICES" ]; then
-                echo "  No per-user services enabled"
-              else
-                while IFS='|' read -r username svc_name; do
-                  # Verify user exists
-                  if ! USER_UID=$(id -u "$username" 2>/dev/null); then
-                    echo "  ⚠  User $username not found, skipping $svc_name"
-                    continue
-                  fi
+                            if [ -z "$USER_SERVICES" ]; then
+                              echo "  No per-user services enabled"
+                            else
+                              while IFS='|' read -r username svc_name; do
+                                # Verify user exists
+                                if ! USER_UID=$(id -u "$username" 2>/dev/null); then
+                                  echo "  ⚠  User $username not found, skipping $svc_name"
+                                  continue
+                                fi
 
-                  # Validate UID range (must be >= 1000 for port formula)
-                  if [ "$USER_UID" -lt 1000 ]; then
-                    echo "  ✗  User $username UID $USER_UID < 1000 (invalid for port formula)"
-                    continue
-                  fi
+                                # Validate UID range (must be >= 1000 for port formula)
+                                if [ "$USER_UID" -lt 1000 ]; then
+                                  echo "  ✗  User $username UID $USER_UID < 1000 (invalid for port formula)"
+                                  continue
+                                fi
 
-                  # Get base port for this service
-                  BASE_PORT=$(echo "$PORT_BASES" | jq -r --arg svc "$svc_name" '.[$svc] // 0')
-                  if [ "$BASE_PORT" -eq 0 ]; then
-                    echo "  ⚠  No base port defined for $svc_name, skipping"
-                    continue
-                  fi
+                                # Get base port for this service
+                                BASE_PORT=$(echo "$PORT_BASES" | jq -r --arg svc "$svc_name" '.[$svc] // 0')
+                                if [ "$BASE_PORT" -eq 0 ]; then
+                                  echo "  ⚠  No base port defined for $svc_name, skipping"
+                                  continue
+                                fi
 
-                  # Calculate port: base_port + (uid - 1000)
-                  CALC_PORT=$((BASE_PORT + USER_UID - 1000))
+                                # Calculate port: base_port + (uid - 1000)
+                                CALC_PORT=$((BASE_PORT + USER_UID - 1000))
 
-                  # Validate calculated port is in valid range
-                  if [ "$CALC_PORT" -lt 1024 ] || [ "$CALC_PORT" -gt 65535 ]; then
-                    echo "  ✗  Calculated port $CALC_PORT out of range (1024-65535) for $svc_name@$username"
-                    continue
-                  fi
+                                # Validate calculated port is in valid range
+                                if [ "$CALC_PORT" -lt 1024 ] || [ "$CALC_PORT" -gt 65535 ]; then
+                                  echo "  ✗  Calculated port $CALC_PORT out of range (1024-65535) for $svc_name@$username"
+                                  continue
+                                fi
 
-                  echo "  Configuring: $svc_name@$username"
-                  echo "    User UID: $USER_UID"
-                  echo "    Base Port: $BASE_PORT"
-                  echo "    Calculated Port: $CALC_PORT"
+                                echo "  Configuring: $svc_name@$username"
+                                echo "    User UID: $USER_UID"
+                                echo "    Base Port: $BASE_PORT"
+                                echo "    Calculated Port: $CALC_PORT"
 
-                  # Generate environment file
-                  ENV_FILE="$ENV_DIR/konductor-''${svc_name}@''${username}.env"
-                  # Cert env is created by ExecStartPre, sourced by ExecStart wrapper
-                  CERT_ENV_FILE="/run/konductor/konductor-''${svc_name}@''${username}.cert-env"
-                  cat > "$ENV_FILE" << EOF
-              PORT=$CALC_PORT
-              USER_UID=$USER_UID
-              WORKSPACE=/workspace
-EOF
+                                # Generate environment file
+                                ENV_FILE="$ENV_DIR/konductor-''${svc_name}@''${username}.env"
+                                # Cert env is created by ExecStartPre, sourced by ExecStart wrapper
+                                CERT_ENV_FILE="/run/konductor/konductor-''${svc_name}@''${username}.cert-env"
+                                cat > "$ENV_FILE" << EOF
+                            PORT=$CALC_PORT
+                            USER_UID=$USER_UID
+                            WORKSPACE=/workspace
+              EOF
 
-                  # Generate drop-in
-                  SERVICE_NAME="konductor-''${svc_name}@''${username}.service"
-                  DROPIN_PATH="$DROPIN_BASE/''${SERVICE_NAME}.d"
-                  mkdir -p "$DROPIN_PATH"
+                                # Generate drop-in
+                                SERVICE_NAME="konductor-''${svc_name}@''${username}.service"
+                                DROPIN_PATH="$DROPIN_BASE/''${SERVICE_NAME}.d"
+                                mkdir -p "$DROPIN_PATH"
 
-                  cat > "$DROPIN_PATH/50-config.conf" << EOF
-              [Service]
-              EnvironmentFile=$ENV_FILE
+                                cat > "$DROPIN_PATH/50-config.conf" << EOF
+                            [Service]
+                            EnvironmentFile=$ENV_FILE
 
-              # Override ExecStart with calculated port
-              # NOTE: ExecStart sources cert-env because EnvironmentFile is loaded
-              # BEFORE ExecStartPre (which creates cert-env). Shell wrapper pattern.
-              ExecStart=
-EOF
+                            # Override ExecStart with calculated port
+                            # NOTE: ExecStart sources cert-env because EnvironmentFile is loaded
+                            # BEFORE ExecStartPre (which creates cert-env). Shell wrapper pattern.
+                            ExecStart=
+              EOF
 
-                  # Service-specific ExecStart overrides
-                  # All services use multi-tier certificate precedence (cluster→hypervisor→self-signed)
-                  # Certificate variables (CERT_PATH, KEY_PATH) come from cert-env file
-                  # which is created by base unit's ExecStartPre and sourced by ExecStart wrapper
-                  case "$svc_name" in
-                    ttyd)
-                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.ttyd}/bin/ttyd --port \''${PORT} --ssl --ssl-cert \$CERT_PATH --ssl-key \$KEY_PATH bash'
-EOF
-                      ;;
-                    restty)
-                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
-EOF
-                      ;;
-                    ghostty)
-                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
-EOF
-                      ;;
-                    vscode)
-                      cat >> "$DROPIN_PATH/50-config.conf" << EOF
-ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/extensions && for ext in ${vscodeExtensionsDir}/share/vscode/extensions/*; do ln -sfn "\$ext" /home/''${username}/.local/share/code-server/extensions/; done'
-ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/User && test -f /home/''${username}/.local/share/code-server/User/settings.json || cp ${vscodeDefaultSettings} /home/''${username}/.local/share/code-server/User/settings.json'
-ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\''${PORT} --user-data-dir /home/''${username}/.local/share/code-server --extensions-dir /home/''${username}/.local/share/code-server/extensions --auth none --cert \$CERT_PATH --cert-key \$KEY_PATH --disable-telemetry --disable-update-check --disable-getting-started-override /workspace'
-EOF
-                      # Also enable VS Code Remote SSH fix service for this user
-                      # This patches VS Code's downloaded node binary to work on NixOS
-                      # See: konductor-vscode-fix@.service and vscodeServerFHS/vscodeServerPatchScript
-                      echo "konductor-vscode-fix@''${username}.service" >> "$STATE_DIR/enabled.list.new"
-                      echo "    ✓ VS Code Remote SSH fix: konductor-vscode-fix@''${username}.service"
-                      ;;
-                    *)
-                      echo "  ✗  Unknown service: $svc_name"
-                      continue
-                      ;;
-                  esac
+                                # Service-specific ExecStart overrides
+                                # All services use multi-tier certificate precedence (cluster→hypervisor→self-signed)
+                                # Certificate variables (CERT_PATH, KEY_PATH) come from cert-env file
+                                # which is created by base unit's ExecStartPre and sourced by ExecStart wrapper
+                                case "$svc_name" in
+                                  ttyd)
+                                    cat >> "$DROPIN_PATH/50-config.conf" << EOF
+              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.ttyd}/bin/ttyd --port \''${PORT} --ssl --ssl-cert \$CERT_PATH --ssl-key \$KEY_PATH bash'
+              EOF
+                                    ;;
+                                  restty)
+                                    cat >> "$DROPIN_PATH/50-config.conf" << EOF
+              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/restty-web { inherit pkgs lib; }).server}/bin/restty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
+              EOF
+                                    ;;
+                                  ghostty)
+                                    cat >> "$DROPIN_PATH/50-config.conf" << EOF
+              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${(import ../programs/ghostty-web { inherit pkgs lib; }).server}/bin/ghostty-web-server --port \''${PORT} --cert \$CERT_PATH --key \$KEY_PATH --writable --working-directory /workspace'
+              EOF
+                                    ;;
+                                  vscode)
+                                    cat >> "$DROPIN_PATH/50-config.conf" << EOF
+              ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/extensions && for ext in ${vscodeExtensionsDir}/share/vscode/extensions/*; do ln -sfn "\$ext" /home/''${username}/.local/share/code-server/extensions/; done'
+              ExecStartPre=/bin/sh -c 'mkdir -p /home/''${username}/.local/share/code-server/User && test -f /home/''${username}/.local/share/code-server/User/settings.json || cp ${vscodeDefaultSettings} /home/''${username}/.local/share/code-server/User/settings.json'
+              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.code-server}/bin/code-server --bind-addr 0.0.0.0:\''${PORT} --user-data-dir /home/''${username}/.local/share/code-server --extensions-dir /home/''${username}/.local/share/code-server/extensions --auth none --cert \$CERT_PATH --cert-key \$KEY_PATH --disable-telemetry --disable-update-check --disable-getting-started-override /workspace'
+              EOF
+                                    # Also enable VS Code Remote SSH fix service for this user
+                                    # This patches VS Code's downloaded node binary to work on NixOS
+                                    # See: konductor-vscode-fix@.service and vscodeServerFHS/vscodeServerPatchScript
+                                    echo "konductor-vscode-fix@''${username}.service" >> "$STATE_DIR/enabled.list.new"
+                                    echo "    ✓ VS Code Remote SSH fix: konductor-vscode-fix@''${username}.service"
+                                    ;;
+                                  *)
+                                    echo "  ✗  Unknown service: $svc_name"
+                                    continue
+                                    ;;
+                                esac
 
-                  echo "    ✓ Env file: $ENV_FILE"
-                  echo "    ✓ Drop-in: $DROPIN_PATH/50-config.conf"
+                                echo "    ✓ Env file: $ENV_FILE"
+                                echo "    ✓ Drop-in: $DROPIN_PATH/50-config.conf"
 
-                  # Track enabled service
-                  echo "$SERVICE_NAME" >> "$STATE_DIR/enabled.list.new"
+                                # Track enabled service
+                                echo "$SERVICE_NAME" >> "$STATE_DIR/enabled.list.new"
 
-                done <<< "$USER_SERVICES"
-              fi
+                              done <<< "$USER_SERVICES"
+                            fi
 
-              echo "└───────────────────────────────────────────────────────────────────────────────┘"
+                            echo "└───────────────────────────────────────────────────────────────────────────────┘"
 
-              # ─────────────────────────────────────────────────────────────────────
-              # Reload systemd and manage services
-              # ─────────────────────────────────────────────────────────────────────
-              echo ""
-              echo "Reloading systemd daemon..."
-              systemctl daemon-reload
-              echo "✓  systemd daemon-reload complete"
+                            # ─────────────────────────────────────────────────────────────────────
+                            # Reload systemd and manage services
+                            # ─────────────────────────────────────────────────────────────────────
+                            echo ""
+                            echo "Reloading systemd daemon..."
+                            systemctl daemon-reload
+                            echo "✓  systemd daemon-reload complete"
 
-              echo ""
-              echo "┌─ Service Lifecycle Management ────────────────────────────────────────────────┐"
+                            echo ""
+                            echo "┌─ Service Lifecycle Management ────────────────────────────────────────────────┐"
 
-              # Start newly enabled services
-              if [ -f "$STATE_DIR/enabled.list.new" ]; then
-                sort -u "$STATE_DIR/enabled.list.new" | while read SERVICE; do
-                  if ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
-                    echo "  ↑ Starting: $SERVICE"
-                    systemctl start "$SERVICE" && echo "    ✓ Started" || echo "    ✗ Failed to start"
-                  else
-                    echo "  ✓ Already active: $SERVICE"
-                  fi
-                done
-              fi
+                            # Start newly enabled services
+                            if [ -f "$STATE_DIR/enabled.list.new" ]; then
+                              sort -u "$STATE_DIR/enabled.list.new" | while read SERVICE; do
+                                if ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+                                  echo "  ↑ Starting: $SERVICE"
+                                  systemctl start "$SERVICE" && echo "    ✓ Started" || echo "    ✗ Failed to start"
+                                else
+                                  echo "  ✓ Already active: $SERVICE"
+                                fi
+                              done
+                            fi
 
-              # Stop services that were removed from config
-              if [ -f "$STATE_DIR/enabled.list" ]; then
-                comm -23 <(sort "$STATE_DIR/enabled.list") <(sort "$STATE_DIR/enabled.list.new" 2>/dev/null || true) | while read SERVICE; do
-                  if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
-                    echo "  ↓ Stopping: $SERVICE (removed from config)"
-                    systemctl stop "$SERVICE" && echo "    ✓ Stopped" || echo "    ✗ Failed to stop"
-                  fi
-                done
-              fi
+                            # Stop services that were removed from config
+                            if [ -f "$STATE_DIR/enabled.list" ]; then
+                              comm -23 <(sort "$STATE_DIR/enabled.list") <(sort "$STATE_DIR/enabled.list.new" 2>/dev/null || true) | while read SERVICE; do
+                                if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+                                  echo "  ↓ Stopping: $SERVICE (removed from config)"
+                                  systemctl stop "$SERVICE" && echo "    ✓ Stopped" || echo "    ✗ Failed to stop"
+                                fi
+                              done
+                            fi
 
-              # Update state
-              [ -f "$STATE_DIR/enabled.list.new" ] && mv "$STATE_DIR/enabled.list.new" "$STATE_DIR/enabled.list"
+                            # Update state
+                            [ -f "$STATE_DIR/enabled.list.new" ] && mv "$STATE_DIR/enabled.list.new" "$STATE_DIR/enabled.list"
 
-              echo "└───────────────────────────────────────────────────────────────────────────────┘"
+                            echo "└───────────────────────────────────────────────────────────────────────────────┘"
 
-              echo ""
-              echo "═══════════════════════════════════════════════════════════════════════════════"
-              echo "  ✓ Orchestration Complete"
-              echo "  View services: systemctl list-units 'konductor-*'"
-              echo "  Edit config: vi /var/lib/konductor/services.toml"
-              echo "  Reload: systemctl reload konductor-init.service"
-              echo "═══════════════════════════════════════════════════════════════════════════════"
+                            echo ""
+                            echo "═══════════════════════════════════════════════════════════════════════════════"
+                            echo "  ✓ Orchestration Complete"
+                            echo "  View services: systemctl list-units 'konductor-*'"
+                            echo "  Edit config: vi /var/lib/konductor/services.toml"
+                            echo "  Reload: systemctl reload konductor-init.service"
+                            echo "═══════════════════════════════════════════════════════════════════════════════"
             '';
           in
           {
@@ -2078,9 +2116,9 @@ EOF
               gawk
               systemd
               util-linux
-              yj  # TOML to JSON converter
-              yq-go  # YAML/TOML/JSON processor
-              jq  # JSON query processor
+              yj # TOML to JSON converter
+              yq-go # YAML/TOML/JSON processor
+              jq # JSON query processor
               findutils
             ];
 
@@ -2188,7 +2226,7 @@ EOF
       # See: nixos/modules/services/system/cloud-init.nix for NixOS defaults
       cloud-init = {
         enable = true;
-        network.enable = true;  # Enables systemd-networkd integration
+        network.enable = true; # Enables systemd-networkd integration
 
         settings = {
           # ─────────────────────────────────────────────────────────────────────
@@ -2240,40 +2278,40 @@ EOF
           log_cfgs = [
             [
               ''
-              [loggers]
-              keys=root,cloudinit
+                [loggers]
+                keys=root,cloudinit
 
-              [handlers]
-              keys=consoleHandler,serialHandler
+                [handlers]
+                keys=consoleHandler,serialHandler
 
-              [formatters]
-              keys=simpleFormatter
+                [formatters]
+                keys=simpleFormatter
 
-              [logger_root]
-              level=DEBUG
-              handlers=consoleHandler
+                [logger_root]
+                level=DEBUG
+                handlers=consoleHandler
 
-              [logger_cloudinit]
-              level=DEBUG
-              handlers=consoleHandler,serialHandler
-              qualname=cloudinit
-              propagate=0
+                [logger_cloudinit]
+                level=DEBUG
+                handlers=consoleHandler,serialHandler
+                qualname=cloudinit
+                propagate=0
 
-              [handler_consoleHandler]
-              class=StreamHandler
-              level=DEBUG
-              formatter=simpleFormatter
-              args=(sys.stderr,)
+                [handler_consoleHandler]
+                class=StreamHandler
+                level=DEBUG
+                formatter=simpleFormatter
+                args=(sys.stderr,)
 
-              [handler_serialHandler]
-              class=FileHandler
-              level=DEBUG
-              formatter=simpleFormatter
-              args=('/dev/ttyS0', 'a')
+                [handler_serialHandler]
+                class=FileHandler
+                level=DEBUG
+                formatter=simpleFormatter
+                args=('/dev/ttyS0', 'a')
 
-              [formatter_simpleFormatter]
-              format=%(asctime)s - %(filename)s[%(levelname)s]: %(message)s
-              datefmt=%Y-%m-%dT%H:%M:%S
+                [formatter_simpleFormatter]
+                format=%(asctime)s - %(filename)s[%(levelname)s]: %(message)s
+                datefmt=%Y-%m-%dT%H:%M:%S
               ''
             ]
           ];
@@ -2424,15 +2462,15 @@ EOF
       # The qcow-efi format provides this automatically for image builds,
       # but nixpkgs.lib.nixosSystem needs explicit bootloader config.
       loader = {
-        timeout = 0;  # Skip boot menu for faster boot
+        timeout = 0; # Skip boot menu for faster boot
         grub = {
           enable = true;
-          device = "nodev";  # EFI doesn't use a specific device
+          device = "nodev"; # EFI doesn't use a specific device
           efiSupport = true;
-          efiInstallAsRemovable = true;  # Works without NVRAM variables
+          efiInstallAsRemovable = true; # Works without NVRAM variables
         };
         efi = {
-          canTouchEfiVariables = false;  # Don't modify NVRAM (safer for VMs)
+          canTouchEfiVariables = false; # Don't modify NVRAM (safer for VMs)
           efiSysMountPoint = "/boot";
         };
       };
@@ -2449,8 +2487,8 @@ EOF
       # serial captures all kernel/systemd output (needed for -display none builds
       # and KubeVirt serial console). kbd_mode warning on serial is harmless.
       kernelParams = [
-        "console=tty0"          # VGA console (also receives output)
-        "console=ttyS0,115200"  # Serial console (primary — receives all output)
+        "console=tty0" # VGA console (also receives output)
+        "console=ttyS0,115200" # Serial console (primary — receives all output)
         "elevator=none"
         "scsi_mod.use_blk_mq=1"
       ];
@@ -2495,106 +2533,69 @@ EOF
     };
 
     # =====================================================================
-    # PKI Trust Configuration (Git CA Trust)
-    # =====================================================================
-    # Configure global git settings for all users
-    # Points directly to mounted hypervisor CA (available at runtime)
-    # If CA not mounted, git will fall back to system CA bundle
-    environment.etc."gitconfig".text = ''
-      [http]
-        sslCAInfo = /mnt/pki/ca.crt
-      [safe]
-        directory = /workspace
-    '';
-
-    # =====================================================================
     # Filesystem Configuration
     # =====================================================================
     # Required for nixosConfigurations (nixos-rebuild on running VMs).
     # Uses labels set by qcow-efi format during image creation.
     # Options optimized for Ceph RBD block devices.
-    fileSystems."/" = {
-      device = "/dev/disk/by-label/nixos";
-      fsType = "ext4";
-      autoResize = true;  # Grow partition on first boot (cloud-init growpart)
-      options = [
-        "noatime"     # Reduce metadata writes
-        "nodiratime"  # Reduce directory access time updates
-        "discard"     # TRIM/unmap for thin provisioning
-        "commit=60"   # Increase journal commit interval (seconds)
-      ];
-    };
+    fileSystems = {
+      "/" = {
+        device = "/dev/disk/by-label/nixos";
+        fsType = "ext4";
+        autoResize = true; # Grow partition on first boot (cloud-init growpart)
+        options = [
+          "noatime" # Reduce metadata writes
+          "nodiratime" # Reduce directory access time updates
+          "discard" # TRIM/unmap for thin provisioning
+          "commit=60" # Increase journal commit interval (seconds)
+        ];
+      };
 
-    fileSystems."/boot" = {
-      device = "/dev/disk/by-label/ESP";
-      fsType = "vfat";
-      options = [ "umask=0077" ];
-    };
+      "/boot" = {
+        device = "/dev/disk/by-label/ESP";
+        fsType = "vfat";
+        options = [ "umask=0077" ];
+      };
 
-    # =====================================================================
-    # Vendored Flake Input Sources (Baked into Image)
-    # =====================================================================
-    # Every flake input's outPath is referenced here, which pulls it into
-    # the system closure. nixos-install copies them to the image's /nix/store.
-    # This means --override-input path:/nix/store/xxx works on a sealed image
-    # because the exact store paths from flake.lock are on disk.
-    #
-    # /etc/konductor/input-sources.env maps input names to store paths.
-    # nixos-rebuild scripts source this to generate --override-input flags.
-    # Devs can also use path:_sources/name for modified inputs (hash mismatch
-    # but functional — nix re-imports the tree under a new store path).
-    environment.etc."konductor/input-sources.env".text = let
-      # Filter to inputs that have outPath (excludes 'self' and non-flake attrs)
-      inputsWithPath = lib.filterAttrs
-        (name: input: name != "self" && (input ? outPath || (builtins.isAttrs input && input ? sourceInfo)))
-        inputs;
-    in lib.concatStringsSep "\n" (
-      lib.mapAttrsToList (name: input: "${name}=${input.outPath or input}")
-        inputsWithPath
-    ) + "\n";
-
-    # =====================================================================
-    # Host Nix Store (Read-Only Substituter for Build & Fleet Acceleration)
-    # =====================================================================
-    # A read-only host nix store can be mounted via virtiofs at /mnt/host-nix.
-    # virtiofsd shares the host's /nix directory. The mount point is chosen
-    # so that local?root=/mnt/host-nix finds the store at /mnt/host-nix/nix/store
-    # and the DB at /mnt/host-nix/nix/var/nix/db — matching nix's convention
-    # of root + /nix/store and root + /nix/var/nix.
-    #
-    # Nix opens this as a read-only local store (experimental feature
-    # read-only-local-store) and uses it as a substituter. nixos-rebuild and
-    # nix-build copy needed paths into the VM's real /nix/store on disk.
-    #
-    # Architecture:
-    #   /mnt/host-nix/nix/store (virtiofs, ro) ──► nix substituter
-    #   /mnt/host-nix/nix/var/nix/db (virtiofs, ro) ──► path metadata
-    #   /nix/store (real on-disk ext4) ──► nix writes here directly
-    #
-    # Use cases:
-    #   CI build:   host shares its /nix via virtiofs for cache hits
-    #   Deploy:     many VMs share one read-only host nix (single builder,
-    #               many consumers) for efficient fleet-wide nix operations
-    #   Standalone: no host mount present — substituter silently fails,
-    #               nix falls back to cache.nixos.org
-    #
-    # Paths are always materialized on the real local disk. The image boots
-    # standalone without any host mounts.
-
-    # Mount host's /nix read-only via virtiofs (optional at boot and deploy)
-    # virtiofsd shares host /nix, QEMU exposes it as vhost-user-fs-pci tag=nixstore
-    # In standalone mode (no virtiofs device), nofail prevents boot failure
-    fileSystems."/mnt/host-nix" = {
-      device = "nixstore";
-      fsType = "virtiofs";
-      options = [
-        "ro"
-        "nofail"           # Don't fail boot if not available (standalone)
-        "noauto"           # Don't mount at boot
-        "x-systemd.automount"  # Mount on first access by nix substituter
-        "x-systemd.device-timeout=5s"
-      ];
-      neededForBoot = false;  # Not required - graceful degradation
+      # =====================================================================
+      # Host Nix Store (Read-Only Substituter for Build & Fleet Acceleration)
+      # =====================================================================
+      # A read-only host nix store can be mounted via virtiofs at /mnt/host-nix.
+      # virtiofsd shares the host's /nix directory. The mount point is chosen
+      # so that local?root=/mnt/host-nix finds the store at /mnt/host-nix/nix/store
+      # and the DB at /mnt/host-nix/nix/var/nix/db — matching nix's convention
+      # of root + /nix/store and root + /nix/var/nix.
+      #
+      # Nix opens this as a read-only local store (experimental feature
+      # read-only-local-store) and uses it as a substituter. nixos-rebuild and
+      # nix-build copy needed paths into the VM's real /nix/store on disk.
+      #
+      # Architecture:
+      #   /mnt/host-nix/nix/store (virtiofs, ro) ──► nix substituter
+      #   /mnt/host-nix/nix/var/nix/db (virtiofs, ro) ──► path metadata
+      #   /nix/store (real on-disk ext4) ──► nix writes here directly
+      #
+      # Use cases:
+      #   CI build:   host shares its /nix via virtiofs for cache hits
+      #   Deploy:     many VMs share one read-only host nix (single builder,
+      #               many consumers) for efficient fleet-wide nix operations
+      #   Standalone: no host mount present — substituter silently fails,
+      #               nix falls back to cache.nixos.org
+      #
+      # Paths are always materialized on the real local disk. The image boots
+      # standalone without any host mounts.
+      "/mnt/host-nix" = {
+        device = "nixstore";
+        fsType = "virtiofs";
+        options = [
+          "ro"
+          "nofail" # Don't fail boot if not available (standalone)
+          "noauto" # Don't mount at boot
+          "x-systemd.automount" # Mount on first access by nix substituter
+          "x-systemd.device-timeout=5s"
+        ];
+        neededForBoot = false; # Not required - graceful degradation
+      };
     };
 
 
@@ -2630,7 +2631,7 @@ EOF
         experimental-features = [
           "nix-command"
           "flakes"
-          "read-only-local-store"  # Required for host store substituter on read-only virtiofs
+          "read-only-local-store" # Required for host store substituter on read-only virtiofs
         ];
         auto-optimise-store = true;
         accept-flake-config = true;
@@ -2650,7 +2651,7 @@ EOF
         # When no host mount is present (standalone), the substituter has no
         # paths and nix falls back to the next substituter in the list.
         extra-substituters = [ "local?root=/mnt/host-nix&read-only=true" ];
-        require-sigs = false;  # Host store paths are unsigned local builds
+        require-sigs = false; # Host store paths are unsigned local builds
         trusted-substituters = [
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
@@ -2691,8 +2692,8 @@ in
   #
   # No nixos-generators required - the image builder is defined
   # directly in konductorModule.system.build.image.
-  image = (nixpkgs.lib.nixosSystem {
+  inherit ((nixpkgs.lib.nixosSystem {
     inherit system;
     modules = [ konductorModule ];
-  }).config.system.build.image;
+  }).config.system.build) image;
 }

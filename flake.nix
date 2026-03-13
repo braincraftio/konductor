@@ -23,16 +23,22 @@
     flake-utils.url = "github:numtide/flake-utils";
     flake-utils.inputs.systems.follows = "systems";
 
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
 
-    nuschtosSearch.url = "github:NuschtOS/search";
-    nuschtosSearch.inputs.flake-utils.follows = "flake-utils";
-    nuschtosSearch.inputs.nixpkgs.follows = "nixpkgs";
+    nuschtosSearch = {
+      url = "github:NuschtOS/search";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
-    ixx.url = "github:NuschtOS/ixx";
-    ixx.inputs.flake-utils.follows = "flake-utils";
-    ixx.inputs.nixpkgs.follows = "nixpkgs";
+    ixx = {
+      url = "github:NuschtOS/ixx";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     nixlib.url = "github:nix-community/nixpkgs.lib";
 
@@ -52,10 +58,12 @@
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     nixvim = {
       url = "github:nix-community/nixvim/nixos-25.11";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.systems.follows = "systems";
-      inputs.flake-parts.follows = "flake-parts";
-      inputs.nuschtosSearch.follows = "nuschtosSearch";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        systems.follows = "systems";
+        flake-parts.follows = "flake-parts";
+        nuschtosSearch.follows = "nuschtosSearch";
+      };
     };
 
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
@@ -100,91 +108,93 @@
     in
 
     # Per-system outputs (devShells, packages)
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
-          config.allowUnfree = true;
-        };
+    flake-utils.lib.eachDefaultSystem
+      (
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
+            config.allowUnfree = true;
+          };
 
-        # Import versions for devshells
-        versions = import ./src/lib/versions.nix;
+          # Import versions for devshells
+          versions = import ./src/lib/versions.nix;
 
-        # Import programs (neovim, tmux)
-        programs = import ./src/programs {
-          inherit pkgs inputs;
-          inherit (nixpkgs) lib;
-        };
+          # Import programs (neovim, tmux)
+          programs = import ./src/programs {
+            inherit pkgs inputs;
+            inherit (nixpkgs) lib;
+          };
 
-        # Import devshells (single source of truth for all development shells)
-        devshells = import ./src/devshells {
-          inherit
-            pkgs
-            inputs
-            versions
-            programs
-            ;
-          inherit (nixpkgs) lib;
-        };
+          # Import devshells (single source of truth for all development shells)
+          devshells = import ./src/devshells {
+            inherit
+              pkgs
+              inputs
+              versions
+              programs
+              ;
+            inherit (nixpkgs) lib;
+          };
 
-        # OCI container (Linux-only)
-        oci = import ./src/oci {
-          inherit pkgs inputs;
-          inherit (nixpkgs) lib;
-          inherit (inputs.nix2container.packages.${system}) nix2container;
-        };
+          # OCI container (Linux-only)
+          oci = import ./src/oci {
+            inherit pkgs inputs;
+            inherit (nixpkgs) lib;
+            inherit (inputs.nix2container.packages.${system}) nix2container;
+          };
 
-        # QCOW2 VM (Linux-only)
-        # Uses native nixpkgs image building (no nixos-generators)
-        qcow2 = import ./src/qcow2 {
-          inherit
-            pkgs
-            nixpkgs
-            inputs
-            system
-            versions
-            programs
-            devshells
-            ;
-          inherit (nixpkgs) lib;
-        };
+          # QCOW2 VM (Linux-only)
+          # Uses native nixpkgs image building (no nixos-generators)
+          qcow2 = import ./src/qcow2 {
+            inherit
+              pkgs
+              nixpkgs
+              inputs
+              system
+              versions
+              programs
+              devshells
+              ;
+            inherit (nixpkgs) lib;
+          };
 
-      in
-      {
-        # Development shells from src/devshells
-        # Cross-platform shells available everywhere
-        # Linux-only shells (konductor, ci, frontend) conditionally included
-        devShells = {
-          inherit (devshells)
-            default
-            python
-            go
-            node
-            rust
-            dev
-            full
-            ;
-        }
-        // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
-          # x86_64-linux only: requires libguestfs-appliance (qemu_kvm, libvirt, virt-manager, etc.)
-          # frontend extends konductor, so it's also Linux-only
-          inherit (devshells) konductor ci frontend;
-        };
-
-        # Packages (build outputs, not shells)
-        packages =
-          pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-            # OCI is Linux-only (Docker/podman)
-            oci = oci.image;
+        in
+        {
+          # Development shells from src/devshells
+          # Cross-platform shells available everywhere
+          # Linux-only shells (konductor, ci, frontend) conditionally included
+          devShells = {
+            inherit (devshells)
+              default
+              python
+              go
+              node
+              rust
+              dev
+              full
+              ;
           }
           // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
-            # qcow2 requires libguestfs-appliance which only supports x86_64-linux
-            qcow2 = qcow2.image;
+            # x86_64-linux only: requires libguestfs-appliance (qemu_kvm, libvirt, virt-manager, etc.)
+            # frontend extends konductor, so it's also Linux-only
+            inherit (devshells) konductor ci frontend;
           };
-      }
-    )
+
+          # Packages (build outputs, not shells)
+          packages =
+            pkgs.lib.optionalAttrs pkgs.stdenv.isLinux
+              {
+                # OCI is Linux-only (Docker/podman)
+                oci = oci.image;
+              }
+            // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
+              # qcow2 requires libguestfs-appliance which only supports x86_64-linux
+              qcow2 = qcow2.image;
+            };
+        }
+      )
 
     # Cross-system outputs (modules, overlays, nixosConfigurations)
     // {

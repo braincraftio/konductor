@@ -31,30 +31,30 @@ let
 
   catppuccinFrappe = {
     # Base colors
-    background = "#303446";   # base
-    foreground = "#c6d0f5";   # text
-    cursor = "#f2d5cf";       # rosewater
+    background = "#303446"; # base
+    foreground = "#c6d0f5"; # text
+    cursor = "#f2d5cf"; # rosewater
     cursorAccent = "#303446"; # base
-    selectionBackground = "rgba(131, 139, 167, 0.3)";  # overlay1 @ 30%
-    selectionForeground = "#c6d0f5";  # text
+    selectionBackground = "rgba(131, 139, 167, 0.3)"; # overlay1 @ 30%
+    selectionForeground = "#c6d0f5"; # text
     # ANSI Normal (0-7)
-    black = "#51576d";        # surface1
-    red = "#e78284";          # red
-    green = "#a6d189";        # green
-    yellow = "#e5c890";       # yellow
-    blue = "#8caaee";         # blue
-    magenta = "#ca9ee6";      # mauve
-    cyan = "#81c8be";         # teal
-    white = "#b5bfe2";        # subtext1
+    black = "#51576d"; # surface1
+    red = "#e78284"; # red
+    green = "#a6d189"; # green
+    yellow = "#e5c890"; # yellow
+    blue = "#8caaee"; # blue
+    magenta = "#ca9ee6"; # mauve
+    cyan = "#81c8be"; # teal
+    white = "#b5bfe2"; # subtext1
     # ANSI Bright (8-15)
-    brightBlack = "#626880";  # surface2
-    brightRed = "#e78284";    # red
-    brightGreen = "#a6d189";  # green
+    brightBlack = "#626880"; # surface2
+    brightRed = "#e78284"; # red
+    brightGreen = "#a6d189"; # green
     brightYellow = "#e5c890"; # yellow
-    brightBlue = "#8caaee";   # blue
+    brightBlue = "#8caaee"; # blue
     brightMagenta = "#f4b8e4"; # pink
-    brightCyan = "#99d1db";   # sky
-    brightWhite = "#c6d0f5";  # text
+    brightCyan = "#99d1db"; # sky
+    brightWhite = "#c6d0f5"; # text
   };
 
   # ===========================================================================
@@ -79,7 +79,7 @@ let
     interface = "0.0.0.0";
     cwd = "/workspace";
     maxSessions = "10";
-    idleTimeout = "3600000";  # 1 hour in ms
+    idleTimeout = "3600000"; # 1 hour in ms
   };
   # ===========================================================================
   # GHOSTTY-WEB NPM PACKAGE (Frontend Assets)
@@ -121,7 +121,7 @@ let
 
     # Native module build requirements for node-pty
     nativeBuildInputs = with pkgs; [
-      python3      # Required for node-gyp
+      python3 # Required for node-gyp
       pkg-config
       makeWrapper
     ];

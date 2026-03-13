@@ -8,14 +8,13 @@
 # This is the appropriate shell for building desktop GUI applications.
 # Use this shell for projects like SpiritStream (Tauri), not #full or #rust.
 
-{
-  baseShell,
-  pkgs,
-  packages,
-  versions,
-  programs,
-  config,
-  ...
+{ baseShell
+, pkgs
+, packages
+, versions
+, programs
+, config
+, ...
 }:
 
 let
@@ -45,7 +44,7 @@ konductorShell.overrideAttrs (old: {
     KONDUCTOR_SHELL = "frontend";
     PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
-  } // tauri.env;  # OPENSSL_NO_VENDOR, ZSTD_SYS_USE_PKG_CONFIG
+  } // tauri.env; # OPENSSL_NO_VENDOR, ZSTD_SYS_USE_PKG_CONFIG
 
   shellHook = ''
     # Tauri runtime libraries (GTK, WebKit, OpenSSL, compression)

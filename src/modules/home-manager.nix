@@ -49,9 +49,10 @@ in
   config = lib.mkIf cfg.enable {
     home = {
       # Base + language packages + atuin (mirrors konductor.nix nativeBuildInputs)
-      packages = common.mkPackages {
-        inherit cfg pkgs lib versions catppuccinSources;
-      }
+      packages = common.mkPackages
+        {
+          inherit cfg pkgs lib versions catppuccinSources;
+        }
       # IDE programs: neovim, tmux, ttyd
       ++ common.mkPrograms { inherit programs packages; }
       # Atuin shell history (mirrors konductor.nix:47)
@@ -66,24 +67,24 @@ in
         // konductorConfig.shell.ssh.env
         // programs.tmux.env
         // {
-          # LD_LIBRARY_PATH — mirrors konductor.nix:61-65 (all three libs)
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
+        # LD_LIBRARY_PATH — mirrors konductor.nix:61-65 (all three libs)
+        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
             pkgs.stdenv.cc.cc.lib
             pkgs.xz
             pkgs.zstd
           ]}";
-          # Language env vars — mirrors konductor.nix:144-153
-          UV_SYSTEM_PYTHON = "1";
-          PYTHONDONTWRITEBYTECODE = "1";
-          GO111MODULE = "on";
-          CGO_ENABLED = "1";
-          NODE_ENV = "development";
-          RUST_BACKTRACE = "1";
-          # Docker — mirrors konductor.nix:101 and packages/konductor.nix:55
-          DOCKER_HOST = "unix:///var/run/docker.sock";
-          # Shell identity
-          KONDUCTOR_SHELL = "konductor";
-        };
+        # Language env vars — mirrors konductor.nix:144-153
+        UV_SYSTEM_PYTHON = "1";
+        PYTHONDONTWRITEBYTECODE = "1";
+        GO111MODULE = "on";
+        CGO_ENABLED = "1";
+        NODE_ENV = "development";
+        RUST_BACKTRACE = "1";
+        # Docker — mirrors konductor.nix:101 and packages/konductor.nix:55
+        DOCKER_HOST = "unix:///var/run/docker.sock";
+        # Shell identity
+        KONDUCTOR_SHELL = "konductor";
+      };
 
       shellAliases = common.mkAliases;
     };

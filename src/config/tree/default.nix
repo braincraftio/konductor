@@ -23,20 +23,24 @@ let
   ignorePatterns = builtins.readFile ./.treeignore;
 
   # Filter comments and empty lines, convert to pipe-separated string
-  patternLines = builtins.filter (line:
-    line != "" &&
-    !(pkgs.lib.hasPrefix "#" line) &&
-    !(pkgs.lib.hasPrefix " " line)
-  ) (pkgs.lib.splitString "\n" ignorePatterns);
+  patternLines = builtins.filter
+    (line:
+      line != "" &&
+      !(pkgs.lib.hasPrefix "#" line) &&
+      !(pkgs.lib.hasPrefix " " line)
+    )
+    (pkgs.lib.splitString "\n" ignorePatterns);
 
   # Join with | for eza -I flag
   # - Remove trailing slashes for eza compatibility
   # - Prefix with **/ to match anywhere in tree (eza globs are anchored)
   excludePattern = builtins.concatStringsSep "|" (
-    map (p:
-      let clean = pkgs.lib.removeSuffix "/" p;
-      in if pkgs.lib.hasPrefix "*" clean then clean else "**/${clean}"
-    ) patternLines
+    map
+      (p:
+        let clean = pkgs.lib.removeSuffix "/" p;
+        in if pkgs.lib.hasPrefix "*" clean then clean else "**/${clean}"
+      )
+      patternLines
   );
 
   # Treeignore file in nix store for reference

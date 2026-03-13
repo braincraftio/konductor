@@ -32,9 +32,9 @@ pkgs.stdenv.mkDerivation {
   # These are in PATH during installPhase
   nativeBuildInputs = with pkgs; [
     installShellFiles
-    unstable.kubectl  # For kubectl completion bash
-    unstable.mise     # For mise completion bash
-    git               # For git completion (already has completions)
+    unstable.kubectl # For kubectl completion bash
+    unstable.mise # For mise completion bash
+    git # For git completion (already has completions)
   ];
 
   installPhase = ''
@@ -121,6 +121,6 @@ pkgs.stdenv.mkDerivation {
 
   meta = {
     description = "Executable wrappers for Konductor shell aliases with bash completions";
-    priority = 0;  # Higher priority to override system commands
+    priority = 0; # Higher priority to override system commands
   };
 }

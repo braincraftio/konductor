@@ -23,18 +23,6 @@ let
   # Structure: $out/share/fonts/truetype/NerdFonts/<fontDirName>/
   fontDir = "${nerdFont}/share/fonts/truetype/NerdFonts/JetBrainsMono";
 
-  # CSS @font-face declaration template
-  # Using ttf format for broad browser compatibility
-  # font-family name must match what we pass to xterm.js via -t fontFamily
-  fontFaceCSS = fontFile: fontWeight: fontStyle: ''
-    @font-face {
-      font-family: "JetBrainsMono Nerd Font Mono";
-      src: url("data:font/ttf;base64,$(base64 -w0 ${fontDir}/${fontFile})") format("truetype");
-      font-weight: ${fontWeight};
-      font-style: ${fontStyle};
-    }
-  '';
-
 in
 {
   # Override ttyd with embedded fonts

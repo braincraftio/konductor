@@ -44,19 +44,19 @@ in
     # Mirrors buildVscode buildInputs for the subset code-server actually links.
     buildInputs = with prev; [
       nodejs
-      stdenv.cc.cc.lib  # libstdc++
+      stdenv.cc.cc.lib # libstdc++
       zlib
-      libsecret         # libsecret-1.so (keyring integration)
-      xorg.libX11       # libX11.so.6 (msal-node-runtime.node)
-      xorg.libxkbfile   # libxkbfile.so.1 (native keyboard module)
-      nss               # libnss3.so (crypto)
-      nspr              # libnspr4.so
-      alsa-lib          # libasound.so.2
-      systemdLibs       # libudev, libsystemd
-      dbus              # libdbus-1.so.3
-      util-linux.lib    # libuuid.so.1
-      curl              # libcurl.so.4
-      openssl           # libcrypto.so.3, libssl.so.3
+      libsecret # libsecret-1.so (keyring integration)
+      xorg.libX11 # libX11.so.6 (msal-node-runtime.node)
+      xorg.libxkbfile # libxkbfile.so.1 (native keyboard module)
+      nss # libnss3.so (crypto)
+      nspr # libnspr4.so
+      alsa-lib # libasound.so.2
+      systemdLibs # libudev, libsystemd
+      dbus # libdbus-1.so.3
+      util-linux.lib # libuuid.so.1
+      curl # libcurl.so.4
+      openssl # libcrypto.so.3, libssl.so.3
     ];
 
     dontBuild = true;

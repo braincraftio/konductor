@@ -39,7 +39,8 @@ let
   # Derivation for file-based usage
   inputrcFile = pkgs.writeText "konductor-inputrc" inputrcContent;
 
-in {
+in
+{
   # Raw content for inline usage (shell-content.nix, etc.)
   content = inputrcContent;
 

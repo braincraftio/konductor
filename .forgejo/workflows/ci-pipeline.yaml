@@ -14,6 +14,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup direnv Environment
+        run: |
+          direnv allow "${WORKSPACE_ROOT}"
+          direnv allow "${WORKSPACE_ROOT}/k9"
+          cd "${WORKSPACE_ROOT}/k9"
+          DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
+          if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
+            echo "$DIRENV_JSON" | jq -r '
+              to_entries[]
+              | select(.value | type == "string")
+              | select(.value | contains("\n") | not)
+              | select(.value | test("^\\s*(echo|if|then|else|fi|for|while|do|done|case|esac|function)\\s") | not)
+              | "\(.key)<<EOF\n\(.value)\nEOF"
+            ' >> $GITHUB_ENV
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
+            echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
+          else
+            echo "✗ direnv export failed"
+            exit 1
+          fi
+
       - name: Build QCOW2
         run: runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
 

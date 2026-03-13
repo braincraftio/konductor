@@ -37,7 +37,8 @@ let
     ldflags = [
       "-s"
       "-w"
-      "-X" "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v12.5.3-braincraft"
+      "-X"
+      "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v12.5.3-braincraft"
     ];
     nativeBuildInputs = [ pkgs.git ];
     doCheck = false;

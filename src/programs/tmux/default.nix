@@ -40,9 +40,10 @@ let
   # Upstream build.py hardcodes verbose `display -p` startup messages with no
   # config option to disable. Since init.tmux is our generated artifact (not
   # upstream code), we strip these from the output as a build post-process step.
-  whichKeyBuilt = pkgs.runCommand "konductor-tmux-which-key" {
-    nativeBuildInputs = [ pkgs.python3 ];
-  } ''
+  whichKeyBuilt = pkgs.runCommand "konductor-tmux-which-key"
+    {
+      nativeBuildInputs = [ pkgs.python3 ];
+    } ''
     mkdir -p $out
     cp ${whichKeyConfig} $out/config.yaml
     cp ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/build.py $out/

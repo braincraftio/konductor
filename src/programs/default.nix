@@ -8,10 +8,10 @@
 #   ttyd        - Web terminal with Catppuccin Frappé theme
 #   ghostty-web - Browser-accessible terminal (experimental, requires feature flag)
 
-{
-  pkgs,
-  lib,
-  inputs,
+{ pkgs
+, lib
+, inputs
+,
 }:
 
 {

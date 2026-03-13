@@ -29,7 +29,7 @@
 #   https://catppuccin.com/palette
 #   https://github.com/ryanoasis/nerd-fonts
 
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 let
   # ===========================================================================
@@ -40,30 +40,30 @@ let
 
   catppuccinFrappe = {
     # Base colors
-    background = "#303446";   # base
-    foreground = "#c6d0f5";   # text
-    cursor = "#f2d5cf";       # rosewater
+    background = "#303446"; # base
+    foreground = "#c6d0f5"; # text
+    cursor = "#f2d5cf"; # rosewater
     cursorAccent = "#303446"; # base
-    selectionBackground = "#626880";  # surface2
-    selectionForeground = "#c6d0f5";  # text
+    selectionBackground = "#626880"; # surface2
+    selectionForeground = "#c6d0f5"; # text
     # ANSI Normal (0-7)
-    black = "#51576d";        # surface1
-    red = "#e78284";          # red
-    green = "#a6d189";        # green
-    yellow = "#e5c890";       # yellow
-    blue = "#8caaee";         # blue
-    magenta = "#ca9ee6";      # mauve
-    cyan = "#81c8be";         # teal
-    white = "#b5bfe2";        # subtext1
+    black = "#51576d"; # surface1
+    red = "#e78284"; # red
+    green = "#a6d189"; # green
+    yellow = "#e5c890"; # yellow
+    blue = "#8caaee"; # blue
+    magenta = "#ca9ee6"; # mauve
+    cyan = "#81c8be"; # teal
+    white = "#b5bfe2"; # subtext1
     # ANSI Bright (8-15)
-    brightBlack = "#626880";  # surface2
-    brightRed = "#e78284";    # red
-    brightGreen = "#a6d189";  # green
+    brightBlack = "#626880"; # surface2
+    brightRed = "#e78284"; # red
+    brightGreen = "#a6d189"; # green
     brightYellow = "#e5c890"; # yellow
-    brightBlue = "#8caaee";   # blue
+    brightBlue = "#8caaee"; # blue
     brightMagenta = "#f4b8e4"; # pink
-    brightCyan = "#99d1db";   # sky
-    brightWhite = "#c6d0f5";  # text
+    brightCyan = "#99d1db"; # sky
+    brightWhite = "#c6d0f5"; # text
   };
 
   # Convert theme to JSON string for ttyd -t option
@@ -241,7 +241,7 @@ in
   # Package list for inclusion in devshells
   packages = [
     ttydKonductor
-    pkgs.ttyd  # Raw ttyd for advanced use / debugging
+    pkgs.ttyd # Raw ttyd for advanced use / debugging
   ];
 
   # Direct package reference
