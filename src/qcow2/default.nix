@@ -1718,6 +1718,8 @@ let
               "DOCKER_BUILDKIT=1"
               # CI marker
               "CI=true"
+              # NixOS /etc/ssl/certs is immutable; konductor-pki-trust writes extended bundle
+              "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
             ];
             ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
             Restart = "always";
