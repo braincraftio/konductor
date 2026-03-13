@@ -35,6 +35,9 @@ jobs:
             exit 1
           fi
 
+      - name: Vendor Flake Inputs
+        run: runme run k9:ci:dev:vendor
+
       - name: Build QCOW2
         run: runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
 
