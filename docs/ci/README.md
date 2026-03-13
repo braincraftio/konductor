@@ -461,7 +461,7 @@ echo "    4. Push to registry"
 echo "    5. Verify pushed tags"
 echo "    6. Deploy to KubeVirt + validate"
 echo "    7. Test web terminal services"
-echo "    8. Test Forgejo runner workflow (disabled — runner not deployed)"
+echo "    8. Test Forgejo runner workflow"
 echo ""
 echo "  Duration: 45-75 minutes"
 echo "  Prerequisites: Docker, 8GB RAM, 100GB disk"
@@ -521,13 +521,11 @@ echo "▶ Phase 7: Test web terminal services..."
 runme run k9:ci:qcow2:validate:services
 
 # ─────────────────────────────────────────────────────────────────────
-# PHASE 8: Test Forgejo runner workflow (DISABLED)
-# Requires forgejo_runner component enabled in operations stack.
-# See: infrastructure/pulumi/stacks/Pulumi.docker-dev-operations.yaml
+# PHASE 8: Test Forgejo runner workflow
 # ─────────────────────────────────────────────────────────────────────
-# echo ""
-# echo "▶ Phase 8: Test Forgejo runner workflow..."
-# runme run k9:ci:qcow2:validate:runner
+echo ""
+echo "▶ Phase 8: Test Forgejo runner workflow..."
+runme run k9:ci:qcow2:validate:runner
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"

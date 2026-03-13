@@ -1,0 +1,27 @@
+name: Promote to Public Registry
+on:
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: 'Target registry'
+        required: true
+        default: 'docker.io'
+        type: choice
+        options:
+          - docker.io
+          - ghcr.io
+
+jobs:
+  promote:
+    name: Promote Image
+    runs-on: konductor
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Promote
+        env:
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROMOTE_REGISTRY: ${{ inputs.registry }}
+        run: runme run k9:ci:qcow2:promote

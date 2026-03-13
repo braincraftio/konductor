@@ -1403,6 +1403,7 @@ let
               echo "  ✓ provenance: /.konductor"
               [ -n "$GIT_COMMIT" ] && echo "  ✓ git_commit: $GIT_COMMIT"
               [ -n "$NIX_DRV" ] && echo "  ✓ nix_drv: $NIX_DRV"
+              echo "  · kernel: $(uname -r)"
 
               if [ "$GIT_DIRTY" != "0" ]; then
                 echo "  ⚠ git_dirty: $GIT_DIRTY (built from dirty tree)"
@@ -1505,7 +1506,32 @@ let
               else
                 echo "  · pki: certificates not yet generated"
               fi
+              if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+                TRUST_HASH=$(sha256sum /etc/ssl/certs/ca-certificates.crt | cut -d' ' -f1)
+                echo "  · trust_store_sha256: ''${TRUST_HASH:0:16}...''${TRUST_HASH: -16}"
+              fi
               echo "└─────────────────────────────────────────────────────────────────────────────┘"
+
+              # ─────────────────────────────────────────────────────────────────────
+              # MACHINE-READABLE PROVENANCE
+              # ─────────────────────────────────────────────────────────────────────
+              if [ -f /.konductor ]; then
+                STRICT_BOOL="false"
+                [ "''${STRICT}" = "true" ] && STRICT_BOOL="true"
+                GIT_BRANCH=$(sed -n 's/^git_branch = "\(.*\)"$/\1/p' /.konductor)
+                NIX_HASH=$(sed -n 's/^nix_hash = "\(.*\)"$/\1/p' /.konductor)
+                echo "PROVENANCE_JSON: $(jq -n \
+                  --arg gc "''${GIT_COMMIT}" \
+                  --arg gb "''${GIT_BRANCH}" \
+                  --arg nd "''${NIX_DRV}" \
+                  --arg nh "''${NIX_HASH}" \
+                  --arg fl "''${EXPECTED_LOCK}" \
+                  --argjson strict "''${STRICT_BOOL}" \
+                  --argjson errors "''${ERRORS}" \
+                  --argjson warnings "''${WARNINGS}" \
+                  --arg kernel "$(uname -r)" \
+                  '{git_commit:''$gc, git_branch:''$gb, nix_drv:''$nd, nix_hash:''$nh, flake_lock_sha256:''$fl, strict:''$strict, errors:''$errors, warnings:''$warnings, kernel:''$kernel}')"
+              fi
 
               # ─────────────────────────────────────────────────────────────────────
               # DETERMINE EXIT STATUS
@@ -1525,12 +1551,6 @@ let
                   echo "  ✓ Verified · systemctl status konductor · cat /.konductor"
                   echo ""
                 } > "$MOTD_FILE"
-                # Output to serial console
-                {
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                  echo "                    ✓ VERIFIED (strict=$STRICT)"
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                } > /dev/ttyS0 2>/dev/null || true
                 exit 0
 
               elif [ "$ERRORS" -gt 0 ] && [ "$STRICT" = "true" ]; then
@@ -1547,13 +1567,6 @@ let
                   echo "  ✗ FAILED ($ERRORS errors) · systemctl status konductor"
                   echo ""
                 } > "$MOTD_FILE"
-                # Output to serial console
-                {
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                  echo "                    ✗ FAILED (strict=true)"
-                  echo "  $ERRORS error(s) - forgejo-runner will NOT start"
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                } > /dev/ttyS0 2>/dev/null || true
                 exit 1
 
               else
@@ -1570,13 +1583,6 @@ let
                   echo "  ⚠ Degraded ($WARNINGS warnings, $ERRORS errors) · systemctl status konductor"
                   echo ""
                 } > "$MOTD_FILE"
-                # Output to serial console
-                {
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                  echo "                    ⚠ DEGRADED (strict=$STRICT)"
-                  echo "  $WARNINGS warning(s), $ERRORS error(s) - forgejo-runner will start"
-                  echo "═══════════════════════════════════════════════════════════════════════════════"
-                } > /dev/ttyS0 2>/dev/null || true
                 exit 0
               fi
             '';

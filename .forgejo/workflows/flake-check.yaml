@@ -1,0 +1,21 @@
+name: Flake Check
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Nix Flake Check
+    runs-on: konductor
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Flake Check
+        run: nix flake check --no-build .
+      - name: Lint
+        run: |
+          statix check .
+          deadnix --fail .
