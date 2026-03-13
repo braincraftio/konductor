@@ -19,7 +19,7 @@
 #   3. Update hash with the sha256 nix reports on mismatch (already SRI format)
 
 _final: prev:
-if !(prev.stdenv.isLinux && prev.stdenv.isx86_64) then {} else
+if !(prev.stdenv.isLinux && prev.stdenv.isx86_64) then { } else
 let
   version = "4.109.5";
 

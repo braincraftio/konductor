@@ -76,10 +76,10 @@ in
       // lib.optionalAttrs pkgs.stdenv.isLinux {
         # LD_LIBRARY_PATH — mirrors konductor.nix:61-65 (all three libs)
         LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            pkgs.xz
-            pkgs.zstd
-          ]}";
+          pkgs.stdenv.cc.cc.lib
+          pkgs.xz
+          pkgs.zstd
+        ]}";
       }
       // {
         # Language env vars — mirrors konductor.nix:144-153
