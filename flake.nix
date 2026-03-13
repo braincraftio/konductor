@@ -146,6 +146,7 @@
             system
             versions
             programs
+            devshells
             ;
           inherit (nixpkgs) lib;
         };
@@ -204,8 +205,12 @@
             inherit pkgs inputs;
             inherit (nixpkgs) lib;
           };
+          devshells = import ./src/devshells {
+            inherit pkgs inputs versions programs;
+            inherit (nixpkgs) lib;
+          };
           qcow2 = import ./src/qcow2 {
-            inherit pkgs nixpkgs inputs system versions programs;
+            inherit pkgs nixpkgs inputs system versions programs devshells;
             inherit (nixpkgs) lib;
           };
         in

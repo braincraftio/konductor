@@ -24,6 +24,7 @@
   system,
   versions,
   programs,
+  devshells, # CI devshell closure baked into image
   ...
 }:
 
@@ -1692,7 +1693,6 @@ let
           after = [
             "network-online.target"
             "docker.service"
-            "cloud-final.service"
             "konductor-pki-trust.service"
             "konductor.service"
           ];
@@ -2620,6 +2620,8 @@ EOF
       format = "qcow2";
       partitionTableType = "efi";
       memSize = 4096;
+      # Bake CI devshell closure into image so `nix develop #ci` is instant
+      additionalPaths = [ devshells.ci ];
     };
 
     # Nix configuration
