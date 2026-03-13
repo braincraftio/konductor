@@ -2635,6 +2635,7 @@ let
         ];
         auto-optimise-store = true;
         accept-flake-config = true;
+        download-buffer-size = 268435456; # 256MB — suppress "download buffer is full" warnings
         trusted-users = [
           "root"
           "@wheel"
