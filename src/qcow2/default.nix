@@ -1718,6 +1718,38 @@ let
         };
 
         # =====================================================================
+        # Host Nix Store Substituter (conditional on virtiofs)
+        # =====================================================================
+        # Attempts to mount virtiofs "nixstore" tag. On success, writes
+        # /etc/nix/host-store.conf so nix picks up the local substituter.
+        # On standalone VMs (no virtiofs), mount fails → no conf → nix
+        # never sees the substituter → zero overhead, no fatal abort.
+        konductor-host-nix-store = {
+          description = "Activate host nix store substituter if virtiofs available";
+          after = [ "local-fs.target" ];
+          wantedBy = [ "multi-user.target" ];
+          unitConfig.ConditionPathIsMountPoint = "!/mnt/host-nix";
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = pkgs.writeShellScript "activate-host-nix-store" ''
+              set -euo pipefail
+
+              # Attempt virtiofs mount — exits non-zero if no device
+              mount -t virtiofs -o ro nixstore /mnt/host-nix \
+                && test -f /mnt/host-nix/nix/var/nix/db/db.sqlite \
+                && printf '%s\n' \
+                     'extra-substituters = local?root=/mnt/host-nix&read-only=true' \
+                     'extra-trusted-substituters = local?root=/mnt/host-nix&read-only=true' \
+                     > /etc/nix/host-store.conf \
+                && echo "host-nix-store: activated local substituter" \
+                && systemctl restart nix-daemon.service \
+                || echo "host-nix-store: virtiofs unavailable or no nix DB, standalone mode"
+            '';
+          };
+        };
+
+        # =====================================================================
         # Forgejo Runner Service
         # =====================================================================
         # Runs Forgejo Actions runner daemon after cloud-init registration.
@@ -2624,17 +2656,20 @@ let
       #
       # Paths are always materialized on the real local disk. The image boots
       # standalone without any host mounts.
+      # Host nix store virtiofs mount — deploy mode only.
+      # With automount, every substituter query triggers a mount attempt,
+      # which cycles ENODEV on VMs without the virtiofs device attached.
+      # Instead: noauto + nofail, and cloud-init/systemd mounts explicitly
+      # only when the virtiofs tag "nixstore" is present.
       "/mnt/host-nix" = {
         device = "nixstore";
         fsType = "virtiofs";
         options = [
           "ro"
-          "nofail" # Don't fail boot if not available (standalone)
-          "noauto" # Don't mount at boot
-          "x-systemd.automount" # Mount on first access by nix substituter
-          "x-systemd.device-timeout=5s"
+          "nofail"  # Don't fail boot if device absent (standalone)
+          "noauto"  # Don't mount at boot — explicit mount only
         ];
-        neededForBoot = false; # Not required - graceful degradation
+        neededForBoot = false;
       };
     };
 
@@ -2660,7 +2695,7 @@ let
       inherit (config.virtualisation) diskSize;
       format = "qcow2";
       partitionTableType = "efi";
-      memSize = 4096;
+      memSize = 16384;
       # Bake CI devshell closure into image so `nix develop #ci` is instant
       additionalPaths = [ devshells.ci ];
     };
@@ -2684,25 +2719,29 @@ let
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
         ];
-        # Host nix store as read-only local substituter.
-        # virtiofs mounts host /nix at /mnt/host-nix (ro).
-        # local?root=/mnt/host-nix finds store at /mnt/host-nix/nix/store
-        # and DB at /mnt/host-nix/nix/var/nix/db — matching nix convention.
-        # read-only=true opens the store without write attempts (locks, gc, etc).
-        # When no host mount is present (standalone), the substituter has no
-        # paths and nix falls back to the next substituter in the list.
-        extra-substituters = [ "local?root=/mnt/host-nix&read-only=true" ];
+        # Host nix store substituter is conditionally loaded via
+        # !include /etc/nix/host-store.conf (see nix.extraOptions below).
+        # A systemd oneshot creates that file only when virtiofs is mounted.
+        # Without this, local?root= on an empty dir aborts nix (no SQLite DB).
         require-sigs = false; # Host store paths are unsigned local builds
         trusted-substituters = [
           "https://cache.nixos.org"
           "https://nix-community.cachix.org"
-          "local?root=/mnt/host-nix&read-only=true"
         ];
         trusted-public-keys = [
           "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
           "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         ];
       };
+
+      # Conditionally load host nix store substituter.
+      # !include silently skips if the file doesn't exist (nix built-in).
+      # The file is created by the konductor-host-nix-store systemd service
+      # only when the virtiofs mount succeeds (deploy mode with host store).
+      # Without virtiofs: file absent → no substituter → zero overhead.
+      extraOptions = ''
+        !include /etc/nix/host-store.conf
+      '';
 
       # Pre-configured flake registry - local source for zero network dependency
       # The bundled /opt/konductor/src has the full Nix store cache from build
