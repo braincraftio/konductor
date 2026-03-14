@@ -1728,6 +1728,11 @@ let
         # Go's TLS uses the system trust store by default.
         forgejo-runner = {
           description = "Forgejo Actions Runner";
+          # Boot ordering: systemd auto-starts via wantedBy, but ConditionPathExists
+          # gates on .runner file (created by cloud-init Phase 6 registration).
+          # On first boot: condition fails → skipped → cloud-init Phase 7 starts it.
+          # On subsequent boots: condition passes → systemd auto-starts it.
+          # ExecStartPre polls Forgejo API to handle server not yet reachable.
           after = [
             "network-online.target"
             "docker.service"
@@ -1740,6 +1745,13 @@ let
             "konductor-pki-trust.service"
             "konductor.service"
           ];
+          wantedBy = [ "multi-user.target" ];
+          # Generous restart rate limit: runner must survive long CI jobs
+          # and recover from transient Forgejo outages (scale-to-zero, redeploys)
+          startLimitIntervalSec = 300;
+          startLimitBurst = 10;
+          # Don't start until cloud-init Phase 6 creates the .runner registration file
+          unitConfig.ConditionPathExists = "/home/runner/.config/forgejo-runner/.runner";
           serviceConfig = {
             Type = "simple";
             User = "runner";
@@ -1759,9 +1771,37 @@ let
               # NixOS /etc/ssl/certs is immutable; konductor-pki-trust writes extended bundle
               "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
             ];
+            # Wait for Forgejo to be reachable before starting runner daemon.
+            # Handles race condition: runner starts before Forgejo is deployed
+            # (scale-to-zero, fresh platform deploy, pod restarts).
+            # Retries every 5s for up to 5 minutes.
+            ExecStartPre = pkgs.writeShellScript "wait-for-forgejo" ''
+              URL=$(cat /etc/konductor/forgejo-runner/url 2>/dev/null)
+              if [ -z "$URL" ]; then
+                echo "forgejo-runner: no server URL configured, skipping readiness check"
+                exit 0
+              fi
+              echo "forgejo-runner: waiting for $URL to become reachable..."
+              attempts=0
+              max_attempts=60
+              while [ "$attempts" -lt "$max_attempts" ]; do
+                if ${pkgs.curl}/bin/curl \
+                  --silent --fail --max-time 5 \
+                  --cacert /etc/konductor/pki/bundle/ca-bundle.crt \
+                  -o /dev/null "$URL/api/v1/version" 2>/dev/null; then
+                  echo "forgejo-runner: $URL is reachable"
+                  exit 0
+                fi
+                attempts=$((attempts + 1))
+                echo "forgejo-runner: attempt $attempts/$max_attempts - $URL not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "forgejo-runner: $URL not reachable after $((max_attempts * 5))s, starting anyway"
+              exit 0
+            '';
             ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
             Restart = "always";
-            RestartSec = 10;
+            RestartSec = 15;
           };
         };
 
