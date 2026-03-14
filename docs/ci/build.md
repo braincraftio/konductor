@@ -108,10 +108,10 @@ Reset build state.
 
 ```bash {"name":"k9:ci:qcow2:build:_clean","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,type:destructive"}
 (pgrep -f "[q]emu-system.*nixos.qcow2" && pkill -9 -f "[q]emu-system.*nixos.qcow2") || true
-# Stop virtiofsd daemon (started as background block by _build:vm:virtiofsd)
-systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
-systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
-rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+# Stop virtiofsd daemon (system-scope transient unit, works headless in CI)
+sudo systemctl stop virtiofsd-nixstore 2>/dev/null || true
+sudo systemctl reset-failed virtiofsd-nixstore 2>/dev/null || true
+sudo rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}.pid"
 rm -f "${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}" "${QCOW2_LOGFILE:-build-vm.log}"
 sudo umount -f "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
 fusermount -uz "${QCOW2_MOUNT:-/tmp/nixmount}" 2>/dev/null || true
@@ -560,17 +560,30 @@ VM_CPUS=$((TOTAL_CPUS - 2))
 echo "Allocating ${VM_CPUS} CPUs to build VM (host has ${TOTAL_CPUS})"
 
 # ─────────────────────────────────────────────────────────────────────
-# Start virtiofsd as a transient systemd unit (fully outside runme's
-# process tree). systemd-run --user creates a cgroup-isolated service
-# that runme cannot track or wait on.
+# Start virtiofsd as a system-scope transient systemd unit (fully
+# outside runme's process tree). System scope works headless in CI
+# (no D-Bus user session required) and provides cgroup isolation,
+# journald logging, and proper resource accounting.
 # ─────────────────────────────────────────────────────────────────────
 VIRTIOFS_SOCK="${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
-rm -f "$VIRTIOFS_SOCK"
 
-systemd-run --user --unit=virtiofsd-nixstore \
+# Clean stale socket and pid files (previous runs may leave these behind;
+# virtiofsd refuses to overwrite a pid file it doesn't own)
+sudo rm -f "$VIRTIOFS_SOCK" "${VIRTIOFS_SOCK}.pid"
+
+# Resolve virtiofsd absolute path for sudo (root's PATH lacks user nix profiles)
+VIRTIOFSD_BIN="$(command -v virtiofsd 2>/dev/null)" \
+    || VIRTIOFSD_BIN="/run/current-system/sw/bin/virtiofsd" \
+    && [ -x "$VIRTIOFSD_BIN" ] \
+    || VIRTIOFSD_BIN="/etc/profiles/per-user/${USER}/bin/virtiofsd" \
+    && [ -x "$VIRTIOFSD_BIN" ] \
+    || { echo "✗ virtiofsd not found in PATH, /run/current-system/sw/bin, or user profile"; exit 1; }
+echo "Using virtiofsd: $VIRTIOFSD_BIN"
+
+sudo systemd-run --unit=virtiofsd-nixstore \
     --description="virtiofsd for konductor build" \
     --property=LimitNOFILE=1048576 \
-    -- virtiofsd \
+    -- "$VIRTIOFSD_BIN" \
     --socket-path="$VIRTIOFS_SOCK" \
     --shared-dir=/nix \
     --sandbox=none \
@@ -581,13 +594,15 @@ systemd-run --user --unit=virtiofsd-nixstore \
     --inode-file-handles=prefer \
     --announce-submounts
 
-# Wait for socket
+# Wait for socket (systemd-run returns before exec, socket appears async)
 for i in $(seq 1 20); do
     [ -S "$VIRTIOFS_SOCK" ] && break
     sleep 0.5
 done
-[ -S "$VIRTIOFS_SOCK" ] || { echo "✗ virtiofsd socket not found at $VIRTIOFS_SOCK"; systemctl --user status virtiofsd-nixstore; exit 1; }
-echo "virtiofsd ready: $(systemctl --user show virtiofsd-nixstore --property=MainPID --value)"
+[ -S "$VIRTIOFS_SOCK" ] || { echo "✗ virtiofsd socket not found at $VIRTIOFS_SOCK"; sudo systemctl status virtiofsd-nixstore --no-pager; sudo journalctl -u virtiofsd-nixstore --no-pager -n 10; exit 1; }
+# Socket is root-owned (system-scope unit); make it accessible for QEMU (runs as user)
+sudo chmod 0666 "$VIRTIOFS_SOCK"
+echo "virtiofsd ready: $(sudo systemctl show virtiofsd-nixstore --property=MainPID --value)"
 
 # ─────────────────────────────────────────────────────────────────────
 # Launch QEMU with:
@@ -964,9 +979,9 @@ fi
 rm -f "$PIDFILE"
 
 # Stop virtiofsd daemon (must outlive QEMU, safe to kill after VM halt)
-systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
-systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
-rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+sudo systemctl stop virtiofsd-nixstore 2>/dev/null || true
+sudo systemctl reset-failed virtiofsd-nixstore 2>/dev/null || true
+sudo rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}.pid"
 ```
 
 ---
@@ -1072,9 +1087,9 @@ Remove temporary files.
 ```bash {"name":"k9:ci:qcow2:build:_tmp-clean","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 rm -rf "${QCOW2_CLOUD_INIT_DIR:-/tmp/konductor-build-cloud-init}"
 # Kill virtiofsd if still running (safety net for skipped _build:vm:halt)
-systemctl --user stop virtiofsd-nixstore 2>/dev/null || true
-systemctl --user reset-failed virtiofsd-nixstore 2>/dev/null || true
-rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}"
+sudo systemctl stop virtiofsd-nixstore 2>/dev/null || true
+sudo systemctl reset-failed virtiofsd-nixstore 2>/dev/null || true
+sudo rm -f "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}" "${QCOW2_VIRTIOFS_SOCK:-/tmp/virtiofsd-nixstore.sock}.pid"
 rm -f .nix_drv .system-toplevel
 ```
 
