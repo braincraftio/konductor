@@ -2704,6 +2704,7 @@ let
       format = "qcow2";
       partitionTableType = "efi";
       memSize = 16384;
+      cpuCount = 4; # Cap inner VM cores to avoid starving KubeVirt/host
       # Bake CI devshell closure into image so `nix develop #ci` is instant
       additionalPaths = [ devshells.ci ];
     };

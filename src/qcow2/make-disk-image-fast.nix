@@ -38,6 +38,7 @@
 , efiVariables ? OVMF.variables
 , # VM resources
   memSize ? 4096
+, cpuCount ? 2
 , # Additional content
   contents ? [ ]
 , additionalPaths ? [ ]
@@ -269,8 +270,10 @@ pkgs.vmTools.runInLinuxVM (
       nix
     ];
 
-    QEMU_OPTS = lib.concatStringsSep " " (
-      lib.optional useEFIBoot "-drive if=pflash,format=raw,unit=0,readonly=on,file=${efiFirmware}"
+    QEMU_OPTS = lib.concatStringsSep " " ([
+        "-smp" "cpus=${toString cpuCount}"
+      ]
+      ++ lib.optional useEFIBoot "-drive if=pflash,format=raw,unit=0,readonly=on,file=${efiFirmware}"
       ++ lib.optionals touchEFIVars [
         "-drive if=pflash,format=raw,unit=1,file=$efiVars"
       ]
@@ -282,7 +285,11 @@ pkgs.vmTools.runInLinuxVM (
       ]
     );
 
-    enableParallelBuilding = true;
+    # Do NOT set enableParallelBuilding = true here.
+    # When true, vmTools.runInLinuxVM sets -smp to nproc (all host cores).
+    # Inside a KubeVirt VM, that saturates the virt-launcher and starves
+    # the Kubernetes control plane, crashing the entire cluster.
+    # Instead, we cap vCPUs via QEMU_OPTS in default.nix (cpuCount param).
   }
     ''
       #!${pkgs.bash}/bin/bash
