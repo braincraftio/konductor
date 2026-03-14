@@ -1735,16 +1735,24 @@ let
             ExecStart = pkgs.writeShellScript "activate-host-nix-store" ''
               set -euo pipefail
 
+              ${pkgs.coreutils}/bin/mkdir -p /mnt/host-nix
+
               # Attempt virtiofs mount — exits non-zero if no device
-              mount -t virtiofs -o ro nixstore /mnt/host-nix \
-                && test -f /mnt/host-nix/nix/var/nix/db/db.sqlite \
-                && printf '%s\n' \
-                     'extra-substituters = local?root=/mnt/host-nix&read-only=true' \
-                     'extra-trusted-substituters = local?root=/mnt/host-nix&read-only=true' \
-                     > /etc/nix/host-store.conf \
-                && echo "host-nix-store: activated local substituter" \
-                && systemctl restart nix-daemon.service \
-                || echo "host-nix-store: virtiofs unavailable or no nix DB, standalone mode"
+              ${pkgs.util-linux}/bin/mount -t virtiofs -o ro nixstore /mnt/host-nix 2>/dev/null \
+                || { echo "host-nix-store: no virtiofs device, standalone mode"; exit 0; }
+
+              # Mounted — verify nix DB exists
+              ${pkgs.coreutils}/bin/test -f /mnt/host-nix/nix/var/nix/db/db.sqlite \
+                || { echo "host-nix-store: virtiofs mounted but no nix DB, unmounting";
+                     ${pkgs.util-linux}/bin/umount /mnt/host-nix; exit 0; }
+
+              # DB present — activate substituter and restart nix-daemon
+              printf '%s\n' \
+                'extra-substituters = local?root=/mnt/host-nix&read-only=true' \
+                'extra-trusted-substituters = local?root=/mnt/host-nix&read-only=true' \
+                > /etc/nix/host-store.conf
+              echo "host-nix-store: activated local substituter"
+              ${pkgs.systemd}/bin/systemctl restart nix-daemon.service
             '';
           };
         };
