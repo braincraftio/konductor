@@ -1846,6 +1846,76 @@ let
         };
 
         # =====================================================================
+        # Forgejo Runner Registration Retry Service
+        # =====================================================================
+        # Defense in depth: if cloud-init registration fails (Forgejo not ready),
+        # the timer below retries every 30s until .runner file is created.
+        # Once registered, forgejo-runner.service is started and timer stops.
+        forgejo-runner-register = {
+          description = "Retry Forgejo Runner Registration";
+          after = [
+            "network-online.target"
+            "konductor-pki-trust.service"
+          ];
+          wants = [ "network-online.target" ];
+          # Do NOT add wantedBy — started only by the timer
+          unitConfig.ConditionPathExists = "!/home/runner/.config/forgejo-runner/.runner";
+          serviceConfig = {
+            Type = "oneshot";
+            User = "runner";
+            Group = "users";
+            Environment = [
+              "HOME=/home/runner"
+              "PATH=/run/wrappers/bin:/run/current-system/sw/bin"
+              "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
+            ];
+            ExecStart = pkgs.writeShellScript "forgejo-runner-register-retry" ''
+              CONFIG_DIR="/home/runner/.config/forgejo-runner"
+              RUNNER_FILE="$CONFIG_DIR/.runner"
+
+              # Skip if already registered
+              if [ -f "$RUNNER_FILE" ]; then
+                echo "forgejo-runner-register: already registered, nothing to do"
+                exit 0
+              fi
+
+              SECRET_FILE="/etc/konductor/forgejo-runner/secret"
+              URL_FILE="/etc/konductor/forgejo-runner/url"
+
+              if [ ! -f "$SECRET_FILE" ] || [ ! -f "$URL_FILE" ]; then
+                echo "forgejo-runner-register: secret or url not configured, skipping"
+                exit 1
+              fi
+
+              SECRET=$(${pkgs.coreutils}/bin/cat "$SECRET_FILE")
+              URL=$(${pkgs.coreutils}/bin/cat "$URL_FILE")
+              NAME=$(${pkgs.hostname}/bin/hostname)
+
+              echo "forgejo-runner-register: attempting registration against $URL..."
+              ${pkgs.coreutils}/bin/mkdir -p "$CONFIG_DIR"
+
+              if ${programs.forgejo.runner}/bin/forgejo-runner \
+                --config "$CONFIG_DIR/config.yaml" \
+                create-runner-file \
+                --secret "$SECRET" \
+                --instance "$URL" \
+                --name "$NAME" \
+                --connect; then
+                echo "forgejo-runner-register: registration succeeded, starting runner"
+                # Start the runner service now that .runner exists
+                /run/current-system/sw/bin/systemctl start forgejo-runner.service || true
+                # Stop the retry timer — no longer needed
+                /run/current-system/sw/bin/systemctl stop forgejo-runner-register.timer || true
+                exit 0
+              else
+                echo "forgejo-runner-register: registration failed, timer will retry"
+                exit 1
+              fi
+            '';
+          };
+        };
+
+        # =====================================================================
         # Multi-User Service Orchestration
         # =====================================================================
         # Template units for per-user services with deterministic port allocation.
@@ -2258,6 +2328,23 @@ let
           PathModified = "/var/lib/konductor/services.toml";
           Unit = "konductor-config-reload.service";
         };
+      };
+    };
+
+    # =====================================================================
+    # Forgejo Runner Registration Retry Timer
+    # =====================================================================
+    # Periodically triggers forgejo-runner-register.service to retry
+    # runner registration if .runner file doesn't exist yet.
+    # ConditionPathExists prevents activation once registration succeeds.
+    systemd.timers.forgejo-runner-register = {
+      description = "Retry Forgejo Runner Registration Timer";
+      wantedBy = [ "timers.target" ];
+      unitConfig.ConditionPathExists = "!/home/runner/.config/forgejo-runner/.runner";
+      timerConfig = {
+        OnBootSec = "30s";
+        OnUnitActiveSec = "30s";
+        AccuracySec = "5s";
       };
     };
 
