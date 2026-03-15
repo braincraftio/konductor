@@ -856,6 +856,9 @@ let
           isNormalUser = true;
           inherit (users.kc2) uid home;
           description = users.kc2.gecos;
+          # Linger: keep systemd --user alive across SSH sessions so Open Sesame
+          # daemons persist. SSH agent socket is refreshed via profile.d hook.
+          linger = true;
           extraGroups = [
             "kc2"
             "docker"
@@ -867,6 +870,7 @@ let
           isNormalUser = true;
           inherit (users.kc2admin) uid home;
           description = users.kc2admin.gecos;
+          linger = true;
           extraGroups = [
             "kc2"
             "wheel"
@@ -1111,6 +1115,33 @@ let
 
         # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
         # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
+
+        # /etc/profile.d/konductor-ssh-agent.sh - propagate forwarded SSH agent
+        # to systemd user services via stable symlink + environment import.
+        # Runs on every interactive SSH login. Idempotent.
+        "profile.d/konductor-ssh-agent.sh".text = ''
+          # Propagate SSH agent forwarding to systemd user services.
+          # Creates a stable symlink at ~/.ssh/agent.sock so services using
+          # a fixed SSH_AUTH_SOCK path can reach the forwarded agent even
+          # after session rotation.
+          if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+            # Create stable symlink (updated on each login)
+            mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+            ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent.sock"
+
+            # Override SSH_AUTH_SOCK for this session to use the stable path
+            export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+
+            # Write EnvironmentFile for Open Sesame systemd user services
+            mkdir -p "$HOME/.config/pds" 2>/dev/null || true
+            printf 'SSH_AUTH_SOCK=%s/.ssh/agent.sock\n' "$HOME" > "$HOME/.config/pds/ssh-agent.env"
+
+            # Import into systemd user manager (affects newly started services)
+            if command -v systemctl >/dev/null 2>&1; then
+              systemctl --user import-environment SSH_AUTH_SOCK 2>/dev/null || true
+            fi
+          fi
+        '';
 
         # /etc/profile.d/konductor-proxy.sh - sources proxy env for shell sessions
         # Cloud-init writes /etc/konductor/proxy.env, this script sources it
@@ -2357,7 +2388,19 @@ let
           PermitRootLogin = "yes";
           PasswordAuthentication = false;
           KbdInteractiveAuthentication = false;
+          # Explicit: permit agent forwarding (default is yes)
+          AllowAgentForwarding = true;
+          # Clean up stale StreamLocalForward sockets on reconnect
+          StreamLocalBindUnlink = true;
         };
+        # Deny agent forwarding for service accounts (CI runner, forge server).
+        # These accounts should never proxy signing authority from a user's keys.
+        extraConfig = ''
+          Match User runner
+            AllowAgentForwarding no
+          Match User forgejo
+            AllowAgentForwarding no
+        '';
       };
 
       # QEMU guest agent for VM management
