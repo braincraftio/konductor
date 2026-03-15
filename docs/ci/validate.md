@@ -245,7 +245,7 @@ kubectl exec -n "$FORGEJO_NS" "$FORGEJO_DEPLOY" -c forgejo -- \
 
 echo ""
 echo "▶ Phase 6: Wait for workflow completion..."
-MAX_WAIT=300
+MAX_WAIT=5400
 POLL_INTERVAL=5
 ELAPSED=0
 STATUS="unknown"
