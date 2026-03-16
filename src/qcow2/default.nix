@@ -55,6 +55,9 @@ let
   # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
   inherit (devshellPackages) konductor;
 
+  # Open Sesame headless package (profile, secrets, launcher, snippets daemons)
+  openSesamePkg = inputs.open-sesame.packages.${system}.open-sesame-headless;
+
   # Systemd mount service template for virtio disk mounting
   mountService = import ./konductor-mount-template.nix { inherit pkgs; };
 
@@ -1145,6 +1148,25 @@ let
           dotenv_if_exists "$HOME/.env"
         '';
 
+        # /etc/skel/.config/pds - Open Sesame headless config
+        # Minimal config for headless mode (no WM keybindings)
+        "skel/.config/pds/config.toml".text = ''
+          config_version = 3
+
+          [global]
+          default_profile = "default"
+          [global.ipc]
+          [global.logging]
+
+          [profiles.default]
+          name = "default"
+          [profiles.default.wm]
+
+          [crypto]
+          [agents]
+          [extensions]
+        '';
+
         # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
         # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
 
@@ -1204,6 +1226,12 @@ let
             mkdir -p "$HOME/.config"
             cp -L /etc/skel/.config/starship.toml "$HOME/.config/"
           fi
+          if [ ! -f "$HOME/.config/pds/config.toml" ] && [ -f /etc/skel/.config/pds/config.toml ]; then
+            mkdir -p "$HOME/.config/pds"
+            cp -L /etc/skel/.config/pds/config.toml "$HOME/.config/pds/"
+          fi
+          # Open Sesame runtime directories (needed by systemd user services)
+          mkdir -p "$HOME/.config/pds" "$HOME/.cache/open-sesame" 2>/dev/null || true
           # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
 
           # Language paths
@@ -1303,6 +1331,8 @@ let
           yj # TOML to JSON converter (for konductor-init.service)
           yq-go # YAML/TOML/JSON processor
         ])
+        # Open Sesame headless daemons (profile, secrets, launcher, snippets)
+        ++ [ openSesamePkg ]
         # Certificate precedence detection for multi-user services
         ++ [ certPrecedenceScript ]
         # FHS compatibility: ldconfig wrapper with high priority
@@ -1362,6 +1392,127 @@ let
         "d /workspace 2775 kc2 kc2 -"
         "d /run/konductor 0755 root root -"  # cert-env files for per-user services
       ];
+
+      # =====================================================================
+      # Open Sesame — system-wide user services (headless mode)
+      # =====================================================================
+      # NixOS-level systemd.user.* puts units in /etc/systemd/user/ which
+      # applies to ALL users, including cloud-init dynamic users that are
+      # not managed by home-manager. For built-in HM users, /etc/systemd/user/
+      # takes precedence over ~/.config/systemd/user/ (harmless shadow).
+
+      user.targets.open-sesame = {
+        unitConfig = {
+          Description = "Open Sesame Headless Suite";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+        };
+        wantedBy = [ "default.target" ];
+      };
+
+      user.services.open-sesame-profile = {
+        unitConfig = {
+          Description = "Open Sesame profile daemon (IPC bus)";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          PartOf = [ "open-sesame.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${openSesamePkg}/bin/daemon-profile";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+          LimitNOFILE = 4096;
+          MemoryMax = "128M";
+          Environment = [ "RUST_LOG=info" ];
+          EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
+        };
+        wantedBy = [ "open-sesame.target" ];
+      };
+
+      user.services.open-sesame-secrets = {
+        unitConfig = {
+          Description = "Open Sesame secrets daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${openSesamePkg}/bin/daemon-secrets";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          PrivateNetwork = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+          LimitNOFILE = 1024;
+          LimitMEMLOCK = "64M";
+          MemoryMax = "256M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+        wantedBy = [ "open-sesame.target" ];
+      };
+
+      user.services.open-sesame-launcher = {
+        unitConfig = {
+          Description = "Open Sesame launcher daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${openSesamePkg}/bin/daemon-launcher";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+          LimitNOFILE = 4096;
+          MemoryMax = "128M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+        wantedBy = [ "open-sesame.target" ];
+      };
+
+      user.services.open-sesame-snippets = {
+        unitConfig = {
+          Description = "Open Sesame snippets daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${openSesamePkg}/bin/daemon-snippets";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          ReadWritePaths = [ "%t/pds" ];
+          LimitNOFILE = 4096;
+          MemoryMax = "128M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+        wantedBy = [ "open-sesame.target" ];
+      };
 
       network = {
         enable = true;
