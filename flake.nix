@@ -78,6 +78,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Open Sesame — programmable desktop suite (headless mode for konductor)
+    # Linux-only: profile, secrets, launcher, snippets daemons
+    open-sesame = {
+      url = "git+https://github.com/scopecreep-zip/open-sesame";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Forked Forgejo runner with workspace isolation
     # Source: git.braincraft.io/BrainCraft/runner
     # Update: nix flake update forgejo-runner-src

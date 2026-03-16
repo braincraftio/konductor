@@ -439,6 +439,13 @@ let
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
+    imports = [ inputs.open-sesame.homeManagerModules.default ];
+
+    programs.open-sesame = {
+      enable = true;
+      headless = true;
+    };
+
     home = {
       inherit (versions.nixos) stateVersion;
       file = {
