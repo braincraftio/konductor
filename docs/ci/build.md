@@ -157,6 +157,15 @@ echo "Clean state validation:"
 [ ! -e konductor.qcow2 ] && printf "✓ no konductor.qcow2\n" || { printf "✗ stale konductor.qcow2 exists\n"; ((ERRORS++)); }
 [ ! -e .konductor ] && printf "✓ no .konductor\n" || { printf "✗ stale .konductor exists\n"; ((ERRORS++)); }
 
+# Working directory must be writable (nix build creates result symlink here)
+if touch .write-test 2>/dev/null; then
+    rm -f .write-test
+    printf "✓ Working directory writable by $(whoami)\n"
+else
+    printf "✗ Working directory not writable by $(whoami) (owner: $(stat -c '%U:%G %a' .))\n"
+    ((ERRORS++))
+fi
+
 # ─────────────────────────────────────────────────────────────────────
 # REQUIRED BINARIES
 # ─────────────────────────────────────────────────────────────────────
@@ -726,7 +735,12 @@ if [ -n "$DIRTY" ]; then
     echo "$DIRTY"
 fi
 
-ssh $SSH_OPTS kc2admin@localhost 'sudo chmod -R a+rX /opt/konductor && sudo chown -R kc2:kc2 /opt/konductor'
+# Set ownership to kc2:kc2 and restore group-write + setgid on directories.
+# git clone creates directories as 755, losing the 2775 that tmpfiles.rules
+# sets on /opt/konductor. Without g+ws on directories, kc2 group members
+# (additional users like katmorg, dyreddin, etc.) can't create files here
+# (e.g., nix build result symlink fails with Permission denied).
+ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor && sudo chmod -R a+rX /opt/konductor && sudo find /opt/konductor -type d -exec chmod g+ws {} +'
 rm -f "/tmp/${BUNDLE}"
 
 echo "✓ /opt/konductor/${BUNDLE} (bundle)"
