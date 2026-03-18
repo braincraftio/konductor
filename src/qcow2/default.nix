@@ -967,6 +967,16 @@ let
       bash = {
         # Shell initialization (all bash shells)
         shellInit = ''
+          # Source proxy configuration for all shell types (login, non-login, scripts)
+          # profile.d only runs for login shells; this ensures non-login shells
+          # (e.g., subshells, direnv, nix develop) also inherit proxy vars.
+          # The file uses KEY=VALUE format (systemd EnvironmentFile compatible),
+          # so set -a is needed to auto-export.
+          if [ -f /etc/konductor/proxy.env ]; then
+            set -a
+            . /etc/konductor/proxy.env
+            set +a
+          fi
           # Language tool paths (complements profile.d/konductor-env.sh)
           export PATH="''${GOPATH:-$HOME/go}/bin:''${CARGO_HOME:-$HOME/.cargo}/bin:''${PNPM_HOME:-$HOME/.local/share/pnpm}:$PATH"
         '';
