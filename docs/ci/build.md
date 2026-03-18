@@ -740,7 +740,7 @@ fi
 # sets on /opt/konductor. Without g+ws on directories, kc2 group members
 # (additional users like katmorg, dyreddin, etc.) can't create files here
 # (e.g., nix build result symlink fails with Permission denied).
-ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor && sudo chmod -R a+rX /opt/konductor && sudo find /opt/konductor -type d -exec chmod g+ws {} +'
+ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor && sudo chmod -R a+rX /opt/konductor && sudo fd --type directory --hidden --no-ignore . /opt/konductor --exec chmod g+ws {}'
 rm -f "/tmp/${BUNDLE}"
 
 echo "✓ /opt/konductor/${BUNDLE} (bundle)"
