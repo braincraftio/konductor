@@ -227,10 +227,10 @@ in
         # Creates /etc/konductor/pki/signed/wildcard.{crt,key} if hypervisor CA
         # is mounted at /mnt/pki/ca.{crt,key}.
         konductor-pki-signed = {
-          description = "Generate Konductor Hypervisor-Signed Certificate";
-          # Wait for PKI disk mount before evaluating ConditionPathExists.
-          # udev triggers konductor-mount@pki.service when the virtio disk appears;
-          # After= ensures this service starts only once the mount completes.
+          description = "Cross-sign VM CA with hypervisor CA (Tier 2 upgrade)";
+          # Wait for:
+          # - konductor-pki-vm: Tier 3 self-signed CA must exist first
+          # - konductor-mount@pki: hypervisor CA disk must be mounted at /mnt/pki/
           after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
           wantedBy = [ "multi-user.target" ];
 
@@ -242,77 +242,67 @@ in
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
+            Environment = [
+              "PYTHONPATH=/opt/konductor/src/src"
+            ];
             ExecStart = pkgs.writeShellScript "generate-signed-pki" ''
               set -euo pipefail
 
               echo "=========================================="
-              echo "Konductor Tier 2 Certificate Generation"
+              echo "Konductor Tier 2: Cross-Sign VM CA"
               echo "=========================================="
 
-              PKI_ROOT="/etc/konductor/pki"
-
-              # Verify hypervisor CA is available
+              # Verify hypervisor CA is available at mount point
               if [ ! -f /mnt/pki/tls.key ] || [ ! -f /mnt/pki/ca.crt ]; then
-                echo "✗ Hypervisor CA not available - skipping Tier 2"
+                echo "✗ Hypervisor CA not available at /mnt/pki/ - skipping"
                 exit 0
               fi
 
-              echo "✓ Hypervisor CA available - generating signed certificate"
+              echo "✓ Hypervisor CA available at /mnt/pki/"
 
-              # Generate private key (EC secp256r1 for performance)
-              ${pkgs.openssl}/bin/openssl ecparam -genkey -name prime256v1 \
-                -out "$PKI_ROOT/signed/wildcard.key"
-              chmod 640 "$PKI_ROOT/signed/wildcard.key"
+              # Check if VM CA is already cross-signed (issuer != subject)
+              VM_CA="/etc/konductor/pki/vm/ca.crt"
+              if [ -f "$VM_CA" ]; then
+                SUBJECT=$(${pkgs.openssl}/bin/openssl x509 -in "$VM_CA" -noout -subject 2>/dev/null | sed 's/subject=//')
+                ISSUER=$(${pkgs.openssl}/bin/openssl x509 -in "$VM_CA" -noout -issuer 2>/dev/null | sed 's/issuer=//')
+                if [ "$SUBJECT" != "$ISSUER" ]; then
+                  echo "✓ VM CA already cross-signed"
+                  echo "  Subject: $SUBJECT"
+                  echo "  Issuer:  $ISSUER"
+                  exit 0
+                fi
+                echo "  VM CA is self-signed - upgrading to intermediate CA"
+              fi
 
-              # Create CSR with proper subject
-              ${pkgs.openssl}/bin/openssl req -new \
-                -key "$PKI_ROOT/signed/wildcard.key" \
-                -out /tmp/wildcard.csr \
-                -subj "/O=${cfg.organization}/OU=${cfg.organizationalUnit}/CN=*.${cfg.domain}"
+              # Cross-sign: regenerate VM CA as intermediate signed by hypervisor CA.
+              # cmd_generate --force detects /mnt/pki/{ca.crt,tls.key} and uses
+              # _build_cross_signed_ca() to produce an intermediate CA with:
+              #   - pathLenConstraint=0
+              #   - Authority Key Identifier linking to hypervisor CA
+              #   - Full provenance OID extensions from /.konductor
+              # Then generates a new wildcard signed by the intermediate CA.
+              # All output goes to /etc/konductor/pki/vm/{ca,wildcard}.{crt,key}
+              ${pythonPki} -m pki generate \
+                --force \
+                --domain "${cfg.domain}" \
+                --org "${cfg.organization}" \
+                --ou "${cfg.organizationalUnit}" \
+                --ca-days ${toString cfg.caValidityDays} \
+                --cert-days ${toString cfg.certValidityDays}
 
-              # Create SAN extensions file
-              cat > /tmp/san.ext << 'EOF'
-              subjectAltName=DNS:*.${cfg.domain},DNS:${cfg.domain},DNS:*.docker.${cfg.domain},DNS:docker.${cfg.domain}
-              basicConstraints=CA:FALSE
-              keyUsage=digitalSignature,keyEncipherment
-              extendedKeyUsage=serverAuth,clientAuth
-              EOF
-
-              # Sign with hypervisor CA
-              ${pkgs.openssl}/bin/openssl x509 -req \
-                -in /tmp/wildcard.csr \
-                -CA /mnt/pki/ca.crt \
-                -CAkey /mnt/pki/tls.key \
-                -out "$PKI_ROOT/signed/wildcard.crt" \
-                -days ${toString cfg.certValidityDays} \
-                -sha256 \
-                -extfile /tmp/san.ext \
-                -set_serial "0x$(${pkgs.openssl}/bin/openssl rand -hex 20)"
-
-              # Copy hypervisor CA for reference
-              cp /mnt/pki/ca.crt "$PKI_ROOT/hypervisor/ca.crt"
-
-              # Verify certificate
-              if ${pkgs.openssl}/bin/openssl verify -CAfile /mnt/pki/ca.crt "$PKI_ROOT/signed/wildcard.crt" >/dev/null 2>&1; then
-                echo "✓ Certificate signed by hypervisor CA"
-                ISSUER=$(${pkgs.openssl}/bin/openssl x509 -in "$PKI_ROOT/signed/wildcard.crt" -noout -issuer | sed 's/issuer=//')
-                echo "  Issuer: $ISSUER"
-
-                # Set permissions (readable by kc2 group)
-                chgrp kc2 "$PKI_ROOT/signed/wildcard.key" "$PKI_ROOT/signed/wildcard.crt"
-                chmod 640 "$PKI_ROOT/signed/wildcard.key"
-                chmod 644 "$PKI_ROOT/signed/wildcard.crt"
+              # Verify the full chain: wildcard → VM CA (intermediate) → hypervisor CA
+              if ${pkgs.openssl}/bin/openssl verify \
+                -CAfile /mnt/pki/ca.crt \
+                -untrusted /etc/konductor/pki/vm/ca.crt \
+                /etc/konductor/pki/vm/wildcard.crt >/dev/null 2>&1; then
+                echo "✓ Chain verified: wildcard → VM CA → hypervisor CA"
               else
-                echo "✗ Certificate verification failed - removing Tier 2 certs"
-                rm -f "$PKI_ROOT/signed/wildcard."{crt,key}
+                echo "✗ Chain verification FAILED"
                 exit 1
               fi
 
-              # Cleanup temp files
-              rm -f /tmp/wildcard.csr /tmp/san.ext
-
               echo "=========================================="
-              echo "Tier 2 Certificate Generation Complete"
+              echo "Tier 2: Cross-Sign Complete"
               echo "=========================================="
             '';
           };
@@ -408,6 +398,7 @@ in
           description = "Generate Konductor CA bundle";
           after = [
             "konductor-pki-vm.service"
+            "konductor-pki-signed.service"
           ] ++ lib.optional (cfg.hypervisorCaPath != null) "konductor-pki-hypervisor.service";
           wantedBy = [ "multi-user.target" ];
 
