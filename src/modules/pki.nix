@@ -184,6 +184,10 @@ in
           before = [ "network.target" ];
           wantedBy = [ "multi-user.target" ];
 
+          # git is required by the Python PKI fingerprint module to read
+          # build provenance from /opt/konductor/src/.git
+          path = [ pkgs.git ];
+
           unitConfig = {
             ConditionPathExists = "!/etc/konductor/pki/vm/ca.crt";
           };
@@ -233,6 +237,10 @@ in
           # - konductor-mount@pki: hypervisor CA disk must be mounted at /mnt/pki/
           after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
           wantedBy = [ "multi-user.target" ];
+
+          # git is required by the Python PKI fingerprint module to read
+          # build provenance from /opt/konductor/src/.git
+          path = [ pkgs.git ];
 
           # Only run if hypervisor CA key is mounted
           unitConfig = {
