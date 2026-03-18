@@ -1686,11 +1686,11 @@ let
         #         no_proxy=localhost,127.0.0.1,10.0.0.0/8
         #         NO_PROXY=localhost,127.0.0.1,10.0.0.0/8
         konductor-proxy-setup = {
-          description = "Configure proxy for Docker from cloud-init";
+          description = "Configure proxy for Docker and Nix from cloud-init";
           # Wait for cloud-init to complete (when proxy.env is written)
           after = [ "cloud-init.service" ];
-          # Start before docker (for ordering on subsequent boots)
-          before = [ "docker.service" ];
+          # Start before docker and nix-daemon (for ordering on subsequent boots)
+          before = [ "docker.service" "nix-daemon.service" ];
           # Activate via multi-user target (not wantedBy the service itself)
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
@@ -1731,7 +1731,17 @@ let
                 echo "  · docker not yet active (will use proxy config on first start)"
               fi
 
-              echo "Proxy configuration applied to Docker"
+              # Restart nix-daemon so the proxy wrapper re-sources proxy.env
+              # The nix-daemon is socket-activated and may have started before
+              # cloud-init wrote proxy.env. The wrapper script sources the file
+              # at daemon start time, so a restart ensures it picks up the config.
+              if systemctl is-active --quiet nix-daemon.service 2>/dev/null; then
+                systemctl restart nix-daemon.service && echo "  ✓ nix-daemon restarted (was active)"
+              else
+                echo "  · nix-daemon not yet active (will use proxy config on first start)"
+              fi
+
+              echo "Proxy configuration applied to Docker and Nix"
             '';
           };
         };
