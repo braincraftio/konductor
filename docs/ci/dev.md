@@ -61,7 +61,7 @@ Boot VM for local development and testing.
 **Prerequisites:** `result/nixos.qcow2` exists (run `build:image` first)
 
 ```bash {"name":"k9:ci:dev:start","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:kvm"}
-set -ex
+set -e
 PIDFILE="${QCOW2_PIDFILE:-/tmp/konductor-build-vm.pid}"
 
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then

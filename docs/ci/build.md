@@ -127,7 +127,7 @@ echo "✓ Clean"
 Validate environment (standalone — no cluster required).
 
 ```bash {"name":"k9:ci:qcow2:build:preflight","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
-set -ex
+set -e
 
 echo "bash: $(which bash) (${BASH_VERSION})"
 
@@ -328,7 +328,7 @@ echo ""
 Build NixOS closure and capture nix_drv.
 
 ```bash {"name":"k9:ci:qcow2:build:_nix","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image,requires:nix"}
-set -ex
+set -e
 if [ "${SKIP_NIX_BUILD:-false}" = "true" ] && [ -d result.writable ]; then
     echo "SKIP_NIX_BUILD: reusing existing"
     exit 0
@@ -940,8 +940,7 @@ Garbage collect.
 
 ```bash {"name":"k9:ci:qcow2:build:_vm-gc","tag":"k9:ci:qcow2:build,k9:ci:pipeline:all,k9:ci:pipeline:image"}
 [ "${SKIP_VM_PHASE:-false}" = "true" ] && exit 0
-set -ex
-echo "DEBUG gc: HOME=$HOME PATH=$PATH"
+set -e
 SSH_PORT="${QCOW2_SSH_PORT:-2222}"
 SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 # No overlay — /nix/store is the real on-disk store.
@@ -1139,9 +1138,8 @@ set -e
 if ! eval "$(nix print-dev-env .#konductor)"; then
     echo "Warning: nix print-dev-env failed, using current environment"
 fi
-echo "DEBUG: which docker=$(which docker)"
-echo "DEBUG: docker buildx version=$(docker buildx version 2>&1)"
-echo "DEBUG: PATH (first 20):" && echo "$PATH" | tr ':' '\n' | head -20 || true
+echo "docker: $(which docker)"
+echo "buildx: $(docker buildx version 2>&1)"
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
 IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 TAG="${CONTAINER_TAG:-latest-qcow2}"
