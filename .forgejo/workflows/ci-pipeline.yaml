@@ -17,8 +17,8 @@ jobs:
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
-          direnv allow "${WORKSPACE_ROOT}/k9"
-          cd "${WORKSPACE_ROOT}/k9"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
           DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
           if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
             echo "$DIRENV_JSON" | jq -r '
