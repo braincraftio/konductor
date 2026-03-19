@@ -848,7 +848,10 @@ let
       # Group must be defined BEFORE users reference it in extraGroups
       groups.kc2 = {
         gid = 1001;
-        members = [ "kc2" "kc2admin" "runner" ];
+        members = [ "kc2" "kc2admin" "runner" "forgejo" ];
+      };
+      groups.forgejo = {
+        gid = users.forgejo.gid;
       };
 
       users = {
@@ -897,6 +900,18 @@ let
             ++ programs.forgejo.runnerPackages
             ++ programs.forgejo.cliPackages
             ++ konductor.packages;
+        };
+        # Forgejo server user — reserves UID 1004 so cloud-init
+        # additional users (1005+) get their expected UIDs.
+        forgejo = {
+          isNormalUser = true;
+          inherit (users.forgejo) uid home;
+          description = users.forgejo.gecos;
+          extraGroups = [
+            "kc2"
+            "forgejo"
+            "docker"
+          ];
         };
       };
     };
@@ -2210,7 +2225,7 @@ let
                                 case "$svc_name" in
                                   ttyd)
                                     cat >> "$DROPIN_PATH/50-config.conf" << EOF
-              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${pkgs.ttyd}/bin/ttyd --port \''${PORT} --ssl --ssl-cert \$CERT_PATH --ssl-key \$KEY_PATH bash'
+              ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${programs.ttyd.wrapped}/bin/ttyd-konductor -p \''${PORT} -S -C \$CERT_PATH -K \$KEY_PATH -- ${pkgs.bashInteractive}/bin/bash'
               EOF
                                     ;;
                                   restty)
@@ -2392,6 +2407,12 @@ let
     # Periodically triggers forgejo-runner-register.service to retry
     # runner registration if .runner file doesn't exist yet.
     # ConditionPathExists prevents activation once registration succeeds.
+    # Ensure /run/konductor/ exists independent of any service lifecycle.
+    # Per-user services write cert-env files here; tmpfiles.d survives restarts.
+    systemd.tmpfiles.rules = [
+      "d /run/konductor 0755 root root -"
+    ];
+
     systemd.timers.forgejo-runner-register = {
       description = "Retry Forgejo Runner Registration Timer";
       wantedBy = [ "timers.target" ];

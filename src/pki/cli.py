@@ -263,12 +263,15 @@ def cmd_generate(args: list[str]) -> int:
     leaf_cert = build_leaf_certificate(
         leaf_key, signing_key, signing_cert, identity, trust_tier, validity_days=cert_days
     )
+    # Write full chain: leaf + signing CA intermediate
+    # Envoy needs the intermediate to verify against root CA in ConfigMap
+    chain_pem = leaf_cert.public_bytes(Encoding.PEM) + signing_cert.public_bytes(Encoding.PEM)
     atomic_write(
         config.VM_WILDCARD_CERT,
-        leaf_cert.public_bytes(Encoding.PEM),
+        chain_pem,
         config.MODE_CERTIFICATE,
     )
-    ok(f"Wildcard cert: {config.VM_WILDCARD_CERT}")
+    ok(f"Wildcard cert (chain): {config.VM_WILDCARD_CERT}")
 
     print()
     _print_cert_summary("CA", ca_cert)
@@ -487,12 +490,14 @@ def cmd_hypervisor(args: list[str]) -> int:
                 trust_tier,
                 validity_days=cert_days,
             )
+            # Write full chain: leaf + hypervisor CA intermediate
+            chain_pem = leaf_cert.public_bytes(Encoding.PEM) + hyp_ca_cert.public_bytes(Encoding.PEM)
             atomic_write(
                 config.VM_WILDCARD_CERT,
-                leaf_cert.public_bytes(Encoding.PEM),
+                chain_pem,
                 config.MODE_CERTIFICATE,
             )
-            ok(f"Wildcard cert (hypervisor-signed): {config.VM_WILDCARD_CERT}")
+            ok(f"Wildcard cert (hypervisor-signed, chain): {config.VM_WILDCARD_CERT}")
     else:
         info(f"Hypervisor key not found: {key_path}")
         info("CA imported for trust only (no wildcard signing)")
