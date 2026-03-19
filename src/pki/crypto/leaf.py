@@ -126,9 +126,13 @@ def build_leaf_certificate(
             critical=False,
         )
         # Authority Key Identifier (from signing CA)
+        # Copy SKI from signing cert directly rather than recomputing,
+        # which may differ if the cert was issued by cert-manager.
         .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(
-                signing_key.public_key()
+            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                signing_cert.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier
+                ).value
             ),
             critical=False,
         )

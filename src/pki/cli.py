@@ -377,9 +377,14 @@ def _build_cross_signed_ca(
             critical=False,
         )
         # Authority Key Identifier (links to issuer)
+        # Use from_issuer_subject_key_identifier to copy the SKI directly
+        # from the issuer cert. from_issuer_public_key recomputes it via
+        # SHA-1, which may differ from how cert-manager computed the SKI.
         .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(
-                issuer_cert.public_key()
+            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                issuer_cert.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier
+                ).value
             ),
             critical=False,
         )
