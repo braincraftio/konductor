@@ -1353,6 +1353,7 @@ let
         "d /opt/konductor 2775 kc2 kc2 -"
         "d /home/Git 2775 kc2 kc2 -"
         "d /workspace 2775 kc2 kc2 -"
+        "d /run/konductor 0755 root root -"  # cert-env files for per-user services
       ];
 
       network = {
@@ -2407,12 +2408,6 @@ let
     # Periodically triggers forgejo-runner-register.service to retry
     # runner registration if .runner file doesn't exist yet.
     # ConditionPathExists prevents activation once registration succeeds.
-    # Ensure /run/konductor/ exists independent of any service lifecycle.
-    # Per-user services write cert-env files here; tmpfiles.d survives restarts.
-    systemd.tmpfiles.rules = [
-      "d /run/konductor 0755 root root -"
-    ];
-
     systemd.timers.forgejo-runner-register = {
       description = "Retry Forgejo Runner Registration Timer";
       wantedBy = [ "timers.target" ];
