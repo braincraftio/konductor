@@ -2190,6 +2190,10 @@ let
                                 mkdir -p "$DROPIN_PATH"
 
                                 cat > "$DROPIN_PATH/50-config.conf" << EOF
+                            [Unit]
+                            After=konductor-mount@home-''${USER_UID}.service
+                            Wants=konductor-mount@home-''${USER_UID}.service
+
                             [Service]
                             EnvironmentFile=$ENV_FILE
 
