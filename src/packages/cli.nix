@@ -22,6 +22,7 @@ let
         config.shell.starship.package # Starship with Konductor theme
         config.tree.package # Tree with gitignore-aware filtering
         config.k9s.package # k9s with Catppuccin Frappe theme
+        config.btop.package # btop with Catppuccin Frappe theme
         # Note: bash.package is not included here - it's used via shellHook/bashrcContent
       ]
       ++ config.shell.atuin.packages # Atuin + bash-preexec for shell history
@@ -32,6 +33,7 @@ let
         pkgs.starship
         pkgs.tree
         pkgs.unstable.k9s
+        pkgs.btop
         pkgs.atuin
         pkgs.bash-preexec
       ];

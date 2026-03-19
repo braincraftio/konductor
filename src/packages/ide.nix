@@ -24,7 +24,7 @@ in
   packages = with pkgs; [
     lazygit # Git TUI
     htop # Process monitor
-    btop
+    # btop → wrapped with Catppuccin theme in cli.nix (config.btop.package)
     # bottom → provided in cli.nix (in packages.default)
     macchina # System info fetcher
     bat # cat with syntax highlighting
