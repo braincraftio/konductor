@@ -1715,8 +1715,8 @@ let
           description = "Configure proxy for Docker and Nix from cloud-init";
           # Wait for cloud-init to complete (when proxy.env is written)
           after = [ "cloud-init.service" ];
-          # Start before docker and nix-daemon (for ordering on subsequent boots)
-          before = [ "docker.service" "nix-daemon.service" ];
+          # Start before docker, nix-daemon, and forgejo-runner (for ordering on subsequent boots)
+          before = [ "docker.service" "nix-daemon.service" "forgejo-runner.service" ];
           # Activate via multi-user target (not wantedBy the service itself)
           wantedBy = [ "multi-user.target" ];
           unitConfig = {
@@ -1740,7 +1740,16 @@ let
               EOF
               echo "  ✓ docker proxy drop-in created"
 
-              # Reload systemd to pick up the drop-in
+              # Configure forgejo-runner proxy (clones GitHub actions repos before job steps)
+              RUNNER_DROPIN_DIR="/run/systemd/system/forgejo-runner.service.d"
+              mkdir -p "$RUNNER_DROPIN_DIR"
+              cat > "$RUNNER_DROPIN_DIR/proxy.conf" << EOF
+              [Service]
+              EnvironmentFile=$PROXY_ENV
+              EOF
+              echo "  ✓ forgejo-runner proxy drop-in created"
+
+              # Reload systemd to pick up the drop-ins
               systemctl daemon-reload
               echo "  ✓ systemd daemon reloaded"
 
@@ -1767,7 +1776,14 @@ let
                 echo "  · nix-daemon not yet active (will use proxy config on first start)"
               fi
 
-              echo "Proxy configuration applied to Docker and Nix"
+              # Restart forgejo-runner if already active to pick up proxy config
+              if systemctl is-active --quiet forgejo-runner.service 2>/dev/null; then
+                systemctl restart forgejo-runner.service && echo "  ✓ forgejo-runner restarted (was active)"
+              else
+                echo "  · forgejo-runner not yet active (will use proxy config on first start)"
+              fi
+
+              echo "Proxy configuration applied to Docker, Nix, and Forgejo Runner"
             '';
           };
         };
