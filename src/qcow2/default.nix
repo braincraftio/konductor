@@ -851,7 +851,7 @@ let
         members = [ "kc2" "kc2admin" "runner" "forgejo" ];
       };
       groups.forgejo = {
-        gid = users.forgejo.gid;
+        inherit (users.forgejo) gid;
       };
 
       users = {
