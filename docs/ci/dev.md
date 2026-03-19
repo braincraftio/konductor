@@ -184,7 +184,26 @@ Rebuild NixOS host from flake (dogfooding).
 
 ```bash {"name":"k9:ci:dev:rebase","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry,requires:nixos"}
 set -e
-sudo nixos-rebuild switch --flake .#konductor
+
+# Generate --override-input flags from vendored sources for offline rebuild.
+# Prefers baked-in /etc/konductor/input-sources.env (exact store paths from
+# image build), falls back to _sources/ directory from dev:vendor.
+OVERRIDE_INPUTS=""
+if [ -f /etc/konductor/input-sources.env ]; then
+    echo "Using baked-in input sources from /etc/konductor/input-sources.env..."
+    while IFS="=" read -r name spath; do
+        [ -n "$name" ] && [ -n "$spath" ] && OVERRIDE_INPUTS="$OVERRIDE_INPUTS --override-input $name path:$spath"
+    done < /etc/konductor/input-sources.env
+elif [ -f _sources/manifest.txt ]; then
+    echo "Using vendored sources from _sources/manifest.txt..."
+    while read -r name spath; do
+        [ -n "$name" ] && [ -n "$spath" ] && OVERRIDE_INPUTS="$OVERRIDE_INPUTS --override-input $name path:$spath"
+    done < _sources/manifest.txt
+else
+    echo "⚠ No vendored sources found, fetching from network..."
+fi
+
+sudo -E nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRIDE_INPUTS
 echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 ```
 
