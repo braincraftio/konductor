@@ -214,7 +214,7 @@ echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
-set -euxo pipefail
+set -euo pipefail
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
