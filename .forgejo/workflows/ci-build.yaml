@@ -1,0 +1,102 @@
+name: Build QCOW2
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build + Push (commit tags)
+    runs-on: konductor
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup direnv Environment
+        run: |
+          direnv allow "${WORKSPACE_ROOT}"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
+          DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
+          if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
+            echo "$DIRENV_JSON" | jq -r '
+              to_entries[]
+              | select(.value | type == "string")
+              | select(.value | contains("\n") | not)
+              | select(.value | test("^\\s*(echo|if|then|else|fi|for|while|do|done|case|esac|function)\\s") | not)
+              | "\(.key)<<EOF\n\(.value)\nEOF"
+            ' >> $GITHUB_ENV
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
+            echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
+          else
+            echo "✗ direnv export failed"
+            exit 1
+          fi
+
+      - name: Vendor Flake Inputs
+        run: runme run k9:ci:dev:vendor
+
+      - name: Build QCOW2 + containerDisk
+        run: runme run --all --tag=k9:ci:pipeline:all --filename docs/ci/build.md
+
+      - name: Platform Up
+        run: runme run k9:ci:platform:up
+
+      - name: Registry Trust + Login
+        run: |
+          runme run k9:ci:registry:trust
+          runme run k9:ci:registry:login
+
+      - name: Push (commit/drv tags only)
+        env:
+          CONTAINER_TAG: "build-pending"
+        run: |
+          set -e
+          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
+
+          [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
+
+          git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
+          git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
+          nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
+          flake_lock=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' .konductor)
+
+          TAGS=()
+          if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
+              TAGS+=("qcow2-${git_commit}")
+          fi
+          if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
+              TAGS+=("qcow2-${nix_drv}")
+          fi
+          if [ -n "$flake_lock" ] && [ "$flake_lock" != "unknown" ]; then
+              TAGS+=("qcow2-${flake_lock}")
+          fi
+
+          [ "${#TAGS[@]}" -gt 0 ] || { echo "Error: no tags to push"; exit 1; }
+
+          SRC="$REGISTRY/$IMAGE:${TAGS[0]}"
+          docker tag "$REGISTRY/$IMAGE:latest-qcow2" "$SRC"
+
+          echo "Pushing ${#TAGS[@]} tags:"
+          for tag in "${TAGS[@]}"; do
+              docker tag "$SRC" "$REGISTRY/$IMAGE:$tag"
+              skopeo copy --dest-cert-dir "$CERT_DIR" \
+                  docker-daemon:"$REGISTRY/$IMAGE:$tag" \
+                  docker://"$REGISTRY/$IMAGE:$tag"
+              echo "  ✓ $tag"
+          done
+
+          OCI_DIGEST=$(skopeo inspect --cert-dir "$CERT_DIR" docker://"$REGISTRY/$IMAGE:${TAGS[0]}" | jq -r '.Digest')
+          echo "oci_digest = \"$OCI_DIGEST\"" >> .konductor
+
+          echo ""
+          echo "✓ Pushed: $REGISTRY/$IMAGE"
+          printf "  %s\n" "${TAGS[@]}"
+          echo "Digest: $OCI_DIGEST"
+
+      - name: Verify Tags
+        run: runme run k9:ci:registry:tags

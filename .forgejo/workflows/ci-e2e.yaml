@@ -1,0 +1,106 @@
+name: E2E Validate + Promote
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to validate (e.g. qcow2-<commit>). Leave empty to auto-resolve from HEAD.'
+        required: false
+        type: string
+
+jobs:
+  e2e:
+    name: Validate + Promote to latest-qcow2
+    runs-on: konductor
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup direnv Environment
+        run: |
+          direnv allow "${WORKSPACE_ROOT}"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
+          DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
+          if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
+            echo "$DIRENV_JSON" | jq -r '
+              to_entries[]
+              | select(.value | type == "string")
+              | select(.value | contains("\n") | not)
+              | select(.value | test("^\\s*(echo|if|then|else|fi|for|while|do|done|case|esac|function)\\s") | not)
+              | "\(.key)<<EOF\n\(.value)\nEOF"
+            ' >> $GITHUB_ENV
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
+            echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
+          else
+            echo "✗ direnv export failed"
+            exit 1
+          fi
+
+      - name: Resolve Image Tag
+        run: |
+          set -e
+          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+
+          INPUT_TAG="${{ inputs.image_tag }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            COMMIT=$(git rev-parse HEAD)
+            TAG="qcow2-${COMMIT}"
+          fi
+
+          echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
+          echo "CONTAINER_TAG=${TAG}" >> $GITHUB_ENV
+          echo "FULL_IMAGE=${REGISTRY}/${IMAGE}:${TAG}" >> $GITHUB_ENV
+          echo "Validating: ${REGISTRY}/${IMAGE}:${TAG}"
+
+      - name: Platform Up
+        run: runme run k9:ci:platform:up
+
+      - name: Registry Trust + Login
+        run: |
+          runme run k9:ci:registry:trust
+          runme run k9:ci:registry:login
+
+      - name: Verify Image Exists
+        run: |
+          set -e
+          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
+          skopeo inspect --cert-dir "$CERT_DIR" docker://"${FULL_IMAGE}" > /dev/null \
+            || { echo "✗ Image not found: ${FULL_IMAGE}"; exit 1; }
+          echo "✓ Image exists: ${FULL_IMAGE}"
+
+      - name: Validate Deploy
+        env:
+          CONTAINER_TAG: ${{ env.IMAGE_TAG }}
+        run: runme run k9:ci:qcow2:validate:deploy
+
+      - name: Validate Services
+        run: runme run k9:ci:qcow2:validate:services
+
+      - name: Validate Runner
+        run: runme run k9:ci:qcow2:validate:runner
+
+      - name: Promote to latest-qcow2
+        run: |
+          set -e
+          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
+
+          echo "Promoting ${IMAGE_TAG} -> latest-qcow2"
+          skopeo copy \
+            --src-cert-dir "$CERT_DIR" \
+            --dest-cert-dir "$CERT_DIR" \
+            docker://"${REGISTRY}/${IMAGE}:${IMAGE_TAG}" \
+            docker://"${REGISTRY}/${IMAGE}:latest-qcow2"
+
+          echo "✓ Promoted: ${REGISTRY}/${IMAGE}:latest-qcow2"
+          echo ""
+          echo "latest-qcow2 now points to validated image: ${IMAGE_TAG}"
+          skopeo inspect --cert-dir "$CERT_DIR" docker://"${REGISTRY}/${IMAGE}:latest-qcow2" | jq '{Digest, Created}'
