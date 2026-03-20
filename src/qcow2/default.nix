@@ -1362,6 +1362,19 @@ let
           matchConfig.Type = "ether";
           networkConfig.DHCP = "yes";
         };
+        # Route .docker.arpa DNS to docker-dev CoreDNS LoadBalancer VIP.
+        # The docker-dev bridge is created by docker compose for the Talos-in-Docker
+        # cluster. CoreDNS at 10.5.0.243 (Cilium L2 LB-IPAM) serves *.docker.arpa.
+        # "04-" matches exact name before "05-docker-unmanaged" wildcards docker*.
+        # Inert when docker-dev stack is down (no interface = no match).
+        # Replaces imperative: sudo resolvectl dns docker-dev 10.5.0.243
+        # See: .config/mise/toml/talos.compose.toml (dev:k8s:network:create)
+        networks."04-docker-dev" = {
+          matchConfig.Name = "docker-dev";
+          dns = [ "10.5.0.243" ];
+          domains = [ "~docker.arpa" ];
+          linkConfig.RequiredForOnline = "no";
+        };
         # Prevent systemd-networkd from managing Docker interfaces
         # Docker creates bridges (docker0, br-*) and veth pairs dynamically via netlink.
         # Without this, systemd-networkd may race with Docker's netlink operations,
@@ -2427,9 +2440,8 @@ let
       # DNS Resolution (systemd-resolved)
       # =====================================================================
       # Enables systemd-resolved for DNS resolution.
-      # Per-link DNS routing for docker.arpa is configured by mise task
-      # `dev:k8s:network:create` when docker-dev bridge is created.
-      # See: .config/mise/toml/talos.compose.toml
+      # Per-link DNS routing for docker.arpa is handled by
+      # networks."04-docker-dev" in systemd.network above.
       resolved = {
         enable = true;
         # Use Google/Cloudflare as fallback DNS
