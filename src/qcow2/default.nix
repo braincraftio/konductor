@@ -56,7 +56,8 @@ let
   inherit (devshellPackages) konductor;
 
   # Open Sesame headless package (profile, secrets, launcher, snippets daemons)
-  openSesamePkg = inputs.open-sesame.packages.${system}.open-sesame-headless;
+  # As of v1.5.0, the base package IS headless; desktop is a separate package
+  openSesamePkg = inputs.open-sesame.packages.${system}.open-sesame;
 
   # Systemd mount service template for virtio disk mounting
   mountService = import ./konductor-mount-template.nix { inherit pkgs; };
@@ -1401,7 +1402,7 @@ let
       # not managed by home-manager. For built-in HM users, /etc/systemd/user/
       # takes precedence over ~/.config/systemd/user/ (harmless shadow).
 
-      user.targets.open-sesame = {
+      user.targets.open-sesame-headless = {
         unitConfig = {
           Description = "Open Sesame Headless Suite";
           Documentation = "https://github.com/scopecreep-zip/open-sesame";
@@ -1413,7 +1414,7 @@ let
         unitConfig = {
           Description = "Open Sesame profile daemon (IPC bus)";
           Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          PartOf = [ "open-sesame.target" ];
+          PartOf = [ "open-sesame-headless.target" ];
         };
         serviceConfig = {
           Type = "notify";
@@ -1427,11 +1428,12 @@ let
           ProtectSystem = "strict";
           ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
           LimitNOFILE = 4096;
+          LimitCORE = 0;
           MemoryMax = "128M";
           Environment = [ "RUST_LOG=info" ];
           EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
         };
-        wantedBy = [ "open-sesame.target" ];
+        wantedBy = [ "open-sesame-headless.target" ];
       };
 
       user.services.open-sesame-secrets = {
@@ -1440,7 +1442,7 @@ let
           Documentation = "https://github.com/scopecreep-zip/open-sesame";
           Requires = [ "open-sesame-profile.service" ];
           After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame.target" ];
+          PartOf = [ "open-sesame-headless.target" ];
         };
         serviceConfig = {
           Type = "notify";
@@ -1455,11 +1457,12 @@ let
           ProtectSystem = "strict";
           ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
           LimitNOFILE = 1024;
+          LimitCORE = 0;
           LimitMEMLOCK = "64M";
           MemoryMax = "256M";
           Environment = [ "RUST_LOG=info" ];
         };
-        wantedBy = [ "open-sesame.target" ];
+        wantedBy = [ "open-sesame-headless.target" ];
       };
 
       user.services.open-sesame-launcher = {
@@ -1468,7 +1471,7 @@ let
           Documentation = "https://github.com/scopecreep-zip/open-sesame";
           Requires = [ "open-sesame-profile.service" ];
           After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame.target" ];
+          PartOf = [ "open-sesame-headless.target" ];
         };
         serviceConfig = {
           Type = "notify";
@@ -1478,14 +1481,21 @@ let
           TimeoutStopSec = 5;
           WatchdogSec = 30;
           NoNewPrivileges = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+          ProtectClock = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectKernelLogs = true;
+          ProtectControlGroups = true;
+          LockPersonality = true;
+          RestrictSUIDSGID = true;
+          SystemCallArchitectures = "native";
+          CapabilityBoundingSet = "";
+          KillMode = "process";
           LimitNOFILE = 4096;
-          MemoryMax = "128M";
+          LimitCORE = 0;
           Environment = [ "RUST_LOG=info" ];
         };
-        wantedBy = [ "open-sesame.target" ];
+        wantedBy = [ "open-sesame-headless.target" ];
       };
 
       user.services.open-sesame-snippets = {
@@ -1494,7 +1504,7 @@ let
           Documentation = "https://github.com/scopecreep-zip/open-sesame";
           Requires = [ "open-sesame-profile.service" ];
           After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame.target" ];
+          PartOf = [ "open-sesame-headless.target" ];
         };
         serviceConfig = {
           Type = "notify";
@@ -1508,10 +1518,11 @@ let
           ProtectSystem = "strict";
           ReadWritePaths = [ "%t/pds" ];
           LimitNOFILE = 4096;
+          LimitCORE = 0;
           MemoryMax = "128M";
           Environment = [ "RUST_LOG=info" ];
         };
-        wantedBy = [ "open-sesame.target" ];
+        wantedBy = [ "open-sesame-headless.target" ];
       };
 
       network = {
