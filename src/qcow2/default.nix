@@ -1371,6 +1371,7 @@ let
         # See: .config/mise/toml/talos.compose.toml (dev:k8s:network:create)
         networks."04-docker-dev" = {
           matchConfig.Name = "docker-dev";
+          address = [ "10.5.0.1/24" ];
           dns = [ "10.5.0.243" ];
           domains = [ "~docker.arpa" ];
           linkConfig.RequiredForOnline = "no";
@@ -1997,6 +1998,9 @@ let
         # NOTE: afterServices uses default (no konductor-init.service to avoid circular dep)
         documentation = [ "https://github.com/tsl0922/ttyd" ];
         workingDirectory = "/home/%i";
+        extraServiceConfig = {
+          NoNewPrivileges = false; # Required for sudo to work in web terminal
+        };
       })
       // (mkKonductorService {
         # Template: VSCode Server (per-user instances)
