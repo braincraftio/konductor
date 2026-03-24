@@ -1438,6 +1438,18 @@ let
           matchConfig.Type = "ether";
           networkConfig.DHCP = "yes";
         };
+        # Route .docker.arpa DNS to docker-dev CoreDNS LoadBalancer VIP.
+        # The docker-dev bridge is created by docker compose for the Talos-in-Docker
+        # cluster. CoreDNS at 10.5.0.243 (Cilium L2 LB-IPAM) serves *.docker.arpa.
+        # "04-" matches exact name before "05-docker-unmanaged" wildcards docker*.
+        # Inert when docker-dev stack is down (no interface = no match).
+        networks."04-docker-dev" = {
+          matchConfig.Name = "docker-dev";
+          address = [ "10.5.0.1/24" ];
+          dns = [ "10.5.0.243" ];
+          domains = [ "~docker.arpa" ];
+          linkConfig.RequiredForOnline = "no";
+        };
         # Prevent systemd-networkd from managing Docker interfaces
         # Docker creates bridges (docker0, br-*) and veth pairs dynamically via netlink.
         # Without this, systemd-networkd may race with Docker's netlink operations,
@@ -1940,6 +1952,10 @@ let
             User = "runner";
             Group = "users";
             WorkingDirectory = "/home/runner";
+            # Source proxy.env when present (cloud-init writes it on proxy-enabled deployments).
+            # This gives the runner daemon HTTP_PROXY/HTTPS_PROXY/NO_PROXY so it can
+            # clone GitHub-hosted actions (actions/checkout etc.) through corporate proxy.
+            EnvironmentFile = [ "-/etc/konductor/proxy.env" ];
             Environment = [
               "HOME=/home/runner"
               "PATH=/run/wrappers/bin:/run/current-system/sw/bin"
@@ -1954,35 +1970,8 @@ let
               # NixOS /etc/ssl/certs is immutable; konductor-pki-trust writes extended bundle
               "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
             ];
-            # Wait for Forgejo to be reachable before starting runner daemon.
-            # Handles race condition: runner starts before Forgejo is deployed
-            # (scale-to-zero, fresh platform deploy, pod restarts).
-            # Retries every 5s for up to 5 minutes.
-            ExecStartPre = pkgs.writeShellScript "wait-for-forgejo" ''
-              URL=$(cat /etc/konductor/forgejo-runner/url 2>/dev/null)
-              if [ -z "$URL" ]; then
-                echo "forgejo-runner: no server URL configured, skipping readiness check"
-                exit 0
-              fi
-              echo "forgejo-runner: waiting for $URL to become reachable..."
-              attempts=0
-              max_attempts=60
-              while [ "$attempts" -lt "$max_attempts" ]; do
-                if ${pkgs.curl}/bin/curl \
-                  --silent --fail --max-time 5 \
-                  --cacert /etc/konductor/pki/bundle/ca-bundle.crt \
-                  -o /dev/null "$URL/api/v1/version" 2>/dev/null; then
-                  echo "forgejo-runner: $URL is reachable"
-                  exit 0
-                fi
-                attempts=$((attempts + 1))
-                echo "forgejo-runner: attempt $attempts/$max_attempts - $URL not ready, retrying in 5s..."
-                sleep 5
-              done
-              echo "forgejo-runner: $URL not reachable after $((max_attempts * 5))s, starting anyway"
-              exit 0
-            '';
             ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
+            # Runner retries connections internally; Restart=always handles crashes/transient failures.
             Restart = "always";
             RestartSec = 15;
           };
@@ -2083,6 +2072,9 @@ let
         # NOTE: afterServices uses default (no konductor-init.service to avoid circular dep)
         documentation = [ "https://github.com/tsl0922/ttyd" ];
         workingDirectory = "/home/%i";
+        extraServiceConfig = {
+          NoNewPrivileges = false; # Required for sudo to work in web terminal
+        };
       })
       // (mkKonductorService {
         # Template: VSCode Server (per-user instances)

@@ -670,6 +670,31 @@ def _trust_status(docker_registries: list[str] | None = None) -> int:
     return 0
 
 
+def _update_system_trust_store(bundle_path: Path) -> None:
+    """Replace NixOS immutable /etc/ssl/certs symlinks with the konductor CA bundle.
+
+    NixOS /etc/ssl/certs/ca-bundle.crt and ca-certificates.crt are symlinks to
+    /nix/store which is read-only. Tools that use the system default trust store
+    (git, curl, openssl without explicit env vars) won't trust the hypervisor CA.
+
+    This replaces those symlinks with a copy of the konductor bundle that includes
+    both the system CAs and the hypervisor CA.
+    """
+    ssl_certs_dir = Path("/etc/ssl/certs")
+    targets = ["ca-bundle.crt", "ca-certificates.crt"]
+    bundle_content = bundle_path.read_bytes()
+
+    for name in targets:
+        cert_path = ssl_certs_dir / name
+        try:
+            if cert_path.is_symlink():
+                cert_path.unlink()
+            cert_path.write_bytes(bundle_content)
+            ok(f"System trust updated: {cert_path}")
+        except OSError as exc:
+            warn(f"Could not update {cert_path}: {exc}")
+
+
 def _trust_install(ca_path: Path, docker_registries: list[str] | None = None) -> int:
     """Install CA to system trust."""
     if not ca_path.exists():
@@ -691,12 +716,16 @@ def _trust_install(ca_path: Path, docker_registries: list[str] | None = None) ->
     cert_count = build_bundle()
     ok(f"Bundle updated: {cert_count} certificates")
 
-    # 3. Install environment variables
+    # 3. Update system trust store (NixOS: /etc/ssl/certs is immutable symlinks)
+    action("Updating system trust store")
+    _update_system_trust_store(config.CA_BUNDLE)
+
+    # 4. Install environment variables
     action("Installing environment variables")
     _install_env_vars()
     ok("Environment variables installed: /etc/profile.d/konductor-ca.sh")
 
-    # 4. Configure Docker registry trust (if registries specified or env set)
+    # 5. Configure Docker registry trust (if registries specified or env set)
     if not docker_registries:
         container_registry = os.environ.get("CONTAINER_REGISTRY")
         if container_registry:
