@@ -13,19 +13,44 @@ Complete build, validation, and promotion pipeline for airgap-ready NixOS VM ima
 
 ## Contents
 
-- [Overview](#overview)
-- [Pipeline Architecture](#pipeline-architecture)
-- [Quick Start](#quick-start)
-- [Task Reference](#task-reference)
-- [Workflows](#workflows)
-  - [Full Pipeline](#full-pipeline)
-  - [Development Build](#development-build)
-  - [Validation Only](#validation-only)
-  - [Promotion](#promotion)
-- [Pipeline Orchestrator](#pipeline-orchestrator)
-- [Output Artifacts](#output-artifacts)
-- [Supply Chain Provenance](#supply-chain-provenance)
-- [Troubleshooting](#troubleshooting)
+- [Konductor CI Pipeline](#konductor-ci-pipeline)
+  - [Contents](#contents)
+  - [Overview](#overview)
+  - [Pipeline Architecture](#pipeline-architecture)
+  - [Quick Start](#quick-start)
+    - [One-Command Full Pipeline](#one-command-full-pipeline)
+    - [Development Iteration](#development-iteration)
+    - [Validation Only](#validation-only)
+    - [Promotion](#promotion)
+  - [Task Reference](#task-reference)
+    - [Build Tasks](#build-tasks)
+    - [Platform Tasks](#platform-tasks)
+    - [Registry Tasks](#registry-tasks)
+    - [Push Tasks](#push-tasks)
+    - [Validation Tasks](#validation-tasks)
+    - [Promotion Tasks](#promotion-tasks)
+    - [Development Tasks](#development-tasks)
+    - [Verification Tasks (runs inside built VM)](#verification-tasks-runs-inside-built-vm)
+    - [Complete Pipeline](#complete-pipeline)
+  - [Workflows](#workflows)
+    - [Full Pipeline](#full-pipeline)
+    - [Development Build](#development-build)
+    - [Validation Only](#validation-only-1)
+    - [Promotion](#promotion-1)
+  - [Pipeline Orchestrator](#pipeline-orchestrator)
+    - [k9:ci:qcow2:pipeline](#k9ciqcow2pipeline)
+  - [Output Artifacts](#output-artifacts)
+    - [QCOW2 Image](#qcow2-image)
+    - [OCI Container](#oci-container)
+    - [Provenance File](#provenance-file)
+  - [Supply Chain Provenance](#supply-chain-provenance)
+    - [Attestation Flow](#attestation-flow)
+    - [Trust Gates](#trust-gates)
+    - [Verification](#verification)
+  - [Troubleshooting](#troubleshooting)
+    - [Build Failures](#build-failures)
+    - [Registry Issues](#registry-issues)
+    - [Cluster Issues](#cluster-issues)
 
 ---
 
@@ -54,79 +79,79 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 ## Pipeline Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  ci:pipeline — Complete Pipeline with Parallel Build + Platform             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  PREFLIGHT (inline, <1s)                                                    │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ LD_LIBRARY_PATH, Docker daemon, OVMF firmware              │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                           ↓                                                 │
+┌────────────────────────────────────────────────────────────────────────────┐
+│  ci:pipeline — Complete Pipeline with Parallel Build + Platform            │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  PREFLIGHT (inline, <1s)                                                   │
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ LD_LIBRARY_PATH, Docker daemon, OVMF firmware              │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                           ↓                                                │
 │  ┌─────────────────────────────┬──────────────────────────────┐            │
-│  │ PARALLEL                    │ PARALLEL                      │            │
-│  │                             │                                │            │
-│  │ BUILD PHASE (build.md)      │ PLATFORM PHASE (platform.md)  │            │
-│  │ ┌────────────────────────┐  │ ┌─────────────────────────┐   │            │
-│  │ │ build:all               │  │ │ platform:up              │   │            │
-│  │ │  _build:clean           │  │ │  mise compose:clean      │   │            │
-│  │ │  _build:preflight       │  │ │  mise compose:up         │   │            │
-│  │ │  _build:nix             │  │ │  mise pulumi:up          │   │            │
-│  │ │  _build:cloudinit       │  │ └─────────────────────────┘   │            │
-│  │ │  _build:img:reset       │  │        5-10 min               │            │
-│  │ │  _build:vm:boot         │  │                                │            │
-│  │ │  _build:vm:wait         │  │                                │            │
-│  │ │  _build:vm:sync         │  │                                │            │
-│  │ │  _build:vm:rebuild      │  │                                │            │
-│  │ │  _build:vm:pki:test     │  │                                │            │
-│  │ │  _build:vm:pki:status   │  │                                │            │
-│  │ │  _build:vm:provenance   │  │                                │            │
-│  │ │  _build:vm:gc           │  │                                │            │
-│  │ │  _build:vm:zero         │  │                                │            │
-│  │ │  _build:vm:halt         │  │                                │            │
-│  │ │  _build:img:clean       │  │                                │            │
-│  │ │  _build:img:compress    │  │                                │            │
-│  │ │  _build:img:sparsify    │  │                                │            │
-│  │ │  _build:tmp:clean       │  │                                │            │
-│  │ │  _build:verify          │  │                                │            │
-│  │ │  _build:container       │  │                                │            │
-│  │ └────────────────────────┘  │                                │            │
-│  │        30-60 min            │                                │            │
+│  │ PARALLEL                    │ PARALLEL                     │            │
+│  │                             │                              │            │
+│  │ BUILD PHASE (build.md)      │ PLATFORM PHASE (platform.md) │            │
+│  │ ┌────────────────────────┐  │ ┌─────────────────────────┐  │            │
+│  │ │ build:all              │  │ │ platform:up             │  │            │
+│  │ │  _build:clean          │  │ │  mise compose:clean     │  │            │
+│  │ │  _build:preflight      │  │ │  mise compose:up        │  │            │
+│  │ │  _build:nix            │  │ │  mise pulumi:up         │  │            │
+│  │ │  _build:cloudinit      │  │ └─────────────────────────┘  │            │
+│  │ │  _build:img:reset      │  │        5-10 min              │            │
+│  │ │  _build:vm:boot        │  │                              │            │
+│  │ │  _build:vm:wait        │  │                              │            │
+│  │ │  _build:vm:sync        │  │                              │            │
+│  │ │  _build:vm:rebuild     │  │                              │            │
+│  │ │  _build:vm:pki:test    │  │                              │            │
+│  │ │  _build:vm:pki:status  │  │                              │            │
+│  │ │  _build:vm:provenance  │  │                              │            │
+│  │ │  _build:vm:gc          │  │                              │            │
+│  │ │  _build:vm:zero        │  │                              │            │
+│  │ │  _build:vm:halt        │  │                              │            │
+│  │ │  _build:img:clean      │  │                              │            │
+│  │ │  _build:img:compress   │  │                              │            │
+│  │ │  _build:img:sparsify   │  │                              │            │
+│  │ │  _build:tmp:clean      │  │                              │            │
+│  │ │  _build:verify         │  │                              │            │
+│  │ │  _build:container      │  │                              │            │
+│  │ └────────────────────────┘  │                              │            │
+│  │        30-60 min            │                              │            │
 │  └─────────────────────────────┴──────────────────────────────┘            │
 │                           ↓ BARRIER (wait for both)                        │
-│  REGISTRY PHASE (registry.md)                                               │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ registry:trust   Install cluster CA for Docker + Skopeo    │             │
-│  │ registry:login   Authenticate to registry.docker.arpa      │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                           ↓                                                 │
-│  PUSH PHASE (push.md)                                                       │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ push:image   Multi-tag skopeo copy to local registry       │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                           ↓                                                 │
-│  VERIFICATION (registry.md)                                                 │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ registry:tags   Confirm pushed tags landed                  │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                           ↓                                                 │
-│  VALIDATION PHASE (validate.md)                                             │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ validate:deploy     Deploy VM to KubeVirt + SSH test        │             │
-│  │ validate:services   Port-forward + curl web terminals       │             │
-│  │ validate:runner     Forgejo push + dispatch + poll          │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                           ↓                                                 │
-│  ═══════════════════════════════════════════════════════════════            │
-│   PIPELINE COMPLETE — manual promotion gate below                           │
-│  ═══════════════════════════════════════════════════════════════            │
-│                           ↓                                                 │
+│  REGISTRY PHASE (registry.md)                                              │
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ registry:trust   Install cluster CA for Docker + Skopeo    │            │
+│  │ registry:login   Authenticate to registry.docker.arpa      │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                           ↓                                                │
+│  PUSH PHASE (push.md)                                                      │
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ push:image   Multi-tag skopeo copy to local registry       │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                           ↓                                                │
+│  VERIFICATION (registry.md)                                                │
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ registry:tags   Confirm pushed tags landed                 │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                           ↓                                                │
+│  VALIDATION PHASE (validate.md)                                            │
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ validate:deploy     Deploy VM to KubeVirt + SSH test       │            │
+│  │ validate:services   Port-forward + curl web terminals      │            │
+│  │ validate:runner     Forgejo push + dispatch + poll         │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                           ↓                                                │
+│  ═══════════════════════════════════════════════════════════════           │
+│   PIPELINE COMPLETE — manual promotion gate below                          │
+│  ═══════════════════════════════════════════════════════════════           │
+│                           ↓                                                │
 │  PROMOTION PHASE (promote.md) — manual, not in ci:pipeline                 │
-│  ┌────────────────────────────────────────────────────────────┐             │
-│  │ promote:image   Copy to docker.io / ghcr.io with all tags  │             │
-│  └────────────────────────────────────────────────────────────┘             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+│  ┌────────────────────────────────────────────────────────────┐            │
+│  │ promote:image   Copy to docker.io / ghcr.io with all tags  │            │
+│  └────────────────────────────────────────────────────────────┘            │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **File responsibilities:**
@@ -278,9 +303,9 @@ Complete end-to-end with cluster validation and parallel execution.
 ┌────────────────────────────────────────┐
 │ Full Pipeline Workflow                 │
 ├────────────────────────────────────────┤
-│ ┌─ build:all (30-60 min) ────────┐    │
-│ │                                 ├──► │
-│ └─ platform:up (5-10 min) ───────┘    │
+│ ┌─ build:all (30-60 min) ────────┐     │
+│ │                                ├──►  │
+│ └─ platform:up (5-10 min) ───────┘     │
 │    registry:trust + registry:login     │
 │    push:image                          │
 │    validate:deploy                     │

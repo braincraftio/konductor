@@ -458,6 +458,20 @@ let
         '';
       };
     };
+
+    # Open Sesame: per-user encrypted secret vaults with SSH agent unlock
+    # Headless mode excludes GUI daemons (wm, clipboard, input)
+    # Provides: sesame CLI, daemon-profile, daemon-secrets
+    # Vaults stored at ~/.config/pds/vaults/{profile}.db
+    # IPC socket at $XDG_RUNTIME_DIR/pds/bus.sock (0700)
+    # Init: sesame init --auth-factor ssh-agent
+    # Usage: sesame unlock -p default --factor ssh-agent
+    #        sesame secret set -p default KEY VALUE
+    #        sesame env -p default -- <command>
+    programs.open-sesame = {
+      enable = true;
+      headless = true;
+    };
   };
 
   # Service template generator for konductor multi-user services
@@ -924,6 +938,9 @@ let
     home-manager = {
       useGlobalPkgs = true;
       useUserPackages = true;
+      sharedModules = [
+        inputs.open-sesame.homeManagerModules.default
+      ];
       users = {
         kc2 = homeManagerUserConfig;
         kc2admin = homeManagerUserConfig;
@@ -1286,6 +1303,10 @@ let
         # Forgejo CI/CD tools (runner + cli)
         ++ programs.forgejo.runnerPackages
         ++ programs.forgejo.cliPackages
+        # Open Sesame headless: encrypted secret vaults with SSH agent unlock
+        # System-wide so cloud-init dynamic users also have the sesame CLI
+        # Note: .default is open-sesame-desktop (GUI); .open-sesame is headless
+        ++ [ inputs.open-sesame.packages.${system}.open-sesame ]
         # Essentials
         ++ (with pkgs; [
           git

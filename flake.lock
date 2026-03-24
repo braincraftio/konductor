@@ -267,6 +267,26 @@
         "type": "github"
       }
     },
+    "open-sesame": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1774342649,
+        "narHash": "sha256-Jl76Aa7uvh2D4pBamVguFZ5EFq1oqkEH4OBwD56py+s=",
+        "owner": "ScopeCreep-zip",
+        "repo": "open-sesame",
+        "rev": "033bfef71a6eb94945226112fcdb32b88aa99b60",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ScopeCreep-zip",
+        "repo": "open-sesame",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "catppuccin": "catppuccin",
@@ -281,6 +301,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim",
         "nuschtosSearch": "nuschtosSearch",
+        "open-sesame": "open-sesame",
         "rust-overlay": "rust-overlay",
         "systems": "systems"
       }
