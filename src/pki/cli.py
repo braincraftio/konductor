@@ -717,7 +717,6 @@ def _trust_install(ca_path: Path, docker_registries: list[str] | None = None) ->
     ok(f"Bundle updated: {cert_count} certificates")
 
     # 3. Update system trust store (NixOS: /etc/ssl/certs is immutable symlinks)
-    # Replace the nix store symlink with a real file containing system + hypervisor CAs
     action("Updating system trust store")
     _update_system_trust_store(config.CA_BUNDLE)
 

@@ -1461,8 +1461,6 @@ let
         # cluster. CoreDNS at 10.5.0.243 (Cilium L2 LB-IPAM) serves *.docker.arpa.
         # "04-" matches exact name before "05-docker-unmanaged" wildcards docker*.
         # Inert when docker-dev stack is down (no interface = no match).
-        # Replaces imperative: sudo resolvectl dns docker-dev 10.5.0.243
-        # See: .config/mise/toml/talos.compose.toml (dev:k8s:network:create)
         networks."04-docker-dev" = {
           matchConfig.Name = "docker-dev";
           address = [ "10.5.0.1/24" ];
