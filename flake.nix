@@ -78,10 +78,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Open Sesame — programmable desktop suite (headless mode for konductor)
-    # Linux-only: profile, secrets, launcher, snippets daemons
+    # Open Sesame: headless encrypted secret vaults with SSH agent unlock
     open-sesame = {
-      url = "git+https://github.com/scopecreep-zip/open-sesame";
+      url = "github:ScopeCreep-zip/open-sesame";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -97,9 +96,13 @@
   };
 
   nixConfig = {
-    extra-substituters = [ "https://nix-community.cachix.org" ];
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+      "https://scopecreep-zip.cachix.org"
+    ];
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "scopecreep-zip.cachix.org-1:LPiVDsYXJvgljVfZPN43zBWB7ZCGFr2jZ/lBinnPGvU="
     ];
     download-buffer-size = 268435456; # 256MB — suppress "download buffer is full" warnings
   };

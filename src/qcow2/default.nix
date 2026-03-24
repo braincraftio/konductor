@@ -55,10 +55,6 @@ let
   # Konductor self-hosting packages (docker, qemu, libvirt, etc.)
   inherit (devshellPackages) konductor;
 
-  # Open Sesame headless package (profile, secrets, launcher, snippets daemons)
-  # As of v1.5.0, the base package IS headless; desktop is a separate package
-  openSesamePkg = inputs.open-sesame.packages.${system}.open-sesame;
-
   # Systemd mount service template for virtio disk mounting
   mountService = import ./konductor-mount-template.nix { inherit pkgs; };
 
@@ -443,8 +439,15 @@ let
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
-    imports = [ inputs.open-sesame.homeManagerModules.default ];
-
+    # Open Sesame: per-user encrypted secret vaults with SSH agent unlock
+    # Headless mode excludes GUI daemons (wm, clipboard, input)
+    # Provides: sesame CLI, daemon-profile, daemon-secrets
+    # Vaults stored at ~/.config/pds/vaults/{profile}.db
+    # IPC socket at $XDG_RUNTIME_DIR/pds/bus.sock (0700)
+    # Init: sesame init --auth-factor ssh-agent
+    # Usage: sesame unlock -p default --factor ssh-agent
+    #        sesame secret set -p default KEY VALUE
+    #        sesame env -p default -- <command>
     programs.open-sesame = {
       enable = true;
       headless = true;
@@ -897,6 +900,9 @@ let
           isNormalUser = true;
           inherit (users.runner) uid home;
           description = users.runner.gecos;
+          # Linger: keep systemd --user alive so Open Sesame daemons and
+          # CI services persist without an active login session.
+          linger = true;
           # wheel needed for QCOW2 build (guestmount, virt-sparsify)
           extraGroups = [
             "kc2"
@@ -935,6 +941,9 @@ let
     home-manager = {
       useGlobalPkgs = true;
       useUserPackages = true;
+      sharedModules = [
+        inputs.open-sesame.homeManagerModules.default
+      ];
       users = {
         kc2 = homeManagerUserConfig;
         kc2admin = homeManagerUserConfig;
@@ -1149,25 +1158,6 @@ let
           dotenv_if_exists "$HOME/.env"
         '';
 
-        # /etc/skel/.config/pds - Open Sesame headless config
-        # Minimal config for headless mode (no WM keybindings)
-        "skel/.config/pds/config.toml".text = ''
-          config_version = 3
-
-          [global]
-          default_profile = "default"
-          [global.ipc]
-          [global.logging]
-
-          [profiles.default]
-          name = "default"
-          [profiles.default.wm]
-
-          [crypto]
-          [agents]
-          [extensions]
-        '';
-
         # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
         # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
 
@@ -1175,10 +1165,25 @@ let
         # to systemd user services via stable symlink + environment import.
         # Runs on every interactive SSH login. Idempotent.
         "profile.d/konductor-ssh-agent.sh".text = ''
-          # Propagate SSH agent forwarding to systemd user services.
+          # =====================================================================
+          # Enable linger for this user (idempotent, one-time effect)
+          # =====================================================================
+          # Without linger, systemd --user only runs while a session is open.
+          # With linger, systemd --user starts at boot and persists across
+          # session disconnects, so Open Sesame daemons survive SSH logout
+          # and auto-start on VM reboot without requiring a login.
+          # Built-in users (kc2, kc2admin, runner) get linger via NixOS config.
+          # Cloud-init dynamic users get it here on first login.
+          if command -v loginctl >/dev/null 2>&1; then
+            loginctl enable-linger "$USER" 2>/dev/null || true
+          fi
+
+          # =====================================================================
+          # Propagate SSH agent forwarding to systemd user services
+          # =====================================================================
           # Creates a stable symlink at ~/.ssh/agent.sock so services using
           # a fixed SSH_AUTH_SOCK path can reach the forwarded agent even
-          # after session rotation.
+          # after session rotation (each SSH session gets a new socket path).
           if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
             # Create stable symlink (updated on each login)
             mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
@@ -1188,12 +1193,21 @@ let
             export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
 
             # Write EnvironmentFile for Open Sesame systemd user services
+            # daemon-profile reads this to access the forwarded SSH agent
             mkdir -p "$HOME/.config/pds" 2>/dev/null || true
             printf 'SSH_AUTH_SOCK=%s/.ssh/agent.sock\n' "$HOME" > "$HOME/.config/pds/ssh-agent.env"
 
             # Import into systemd user manager (affects newly started services)
             if command -v systemctl >/dev/null 2>&1; then
               systemctl --user import-environment SSH_AUTH_SOCK 2>/dev/null || true
+
+              # Restart open-sesame daemons so they pick up the fresh SSH agent.
+              # On first login: daemons started at session creation without an agent.
+              # On subsequent logins: agent socket path changed (new SSH session).
+              # The restart is cheap (~200ms) and ensures daemons have working agent access.
+              if systemctl --user is-active --quiet open-sesame-headless.target 2>/dev/null; then
+                systemctl --user restart open-sesame-headless.target 2>/dev/null || true
+              fi
             fi
           fi
         '';
@@ -1227,12 +1241,6 @@ let
             mkdir -p "$HOME/.config"
             cp -L /etc/skel/.config/starship.toml "$HOME/.config/"
           fi
-          if [ ! -f "$HOME/.config/pds/config.toml" ] && [ -f /etc/skel/.config/pds/config.toml ]; then
-            mkdir -p "$HOME/.config/pds"
-            cp -L /etc/skel/.config/pds/config.toml "$HOME/.config/pds/"
-          fi
-          # Open Sesame runtime directories (needed by systemd user services)
-          mkdir -p "$HOME/.config/pds" "$HOME/.cache/open-sesame" 2>/dev/null || true
           # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
 
           # Language paths
@@ -1332,8 +1340,10 @@ let
           yj # TOML to JSON converter (for konductor-init.service)
           yq-go # YAML/TOML/JSON processor
         ])
-        # Open Sesame headless daemons (profile, secrets, launcher, snippets)
-        ++ [ openSesamePkg ]
+        # Open Sesame headless: encrypted secret vaults with SSH agent unlock
+        # System-wide so cloud-init dynamic users also have the sesame CLI
+        # Note: .default is open-sesame-desktop (GUI); .open-sesame is headless
+        ++ [ inputs.open-sesame.packages.${system}.open-sesame ]
         # Certificate precedence detection for multi-user services
         ++ [ certPrecedenceScript ]
         # FHS compatibility: ldconfig wrapper with high priority
@@ -1395,135 +1405,22 @@ let
       ];
 
       # =====================================================================
-      # Open Sesame — system-wide user services (headless mode)
+      # Open Sesame — system-wide enablement for cloud-init dynamic users
       # =====================================================================
-      # NixOS-level systemd.user.* puts units in /etc/systemd/user/ which
-      # applies to ALL users, including cloud-init dynamic users that are
-      # not managed by home-manager. For built-in HM users, /etc/systemd/user/
-      # takes precedence over ~/.config/systemd/user/ (harmless shadow).
-
-      user.targets.open-sesame-headless = {
-        unitConfig = {
-          Description = "Open Sesame Headless Suite";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-        };
-        wantedBy = [ "default.target" ];
-      };
-
-      user.services.open-sesame-profile = {
-        unitConfig = {
-          Description = "Open Sesame profile daemon (IPC bus)";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${openSesamePkg}/bin/daemon-profile";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          MemoryMax = "128M";
-          Environment = [ "RUST_LOG=info" ];
-          EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
-        };
-        wantedBy = [ "open-sesame-headless.target" ];
-      };
-
-      user.services.open-sesame-secrets = {
-        unitConfig = {
-          Description = "Open Sesame secrets daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${openSesamePkg}/bin/daemon-secrets";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          PrivateNetwork = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
-          LimitNOFILE = 1024;
-          LimitCORE = 0;
-          LimitMEMLOCK = "64M";
-          MemoryMax = "256M";
-          Environment = [ "RUST_LOG=info" ];
-        };
-        wantedBy = [ "open-sesame-headless.target" ];
-      };
-
-      user.services.open-sesame-launcher = {
-        unitConfig = {
-          Description = "Open Sesame launcher daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${openSesamePkg}/bin/daemon-launcher";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectClock = true;
-          ProtectKernelTunables = true;
-          ProtectKernelModules = true;
-          ProtectKernelLogs = true;
-          ProtectControlGroups = true;
-          LockPersonality = true;
-          RestrictSUIDSGID = true;
-          SystemCallArchitectures = "native";
-          CapabilityBoundingSet = "";
-          KillMode = "process";
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          Environment = [ "RUST_LOG=info" ];
-        };
-        wantedBy = [ "open-sesame-headless.target" ];
-      };
-
-      user.services.open-sesame-snippets = {
-        unitConfig = {
-          Description = "Open Sesame snippets daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${openSesamePkg}/bin/daemon-snippets";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          ReadWritePaths = [ "%t/pds" ];
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          MemoryMax = "128M";
-          Environment = [ "RUST_LOG=info" ];
-        };
-        wantedBy = [ "open-sesame-headless.target" ];
-      };
+      # The open-sesame package ships unit files at share/systemd/user/ with
+      # correct nix store ExecStart paths (substituteInPlace in package.nix).
+      # environment.systemPackages makes them visible at
+      # /run/current-system/sw/share/systemd/user/ for all users.
+      #
+      # Home-manager creates enablement symlinks for HM-managed users.
+      # These wantedBy declarations create system-level enablement in
+      # /etc/systemd/user/ so cloud-init dynamic users also get auto-start.
+      # No service definitions needed — the package's units are authoritative.
+      user.targets.open-sesame-headless.wantedBy = [ "default.target" ];
+      user.services.open-sesame-profile.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-secrets.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-launcher.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-snippets.wantedBy = [ "open-sesame-headless.target" ];
 
       network = {
         enable = true;
