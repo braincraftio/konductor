@@ -42,6 +42,41 @@ let
   # Named 'konductorConfig' to avoid shadowing NixOS 'config' in modules
   konductorConfig = import ../config { inherit pkgs lib versions catppuccinSources; };
 
+  # /etc/skel as a derivation containing real files (not symlinks).
+  # NixOS environment.etc creates symlinks to /nix/store. When cloud-init
+  # runs useradd for dynamic users, it copies symlinks as-is, leaving home
+  # dirs pointing at read-only nix store paths. This derivation produces
+  # real files so useradd --copy-skel gives users writable dotfiles.
+  skelPackage = pkgs.runCommand "konductor-skel" {
+    inherit (konductorConfig.shell.bash) bashrcContent;
+    inherit (shellContent) bashProfileContent inputrcContent;
+    inherit (konductorConfig.shell.starship) configContent;
+    atuinConfigContent = konductorConfig.shell.atuin.configContent;
+    envrcContent = ''
+      # Konductor VM - all packages pre-installed system-wide
+      # This .envrc is for project-specific env vars only
+      dotenv_if_exists .env
+      dotenv_if_exists "$HOME/.env"
+    '';
+    passAsFile = [
+      "bashrcContent"
+      "bashProfileContent"
+      "inputrcContent"
+      "configContent"
+      "atuinConfigContent"
+      "envrcContent"
+    ];
+  } ''
+    mkdir -p $out/.config/atuin $out/.cache/starship $out/.local/share/atuin
+
+    cp "$bashrcContentPath"      $out/.bashrc
+    cp "$bashProfileContentPath" $out/.bash_profile
+    cp "$inputrcContentPath"     $out/.inputrc
+    cp "$configContentPath"      $out/.config/starship.toml
+    cp "$atuinConfigContentPath" $out/.config/atuin/config.toml
+    cp "$envrcContentPath"       $out/.envrc
+  '';
+
   # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
     inherit
@@ -1142,24 +1177,12 @@ let
       # /etc/skel - Shell Configuration (copied to new user home dirs)
       # Same shell experience as devshell and OCI container
       # Uses canonical config from src/config/shell/ (SSOT)
+      # Source points to a derivation with real files (not symlinks) so that
+      # useradd --copy-skel gives cloud-init dynamic users writable dotfiles.
+      # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
+      # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
       etc = {
-        "skel/.bashrc".text = konductorConfig.shell.bash.bashrcContent;
-        "skel/.bash_profile".text = shellContent.bashProfileContent;
-        "skel/.inputrc".text = shellContent.inputrcContent;
-        # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
-        "skel/.config/starship.toml".text = konductorConfig.shell.starship.configContent;
-        "skel/.config/atuin/config.toml".text = konductorConfig.shell.atuin.configContent;
-
-        # /etc/skel/.envrc - for project .env files only (packages pre-installed)
-        "skel/.envrc".text = ''
-          # Konductor VM - all packages pre-installed system-wide
-          # This .envrc is for project-specific env vars only
-          dotenv_if_exists .env
-          dotenv_if_exists "$HOME/.env"
-        '';
-
-        # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
-        # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
+        "skel".source = skelPackage;
 
         # /etc/profile.d/konductor-ssh-agent.sh - propagate forwarded SSH agent
         # to systemd user services via stable symlink + environment import.
@@ -1229,19 +1252,6 @@ let
           # =====================================================================
           # Konductor Environment Setup
           # =====================================================================
-          # Copy shell configs from /etc/skel if missing (first login setup)
-          # Use -L to dereference symlinks (nix store files are read-only)
-          # Note: .gitconfig is NOT copied - git uses /etc/gitconfig (system level)
-          # Check each file independently so partial setups get completed
-          [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ] && cp -L /etc/skel/.bashrc "$HOME/"
-          [ ! -f "$HOME/.bash_profile" ] && [ -f /etc/skel/.bash_profile ] && cp -L /etc/skel/.bash_profile "$HOME/"
-          [ ! -f "$HOME/.inputrc" ] && [ -f /etc/skel/.inputrc ] && cp -L /etc/skel/.inputrc "$HOME/"
-          [ ! -f "$HOME/.envrc" ] && [ -f /etc/skel/.envrc ] && cp -L /etc/skel/.envrc "$HOME/"
-          if [ ! -f "$HOME/.config/starship.toml" ] && [ -f /etc/skel/.config/starship.toml ]; then
-            mkdir -p "$HOME/.config"
-            cp -L /etc/skel/.config/starship.toml "$HOME/.config/"
-          fi
-          # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
 
           # Language paths
           export GOPATH="''${GOPATH:-$HOME/go}"
