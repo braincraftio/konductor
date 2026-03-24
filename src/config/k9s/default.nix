@@ -21,7 +21,7 @@ let
   # Theme file from catppuccin/nix flake (SSOT - no local copy)
   # catppuccinSources.sources.k9s contains all k9s theme files
   #
-  skinFile = "${catppuccinSources.sources.k9s}/dist/catppuccin-frappe.yaml";
+  skinFile = "${catppuccinSources.sources.k9s}/dist/catppuccin-frappe-transparent.yaml";
 
   # ===========================================================================
   # WRAPPED K9S
@@ -45,12 +45,12 @@ let
       mkdir -p "$SKINS_DIR"
 
       # Symlink theme from nix store (idempotent)
-      THEME_LINK="$SKINS_DIR/catppuccin-frappe.yaml"
+      THEME_LINK="$SKINS_DIR/catppuccin-frappe-transparent.yaml"
       if [[ ! -L "$THEME_LINK" ]] || [[ "$(readlink "$THEME_LINK")" != "${skinFile}" ]]; then
         ln -sf "${skinFile}" "$THEME_LINK"
       fi
 
-      export K9S_SKIN="catppuccin-frappe"
+      export K9S_SKIN="catppuccin-frappe-transparent"
       exec k9s "$@"
     '';
   };

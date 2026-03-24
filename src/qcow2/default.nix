@@ -42,6 +42,41 @@ let
   # Named 'konductorConfig' to avoid shadowing NixOS 'config' in modules
   konductorConfig = import ../config { inherit pkgs lib versions catppuccinSources; };
 
+  # /etc/skel as a derivation containing real files (not symlinks).
+  # NixOS environment.etc creates symlinks to /nix/store. When cloud-init
+  # runs useradd for dynamic users, it copies symlinks as-is, leaving home
+  # dirs pointing at read-only nix store paths. This derivation produces
+  # real files so useradd --copy-skel gives users writable dotfiles.
+  skelPackage = pkgs.runCommand "konductor-skel" {
+    inherit (konductorConfig.shell.bash) bashrcContent;
+    inherit (shellContent) bashProfileContent inputrcContent;
+    inherit (konductorConfig.shell.starship) configContent;
+    atuinConfigContent = konductorConfig.shell.atuin.configContent;
+    envrcContent = ''
+      # Konductor VM - all packages pre-installed system-wide
+      # This .envrc is for project-specific env vars only
+      dotenv_if_exists .env
+      dotenv_if_exists "$HOME/.env"
+    '';
+    passAsFile = [
+      "bashrcContent"
+      "bashProfileContent"
+      "inputrcContent"
+      "configContent"
+      "atuinConfigContent"
+      "envrcContent"
+    ];
+  } ''
+    mkdir -p $out/.config/atuin $out/.cache/starship $out/.local/share/atuin
+
+    cp "$bashrcContentPath"      $out/.bashrc
+    cp "$bashProfileContentPath" $out/.bash_profile
+    cp "$inputrcContentPath"     $out/.inputrc
+    cp "$configContentPath"      $out/.config/starship.toml
+    cp "$atuinConfigContentPath" $out/.config/atuin/config.toml
+    cp "$envrcContentPath"       $out/.envrc
+  '';
+
   # Import packages with wrapped config (hermetic linters/formatters)
   devshellPackages = import ../packages {
     inherit
@@ -439,6 +474,20 @@ let
   # Provisions shell configs (.bashrc, .bash_profile, etc.) at build time
   # Uses canonical config from src/config/shell/ (SSOT)
   homeManagerUserConfig = {
+    # Open Sesame: per-user encrypted secret vaults with SSH agent unlock
+    # Headless mode excludes GUI daemons (wm, clipboard, input)
+    # Provides: sesame CLI, daemon-profile, daemon-secrets
+    # Vaults stored at ~/.config/pds/vaults/{profile}.db
+    # IPC socket at $XDG_RUNTIME_DIR/pds/bus.sock (0700)
+    # Init: sesame init --auth-factor ssh-agent
+    # Usage: sesame unlock -p default --factor ssh-agent
+    #        sesame secret set -p default KEY VALUE
+    #        sesame env -p default -- <command>
+    programs.open-sesame = {
+      enable = true;
+      headless = true;
+    };
+
     home = {
       inherit (versions.nixos) stateVersion;
       file = {
@@ -900,6 +949,9 @@ let
           isNormalUser = true;
           inherit (users.runner) uid home;
           description = users.runner.gecos;
+          # Linger: keep systemd --user alive so Open Sesame daemons and
+          # CI services persist without an active login session.
+          linger = true;
           # wheel needed for QCOW2 build (guestmount, virt-sparsify)
           extraGroups = [
             "kc2"
@@ -1139,33 +1191,36 @@ let
       # /etc/skel - Shell Configuration (copied to new user home dirs)
       # Same shell experience as devshell and OCI container
       # Uses canonical config from src/config/shell/ (SSOT)
+      # Source points to a derivation with real files (not symlinks) so that
+      # useradd --copy-skel gives cloud-init dynamic users writable dotfiles.
+      # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
+      # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
       etc = {
-        "skel/.bashrc".text = konductorConfig.shell.bash.bashrcContent;
-        "skel/.bash_profile".text = shellContent.bashProfileContent;
-        "skel/.inputrc".text = shellContent.inputrcContent;
-        # Note: .gitconfig is NOT in skel - git config is at system level via programs.git
-        "skel/.config/starship.toml".text = konductorConfig.shell.starship.configContent;
-        "skel/.config/atuin/config.toml".text = konductorConfig.shell.atuin.configContent;
-
-        # /etc/skel/.envrc - for project .env files only (packages pre-installed)
-        "skel/.envrc".text = ''
-          # Konductor VM - all packages pre-installed system-wide
-          # This .envrc is for project-specific env vars only
-          dotenv_if_exists .env
-          dotenv_if_exists "$HOME/.env"
-        '';
-
-        # Note: direnv whitelist is in /etc/direnv/direnv.toml via programs.direnv.settings
-        # No user-level direnv.toml needed since NixOS sets DIRENV_CONFIG=/etc/direnv
+        "skel".source = skelPackage;
 
         # /etc/profile.d/konductor-ssh-agent.sh - propagate forwarded SSH agent
         # to systemd user services via stable symlink + environment import.
         # Runs on every interactive SSH login. Idempotent.
         "profile.d/konductor-ssh-agent.sh".text = ''
-          # Propagate SSH agent forwarding to systemd user services.
+          # =====================================================================
+          # Enable linger for this user (idempotent, one-time effect)
+          # =====================================================================
+          # Without linger, systemd --user only runs while a session is open.
+          # With linger, systemd --user starts at boot and persists across
+          # session disconnects, so Open Sesame daemons survive SSH logout
+          # and auto-start on VM reboot without requiring a login.
+          # Built-in users (kc2, kc2admin, runner) get linger via NixOS config.
+          # Cloud-init dynamic users get it here on first login.
+          if command -v loginctl >/dev/null 2>&1; then
+            loginctl enable-linger "$USER" 2>/dev/null || true
+          fi
+
+          # =====================================================================
+          # Propagate SSH agent forwarding to systemd user services
+          # =====================================================================
           # Creates a stable symlink at ~/.ssh/agent.sock so services using
           # a fixed SSH_AUTH_SOCK path can reach the forwarded agent even
-          # after session rotation.
+          # after session rotation (each SSH session gets a new socket path).
           if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
             # Create stable symlink (updated on each login)
             mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
@@ -1175,12 +1230,21 @@ let
             export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
 
             # Write EnvironmentFile for Open Sesame systemd user services
+            # daemon-profile reads this to access the forwarded SSH agent
             mkdir -p "$HOME/.config/pds" 2>/dev/null || true
             printf 'SSH_AUTH_SOCK=%s/.ssh/agent.sock\n' "$HOME" > "$HOME/.config/pds/ssh-agent.env"
 
             # Import into systemd user manager (affects newly started services)
             if command -v systemctl >/dev/null 2>&1; then
               systemctl --user import-environment SSH_AUTH_SOCK 2>/dev/null || true
+
+              # Restart open-sesame daemons so they pick up the fresh SSH agent.
+              # On first login: daemons started at session creation without an agent.
+              # On subsequent logins: agent socket path changed (new SSH session).
+              # The restart is cheap (~200ms) and ensures daemons have working agent access.
+              if systemctl --user is-active --quiet open-sesame-headless.target 2>/dev/null; then
+                systemctl --user restart open-sesame-headless.target 2>/dev/null || true
+              fi
             fi
           fi
         '';
@@ -1202,19 +1266,6 @@ let
           # =====================================================================
           # Konductor Environment Setup
           # =====================================================================
-          # Copy shell configs from /etc/skel if missing (first login setup)
-          # Use -L to dereference symlinks (nix store files are read-only)
-          # Note: .gitconfig is NOT copied - git uses /etc/gitconfig (system level)
-          # Check each file independently so partial setups get completed
-          [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ] && cp -L /etc/skel/.bashrc "$HOME/"
-          [ ! -f "$HOME/.bash_profile" ] && [ -f /etc/skel/.bash_profile ] && cp -L /etc/skel/.bash_profile "$HOME/"
-          [ ! -f "$HOME/.inputrc" ] && [ -f /etc/skel/.inputrc ] && cp -L /etc/skel/.inputrc "$HOME/"
-          [ ! -f "$HOME/.envrc" ] && [ -f /etc/skel/.envrc ] && cp -L /etc/skel/.envrc "$HOME/"
-          if [ ! -f "$HOME/.config/starship.toml" ] && [ -f /etc/skel/.config/starship.toml ]; then
-            mkdir -p "$HOME/.config"
-            cp -L /etc/skel/.config/starship.toml "$HOME/.config/"
-          fi
-          # Note: direnv whitelist is at /etc/direnv/direnv.toml (NixOS system config)
 
           # Language paths
           export GOPATH="''${GOPATH:-$HOME/go}"
@@ -1317,6 +1368,10 @@ let
           yj # TOML to JSON converter (for konductor-init.service)
           yq-go # YAML/TOML/JSON processor
         ])
+        # Open Sesame headless: encrypted secret vaults with SSH agent unlock
+        # System-wide so cloud-init dynamic users also have the sesame CLI
+        # Note: .default is open-sesame-desktop (GUI); .open-sesame is headless
+        ++ [ inputs.open-sesame.packages.${system}.open-sesame ]
         # Certificate precedence detection for multi-user services
         ++ [ certPrecedenceScript ]
         # FHS compatibility: ldconfig wrapper with high priority
@@ -1376,6 +1431,24 @@ let
         "d /workspace 2775 kc2 kc2 -"
         "d /run/konductor 0755 root root -"  # cert-env files for per-user services
       ];
+
+      # =====================================================================
+      # Open Sesame — system-wide enablement for cloud-init dynamic users
+      # =====================================================================
+      # The open-sesame package ships unit files at share/systemd/user/ with
+      # correct nix store ExecStart paths (substituteInPlace in package.nix).
+      # environment.systemPackages makes them visible at
+      # /run/current-system/sw/share/systemd/user/ for all users.
+      #
+      # Home-manager creates enablement symlinks for HM-managed users.
+      # These wantedBy declarations create system-level enablement in
+      # /etc/systemd/user/ so cloud-init dynamic users also get auto-start.
+      # No service definitions needed — the package's units are authoritative.
+      user.targets.open-sesame-headless.wantedBy = [ "default.target" ];
+      user.services.open-sesame-profile.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-secrets.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-launcher.wantedBy = [ "open-sesame-headless.target" ];
+      user.services.open-sesame-snippets.wantedBy = [ "open-sesame-headless.target" ];
 
       network = {
         enable = true;

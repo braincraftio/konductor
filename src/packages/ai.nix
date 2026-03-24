@@ -7,7 +7,7 @@
   packages = with pkgs; [
     # Claude Code ecosystem
     unstable.claude-code # Anthropic Claude Code CLI
-    unstable.claude-code-acp # ACP-compatible agent for Zed IDE (by Zed Industries)
+    # unstable.claude-code-acp # ACP-compatible agent — removed from nixpkgs-unstable
     unstable.vscode-extensions.anthropic.claude-code # Official VS Code extension
 
     # Other AI assistants

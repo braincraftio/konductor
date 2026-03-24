@@ -84,6 +84,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Open Sesame: headless encrypted secret vaults with SSH agent unlock
+    open-sesame = {
+      url = "github:ScopeCreep-zip/open-sesame";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Forked Forgejo runner with workspace isolation
     # Source: git.braincraft.io/BrainCraft/runner
     # Update: nix flake update forgejo-runner-src
