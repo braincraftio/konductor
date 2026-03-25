@@ -16,11 +16,28 @@
   # Pre-built code-server binary (avoids 2-4 hour source build)
   (import ./code-server.nix)
 
-  # Unstable packages overlay
+  # direnv CGO fix for Darwin — buildGoModule in nixpkgs 25.11 requires
+  # env.CGO_ENABLED but direnv's GNUmakefile passes -linkmode=external on
+  # Darwin which needs CGO. Without this, direnv fails to build on aarch64-darwin.
   (_final: prev: {
+    direnv = prev.direnv.overrideAttrs (old: prev.lib.optionalAttrs prev.stdenv.isDarwin {
+      env = (old.env or { }) // { CGO_ENABLED = "1"; };
+    });
+  })
+
+  # Unstable packages overlay — apply direnv CGO fix here too since
+  # mise and other unstable packages depend on unstable.direnv
+  (_final: prev: let
+    direnvCgoOverlay = uFinal: uPrev: {
+      direnv = uPrev.direnv.overrideAttrs (old: uPrev.lib.optionalAttrs uPrev.stdenv.isDarwin {
+        env = (old.env or { }) // { CGO_ENABLED = "1"; };
+      });
+    };
+  in {
     unstable = import nixpkgs-unstable {
       inherit (prev.stdenv.hostPlatform) system;
       config.allowUnfree = true;
+      overlays = [ direnvCgoOverlay ];
     };
   })
 ]
