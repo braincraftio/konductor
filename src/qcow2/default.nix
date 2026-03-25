@@ -1550,7 +1550,7 @@ let
         };
         serviceConfig = {
           Type = "notify";
-          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/launcher";
+          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-launcher";
           Restart = "on-failure";
           RestartSec = 5;
           TimeoutStopSec = 5;
