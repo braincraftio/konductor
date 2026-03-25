@@ -466,8 +466,29 @@ write_files:
     permissions: '0644'
 runcmd:
   - echo "═══ cloud-init runcmd start ═══" > /dev/ttyS0
-  - echo "═══ Fix home directory ownership ═══" > /dev/ttyS0
-  - 'for dir in /home/*/; do user=$(basename "$dir"); id "$user" >/dev/null 2>&1 && chown -R "$user:users" "$dir" > /dev/ttyS0 2>&1; done'
+  - echo "═══ Fix home directory ownership + populate from skel ═══" > /dev/ttyS0
+  - |
+    for dir in /home/*/; do
+      user=$(basename "$dir")
+      id "$user" >/dev/null 2>&1 || continue
+      # Fix ownership (cloud-init creates home dirs owned by root)
+      chown -R "$user:users" "$dir" > /dev/ttyS0 2>&1
+      # Copy skel files (cloud-init on NixOS does not run useradd --copy-skel)
+      if [ -d /etc/skel ]; then
+        for f in .bashrc .bash_profile .inputrc .envrc; do
+          [ ! -f "$dir/$f" ] && [ -f "/etc/skel/$f" ] && cp "/etc/skel/$f" "$dir/$f" && chown "$user:users" "$dir/$f"
+        done
+        if [ ! -f "$dir/.config/starship.toml" ] && [ -f /etc/skel/.config/starship.toml ]; then
+          mkdir -p "$dir/.config" && cp /etc/skel/.config/starship.toml "$dir/.config/" && chown -R "$user:users" "$dir/.config"
+        fi
+        if [ ! -f "$dir/.config/atuin/config.toml" ] && [ -f /etc/skel/.config/atuin/config.toml ]; then
+          mkdir -p "$dir/.config/atuin" && cp /etc/skel/.config/atuin/config.toml "$dir/.config/atuin/" && chown -R "$user:users" "$dir/.config/atuin"
+        fi
+        mkdir -p "$dir/.cache/starship" "$dir/.cache/open-sesame" "$dir/.local/share/atuin" "$dir/.config/pds" 2>/dev/null
+        chown -R "$user:users" "$dir" > /dev/ttyS0 2>&1
+      fi
+      echo "  ✓ $user home provisioned" > /dev/ttyS0
+    done
   - echo "═══ Cloud-init configuration ═══" > /dev/ttyS0
   - echo "--- user-data ---" > /dev/ttyS0
   - cat /var/lib/cloud/instance/user-data.txt > /dev/ttyS0 2>&1 || echo "user-data not found" > /dev/ttyS0
