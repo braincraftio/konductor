@@ -1253,6 +1253,27 @@ let
           # Konductor Environment Setup
           # =====================================================================
 
+          # Populate home directory from /etc/skel on first login.
+          # Cloud-init on NixOS does not run useradd --copy-skel for dynamic users.
+          # The skelPackage derivation provides real files (not symlinks) so copies
+          # are writable. Each file is checked independently so partial setups complete.
+          if [ -d /etc/skel ] && [ -d "$HOME" ]; then
+            [ ! -f "$HOME/.bashrc" ] && [ -f /etc/skel/.bashrc ] && cp /etc/skel/.bashrc "$HOME/"
+            [ ! -f "$HOME/.bash_profile" ] && [ -f /etc/skel/.bash_profile ] && cp /etc/skel/.bash_profile "$HOME/"
+            [ ! -f "$HOME/.inputrc" ] && [ -f /etc/skel/.inputrc ] && cp /etc/skel/.inputrc "$HOME/"
+            [ ! -f "$HOME/.envrc" ] && [ -f /etc/skel/.envrc ] && cp /etc/skel/.envrc "$HOME/"
+            if [ ! -f "$HOME/.config/starship.toml" ] && [ -f /etc/skel/.config/starship.toml ]; then
+              mkdir -p "$HOME/.config"
+              cp /etc/skel/.config/starship.toml "$HOME/.config/"
+            fi
+            if [ ! -f "$HOME/.config/atuin/config.toml" ] && [ -f /etc/skel/.config/atuin/config.toml ]; then
+              mkdir -p "$HOME/.config/atuin"
+              cp /etc/skel/.config/atuin/config.toml "$HOME/.config/atuin/"
+            fi
+            mkdir -p "$HOME/.cache/starship" 2>/dev/null || true
+            mkdir -p "$HOME/.local/share/atuin" 2>/dev/null || true
+          fi
+
           # Language paths
           export GOPATH="''${GOPATH:-$HOME/go}"
           export GOBIN="$GOPATH/bin"

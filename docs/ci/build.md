@@ -466,6 +466,8 @@ write_files:
     permissions: '0644'
 runcmd:
   - echo "═══ cloud-init runcmd start ═══" > /dev/ttyS0
+  - echo "═══ Fix home directory ownership ═══" > /dev/ttyS0
+  - 'for dir in /home/*/; do user=$(basename "$dir"); id "$user" >/dev/null 2>&1 && chown -R "$user:users" "$dir" > /dev/ttyS0 2>&1; done'
   - echo "═══ Cloud-init configuration ═══" > /dev/ttyS0
   - echo "--- user-data ---" > /dev/ttyS0
   - cat /var/lib/cloud/instance/user-data.txt > /dev/ttyS0 2>&1 || echo "user-data not found" > /dev/ttyS0
