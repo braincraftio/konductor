@@ -127,10 +127,10 @@ jobs:
           else
             echo "✗ ${WORKSPACE_ROOT}/.envrc missing"
           fi
-          if [ -f "${WORKSPACE_ROOT}/flake/.envrc" ]; then
-            echo "✓ ${WORKSPACE_ROOT}/flake/.envrc exists (child)"
+          if [ -f "${WORKSPACE_ROOT}/k9/.envrc" ]; then
+            echo "✓ ${WORKSPACE_ROOT}/k9/.envrc exists (child)"
           else
-            echo "✗ ${WORKSPACE_ROOT}/flake/.envrc missing"
+            echo "✗ ${WORKSPACE_ROOT}/k9/.envrc missing"
           fi
           echo ""
 
@@ -154,12 +154,12 @@ jobs:
           direnv allow "${WORKSPACE_ROOT}"
           echo "✓ Allowed: ${WORKSPACE_ROOT}/.envrc"
 
-          direnv allow "${WORKSPACE_ROOT}/flake"
-          echo "✓ Allowed: ${WORKSPACE_ROOT}/flake/.envrc"
+          direnv allow "${WORKSPACE_ROOT}/k9"
+          echo "✓ Allowed: ${WORKSPACE_ROOT}/k9/.envrc"
           echo ""
 
           # cd to the repo directory (innermost .envrc with source_up)
-          cd "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/k9"
           echo "Working directory: $(pwd)"
           echo ""
 

@@ -17,12 +17,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout Infrastructure
-        run: |
-          set -e
-          git clone https://git.ucs.central01.helix.cisco.com/helix/infrastructure.git "${WORKSPACE_ROOT}/infrastructure"
-          echo "✓ Infrastructure repo cloned to ${WORKSPACE_ROOT}/infrastructure"
-
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"

@@ -57,7 +57,7 @@ echo ""
 
 [[ "${WORKSPACE_ROOT:-}" == /* ]] || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
 
-PROVENANCE_FILE="${WORKSPACE_ROOT}/flake/.konductor"
+PROVENANCE_FILE="${WORKSPACE_ROOT}/k9/.konductor"
 [ -f "$PROVENANCE_FILE" ] || { echo "✗ Provenance file not found"; exit 1; }
 
 SRC_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"

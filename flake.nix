@@ -72,12 +72,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Open Sesame: headless encrypted secret vaults with SSH agent unlock
-    open-sesame = {
-      url = "github:ScopeCreep-zip/open-sesame";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # Catppuccin themes for k9s and other applications
     catppuccin = {
       url = "github:catppuccin/nix";
