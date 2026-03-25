@@ -67,7 +67,7 @@ let
       "envrcContent"
     ];
   } ''
-    mkdir -p $out/.config/atuin $out/.cache/starship $out/.local/share/atuin
+    mkdir -p $out/.config/atuin $out/.config/pds $out/.cache/starship $out/.cache/open-sesame $out/.local/share/atuin
 
     cp "$bashrcContentPath"      $out/.bashrc
     cp "$bashProfileContentPath" $out/.bash_profile
@@ -1184,6 +1184,7 @@ let
       etc = {
         "skel".source = skelPackage;
 
+
         # /etc/profile.d/konductor-ssh-agent.sh - propagate forwarded SSH agent
         # to systemd user services via stable symlink + environment import.
         # Runs on every interactive SSH login. Idempotent.
@@ -1271,7 +1272,9 @@ let
               cp /etc/skel/.config/atuin/config.toml "$HOME/.config/atuin/"
             fi
             mkdir -p "$HOME/.cache/starship" 2>/dev/null || true
+            mkdir -p "$HOME/.cache/open-sesame" 2>/dev/null || true
             mkdir -p "$HOME/.local/share/atuin" 2>/dev/null || true
+            mkdir -p "$HOME/.config/pds" 2>/dev/null || true
           fi
 
           # Language paths
@@ -1444,14 +1447,159 @@ let
       # /run/current-system/sw/share/systemd/user/ for all users.
       #
       # Home-manager creates enablement symlinks for HM-managed users.
-      # These wantedBy declarations create system-level enablement in
-      # /etc/systemd/user/ so cloud-init dynamic users also get auto-start.
-      # No service definitions needed — the package's units are authoritative.
-      user.targets.open-sesame-headless.wantedBy = [ "default.target" ];
-      user.services.open-sesame-profile.wantedBy = [ "open-sesame-headless.target" ];
-      user.services.open-sesame-secrets.wantedBy = [ "open-sesame-headless.target" ];
-      user.services.open-sesame-launcher.wantedBy = [ "open-sesame-headless.target" ];
-      user.services.open-sesame-snippets.wantedBy = [ "open-sesame-headless.target" ];
+      # For cloud-init dynamic users, we need system-level enablement in
+      # /etc/systemd/user/ so daemons auto-start for all users.
+      #
+      # NixOS systemd.user.services.<name>.wantedBy generates a FULL unit file
+      # in /etc/systemd/user/ that shadows the package's unit. If only wantedBy
+      # is set, the generated unit has no ExecStart and systemd refuses it.
+      # Fix: provide the complete service definition so the generated unit works.
+      user.targets.open-sesame-headless = {
+        wantedBy = [ "default.target" ];
+        unitConfig = {
+          Description = "Open Sesame Headless Suite";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+        };
+      };
+      # Create directories required by open-sesame ReadWritePaths BEFORE
+      # the services start. systemd sets up mount namespaces (for ProtectHome,
+      # ProtectSystem) BEFORE ExecStartPre runs. If ReadWritePaths targets
+      # don't exist, namespace setup fails with exit 226/NAMESPACE.
+      # This oneshot has no ProtectHome/ProtectSystem so it can mkdir freely.
+      user.services.open-sesame-dirs = {
+        unitConfig = {
+          Description = "Create open-sesame directories";
+          Before = [ "open-sesame-profile.service" ];
+        };
+        wantedBy = [ "open-sesame-headless.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.coreutils}/bin/mkdir -p %h/.config/pds %h/.cache/open-sesame";
+        };
+      };
+
+      # Service definitions match upstream contrib/systemd/ exactly,
+      # with ExecStart paths pointing to the nix store package.
+      user.services.open-sesame-profile = {
+        wantedBy = [ "open-sesame-headless.target" ];
+        unitConfig = {
+          Description = "Open Sesame profile daemon (IPC bus)";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-dirs.service" ];
+          After = [ "open-sesame-dirs.service" ];
+          PartOf = [ "open-sesame-headless.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-profile";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          RuntimeDirectory = "pds";
+          ReadWritePaths = [ "%t/pds" "%h/.config/pds" "%h/.cache/open-sesame" ];
+          LimitNOFILE = 4096;
+          LimitCORE = 0;
+          LimitMEMLOCK = "64M";
+          MemoryMax = "128M";
+          Environment = [ "RUST_LOG=info" ];
+          EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
+        };
+      };
+      user.services.open-sesame-secrets = {
+        wantedBy = [ "open-sesame-headless.target" ];
+        unitConfig = {
+          Description = "Open Sesame secrets daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame-headless.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-secrets";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          PrivateNetwork = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          RuntimeDirectory = "pds";
+          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+          LimitNOFILE = 1024;
+          LimitCORE = 0;
+          LimitMEMLOCK = "64M";
+          MemoryMax = "256M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+      };
+      user.services.open-sesame-launcher = {
+        wantedBy = [ "open-sesame-headless.target" ];
+        unitConfig = {
+          Description = "Open Sesame launcher daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame-headless.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/launcher";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectClock = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectKernelLogs = true;
+          ProtectControlGroups = true;
+          LockPersonality = true;
+          RestrictSUIDSGID = true;
+          SystemCallArchitectures = "native";
+          CapabilityBoundingSet = "";
+          KillMode = "process";
+          LimitNOFILE = 4096;
+          LimitCORE = 0;
+          LimitMEMLOCK = "64M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+      };
+      user.services.open-sesame-snippets = {
+        wantedBy = [ "open-sesame-headless.target" ];
+        unitConfig = {
+          Description = "Open Sesame snippets daemon";
+          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          Requires = [ "open-sesame-profile.service" ];
+          After = [ "open-sesame-profile.service" ];
+          PartOf = [ "open-sesame-headless.target" ];
+        };
+        serviceConfig = {
+          Type = "notify";
+          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-snippets";
+          Restart = "on-failure";
+          RestartSec = 5;
+          TimeoutStopSec = 5;
+          WatchdogSec = 30;
+          NoNewPrivileges = true;
+          ProtectHome = "read-only";
+          ProtectSystem = "strict";
+          RuntimeDirectory = "pds";
+          ReadWritePaths = [ "%t/pds" ];
+          LimitNOFILE = 4096;
+          LimitCORE = 0;
+          LimitMEMLOCK = "64M";
+          MemoryMax = "128M";
+          Environment = [ "RUST_LOG=info" ];
+        };
+      };
 
       network = {
         enable = true;
