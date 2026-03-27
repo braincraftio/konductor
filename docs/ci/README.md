@@ -1,6 +1,6 @@
 ---
 cwd: ../..
-shell: /run/current-system/sw/bin/bash
+shell: bash
 skipPrompts: true
 tag: k9:ci,k9:ci:qcow2
 runme:
