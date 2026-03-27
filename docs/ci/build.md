@@ -424,13 +424,6 @@ SSH_PUBKEY="${QCOW2_SSH_KEY_DIR:-$HOME/.ssh}/id_ed25519.pub"
 cat > "$CLOUD_INIT_DIR/user-data" << 'EOF'
 #cloud-config
 users:
-  - name: PLACEHOLDER_USER
-    groups: kc2, wheel, docker, libvirtd, kvm
-    shell: /run/current-system/sw/bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
-    ssh_authorized_keys:
-      - PLACEHOLDER_PUBKEY
   - name: kc2
     groups: docker, libvirtd, kvm
     shell: /run/current-system/sw/bin/bash
@@ -517,8 +510,6 @@ runcmd:
   - echo "═══ cloud-init runcmd complete ═══" > /dev/ttyS0
 EOF
 
-# Replace placeholders
-sed -i "s/PLACEHOLDER_USER/${USER}/g" "$CLOUD_INIT_DIR/user-data"
 sed -i "s|PLACEHOLDER_PUBKEY|$(cat "$SSH_PUBKEY")|g" "$CLOUD_INIT_DIR/user-data"
 
 # Add proxy configuration if it exists
@@ -1044,23 +1035,6 @@ sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
 sudo rm -rf "$MOUNT"/root/.ssh "$MOUNT"/home/*/.ssh 2>/dev/null || true
 sudo rm -f "$MOUNT"/root/.gitconfig "$MOUNT"/home/*/.gitconfig 2>/dev/null || true
 
-# Remove build-time cloud-init user account and home directory
-# Baked-in users (kc2, kc2admin, runner, forgejo) are declarative in NixOS config.
-# The build user (e.g., usrbinkat) was created by cloud-init and must not ship.
-BUILD_USER="${USER:-}"
-BAKED_IN="kc2 kc2admin runner forgejo"
-if [ -n "$BUILD_USER" ]; then
-  echo "$BAKED_IN" | grep -qw "$BUILD_USER" || {
-    echo "Removing build-time user: $BUILD_USER"
-    sudo rm -rf "$MOUNT/home/$BUILD_USER"
-    # Remove user entry from passwd and shadow
-    for f in passwd shadow; do
-      sudo sed -i "/^${BUILD_USER}:/d" "$MOUNT/etc/$f" 2>/dev/null || true
-    done
-    # Remove user from group membership lists (e.g., wheel, docker, kvm, etc.)
-    sudo sed -i "s/,${BUILD_USER}\b//g; s/${BUILD_USER},//g; s/:${BUILD_USER}$/:/" "$MOUNT/etc/group" 2>/dev/null || true
-  }
-fi
 
 sudo guestunmount "$MOUNT"
 trap - EXIT
