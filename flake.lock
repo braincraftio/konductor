@@ -274,11 +274,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774810739,
-        "narHash": "sha256-EDL7NGC4AFJKZBVSMsY54d0p0zWwol/k+ZTQn5lt/9k=",
+        "lastModified": 1774824373,
+        "narHash": "sha256-Mt/1SoDjJIUnhwSLWRFSpNWukcBnPFIqM2NmlxFx7R4=",
         "owner": "ScopeCreep-zip",
         "repo": "open-sesame",
-        "rev": "6aaa59a1187b393fcd8af88638b655ec9c7924bd",
+        "rev": "e08e26558656d7d7d18a72d8ec5b06cc4c66aaea",
         "type": "github"
       },
       "original": {
