@@ -274,11 +274,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774824373,
-        "narHash": "sha256-Mt/1SoDjJIUnhwSLWRFSpNWukcBnPFIqM2NmlxFx7R4=",
+        "lastModified": 1774840367,
+        "narHash": "sha256-g4Iscj0WrYC7pG/VBl6ZIwDeXOMiNZHFDykI2p4+pCg=",
         "owner": "ScopeCreep-zip",
         "repo": "open-sesame",
-        "rev": "e08e26558656d7d7d18a72d8ec5b06cc4c66aaea",
+        "rev": "bb4f5792a360d0d3aa769cdf977c452ffdf9bccf",
         "type": "github"
       },
       "original": {
@@ -313,11 +313,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774753967,
-        "narHash": "sha256-HpT5fE8JQSbAxolUnw3VgGAo3urVjcrgtB2rtoxURVw=",
+        "lastModified": 1774840424,
+        "narHash": "sha256-3Oi4mBKzOCFQYLUyEjyc0s5cnlNj1MzmhpVKoLptpe8=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "405b9b4c2c6c5a2b1d390524ce8a240729f34a96",
+        "rev": "d9f52b51548e76ab8b6e7d647763047ebdec835c",
         "type": "github"
       },
       "original": {
