@@ -96,8 +96,11 @@ fi
 # ===========================================================================
 # Silence direnv logging for IDE agents (must be set before hook)
 export DIRENV_LOG_FORMAT="${DIRENV_LOG_FORMAT:-}"
-# Skip direnv hook if already inside a nix shell to prevent double-loading
-if command -v direnv >/dev/null 2>&1 && [ -z "$IN_NIX_SHELL" ]; then
+# Direnv hook must always be active so switching between flake directories
+# (e.g., konductor workspace → open-sesame repo) loads the correct devshell.
+# Performance: nix-direnv caches flake evaluations to prevent re-evaluation on
+# every prompt. Without nix-direnv, `use flake` evaluates nix on every cd.
+if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook bash)"
 fi
 
