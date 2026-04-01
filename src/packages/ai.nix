@@ -6,7 +6,7 @@
 {
   packages = with pkgs; [
     # Claude Code ecosystem
-    unstable.claude-code # Anthropic Claude Code CLI
+    unstable.claude-code-bin # Anthropic Claude Code CLI (native binary, bundled runtime)
     # unstable.claude-code-acp # ACP-compatible agent — removed from nixpkgs-unstable
     unstable.vscode-extensions.anthropic.claude-code # Official VS Code extension
 
