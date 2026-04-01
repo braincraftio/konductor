@@ -85,10 +85,10 @@
     };
 
     # Forked Forgejo runner with workspace isolation
-    # Source: git.braincraft.io/BrainCraft/runner
+    # Source: git.ucs.central01.helix.cisco.com/projv-engprod/runner
     # Update: nix flake update forgejo-runner-src
     forgejo-runner-src = {
-      url = "git+https://git.braincraft.io/BrainCraft/runner";
+      url = "git+https://git.ucs.central01.helix.cisco.com/projv-engprod/runner";
       flake = false;
     };
 
