@@ -39,7 +39,6 @@ set -e
 
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
 
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 [ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found"; exit 1; }
 
