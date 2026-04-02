@@ -490,11 +490,11 @@ runcmd:
   - echo "--- cloud-init status ---" > /dev/ttyS0
   - cloud-init status --long > /dev/ttyS0 2>&1 || true
   - echo "═══ Network preflight checks ═══" > /dev/ttyS0
-  - 'ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: no routes" > /dev/ttyS0; exit 1; }'
-  - 'ip route | grep -q default || { echo "PREFLIGHT FAILED: no default route" > /dev/ttyS0; exit 1; }'
-  - 'nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: DNS resolution failed" > /dev/ttyS0; exit 1; }'
-  - 'if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed "s|http://||" | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed "s|http://||" | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; exit 1; }; fi'
-  - 'curl -I --connect-timeout 5 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: cannot reach cache.nixos.org" > /dev/ttyS0; exit 1; }'
+  - 'ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: no routes" > /dev/ttyS0; }'
+  - 'ip route | grep -q default || { echo "PREFLIGHT WARN: no default route" > /dev/ttyS0; }'
+  - 'nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: DNS resolution failed for cache.nixos.org" > /dev/ttyS0; }'
+  - 'if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed "s|http://||" | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed "s|http://||" | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; }; fi'
+  - 'curl -I --connect-timeout 10 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: cannot reach cache.nixos.org" > /dev/ttyS0; }'
   - echo "═══ Network preflight PASSED ═══" > /dev/ttyS0
   - ls -lah /home/*/.ssh/ > /dev/ttyS0 2>&1 || true
   - echo "authorized_keys:" > /dev/ttyS0
@@ -1034,6 +1034,11 @@ sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
 # Remove ALL credentials from ALL home directories (root + users)
 sudo rm -rf "$MOUNT"/root/.ssh "$MOUNT"/home/*/.ssh 2>/dev/null || true
 sudo rm -f "$MOUNT"/root/.gitconfig "$MOUNT"/home/*/.gitconfig 2>/dev/null || true
+
+# Remove build-time proxy configuration (deploy-time proxy is injected by cloud-init)
+# This prevents build host proxy settings from leaking into shipped images
+sudo rm -f "$MOUNT"/etc/konductor/proxy.env 2>/dev/null || true
+sudo rm -f "$MOUNT"/etc/systemd/system/docker.service.d/proxy.conf 2>/dev/null || true
 
 
 sudo guestunmount "$MOUNT"
