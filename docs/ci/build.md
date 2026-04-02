@@ -336,8 +336,8 @@ fi
 
 # Vendored inputs are required for offline builds.
 if [ ! -f "_sources/catppuccin/flake.nix" ]; then
-    echo "Error: vendored inputs missing. Run: runme run k9:ci:dev:vendor"
-    exit 1
+    echo "Vendored inputs missing, running k9:ci:dev:vendor..."
+    runme run k9:ci:dev:vendor
 fi
 
 # Update forked forgejo-runner to latest commit (optional - skip on network errors)

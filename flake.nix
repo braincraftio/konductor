@@ -85,10 +85,11 @@
     };
 
     # Forked Forgejo runner with workspace isolation
-    # Source: git.ucs.central01.helix.cisco.com/projv-engprod/runner
+    # TODO: switch back to git.ucs.central01.helix.cisco.com/projv-engprod/runner
+    #        once nix daemon git auth for Gitea is resolved (netrc-file or equivalent)
     # Update: nix flake update forgejo-runner-src
     forgejo-runner-src = {
-      url = "git+https://git.ucs.central01.helix.cisco.com/projv-engprod/runner";
+      url = "git+https://git.braincraft.io/braincraft/runner";
       flake = false;
     };
 

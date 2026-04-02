@@ -63,17 +63,17 @@
     "forgejo-runner-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1775083199,
-        "narHash": "sha256-GPPzImwmv/E0Q6m270qyHapECt3kS7K0sv0QRv27hF4=",
+        "lastModified": 1769493915,
+        "narHash": "sha256-BkPJp9R/l4t5ZFM2k51MnWl8tPuEdrhQXxgCtu26Q+E=",
         "ref": "refs/heads/main",
-        "rev": "fb4934bdef245bb58e94779b9f036cc6522d7d35",
-        "revCount": 2213,
+        "rev": "be280cd779bb0906d32546086bbdcd02e9c334c6",
+        "revCount": 2212,
         "type": "git",
-        "url": "https://git.ucs.central01.helix.cisco.com/projv-engprod/runner"
+        "url": "https://git.braincraft.io/braincraft/runner"
       },
       "original": {
         "type": "git",
-        "url": "https://git.ucs.central01.helix.cisco.com/projv-engprod/runner"
+        "url": "https://git.braincraft.io/braincraft/runner"
       }
     },
     "home-manager": {
@@ -199,11 +199,11 @@
     },
     "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1775034801,
-        "narHash": "sha256-tsecHNsWwr4wSaM2oW9GwafMwE24J+xD8bKDoto3exY=",
+        "lastModified": 1774701658,
+        "narHash": "sha256-CIS/4AMUSwUyC8X5g+5JsMRvIUL3YUfewe8K4VrbsSQ=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "8d029aa64915e54b7846873d9583af4c9fd21ea4",
+        "rev": "b63fe7f000adcfa269967eeff72c64cafecbbebe",
         "type": "github"
       },
       "original": {
