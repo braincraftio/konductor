@@ -39,7 +39,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 2. **Package**: Wraps QCOW2 as OCI containerDisk for KubeVirt
 3. **Push**: Publishes to local registry with deterministic tags (git commit, nix derivation)
 4. **Validate**: Deploys to KubeVirt cluster, verifies SSH, services, and runner workflows
-5. **Promote**: Copies validated image to public registries (docker.io, ghcr.io)
+5. **Promote**: Copies validated image to platform registry ($PROMOTE_REGISTRY)
 
 **Key features:**
 
@@ -123,7 +123,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 │                           ↓                                                 │
 │  PROMOTION PHASE (promote.md) — manual, not in ci:pipeline                 │
 │  ┌────────────────────────────────────────────────────────────┐             │
-│  │ promote:image   Copy to docker.io / ghcr.io with all tags  │             │
+│  │ promote:image   Copy to $PROMOTE_REGISTRY with all tags     │             │
 │  └────────────────────────────────────────────────────────────┘             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -373,20 +373,17 @@ Promote validated image to public registry.
 └────────────────────────────────────────┘
 ```
 
-**Use case:** Publishing releases to docker.io or ghcr.io.
+**Use case:** Publishing validated image to the platform registry.
 
 ```bash {"name":"k9:ci:workflow:promote","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
-# Set credentials
-export DOCKER_TOKEN="<your-docker-hub-token>"
-
-# Promote to docker.io
+# Promote uses PROMOTE_REGISTRY and PROMOTE_IMAGE from .env
+# Default: registry.ucs.central01.helix.cisco.com/projv-engprod/konductor
 runme run k9:ci:qcow2:promote
 
-# Or promote to ghcr.io
-export GITHUB_TOKEN="<your-github-token>"
-export PROMOTE_REGISTRY="ghcr.io"
-export PROMOTE_IMAGE="your-org/konductor"
-runme run k9:ci:qcow2:promote
+# Override for a different target registry:
+# export PROMOTE_REGISTRY="registry.ucs.central02.helix.cisco.com"
+# export PROMOTE_IMAGE="projv-engprod/konductor"
+# runme run k9:ci:qcow2:promote
 ```
 
 ---
