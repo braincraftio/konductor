@@ -317,6 +317,20 @@ DISK_AVAIL_GB=$(df -BG --output=avail . | tail -1 | tr -d ' G')
 MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 [ "$MEM_AVAIL_MB" -ge "${QCOW2_MIN_MEM_MB:-8192}" ] && printf "✓ Memory: %sMB available\n" "$MEM_AVAIL_MB" || { printf "✗ Memory: %sMB (need %sMB)\n" "$MEM_AVAIL_MB" "${QCOW2_MIN_MEM_MB:-8192}"; ((ERRORS++)); }
 
+# ─────────────────────────────────────────────────────────────────────
+# IMAGE PIPELINE TARGETS
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Image pipeline:"
+_build_registry="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+_build_image="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+_build_tag="${CONTAINER_TAG:-latest-qcow2}"
+_promote_registry="${PROMOTE_REGISTRY:-(not set)}"
+_promote_image="${PROMOTE_IMAGE:-${_build_image}}"
+printf "  Build:   %s/%s:%s\n" "$_build_registry" "$_build_image" "$_build_tag"
+printf "  Push:    %s/%s\n" "$_build_registry" "$_build_image"
+printf "  Promote: %s/%s\n" "$_promote_registry" "$_promote_image"
+
 echo ""
 [ "$ERRORS" -eq 0 ] && echo "✓ Preflight passed" || { echo "✗ $ERRORS error(s)"; exit 1; }
 ```
