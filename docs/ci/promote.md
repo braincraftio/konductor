@@ -9,7 +9,7 @@ runme:
 
 # Promote to Production Registry
 
-Copy validated image to the production cluster registry (`$CONTAINER_REGISTRY`).
+Copy validated image to the production cluster registry (`$PROMOTE_REGISTRY`).
 
 ## Contents
 
@@ -25,13 +25,13 @@ Promote validated image from docker daemon to the production cluster registry.
 
 1. Reads build-time image name from `.konductor` provenance
 2. Verifies source image exists in local Docker daemon
-3. Copies image with all tags to `$CONTAINER_REGISTRY` via skopeo
+3. Copies image with all tags to `$PROMOTE_REGISTRY` via skopeo
 4. Verifies copy with digest check
 
 **Environment variables:**
 
-- `CONTAINER_REGISTRY` - Destination registry (e.g. `registry.ucs.central01.helix.cisco.com`)
-- `CONTAINER_IMAGE` - Image name (default: `projv-engprod/konductor`)
+- `PROMOTE_REGISTRY` - Destination registry (e.g. `registry.ucs.central01.helix.cisco.com`)
+- `PROMOTE_IMAGE` - Destination image name (default: `projv-engprod/konductor`)
 - `CONTAINER_TAG` - Base tag (default: `latest-qcow2`)
 
 **Prerequisites:** Image validated (`validate:deploy` passed), registry trust configured
@@ -50,8 +50,8 @@ echo ""
 
 [ -f .konductor ] || { echo "✗ Provenance file .konductor not found"; exit 1; }
 
-DST_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+DST_REGISTRY="${PROMOTE_REGISTRY:?PROMOTE_REGISTRY must be set}"
+IMAGE="${PROMOTE_IMAGE:-projv-engprod/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 CERT_DIR="${WORKSPACE_ROOT}/.certs/${DST_REGISTRY}"
 
