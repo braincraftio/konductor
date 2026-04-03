@@ -129,7 +129,7 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 **What it does:**
 
 1. Provisions Forgejo user and access token
-2. Creates repositories: `braincraft/k9` (main repo) and `braincraft/workspace` (shared tooling)
+2. Creates repositories: `projv-engprod/k9` (main repo) and `projv-engprod/workspace` (shared tooling)
 3. Pushes workspace repository
 4. Pushes k9 repository
 5. Triggers workflow via API: `validate-environment.yaml`
@@ -163,7 +163,7 @@ export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated
 FORGEJO_NS="forgejo"
 FORGEJO_DEPLOY="deployment/forgejo-deployment"
 REPO_NAME="k9"
-REPO_OWNER="braincraft"
+REPO_OWNER="projv-engprod"
 TOKEN_NAME="ci-runner-test-$(date +%s)"
 BRANCH="${GITHUB_REF_NAME:-main}"
 WORKFLOW="validate-environment.yaml"
