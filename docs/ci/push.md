@@ -32,7 +32,7 @@ Push container with multi-tag (git commit, nix derivation, latest).
 ```bash {"name":"k9:ci:qcow2:push:image","excludeFromRunAll":"true","tag":"k9:ci:qcow2:push,k9:ci:pipeline:all,type:entry,requires:docker"}
 set -e
 REGISTRY="registry.docker.arpa"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 

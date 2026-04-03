@@ -47,7 +47,7 @@ Set these in `.env` or export before running:
 ```bash
 # Registry configuration
 export CONTAINER_REGISTRY="registry.docker.arpa"
-export CONTAINER_IMAGE="containercraft/konductor"
+export CONTAINER_IMAGE="projv-engprod/konductor"
 export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding (host ports, avoid conflicts with host services)
@@ -900,7 +900,7 @@ _qemu_ver=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator versio
 _hw_vendor=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || _hw_vendor=""
 _hw_product=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || _hw_product=""
 _hw_serial=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || _hw_serial=""
-_oci_image="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
+_oci_image="registry.docker.arpa/${CONTAINER_IMAGE:-projv-engprod/konductor}"
 
 # Build tags array
 _tags="[\"${CONTAINER_TAG:-latest-qcow2}\""
@@ -1142,8 +1142,8 @@ if ! eval "$(nix print-dev-env .#konductor)"; then
 fi
 echo "docker: $(which docker)"
 echo "buildx: $(docker buildx version 2>&1)"
-REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+REGISTRY="registry.docker.arpa"
+IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 TAG="${CONTAINER_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 

@@ -562,7 +562,7 @@ cat .konductor
 
 ### OCI Container
 
-**Registry:** `registry.docker.arpa/containercraft/konductor`
+**Registry:** `registry.docker.arpa/projv-engprod/konductor`
 
 **Tags:**
 
@@ -590,7 +590,7 @@ cat .konductor
 [konductor]
 git_commit = "<40-char SHA>"
 git_branch = "main"
-git_remote = "https://github.com/containercraft/konductor.git"
+git_remote = "https://git.ucs.central01.helix.cisco.com/projv-engprod/flake"
 git_dirty = 0
 nix_version = "2.24.0"
 nix_hash = "sha256-..."
@@ -604,7 +604,7 @@ build_hw_vendor = "Dell Inc."
 build_hw_product = "PowerEdge R730"
 build_hw_serial = "ABC123"
 strict = false
-oci_image = "registry.docker.arpa/containercraft/konductor"
+oci_image = "registry.docker.arpa/projv-engprod/konductor"
 oci_tags = ["latest-qcow2", "qcow2-abc123", "qcow2-def456"]
 image_sha256 = "def456..."
 image_size = "3.8G"
@@ -673,7 +673,7 @@ docker pull "${oci_image}:qcow2-${git_commit}"
 ```bash {"name":"k9:ci:example:verify-digest","excludeFromRunAll":"true","tag":"k9:ci:example,type:example"}
 # Compare digest from provenance with actual image
 expected=$(grep '^oci_digest = ' .konductor | cut -d'"' -f2)
-actual=$(skopeo inspect docker://registry.docker.arpa/containercraft/konductor:latest-qcow2 | jq -r '.Digest')
+actual=$(skopeo inspect docker://registry.docker.arpa/projv-engprod/konductor:latest-qcow2 | jq -r '.Digest')
 [ "$expected" = "$actual" ] && echo "✓ Digest match" || echo "✗ Digest mismatch"
 ```
 

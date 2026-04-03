@@ -31,7 +31,7 @@ Promote validated image from docker daemon to the production cluster registry.
 **Environment variables:**
 
 - `CONTAINER_REGISTRY` - Destination registry (e.g. `registry.ucs.central01.helix.cisco.com`)
-- `CONTAINER_IMAGE` - Image name (default: `containercraft/konductor`)
+- `CONTAINER_IMAGE` - Image name (default: `projv-engprod/konductor`)
 - `CONTAINER_TAG` - Base tag (default: `latest-qcow2`)
 
 **Prerequisites:** Image validated (`validate:deploy` passed), registry trust configured
@@ -51,7 +51,7 @@ echo ""
 [ -f .konductor ] || { echo "✗ Provenance file .konductor not found"; exit 1; }
 
 DST_REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 CERT_DIR="${WORKSPACE_ROOT}/.certs/${DST_REGISTRY}"
 
