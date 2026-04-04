@@ -1114,7 +1114,7 @@ echo "Sparsifying with virt-sparsify..."
 echo "  source: konductor.qcow2.tmp (${SRC_SIZE})"
 export LIBGUESTFS_BACKEND=direct
 START=$(date +%s)
-sudo -E virt-sparsify --quiet --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+sudo -E virt-sparsify --quiet --check-tmpdir=ignore --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
 ELAPSED=$(( $(date +%s) - START ))
 DST_SIZE=$(dust -b -n 1 konductor.qcow2 2>/dev/null | awk '{print $1}')
 echo "  output: konductor.qcow2 (${DST_SIZE}) in ${ELAPSED}s"
