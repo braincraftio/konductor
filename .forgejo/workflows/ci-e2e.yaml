@@ -12,6 +12,8 @@ jobs:
     name: Validate + Promote to latest-qcow2
     runs-on: konductor
     timeout-minutes: 60
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:

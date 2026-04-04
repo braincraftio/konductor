@@ -24,6 +24,8 @@ jobs:
     name: CI Environment Validation
     runs-on: konductor
     timeout-minutes: 10
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
 
     steps:
       - name: Pre-checkout Environment Audit

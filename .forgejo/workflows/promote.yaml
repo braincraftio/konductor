@@ -13,6 +13,8 @@ on:
 
 jobs:
   promote:
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
     name: Promote Image
     runs-on: konductor
     timeout-minutes: 15

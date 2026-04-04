@@ -9,6 +9,8 @@ jobs:
     name: Build + Push (commit tags)
     runs-on: konductor
     timeout-minutes: 120
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
