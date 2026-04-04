@@ -738,17 +738,19 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /o
 
 # git bundle: portable repo with full history
 echo "Creating bundle ${BUNDLE}..."
-git bundle create "/tmp/${BUNDLE}" HEAD --all
+git bundle create --quiet "/tmp/${BUNDLE}" HEAD --all
 
 # Transfer bundle
 echo "Transferring bundle..."
 scp -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
 ssh $SSH_OPTS kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
-# Clone from bundle (creates clean repo with history)
+# Clone from bundle and set up as if cloned from Forgejo origin.
+# This ensures flake store paths match the host (cache hit rate).
+FORGEJO_URL="https://git.ucs.central01.helix.cisco.com/projv-engprod/flake.git"
 echo "Cloning to /opt/konductor/src/..."
-ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
+ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone --quiet /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout -q -B main ${COMMIT} && sudo -E git remote set-url origin ${FORGEJO_URL}"
 
 # Sync vendored inputs if present (required for offline flake evaluation)
 if [ -d _sources ]; then
@@ -1080,13 +1082,13 @@ if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
     echo "SKIP_COMPRESS: copying uncompressed image..."
     cp result/nixos.qcow2 konductor.qcow2
 else
-    SRC_SIZE=$(du -h result/nixos.qcow2 | cut -f1)
+    SRC_SIZE=$(dust -b -n 1 result/nixos.qcow2 2>/dev/null | awk '{print $1}')
     echo "Compressing with qemu-img (zstd, ${CORES} coroutines)..."
     echo "  source: result/nixos.qcow2 (${SRC_SIZE})"
     START=$(date +%s)
     qemu-img convert -c -q -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
     ELAPSED=$(( $(date +%s) - START ))
-    DST_SIZE=$(du -h konductor.qcow2.tmp | cut -f1)
+    DST_SIZE=$(dust -b -n 1 konductor.qcow2.tmp 2>/dev/null | awk '{print $1}')
     echo "  output: konductor.qcow2.tmp (${DST_SIZE}) in ${ELAPSED}s"
 fi
 ```
@@ -1107,14 +1109,14 @@ fi
 
 [ -f konductor.qcow2.tmp ] || { echo "Error: konductor.qcow2.tmp not found (compress phase failed?)"; exit 1; }
 
-SRC_SIZE=$(du -h konductor.qcow2.tmp | cut -f1)
+SRC_SIZE=$(dust -b -n 1 konductor.qcow2.tmp 2>/dev/null | awk '{print $1}')
 echo "Sparsifying with virt-sparsify..."
 echo "  source: konductor.qcow2.tmp (${SRC_SIZE})"
 export LIBGUESTFS_BACKEND=direct
 START=$(date +%s)
 sudo -E virt-sparsify --quiet --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
 ELAPSED=$(( $(date +%s) - START ))
-DST_SIZE=$(du -h konductor.qcow2 | cut -f1)
+DST_SIZE=$(dust -b -n 1 konductor.qcow2 2>/dev/null | awk '{print $1}')
 echo "  output: konductor.qcow2 (${DST_SIZE}) in ${ELAPSED}s"
 rm -f konductor.qcow2.tmp
 ```
