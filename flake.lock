@@ -63,11 +63,11 @@
     "forgejo-runner-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1775272044,
-        "narHash": "sha256-VtAfeGpmk9sqC9rclRge4IATNseIRt3UfXtkNddxK4w=",
+        "lastModified": 1775272448,
+        "narHash": "sha256-Agoqfpy3Th2A3JVle9vZ9XVacNBFtUm8f3x/1EFIU14=",
         "ref": "refs/heads/main",
-        "rev": "0c9553415853f8cc507aa96adfeecbd6547c7a70",
-        "revCount": 2215,
+        "rev": "30e426f9edd7eb56d58d31e2cfed971735588741",
+        "revCount": 2216,
         "type": "git",
         "url": "https://git.braincraft.io/braincraft/runner"
       },
@@ -313,11 +313,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1775185947,
-        "narHash": "sha256-8ctPmj6RME4q4ELeg+BuY9lV/34M4AG1CNc0Im9PDDk=",
+        "lastModified": 1775272153,
+        "narHash": "sha256-FwYb64ysv8J2TxaqsYYcDyHAHBUEaQlriPMWPMi1K7M=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "199eeb6748116f7da4fbd3a680bc854e99d9132b",
+        "rev": "740fb0203b2852917b909a72b948d34d0b171ec0",
         "type": "github"
       },
       "original": {
