@@ -38,9 +38,13 @@ jobs:
           fi
 
       - name: Vendor Flake Inputs
+        env:
+          GITHUB_TOKEN: ""
         run: runme run k9:ci:dev:vendor
 
       - name: Build QCOW2 + containerDisk
+        env:
+          GITHUB_TOKEN: ""
         run: runme run --all --tag=k9:ci:qcow2:build --filename docs/ci/build.md
 
       - name: Platform Up

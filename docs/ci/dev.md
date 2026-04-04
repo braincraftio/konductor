@@ -220,6 +220,7 @@ set -euo pipefail
 # with the Forgejo job token (which GitHub rejects as "Bad credentials").
 # Public repos fetch fine without auth; the Forgejo token is not valid on GitHub.
 unset GITHUB_TOKEN
+gh auth status 2>&1 || true
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
@@ -343,6 +344,7 @@ set -euo pipefail
 
 # Unset GITHUB_TOKEN to prevent nix from sending the Forgejo job token to GitHub API.
 unset GITHUB_TOKEN
+gh auth status 2>&1 || true
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

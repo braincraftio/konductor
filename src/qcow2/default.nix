@@ -900,7 +900,7 @@ let
         members = [ "kc2" "kc2admin" "runner" "forgejo" ];
       };
       groups.forgejo = {
-        gid = users.forgejo.gid;
+        inherit (users.forgejo) gid;
       };
 
       users = {
@@ -1454,183 +1454,188 @@ let
       # in /etc/systemd/user/ that shadows the package's unit. If only wantedBy
       # is set, the generated unit has no ExecStart and systemd refuses it.
       # Fix: provide the complete service definition so the generated unit works.
-      user.targets.open-sesame-headless = {
-        wantedBy = [ "default.target" ];
-        unitConfig = {
-          Description = "Open Sesame Headless Suite";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
+      user = {
+        targets.open-sesame-headless = {
+          wantedBy = [ "default.target" ];
+          unitConfig = {
+            Description = "Open Sesame Headless Suite";
+            Documentation = "https://github.com/scopecreep-zip/open-sesame";
+          };
         };
-      };
-      # Create directories required by open-sesame ReadWritePaths BEFORE
-      # the services start. systemd sets up mount namespaces (for ProtectHome,
-      # ProtectSystem) BEFORE ExecStartPre runs. If ReadWritePaths targets
-      # don't exist, namespace setup fails with exit 226/NAMESPACE.
-      # This oneshot has no ProtectHome/ProtectSystem so it can mkdir freely.
-      user.services.open-sesame-dirs = {
-        unitConfig = {
-          Description = "Create open-sesame directories";
-          Before = [ "open-sesame-profile.service" ];
-        };
-        wantedBy = [ "open-sesame-headless.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.coreutils}/bin/mkdir -p %h/.config/pds %h/.cache/open-sesame";
-        };
-      };
-
-      # Service definitions match upstream contrib/systemd/ exactly,
-      # with ExecStart paths pointing to the nix store package.
-      user.services.open-sesame-profile = {
-        wantedBy = [ "open-sesame-headless.target" ];
-        unitConfig = {
-          Description = "Open Sesame profile daemon (IPC bus)";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-dirs.service" ];
-          After = [ "open-sesame-dirs.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-profile";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          RuntimeDirectory = "pds";
-          ReadWritePaths = [ "%t/pds" "%h/.config/pds" "%h/.cache/open-sesame" ];
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          LimitMEMLOCK = "64M";
-          MemoryMax = "128M";
-          Environment = [ "RUST_LOG=info" ];
-          EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
-        };
-      };
-      user.services.open-sesame-secrets = {
-        wantedBy = [ "open-sesame-headless.target" ];
-        unitConfig = {
-          Description = "Open Sesame secrets daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-secrets";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          PrivateNetwork = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          RuntimeDirectory = "pds";
-          ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
-          LimitNOFILE = 1024;
-          LimitCORE = 0;
-          LimitMEMLOCK = "64M";
-          MemoryMax = "256M";
-          Environment = [ "RUST_LOG=info" ];
-        };
-      };
-      user.services.open-sesame-launcher = {
-        wantedBy = [ "open-sesame-headless.target" ];
-        unitConfig = {
-          Description = "Open Sesame launcher daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-launcher";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectClock = true;
-          ProtectKernelTunables = true;
-          ProtectKernelModules = true;
-          ProtectKernelLogs = true;
-          ProtectControlGroups = true;
-          LockPersonality = true;
-          RestrictSUIDSGID = true;
-          SystemCallArchitectures = "native";
-          CapabilityBoundingSet = "";
-          KillMode = "process";
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          LimitMEMLOCK = "64M";
-          Environment = [ "RUST_LOG=info" ];
-        };
-      };
-      user.services.open-sesame-snippets = {
-        wantedBy = [ "open-sesame-headless.target" ];
-        unitConfig = {
-          Description = "Open Sesame snippets daemon";
-          Documentation = "https://github.com/scopecreep-zip/open-sesame";
-          Requires = [ "open-sesame-profile.service" ];
-          After = [ "open-sesame-profile.service" ];
-          PartOf = [ "open-sesame-headless.target" ];
-        };
-        serviceConfig = {
-          Type = "notify";
-          ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-snippets";
-          Restart = "on-failure";
-          RestartSec = 5;
-          TimeoutStopSec = 5;
-          WatchdogSec = 30;
-          NoNewPrivileges = true;
-          ProtectHome = "read-only";
-          ProtectSystem = "strict";
-          RuntimeDirectory = "pds";
-          ReadWritePaths = [ "%t/pds" ];
-          LimitNOFILE = 4096;
-          LimitCORE = 0;
-          LimitMEMLOCK = "64M";
-          MemoryMax = "128M";
-          Environment = [ "RUST_LOG=info" ];
+        services = {
+          # Create directories required by open-sesame ReadWritePaths BEFORE
+          # the services start. systemd sets up mount namespaces (for ProtectHome,
+          # ProtectSystem) BEFORE ExecStartPre runs. If ReadWritePaths targets
+          # don't exist, namespace setup fails with exit 226/NAMESPACE.
+          # This oneshot has no ProtectHome/ProtectSystem so it can mkdir freely.
+          open-sesame-dirs = {
+            unitConfig = {
+              Description = "Create open-sesame directories";
+              Before = [ "open-sesame-profile.service" ];
+            };
+            wantedBy = [ "open-sesame-headless.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              ExecStart = "${pkgs.coreutils}/bin/mkdir -p %h/.config/pds %h/.cache/open-sesame";
+            };
+          };
+          # Service definitions match upstream contrib/systemd/ exactly,
+          # with ExecStart paths pointing to the nix store package.
+          open-sesame-profile = {
+            wantedBy = [ "open-sesame-headless.target" ];
+            unitConfig = {
+              Description = "Open Sesame profile daemon (IPC bus)";
+              Documentation = "https://github.com/scopecreep-zip/open-sesame";
+              Requires = [ "open-sesame-dirs.service" ];
+              After = [ "open-sesame-dirs.service" ];
+              PartOf = [ "open-sesame-headless.target" ];
+            };
+            serviceConfig = {
+              Type = "notify";
+              ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-profile";
+              Restart = "on-failure";
+              RestartSec = 5;
+              TimeoutStopSec = 5;
+              WatchdogSec = 30;
+              NoNewPrivileges = true;
+              ProtectHome = "read-only";
+              ProtectSystem = "strict";
+              RuntimeDirectory = "pds";
+              ReadWritePaths = [ "%t/pds" "%h/.config/pds" "%h/.cache/open-sesame" ];
+              LimitNOFILE = 4096;
+              LimitCORE = 0;
+              LimitMEMLOCK = "64M";
+              MemoryMax = "128M";
+              Environment = [ "RUST_LOG=info" ];
+              EnvironmentFile = [ "-%h/.config/pds/ssh-agent.env" ];
+            };
+          };
+          open-sesame-secrets = {
+            wantedBy = [ "open-sesame-headless.target" ];
+            unitConfig = {
+              Description = "Open Sesame secrets daemon";
+              Documentation = "https://github.com/scopecreep-zip/open-sesame";
+              Requires = [ "open-sesame-profile.service" ];
+              After = [ "open-sesame-profile.service" ];
+              PartOf = [ "open-sesame-headless.target" ];
+            };
+            serviceConfig = {
+              Type = "notify";
+              ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-secrets";
+              Restart = "on-failure";
+              RestartSec = 5;
+              TimeoutStopSec = 5;
+              WatchdogSec = 30;
+              NoNewPrivileges = true;
+              PrivateNetwork = true;
+              ProtectHome = "read-only";
+              ProtectSystem = "strict";
+              RuntimeDirectory = "pds";
+              ReadWritePaths = [ "%t/pds" "%h/.config/pds" ];
+              LimitNOFILE = 1024;
+              LimitCORE = 0;
+              LimitMEMLOCK = "64M";
+              MemoryMax = "256M";
+              Environment = [ "RUST_LOG=info" ];
+            };
+          };
+          open-sesame-launcher = {
+            wantedBy = [ "open-sesame-headless.target" ];
+            unitConfig = {
+              Description = "Open Sesame launcher daemon";
+              Documentation = "https://github.com/scopecreep-zip/open-sesame";
+              Requires = [ "open-sesame-profile.service" ];
+              After = [ "open-sesame-profile.service" ];
+              PartOf = [ "open-sesame-headless.target" ];
+            };
+            serviceConfig = {
+              Type = "notify";
+              ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-launcher";
+              Restart = "on-failure";
+              RestartSec = 5;
+              TimeoutStopSec = 5;
+              WatchdogSec = 30;
+              NoNewPrivileges = true;
+              ProtectClock = true;
+              ProtectKernelTunables = true;
+              ProtectKernelModules = true;
+              ProtectKernelLogs = true;
+              ProtectControlGroups = true;
+              LockPersonality = true;
+              RestrictSUIDSGID = true;
+              SystemCallArchitectures = "native";
+              CapabilityBoundingSet = "";
+              KillMode = "process";
+              LimitNOFILE = 4096;
+              LimitCORE = 0;
+              LimitMEMLOCK = "64M";
+              Environment = [ "RUST_LOG=info" ];
+            };
+          };
+          open-sesame-snippets = {
+            wantedBy = [ "open-sesame-headless.target" ];
+            unitConfig = {
+              Description = "Open Sesame snippets daemon";
+              Documentation = "https://github.com/scopecreep-zip/open-sesame";
+              Requires = [ "open-sesame-profile.service" ];
+              After = [ "open-sesame-profile.service" ];
+              PartOf = [ "open-sesame-headless.target" ];
+            };
+            serviceConfig = {
+              Type = "notify";
+              ExecStart = "${inputs.open-sesame.packages.${system}.open-sesame}/bin/daemon-snippets";
+              Restart = "on-failure";
+              RestartSec = 5;
+              TimeoutStopSec = 5;
+              WatchdogSec = 30;
+              NoNewPrivileges = true;
+              ProtectHome = "read-only";
+              ProtectSystem = "strict";
+              RuntimeDirectory = "pds";
+              ReadWritePaths = [ "%t/pds" ];
+              LimitNOFILE = 4096;
+              LimitCORE = 0;
+              LimitMEMLOCK = "64M";
+              MemoryMax = "128M";
+              Environment = [ "RUST_LOG=info" ];
+            };
+          };
         };
       };
 
       network = {
         enable = true;
-        networks."10-ethernet" = {
-          matchConfig.Type = "ether";
-          networkConfig.DHCP = "yes";
-        };
-        # Route .docker.arpa DNS to docker-dev CoreDNS LoadBalancer VIP.
-        # The docker-dev bridge is created by docker compose for the Talos-in-Docker
-        # cluster. CoreDNS at 10.5.0.243 (Cilium L2 LB-IPAM) serves *.docker.arpa.
-        # "04-" matches exact name before "05-docker-unmanaged" wildcards docker*.
-        # Inert when docker-dev stack is down (no interface = no match).
-        networks."04-docker-dev" = {
-          matchConfig.Name = "docker-dev";
-          address = [ "10.5.0.1/24" ];
-          dns = [ "10.5.0.243" ];
-          domains = [ "~docker.arpa" ];
-          linkConfig.RequiredForOnline = "no";
-        };
-        # Prevent systemd-networkd from managing Docker interfaces
-        # Docker creates bridges (docker0, br-*) and veth pairs dynamically via netlink.
-        # Without this, systemd-networkd may race with Docker's netlink operations,
-        # causing veth interfaces to not be attached to bridges properly.
-        # IMPORTANT: Must be "05-" to come BEFORE "10-ethernet" which matches Type=ether
-        # (veth is type ether, so it would match 10-ethernet first otherwise)
-        # See: BUG_REPORT.docker-compose-nixos-qcow2.md
-        networks."05-docker-unmanaged" = {
-          matchConfig.Name = "docker* br-* veth*";
-          linkConfig = {
-            Unmanaged = "yes";
-            RequiredForOnline = "no";
+        networks = {
+          "10-ethernet" = {
+            matchConfig.Type = "ether";
+            networkConfig.DHCP = "yes";
+          };
+          # Route .docker.arpa DNS to docker-dev CoreDNS LoadBalancer VIP.
+          # The docker-dev bridge is created by docker compose for the Talos-in-Docker
+          # cluster. CoreDNS at 10.5.0.243 (Cilium L2 LB-IPAM) serves *.docker.arpa.
+          # "04-" matches exact name before "05-docker-unmanaged" wildcards docker*.
+          # Inert when docker-dev stack is down (no interface = no match).
+          "04-docker-dev" = {
+            matchConfig.Name = "docker-dev";
+            address = [ "10.5.0.1/24" ];
+            dns = [ "10.5.0.243" ];
+            domains = [ "~docker.arpa" ];
+            linkConfig.RequiredForOnline = "no";
+          };
+          # Prevent systemd-networkd from managing Docker interfaces
+          # Docker creates bridges (docker0, br-*) and veth pairs dynamically via netlink.
+          # Without this, systemd-networkd may race with Docker's netlink operations,
+          # causing veth interfaces to not be attached to bridges properly.
+          # IMPORTANT: Must be "05-" to come BEFORE "10-ethernet" which matches Type=ether
+          # (veth is type ether, so it would match 10-ethernet first otherwise)
+          # See: BUG_REPORT.docker-compose-nixos-qcow2.md
+          "05-docker-unmanaged" = {
+            matchConfig.Name = "docker* br-* veth*";
+            linkConfig = {
+              Unmanaged = "yes";
+              RequiredForOnline = "no";
+            };
           };
         };
       };
