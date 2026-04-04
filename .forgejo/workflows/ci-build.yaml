@@ -55,7 +55,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
           [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
