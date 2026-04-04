@@ -47,7 +47,7 @@
             anthropic = (uPrev.vscode-extensions.anthropic or {}) // {
               claude-code = uPrev.vscode-extensions.anthropic.claude-code.overrideAttrs (old: {
                 src = uPrev.fetchurl {
-                  url = old.src.url;
+                  inherit (old.src) url name;
                   sha256 = "sha256-6PBg+T4DePIwire3ioeZemMdAWNG4hAeBh0dmBTaVys=";
                 };
               });
