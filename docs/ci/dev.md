@@ -214,13 +214,22 @@ echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
-set -euo pipefail
+set -euxo pipefail
 
 # Unset GITHUB_TOKEN to prevent nix from authenticating to api.github.com
 # with the Forgejo job token (which GitHub rejects as "Bad credentials").
 # Public repos fetch fine without auth; the Forgejo token is not valid on GitHub.
 unset GITHUB_TOKEN
 gh auth status 2>&1 || true
+
+# Debug: check if nix has cached access tokens or other auth config
+echo "=== NIX_CONFIG ==="
+echo "${NIX_CONFIG:-<unset>}"
+echo "=== nix.conf ==="
+cat ~/.config/nix/nix.conf 2>/dev/null || echo "<no user nix.conf>"
+cat /etc/nix/nix.conf 2>/dev/null || echo "<no system nix.conf>"
+echo "=== env vars with TOKEN/AUTH ==="
+env | grep -iE 'token|auth|github|credential' || echo "<none>"
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
