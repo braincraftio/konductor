@@ -122,3 +122,44 @@ jobs:
 
       - name: Verify Tags
         run: runme run k9:ci:registry:tags
+
+      - name: Validate Deploy
+        run: runme run k9:ci:qcow2:validate:deploy
+
+      - name: Validate Services
+        run: runme run k9:ci:qcow2:validate:services
+
+      - name: Validate Runner
+        run: runme run k9:ci:qcow2:validate:runner
+
+      - name: Promote Registry Trust + Login
+        run: |
+          set -e
+          REGISTRY="${PROMOTE_REGISTRY:?PROMOTE_REGISTRY must be set}"
+          KUBECONFIG_HOST="$HOME/.kube/config"
+          CERT_DIR="${WORKSPACE_ROOT}/.certs/${REGISTRY}"
+
+          # Extract CA from central01 envoy-gateway
+          mkdir -p "$CERT_DIR"
+          kubectl --kubeconfig "$KUBECONFIG_HOST" \
+            get secret gateway-tls-https -n envoy-gateway-system \
+            -o jsonpath='{.data.ca\.crt}' | base64 -d \
+            > "$CERT_DIR/ca.crt"
+          echo "✓ CA installed: $CERT_DIR/ca.crt"
+
+          # Docker trust
+          DOCKER_CERT_DIR="/etc/docker/certs.d/$REGISTRY"
+          sudo mkdir -p "$DOCKER_CERT_DIR"
+          sudo cp "$CERT_DIR/ca.crt" "$DOCKER_CERT_DIR/ca.crt"
+          echo "✓ Docker CA: $DOCKER_CERT_DIR/ca.crt"
+
+          # Login
+          USERNAME="${PROMOTE_REGISTRY_USERNAME:-admin}"
+          PASSWORD="${PROMOTE_REGISTRY_PASSWORD:-admin}"
+          echo "$PASSWORD" | skopeo login "$REGISTRY" \
+            --username "$USERNAME" --password-stdin \
+            --cert-dir "$CERT_DIR"
+          echo "✓ Logged in to $REGISTRY"
+
+      - name: Promote
+        run: runme run k9:ci:qcow2:promote
