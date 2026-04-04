@@ -216,20 +216,14 @@ Vendor all flake inputs into `./_sources` for fully offline builds.
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euxo pipefail
 
-# Unset GITHUB_TOKEN to prevent nix from authenticating to api.github.com
-# with the Forgejo job token (which GitHub rejects as "Bad credentials").
-# Public repos fetch fine without auth; the Forgejo token is not valid on GitHub.
+# In CI, GITHUB_TOKEN is a Forgejo job token — not valid on github.com.
+# The workspace .envrc injects it into NIX_CONFIG as access-tokens, which
+# causes nix to send invalid credentials to api.github.com (HTTP 401).
+# Unset both as defense-in-depth (the .envrc also skips injection in CI).
 unset GITHUB_TOKEN
-gh auth status 2>&1 || true
-
-# Debug: check if nix has cached access tokens or other auth config
-echo "=== NIX_CONFIG ==="
-echo "${NIX_CONFIG:-<unset>}"
-echo "=== nix.conf ==="
-cat ~/.config/nix/nix.conf 2>/dev/null || echo "<no user nix.conf>"
-cat /etc/nix/nix.conf 2>/dev/null || echo "<no system nix.conf>"
-echo "=== env vars with TOKEN/AUTH ==="
-env | grep -iE 'token|auth|github|credential' || echo "<none>"
+if [[ "${NIX_CONFIG:-}" == *access-tokens* ]]; then
+  export NIX_CONFIG="$(echo "$NIX_CONFIG" | grep -v '^access-tokens')"
+fi
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
