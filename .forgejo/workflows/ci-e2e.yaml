@@ -22,8 +22,8 @@ jobs:
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
-          direnv allow "${WORKSPACE_ROOT}/k9"
-          cd "${WORKSPACE_ROOT}/k9"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
           DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
           if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
             echo "$DIRENV_JSON" | jq -r '
@@ -44,7 +44,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 
           INPUT_TAG="${{ inputs.image_tag }}"
           if [ -n "$INPUT_TAG" ]; then
@@ -71,7 +71,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
           skopeo inspect --cert-dir "$CERT_DIR" docker://"${FULL_IMAGE}" > /dev/null \
             || { echo "✗ Image not found: ${FULL_IMAGE}"; exit 1; }
@@ -92,7 +92,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
           echo "Promoting ${IMAGE_TAG} -> latest-qcow2"
