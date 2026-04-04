@@ -1153,18 +1153,19 @@ let
       defaultPackages = lib.mkForce [ ];
 
       # Session variables (PAM-level - available to all contexts including systemd services)
-      # Uses @{HOME} syntax for PAM variable expansion
+      # Uses $HOME syntax — NixOS converts $HOME→@{HOME} for PAM automatically
       sessionVariables = {
-        # CI environment marker
-        CI = "true";
+        # NOTE: CI=true intentionally NOT set here — it disables TUI rendering
+        # in Claude Code, Copilot CLI, and other interactive tools.
+        # CI runners get CI=true from their systemd service environment.
         # Hermetic bash configuration (from devshell)
         inherit (konductorConfig.shell.bash.env) KONDUCTOR_BASHRC KONDUCTOR_INPUTRC;
         # Atuin shell history (config + bash-preexec for hooks)
         inherit (konductorConfig.shell.atuin.env) ATUIN_CONFIG_DIR KONDUCTOR_PREEXEC_PATH;
-        # Language paths (PAM @{HOME} expansion)
-        GOPATH = "@{HOME}/go";
-        CARGO_HOME = "@{HOME}/.cargo";
-        PNPM_HOME = "@{HOME}/.local/share/pnpm";
+        # Language paths ($HOME → @{HOME} converted by NixOS for PAM)
+        GOPATH = "$HOME/go";
+        CARGO_HOME = "$HOME/.cargo";
+        PNPM_HOME = "$HOME/.local/share/pnpm";
         # OVMF EFI firmware paths for QEMU (from konductor.env)
         OVMF_CODE = "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd";
         OVMF_VARS = "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd";
