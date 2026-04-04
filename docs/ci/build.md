@@ -1080,8 +1080,14 @@ if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
     echo "SKIP_COMPRESS: copying uncompressed image..."
     cp result/nixos.qcow2 konductor.qcow2
 else
+    SRC_SIZE=$(du -h result/nixos.qcow2 | cut -f1)
     echo "Compressing with qemu-img (zstd, ${CORES} coroutines)..."
-    qemu-img convert -c -p -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+    echo "  source: result/nixos.qcow2 (${SRC_SIZE})"
+    START=$(date +%s)
+    qemu-img convert -c -q -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+    ELAPSED=$(( $(date +%s) - START ))
+    DST_SIZE=$(du -h konductor.qcow2.tmp | cut -f1)
+    echo "  output: konductor.qcow2.tmp (${DST_SIZE}) in ${ELAPSED}s"
 fi
 ```
 
@@ -1101,9 +1107,15 @@ fi
 
 [ -f konductor.qcow2.tmp ] || { echo "Error: konductor.qcow2.tmp not found (compress phase failed?)"; exit 1; }
 
+SRC_SIZE=$(du -h konductor.qcow2.tmp | cut -f1)
 echo "Sparsifying with virt-sparsify..."
+echo "  source: konductor.qcow2.tmp (${SRC_SIZE})"
 export LIBGUESTFS_BACKEND=direct
-sudo -E virt-sparsify --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+START=$(date +%s)
+sudo -E virt-sparsify --quiet --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+ELAPSED=$(( $(date +%s) - START ))
+DST_SIZE=$(du -h konductor.qcow2 | cut -f1)
+echo "  output: konductor.qcow2 (${DST_SIZE}) in ${ELAPSED}s"
 rm -f konductor.qcow2.tmp
 ```
 
@@ -1167,6 +1179,7 @@ FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 [ -f "${QCOW2_LOGFILE:-build-vm.log}" ] || echo "# VM phase skipped" > "${QCOW2_LOGFILE:-build-vm.log}"
 
 docker buildx build -f Dockerfile.qcow2 \
+    --progress=plain \
     --build-arg QCOW2_FILE=konductor.qcow2 \
     --build-arg BUILD_LOG="${QCOW2_LOGFILE:-build-vm.log}" \
     --build-arg PROVENANCE=.konductor \

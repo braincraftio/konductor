@@ -16,6 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate Workspace
+        run: |
+          [ -n "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT not set"; exit 1; }
+          [ -d "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT=$WORKSPACE_ROOT does not exist"; exit 1; }
+          echo "✓ WORKSPACE_ROOT=$WORKSPACE_ROOT"
+
+      - name: Clone Infrastructure Repo
+        uses: actions/checkout@v4
+        with:
+          repository: projv-engprod/infrastructure
+          token: ${{ secrets.WORKSPACE_TOKEN }}
+          path: ${{ env.WORKSPACE_ROOT }}/infrastructure
+
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
