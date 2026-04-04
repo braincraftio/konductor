@@ -37,7 +37,24 @@
     unstable = import nixpkgs-unstable {
       inherit (prev.stdenv.hostPlatform) system;
       config.allowUnfree = true;
-      overlays = [ direnvCgoOverlay ];
+      overlays = [
+        direnvCgoOverlay
+        # Fix stale VSIX hash for anthropic.claude-code — marketplace payload changed,
+        # nixpkgs-unstable hasn't merged the updated hash yet.
+        # TODO: remove once nixpkgs-unstable ships with the correct hash
+        (_: uPrev: {
+          vscode-extensions = uPrev.vscode-extensions // {
+            anthropic = (uPrev.vscode-extensions.anthropic or {}) // {
+              claude-code = uPrev.vscode-extensions.anthropic.claude-code.overrideAttrs (old: {
+                src = uPrev.fetchurl {
+                  url = old.src.url;
+                  sha256 = "sha256-6PBg+T4DePIwire3ioeZemMdAWNG4hAeBh0dmBTaVys=";
+                };
+              });
+            };
+          };
+        })
+      ];
     };
   })
 ]
