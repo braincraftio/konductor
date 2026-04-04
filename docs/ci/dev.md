@@ -216,6 +216,11 @@ Vendor all flake inputs into `./_sources` for fully offline builds.
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
 
+# Unset GITHUB_TOKEN to prevent nix from authenticating to api.github.com
+# with the Forgejo job token (which GitHub rejects as "Bad credentials").
+# Public repos fetch fine without auth; the Forgejo token is not valid on GitHub.
+unset GITHUB_TOKEN
+
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
 mkdir -p _sources
@@ -335,6 +340,9 @@ to local paths for offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor-online","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
+
+# Unset GITHUB_TOKEN to prevent nix from sending the Forgejo job token to GitHub API.
+unset GITHUB_TOKEN
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
