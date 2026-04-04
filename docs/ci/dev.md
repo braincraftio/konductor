@@ -214,7 +214,7 @@ echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 Vendor all flake inputs into `./_sources` for fully offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
-set -euxo pipefail
+set -euo pipefail
 
 # In CI, GITHUB_TOKEN is a Forgejo job token — not valid on github.com.
 # The workspace .envrc injects it into NIX_CONFIG as access-tokens, which
