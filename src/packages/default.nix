@@ -20,7 +20,7 @@ let
   network = import ./network.nix { inherit pkgs; };
   system = import ./system.nix { inherit pkgs lib; };
   languages = import ./languages.nix { inherit pkgs lib versions; };
-  cli = import ./cli.nix { inherit pkgs config; pulumiPkg = languages.pulumiPkg; };
+  cli = import ./cli.nix { inherit pkgs config; inherit (languages) pulumiPkg; };
   linters = import ./linters.nix { inherit pkgs config; };
   formatters = import ./formatters.nix { inherit pkgs lib config; };
   ai = import ./ai.nix { inherit pkgs; };
