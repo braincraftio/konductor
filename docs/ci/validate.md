@@ -148,7 +148,7 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 **Duration:** 5-10 minutes
 
 ```bash {"name":"k9:ci:qcow2:validate:runner","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
-set -eo pipefail
+set -eox pipefail
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  validate:runner — Validate Forgejo Runner"
@@ -228,7 +228,6 @@ GIT_CA_CERT="${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt"
 
 git -C .. remote remove runner-test 2>/dev/null || true
 git -C .. remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/workspace.git"
-git -C .. fetch --quiet --unshallow origin 2>/dev/null || true
 GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 git -C .. remote remove runner-test 2>/dev/null || true
 
