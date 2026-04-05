@@ -85,6 +85,35 @@ let
   };
 
   # =========================================================================
+  # pyright -- not in python313Packages, built from PyPI wheel
+  # =========================================================================
+  # Pulumi's language plugin requires pyright to be pip-visible (installed in
+  # the Python environment as a package), not just on PATH as a standalone CLI.
+  # The PyPI pyright package is a thin Python wrapper that invokes the node binary.
+  pyrightPkg = pkgs.python313Packages.buildPythonPackage {
+    pname = "pyright";
+    version = "1.1.407";
+    format = "wheel";
+
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/dc/93/b69052907d032b00c40cb656d21438ec00b3a471733de137a3f65a49a0a0/pyright-1.1.407-py3-none-any.whl";
+      hash = "sha256-bdQZ9U/ME/A7UihXltZeY5eGNz9DPiQ/i5TPk6dETSE=";
+    };
+
+    propagatedBuildInputs = with pkgs.python313Packages; [
+      nodeenv
+      typing-extensions
+    ];
+
+    doCheck = false;
+
+    meta = with lib; {
+      description = "Python command line wrapper for pyright type checker";
+      license = licenses.mit;
+    };
+  };
+
+  # =========================================================================
   # Python packages for python.withPackages (merged in languages.nix)
   # =========================================================================
   # This is a function that takes the python package set (ps) and returns
@@ -124,7 +153,7 @@ let
     ps.setuptools   # Required by some provider SDKs at runtime
 
     # Type checker (must be pip-visible for Pulumi's typechecker option)
-    ps.pyright
+    pyrightPkg
   ];
 
 in
