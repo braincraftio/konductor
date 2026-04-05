@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, pythonEnv ? null }:
 # =============================================================================
 # Pulumi Python Environment (NixOS-native with python.withPackages)
 # =============================================================================
@@ -7,6 +7,10 @@
 # infrastructure/pulumi/src/. The Python packages are merged into the single
 # python.withPackages call in languages.nix to avoid PATH collisions between
 # multiple Python environments.
+#
+# pythonEnv parameter: when provided (by languages.nix), the Pulumi wrapper and
+# env use this single derivation instead of building separate copies. This
+# eliminates duplicate store paths for identical withPackages environments.
 #
 # All native extensions (grpc, protobuf, bcrypt, etc.) are correctly linked
 # against Nix store library paths -- no LD_LIBRARY_PATH workarounds needed.
@@ -165,14 +169,11 @@ in
   # Pulumi CLI package (for cli.nix)
   # =========================================================================
   # The symlinkJoin containing pulumi CLI, wrapper, and language plugin.
-  # Does NOT include pythonWithPulumi -- that is provided by the single
-  # python.withPackages in languages.nix to avoid PATH collisions.
+  # Uses pythonEnv from languages.nix (single derivation for all consumers).
   package = let
-    # Build the python env here just for the wrapper's PULUMI_PYTHON_CMD reference.
-    # The actual python3 in devshell PATH comes from languages.nix.
-    pythonWithPulumi = pkgs.python313.withPackages pythonDeps;
+    resolvedPythonEnv = assert pythonEnv != null; pythonEnv;
     pulumiWrapper = pkgs.writeShellScriptBin "pulumi" ''
-      export PULUMI_PYTHON_CMD="${pythonWithPulumi}/bin/python"
+      export PULUMI_PYTHON_CMD="${resolvedPythonEnv}/bin/python"
       exec ${pkgs.pulumi}/bin/pulumi "$@"
     '';
   in pkgs.symlinkJoin {
@@ -197,8 +198,8 @@ in
   # Environment variables for devshells
   # =========================================================================
   env = let
-    pythonWithPulumi = pkgs.python313.withPackages pythonDeps;
+    resolvedPythonEnv = assert pythonEnv != null; pythonEnv;
   in {
-    PULUMI_PYTHON_CMD = "${pythonWithPulumi}/bin/python";
+    PULUMI_PYTHON_CMD = "${resolvedPythonEnv}/bin/python";
   };
 }

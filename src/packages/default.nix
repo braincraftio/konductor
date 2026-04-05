@@ -20,7 +20,7 @@ let
   network = import ./network.nix { inherit pkgs; };
   system = import ./system.nix { inherit pkgs lib; };
   languages = import ./languages.nix { inherit pkgs lib versions; };
-  cli = import ./cli.nix { inherit pkgs config; };
+  cli = import ./cli.nix { inherit pkgs config; pulumiPkg = languages.pulumiPkg; };
   linters = import ./linters.nix { inherit pkgs config; };
   formatters = import ./formatters.nix { inherit pkgs lib config; };
   ai = import ./ai.nix { inherit pkgs; };
@@ -71,7 +71,7 @@ rec {
   # LANGUAGE PACKAGES (added to default in language-specific shells)
   # ===========================================================================
 
-  inherit (languages) pythonPackages goPackages nodejsPackages rustPackages;
+  inherit (languages) pythonEnv pythonPackages goPackages nodejsPackages rustPackages;
 
   # ===========================================================================
   # IDE PACKAGES (added in dev and full shells)
