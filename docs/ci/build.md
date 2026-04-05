@@ -752,6 +752,12 @@ echo "Cloning to /opt/konductor/src/..."
 ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone --quiet /opt/konductor/${BUNDLE} /opt/konductor/src"
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout -q -B main ${COMMIT} && sudo -E git remote set-url origin ${FORGEJO_URL}"
 
+# Configure repo for shared group access and SSH push support.
+# core.sharedRepository=group: new files/dirs inherit group write + setgid
+# receive.denyCurrentBranch=updateInstead: allow push to checked-out branch
+#   (updates working tree in place — used for live code delivery via SSH)
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git config core.sharedRepository group && sudo -E git config receive.denyCurrentBranch updateInstead"
+
 # Sync vendored inputs if present (required for offline flake evaluation)
 if [ -d _sources ]; then
     rsync -e "ssh $SSH_OPTS" -a _sources/ "kc2admin@localhost:/tmp/_sources/"
@@ -841,6 +847,13 @@ ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link '.#devShells.x86_64-linux.full' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.full failed"; exit 1; }
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link '.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.konductor failed"; exit 1; }
 echo "✓ Devshells cached"
+
+# Restore group permissions after sudo operations.
+# nixos-rebuild and nix build run as root from /opt/konductor/src, which
+# can create/update .git/index and other files as root:kc2. Without this,
+# kc2 group members (kc2admin, katmorg, etc.) get "Permission denied" on
+# git operations and direnv .envrc evaluation.
+ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor/src && sudo chmod -R g+rwX /opt/konductor/src/.git'
 
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
