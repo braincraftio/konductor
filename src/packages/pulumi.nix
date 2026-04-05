@@ -122,6 +122,9 @@ let
     ps.dill
     ps.parver
     ps.setuptools   # Required by some provider SDKs at runtime
+
+    # Type checker (must be pip-visible for Pulumi's typechecker option)
+    ps.pyright
   ];
 
 in
