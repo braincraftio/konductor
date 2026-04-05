@@ -226,17 +226,10 @@ echo "▶ Phase 3-4: Push repositories..."
 GIT_CA_CERT="${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt"
 [ -f "$GIT_CA_CERT" ] || { echo "✗ CA cert not found"; exit 1; }
 
-# Remove shallow marker — runner clones workspace with limited depth but
-# Forgejo rejects shallow pushes. Removing the file is safe: the objects
-# are already local, we just lose the grafted boundary.
-rm -f ../.git/shallow
-
 git -C .. remote remove runner-test 2>/dev/null || true
 git -C .. remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/workspace.git"
 GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 git -C .. remote remove runner-test 2>/dev/null || true
-
-rm -f .git/shallow
 
 git remote remove runner-test 2>/dev/null || true
 git remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/${REPO_NAME}.git"

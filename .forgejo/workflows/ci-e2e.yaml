@@ -19,6 +19,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Unshallow Workspace
+        run: |
+          set -e
+          [ -n "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT not set"; exit 1; }
+          if [ -f "${WORKSPACE_ROOT}/.git/shallow" ]; then
+            echo "Workspace is shallow, fetching full history..."
+            REMOTE_URL=$(git -C "$WORKSPACE_ROOT" remote get-url origin)
+            AUTH_URL=$(echo "$REMOTE_URL" | sed "s|https://|https://x-access-token:${WORKSPACE_TOKEN}@|")
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$AUTH_URL"
+            git -C "$WORKSPACE_ROOT" fetch --unshallow
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$REMOTE_URL"
+            echo "✓ Workspace unshallowed: $(git -C "$WORKSPACE_ROOT" rev-list --count HEAD) commits"
+          else
+            echo "✓ Workspace already has full history"
+          fi
+
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
