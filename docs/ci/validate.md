@@ -162,7 +162,7 @@ export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated
 
 FORGEJO_NS="forgejo"
 FORGEJO_DEPLOY="deployment/forgejo-deployment"
-REPO_NAME="k9"
+REPO_NAME="flake"
 REPO_OWNER="projv-engprod"
 TOKEN_NAME="ci-runner-test-$(date +%s)"
 BRANCH="${GITHUB_REF_NAME:-main}"
@@ -228,12 +228,13 @@ GIT_CA_CERT="${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt"
 
 git -C .. remote remove runner-test 2>/dev/null || true
 git -C .. remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/workspace.git"
-GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+git -C .. fetch --quiet --unshallow origin 2>/dev/null || true
+GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 git -C .. remote remove runner-test 2>/dev/null || true
 
 git remote remove runner-test 2>/dev/null || true
 git remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/${REPO_NAME}.git"
-GIT_SSL_CAINFO="$GIT_CA_CERT" git push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+GIT_SSL_CAINFO="$GIT_CA_CERT" git push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 
 echo ""
 echo "▶ Phase 5: Trigger workflow..."
