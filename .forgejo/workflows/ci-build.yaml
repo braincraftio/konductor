@@ -71,54 +71,8 @@ jobs:
           runme run k9:ci:registry:trust
           runme run k9:ci:registry:login
 
-      - name: Push (commit/drv tags only)
-        env:
-          CONTAINER_TAG: "build-pending"
-        run: |
-          set -e
-          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
-          CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
-
-          [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
-
-          git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
-          git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
-          nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
-          flake_lock=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' .konductor)
-
-          TAGS=()
-          if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-              TAGS+=("qcow2-${git_commit}")
-          fi
-          if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-              TAGS+=("qcow2-${nix_drv}")
-          fi
-          if [ -n "$flake_lock" ] && [ "$flake_lock" != "unknown" ]; then
-              TAGS+=("qcow2-${flake_lock}")
-          fi
-
-          [ "${#TAGS[@]}" -gt 0 ] || { echo "Error: no tags to push"; exit 1; }
-
-          SRC="$REGISTRY/$IMAGE:${TAGS[0]}"
-          docker tag "$REGISTRY/$IMAGE:latest-qcow2" "$SRC"
-
-          echo "Pushing ${#TAGS[@]} tags:"
-          for tag in "${TAGS[@]}"; do
-              docker tag "$SRC" "$REGISTRY/$IMAGE:$tag"
-              skopeo copy --dest-cert-dir "$CERT_DIR" \
-                  docker-daemon:"$REGISTRY/$IMAGE:$tag" \
-                  docker://"$REGISTRY/$IMAGE:$tag"
-              echo "  ✓ $tag"
-          done
-
-          OCI_DIGEST=$(skopeo inspect --cert-dir "$CERT_DIR" docker://"$REGISTRY/$IMAGE:${TAGS[0]}" | jq -r '.Digest')
-          echo "oci_digest = \"$OCI_DIGEST\"" >> .konductor
-
-          echo ""
-          echo "✓ Pushed: $REGISTRY/$IMAGE"
-          printf "  %s\n" "${TAGS[@]}"
-          echo "Digest: $OCI_DIGEST"
+      - name: Push
+        run: runme run k9:ci:qcow2:push:image
 
       - name: Verify Tags
         run: runme run k9:ci:registry:tags
@@ -133,33 +87,15 @@ jobs:
         run: runme run k9:ci:qcow2:validate:runner
 
       - name: Promote Registry Trust + Login
+        env:
+          CONTAINER_REGISTRY: ${{ env.PROMOTE_REGISTRY }}
+          KUBECONFIG: ${{ env.HOME }}/.kube/config
+          KUBECTL_CONTEXT: developers
+          REGISTRY_USERNAME: ${{ env.PROMOTE_REGISTRY_USERNAME || 'admin' }}
+          REGISTRY_PASSWORD: ${{ env.PROMOTE_REGISTRY_PASSWORD || 'admin' }}
         run: |
-          set -e
-          REGISTRY="${PROMOTE_REGISTRY:?PROMOTE_REGISTRY must be set}"
-          KUBECONFIG_HOST="$HOME/.kube/config"
-          CERT_DIR="${WORKSPACE_ROOT}/.certs/${REGISTRY}"
-
-          # Extract CA from central01 envoy-gateway
-          mkdir -p "$CERT_DIR"
-          kubectl --kubeconfig "$KUBECONFIG_HOST" \
-            get secret gateway-tls-https -n envoy-gateway-system \
-            -o jsonpath='{.data.ca\.crt}' | base64 -d \
-            > "$CERT_DIR/ca.crt"
-          echo "✓ CA installed: $CERT_DIR/ca.crt"
-
-          # Docker trust
-          DOCKER_CERT_DIR="/etc/docker/certs.d/$REGISTRY"
-          sudo mkdir -p "$DOCKER_CERT_DIR"
-          sudo cp "$CERT_DIR/ca.crt" "$DOCKER_CERT_DIR/ca.crt"
-          echo "✓ Docker CA: $DOCKER_CERT_DIR/ca.crt"
-
-          # Login
-          USERNAME="${PROMOTE_REGISTRY_USERNAME:-admin}"
-          PASSWORD="${PROMOTE_REGISTRY_PASSWORD:-admin}"
-          echo "$PASSWORD" | skopeo login "$REGISTRY" \
-            --username "$USERNAME" --password-stdin \
-            --cert-dir "$CERT_DIR"
-          echo "✓ Logged in to $REGISTRY"
+          runme run k9:ci:registry:trust
+          runme run k9:ci:registry:login
 
       - name: Promote
         run: runme run k9:ci:qcow2:promote
