@@ -88,12 +88,13 @@ in
       # Pulumi with NixOS-native Python environment (src/packages/pulumi.nix)
       # Replaces: pulumi, pulumictl, pulumiPackages.pulumi-python
       # Provides python.withPackages environment with properly-linked native extensions
-      (import ../packages/pulumi.nix { inherit pkgs; })
+      (import ../packages/pulumi.nix { inherit pkgs; }).package
 
       # Cloud provider CLIs (unstable for faster updates)
       unstable.awscli2 # AWS CLI v2
     ]);
 
   shellHook = "";
-  env = if hasConfig then config.shell.bash.env // config.shell.atuin.env else { };
+  env = (if hasConfig then config.shell.bash.env // config.shell.atuin.env else { })
+    // (import ../packages/pulumi.nix { inherit pkgs; }).env;
 }

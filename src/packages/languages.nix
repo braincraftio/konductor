@@ -13,19 +13,22 @@
 
 let
   langs = versions.languages;
+  pulumiPkg = import ./pulumi.nix { inherit pkgs; };
 in
 
 rec {
   # ===========================================================================
   # Python
   # ===========================================================================
+  # Single python.withPackages call merges base deps + Pulumi deps to avoid
+  # multiple python3 interpreters in PATH (only one withPackages can win).
   pythonPackages = with pkgs; [
     (pkgs."python${langs.python.version}".withPackages (ps: [
       ps.pip
       ps.ipython
       ps.pytest
       ps.cryptography
-    ]))
+    ] ++ pulumiPkg.pythonDeps ps))
     poetry
     uv
     pipx
