@@ -83,6 +83,7 @@ for tag in "${TAGS[@]}"; do
     echo "▶ ${DST_REGISTRY}/${IMAGE}:${tag}"
     if ! skopeo copy \
         --dest-cert-dir "$CERT_DIR" \
+        --dest-authfile "${WORKSPACE_ROOT}/.docker/config.json" \
         docker-daemon:"$SRC_FULL" \
         docker://"$DST_REGISTRY/$IMAGE:$tag"; then
         echo "FAIL: Failed to copy tag: $tag"

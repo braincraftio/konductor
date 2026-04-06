@@ -71,6 +71,17 @@ jobs:
             exit 1
           fi
 
+      - name: Promote Registry Trust + Login
+        env:
+          CONTAINER_REGISTRY: ${{ env.PROMOTE_REGISTRY }}
+          KUBECONFIG: ${{ env.HOME }}/.kube/config
+          KUBECTL_CONTEXT: konductor-central01
+          REGISTRY_USERNAME: ${{ env.PROMOTE_REGISTRY_USERNAME || 'admin' }}
+          REGISTRY_PASSWORD: ${{ env.PROMOTE_REGISTRY_PASSWORD || 'admin' }}
+        run: |
+          runme run k9:ci:registry:trust
+          runme run k9:ci:registry:login
+
       - name: Vendor Flake Inputs
         env:
           GITHUB_TOKEN: ""
@@ -103,17 +114,6 @@ jobs:
 
       - name: Validate Runner
         run: runme run k9:ci:qcow2:validate:runner
-
-      - name: Promote Registry Trust + Login
-        env:
-          CONTAINER_REGISTRY: ${{ env.PROMOTE_REGISTRY }}
-          KUBECONFIG: ${{ env.HOME }}/.kube/config
-          KUBECTL_CONTEXT: developers
-          REGISTRY_USERNAME: ${{ env.PROMOTE_REGISTRY_USERNAME || 'admin' }}
-          REGISTRY_PASSWORD: ${{ env.PROMOTE_REGISTRY_PASSWORD || 'admin' }}
-        run: |
-          runme run k9:ci:registry:trust
-          runme run k9:ci:registry:login
 
       - name: Promote
         run: runme run k9:ci:qcow2:promote
