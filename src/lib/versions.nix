@@ -25,8 +25,8 @@
       display = "3.13"; # Human-readable
     };
     go = {
-      version = "1_24"; # Maps to pkgs.go_1_24 (1.23 is EOL)
-      display = "1.24";
+      version = "1_25"; # Maps to pkgs.go_1_25
+      display = "1.25";
     };
     node = {
       version = "22"; # Maps to pkgs.nodejs_22

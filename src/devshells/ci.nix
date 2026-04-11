@@ -46,11 +46,6 @@ baseShell.overrideAttrs (old: {
     # SSH identity detection (dynamic, needs $HOME)
     ${config.shell.ssh.shellHook}
 
-    # Python: activate SSOT venv from UV_PROJECT_ENVIRONMENT (set in .envrc/.env.example)
-    if [ -n "$UV_PROJECT_ENVIRONMENT" ] && [ -d "$UV_PROJECT_ENVIRONMENT" ]; then
-      source "$UV_PROJECT_ENVIRONMENT/bin/activate" 2>/dev/null || true
-    fi
-
     # Go workspace (dynamic, needs $HOME)
     GOPATH="''${GOPATH:-$HOME/go}"
     GOBIN="$GOPATH/bin"
@@ -68,7 +63,9 @@ baseShell.overrideAttrs (old: {
     DOCKER_HOST="''${DOCKER_HOST:-unix:///var/run/docker.sock}"
 
     # Update PATH (depends on dynamic vars above)
-    export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
+    # Python env MUST be first — mkShell puts bare python3 in PATH from
+    # withPackages build deps; this ensures the -env wrapper wins.
+    export PATH="${packages.pythonEnv}/bin:$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
 
     # Forgejo shell hook (conditional)
     ${programs.forgejo.shellHook}

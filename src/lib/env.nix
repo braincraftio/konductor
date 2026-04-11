@@ -18,6 +18,7 @@
   # Terminal Configuration
   # ===========================================================================
   TERM = "xterm-256color";
+  COLORTERM = "truecolor";
 
   # ===========================================================================
   # SSL Certificate Configuration

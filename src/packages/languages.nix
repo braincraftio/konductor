@@ -13,22 +13,40 @@
 
 let
   langs = versions.languages;
+  # Import pulumi.nix without pythonEnv first (for pythonDeps function only)
+  pulumiDeps = import ./pulumi.nix { inherit pkgs; };
 in
 
 rec {
   # ===========================================================================
   # Python
   # ===========================================================================
-  pythonPackages = with pkgs; [
-    (pkgs."python${langs.python.version}".withPackages (ps: [
-      ps.pip
-      ps.ipython
-      ps.pytest
-      ps.cryptography
-    ]))
-    poetry
-    uv
-    pipx
+  # Single python.withPackages derivation shared by:
+  #   - devshell PATH (via pythonPackages)
+  #   - Pulumi CLI wrapper (PULUMI_PYTHON_CMD)
+  #   - devshell env (PULUMI_PYTHON_CMD)
+  #
+  # IMPORTANT: mkShell ignores lib.hiPrio / meta.priority — it simply prepends
+  # each package's bin/ to PATH. The bare python3 interpreter (a build input of
+  # withPackages) can shadow the -env wrapper. To fix this, pythonEnv is exported
+  # separately and prepended to PATH via shellHook in devshells that include
+  # Python (same pattern as GOBIN/PNPM_HOME/CARGO_HOME).
+  pythonEnv = pkgs."python${langs.python.version}".withPackages (ps: [
+    ps.pip
+    ps.ipython
+    ps.pytest
+    ps.cryptography
+    ps.pylatexenc  # latex-to-unicode (utftex) — in withPackages to avoid python3.12 contamination
+  ] ++ pulumiDeps.pythonDeps ps);
+
+  # Re-import pulumi.nix with pythonEnv so wrapper and env use same derivation
+  pulumiPkg = import ./pulumi.nix { inherit pkgs pythonEnv; };
+
+  pythonPackages = [
+    pythonEnv
+    pkgs.poetry
+    pkgs.uv
+    pkgs.pipx
     # ruff, mypy, bandit → wrapped in src/config/linters/ (in packages.default)
     # black, isort → wrapped in src/packages/formatters.nix (in packages.default)
   ];

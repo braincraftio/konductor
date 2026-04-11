@@ -39,7 +39,6 @@ set -e
 
 [[ "${WORKSPACE_ROOT:-}" == /* ]] && printf "✓ WORKSPACE_ROOT=%s\n" "$WORKSPACE_ROOT" || { echo "✗ WORKSPACE_ROOT must be absolute"; exit 1; }
 
-export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated/kubeconfig"
 printf "✓ KUBECONFIG=%s\n" "$KUBECONFIG"
 [ -f "$KUBECONFIG" ] && printf "✓ KUBECONFIG file exists\n" || { echo "✗ KUBECONFIG file not found"; exit 1; }
 
@@ -116,7 +115,7 @@ List tags for konductor image.
 ```bash {"name":"k9:ci:registry:tags","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry,type:readonly"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
     "https://$REGISTRY/v2/$IMAGE/tags/list" | jq
 ```

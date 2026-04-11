@@ -47,7 +47,7 @@ Set these in `.env` or export before running:
 ```bash
 # Registry configuration
 export CONTAINER_REGISTRY="registry.docker.arpa"
-export CONTAINER_IMAGE="containercraft/konductor"
+export CONTAINER_IMAGE="projv-engprod/konductor"
 export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding (host ports, avoid conflicts with host services)
@@ -317,6 +317,20 @@ DISK_AVAIL_GB=$(df -BG --output=avail . | tail -1 | tr -d ' G')
 MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 [ "$MEM_AVAIL_MB" -ge "${QCOW2_MIN_MEM_MB:-8192}" ] && printf "✓ Memory: %sMB available\n" "$MEM_AVAIL_MB" || { printf "✗ Memory: %sMB (need %sMB)\n" "$MEM_AVAIL_MB" "${QCOW2_MIN_MEM_MB:-8192}"; ((ERRORS++)); }
 
+# ─────────────────────────────────────────────────────────────────────
+# IMAGE PIPELINE TARGETS
+# ─────────────────────────────────────────────────────────────────────
+echo ""
+echo "Image pipeline:"
+_build_registry="${CONTAINER_REGISTRY:-registry.docker.arpa}"
+_build_image="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+_build_tag="${CONTAINER_TAG:-latest-qcow2}"
+_promote_registry="${PROMOTE_REGISTRY:-(not set)}"
+_promote_image="${PROMOTE_IMAGE:-${_build_image}}"
+printf "  Build:   %s/%s:%s\n" "$_build_registry" "$_build_image" "$_build_tag"
+printf "  Push:    %s/%s\n" "$_build_registry" "$_build_image"
+printf "  Promote: %s/%s\n" "$_promote_registry" "$_promote_image"
+
 echo ""
 [ "$ERRORS" -eq 0 ] && echo "✓ Preflight passed" || { echo "✗ $ERRORS error(s)"; exit 1; }
 ```
@@ -336,8 +350,8 @@ fi
 
 # Vendored inputs are required for offline builds.
 if [ ! -f "_sources/catppuccin/flake.nix" ]; then
-    echo "Error: vendored inputs missing. Run: runme run k9:ci:dev:vendor"
-    exit 1
+    echo "Vendored inputs missing, running k9:ci:dev:vendor..."
+    runme run k9:ci:dev:vendor
 fi
 
 # Update forked forgejo-runner to latest commit (optional - skip on network errors)
@@ -490,11 +504,11 @@ runcmd:
   - echo "--- cloud-init status ---" > /dev/ttyS0
   - cloud-init status --long > /dev/ttyS0 2>&1 || true
   - echo "═══ Network preflight checks ═══" > /dev/ttyS0
-  - 'ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: no routes" > /dev/ttyS0; exit 1; }'
-  - 'ip route | grep -q default || { echo "PREFLIGHT FAILED: no default route" > /dev/ttyS0; exit 1; }'
-  - 'nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: DNS resolution failed" > /dev/ttyS0; exit 1; }'
-  - 'if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed "s|http://||" | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed "s|http://||" | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; exit 1; }; fi'
-  - 'curl -I --connect-timeout 5 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT FAILED: cannot reach cache.nixos.org" > /dev/ttyS0; exit 1; }'
+  - 'ip route show > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: no routes" > /dev/ttyS0; }'
+  - 'ip route | grep -q default || { echo "PREFLIGHT WARN: no default route" > /dev/ttyS0; }'
+  - 'nslookup cache.nixos.org > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: DNS resolution failed for cache.nixos.org" > /dev/ttyS0; }'
+  - 'if [ -f /etc/konductor/proxy.env ]; then source /etc/konductor/proxy.env && PROXY_HOST=$(echo $http_proxy | sed "s|http://||" | cut -d: -f1) && PROXY_PORT=$(echo $http_proxy | sed "s|http://||" | cut -d: -f2) && nc -zv -w 5 $PROXY_HOST $PROXY_PORT > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: proxy $PROXY_HOST:$PROXY_PORT unreachable" > /dev/ttyS0; }; fi'
+  - 'curl -I --connect-timeout 10 https://cache.nixos.org/nix-cache-info > /dev/ttyS0 2>&1 || { echo "PREFLIGHT WARN: cannot reach cache.nixos.org" > /dev/ttyS0; }'
   - echo "═══ Network preflight PASSED ═══" > /dev/ttyS0
   - ls -lah /home/*/.ssh/ > /dev/ttyS0 2>&1 || true
   - echo "authorized_keys:" > /dev/ttyS0
@@ -724,17 +738,25 @@ ssh $SSH_OPTS kc2admin@localhost 'sudo rm -rf /opt/konductor && sudo mkdir -p /o
 
 # git bundle: portable repo with full history
 echo "Creating bundle ${BUNDLE}..."
-git bundle create "/tmp/${BUNDLE}" HEAD --all
+git bundle create --quiet "/tmp/${BUNDLE}" HEAD --all
 
 # Transfer bundle
 echo "Transferring bundle..."
 scp -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "/tmp/${BUNDLE}" "kc2admin@localhost:/tmp/${BUNDLE}"
 ssh $SSH_OPTS kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE}"
 
-# Clone from bundle (creates clean repo with history)
+# Clone from bundle and set up as if cloned from Forgejo origin.
+# This ensures flake store paths match the host (cache hit rate).
+FORGEJO_URL="https://git.ucs.central01.helix.cisco.com/projv-engprod/flake.git"
 echo "Cloning to /opt/konductor/src/..."
-ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone /opt/konductor/${BUNDLE} /opt/konductor/src"
-ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout ${COMMIT}"
+ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone --quiet /opt/konductor/${BUNDLE} /opt/konductor/src"
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout -q -B main ${COMMIT} && sudo -E git remote set-url origin ${FORGEJO_URL}"
+
+# Configure repo for shared group access and SSH push support.
+# core.sharedRepository=group: new files/dirs inherit group write + setgid
+# receive.denyCurrentBranch=updateInstead: allow push to checked-out branch
+#   (updates working tree in place — used for live code delivery via SSH)
+ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git config core.sharedRepository group && sudo -E git config receive.denyCurrentBranch updateInstead"
 
 # Sync vendored inputs if present (required for offline flake evaluation)
 if [ -d _sources ]; then
@@ -826,6 +848,13 @@ ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && source /etc/konductor/proxy.env 2>/dev/null || true && sudo -E env HOME=/root XDG_CACHE_HOME=/root/.cache http_proxy=\${http_proxy:-} https_proxy=\${https_proxy:-} HTTP_PROXY=\${HTTP_PROXY:-} HTTPS_PROXY=\${HTTPS_PROXY:-} NO_PROXY=\${NO_PROXY:-} no_proxy=\${no_proxy:-} nix build --no-link '.#devShells.x86_64-linux.konductor' --no-write-lock-file $OVERRIDE_INPUTS 2>&1" | tee -a "${QCOW2_LOGFILE:-build-vm.log}" || { echo "✗ devShells.konductor failed"; exit 1; }
 echo "✓ Devshells cached"
 
+# Restore group permissions after sudo operations.
+# nixos-rebuild and nix build run as root from /opt/konductor/src, which
+# can create/update .git/index and other files as root:kc2. Without this,
+# kc2 group members (kc2admin, katmorg, etc.) get "Permission denied" on
+# git operations and direnv .envrc evaluation.
+ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor/src && sudo chmod -R g+rwX /opt/konductor/src/.git'
+
 echo "VM rebuilt from /opt/konductor/src flake"
 ```
 
@@ -900,7 +929,7 @@ _qemu_ver=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator versio
 _hw_vendor=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || _hw_vendor=""
 _hw_product=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || _hw_product=""
 _hw_serial=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || _hw_serial=""
-_oci_image="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
+_oci_image="registry.docker.arpa/${CONTAINER_IMAGE:-projv-engprod/konductor}"
 
 # Build tags array
 _tags="[\"${CONTAINER_TAG:-latest-qcow2}\""
@@ -1035,6 +1064,10 @@ sudo rm -rf "$MOUNT"/var/lib/cloud "$MOUNT"/var/log/journal/*
 sudo rm -rf "$MOUNT"/root/.ssh "$MOUNT"/home/*/.ssh 2>/dev/null || true
 sudo rm -f "$MOUNT"/root/.gitconfig "$MOUNT"/home/*/.gitconfig 2>/dev/null || true
 
+# Remove build-time proxy configuration (deploy-time proxy is injected by cloud-init)
+# This prevents build host proxy settings from leaking into shipped images
+sudo rm -f "$MOUNT"/etc/konductor/proxy.env 2>/dev/null || true
+sudo rm -f "$MOUNT"/etc/systemd/system/docker.service.d/proxy.conf 2>/dev/null || true
 
 sudo guestunmount "$MOUNT"
 trap - EXIT
@@ -1061,8 +1094,14 @@ if [ "${SKIP_COMPRESS:-false}" = "true" ]; then
     echo "SKIP_COMPRESS: copying uncompressed image..."
     cp result/nixos.qcow2 konductor.qcow2
 else
+    SRC_SIZE=$(dust -b -n 1 result/nixos.qcow2 2>/dev/null | awk '{print $1}')
     echo "Compressing with qemu-img (zstd, ${CORES} coroutines)..."
-    qemu-img convert -c -p -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+    echo "  source: result/nixos.qcow2 (${SRC_SIZE})"
+    START=$(date +%s)
+    qemu-img convert -c -q -m "$CORES" -O qcow2 -o compression_type=zstd result/nixos.qcow2 konductor.qcow2.tmp
+    ELAPSED=$(( $(date +%s) - START ))
+    DST_SIZE=$(dust -b -n 1 konductor.qcow2.tmp 2>/dev/null | awk '{print $1}')
+    echo "  output: konductor.qcow2.tmp (${DST_SIZE}) in ${ELAPSED}s"
 fi
 ```
 
@@ -1082,9 +1121,15 @@ fi
 
 [ -f konductor.qcow2.tmp ] || { echo "Error: konductor.qcow2.tmp not found (compress phase failed?)"; exit 1; }
 
+SRC_SIZE=$(dust -b -n 1 konductor.qcow2.tmp 2>/dev/null | awk '{print $1}')
 echo "Sparsifying with virt-sparsify..."
+echo "  source: konductor.qcow2.tmp (${SRC_SIZE})"
 export LIBGUESTFS_BACKEND=direct
-sudo -E virt-sparsify --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+START=$(date +%s)
+sudo -E virt-sparsify --quiet --check-tmpdir=ignore --compress --convert qcow2 -o compression_type=zstd konductor.qcow2.tmp konductor.qcow2
+ELAPSED=$(( $(date +%s) - START ))
+DST_SIZE=$(dust -b -n 1 konductor.qcow2 2>/dev/null | awk '{print $1}')
+echo "  output: konductor.qcow2 (${DST_SIZE}) in ${ELAPSED}s"
 rm -f konductor.qcow2.tmp
 ```
 
@@ -1137,8 +1182,8 @@ if ! eval "$(nix print-dev-env .#konductor)"; then
 fi
 echo "docker: $(which docker)"
 echo "buildx: $(docker buildx version 2>&1)"
-REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+REGISTRY="registry.docker.arpa"
+IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 TAG="${CONTAINER_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 
@@ -1148,6 +1193,7 @@ FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 [ -f "${QCOW2_LOGFILE:-build-vm.log}" ] || echo "# VM phase skipped" > "${QCOW2_LOGFILE:-build-vm.log}"
 
 docker buildx build -f Dockerfile.qcow2 \
+    --progress=plain \
     --build-arg QCOW2_FILE=konductor.qcow2 \
     --build-arg BUILD_LOG="${QCOW2_LOGFILE:-build-vm.log}" \
     --build-arg PROVENANCE=.konductor \

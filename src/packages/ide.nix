@@ -47,7 +47,8 @@ in
     mermaid-cli # Mermaid diagram rendering (mmdc)
 
     # Render-markdown latex support
-    python312Packages.pylatexenc # utftex for latex-to-unicode conversion
+    # pylatexenc → provided via python313.withPackages in languages.nix
+    # (python312Packages.pylatexenc contaminates PATH with bare python3.12)
 
     # Cloudflare developer platform CLI tools
     # wrangler # CLI for Cloudflare Workers, Pages, KV, R2, D1, Workflows (122K files in node_modules — re-enable when needed)
@@ -61,7 +62,8 @@ in
     # https://docs.anthropic.com/en/docs/claude-code/settings#code-intelligence
     # gopls → provided in goPackages (languages.nix)
     lua-language-server # Lua LSP server
-    pyright # Python LSP server
+    # pyright → provided as Python package in pulumi.nix (pyrightPkg) via languages.nix withPackages
+    # Standalone nixpkgs pyright brings a bare python3 that shadows the withPackages python3
     # rust-analyzer → provided as extension in rustPackages (languages.nix)
     # typescript-language-server → provided in nodejsPackages (languages.nix)
     nil # Nix LSP server

@@ -9,16 +9,52 @@ jobs:
     name: Build + Push (commit tags)
     runs-on: konductor
     timeout-minutes: 120
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Unshallow Workspace
+        run: |
+          set -e
+          [ -n "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT not set"; exit 1; }
+          if [ -f "${WORKSPACE_ROOT}/.git/shallow" ]; then
+            echo "Workspace is shallow, fetching full history..."
+            REMOTE_URL=$(git -C "$WORKSPACE_ROOT" remote get-url origin)
+            # Inject token for authenticated fetch
+            AUTH_URL=$(echo "$REMOTE_URL" | sed "s|https://|https://x-access-token:${WORKSPACE_TOKEN}@|")
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$AUTH_URL"
+            git -C "$WORKSPACE_ROOT" fetch --unshallow
+            # Restore original URL (no credentials in remote)
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$REMOTE_URL"
+            echo "✓ Workspace unshallowed: $(git -C "$WORKSPACE_ROOT" rev-list --count HEAD) commits"
+          else
+            echo "✓ Workspace already has full history"
+          fi
+
+      - name: Validate Workspace
+        run: |
+          [ -n "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT not set"; exit 1; }
+          [ -d "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT=$WORKSPACE_ROOT does not exist"; exit 1; }
+          echo "✓ WORKSPACE_ROOT=$WORKSPACE_ROOT"
+
+      - name: Clone Infrastructure Repo
+        run: |
+          set -e
+          INFRA_DIR="${WORKSPACE_ROOT}/infrastructure"
+          echo "Cloning projv-engprod/infrastructure to ${INFRA_DIR}..."
+          git clone --quiet --depth 1 \
+            "https://x-access-token:${WORKSPACE_TOKEN}@git.ucs.central01.helix.cisco.com/projv-engprod/infrastructure.git" \
+            "$INFRA_DIR"
+          echo "✓ Cloned $(git -C "$INFRA_DIR" log -1 --format='%h %s')"
+
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
-          direnv allow "${WORKSPACE_ROOT}/k9"
-          cd "${WORKSPACE_ROOT}/k9"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
           DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
           if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
             echo "$DIRENV_JSON" | jq -r '
@@ -35,10 +71,25 @@ jobs:
             exit 1
           fi
 
+      - name: Promote Registry Trust + Login
+        env:
+          CONTAINER_REGISTRY: ${{ env.PROMOTE_REGISTRY }}
+          KUBECONFIG: ${{ env.HOME }}/.kube/config
+          KUBECTL_CONTEXT: konductor-central01
+          REGISTRY_USERNAME: ${{ env.PROMOTE_REGISTRY_USERNAME || 'admin' }}
+          REGISTRY_PASSWORD: ${{ env.PROMOTE_REGISTRY_PASSWORD || 'admin' }}
+        run: |
+          runme run k9:ci:registry:trust
+          runme run k9:ci:registry:login
+
       - name: Vendor Flake Inputs
+        env:
+          GITHUB_TOKEN: ""
         run: runme run k9:ci:dev:vendor
 
       - name: Build QCOW2 + containerDisk
+        env:
+          GITHUB_TOKEN: ""
         run: runme run --all --tag=k9:ci:qcow2:build --filename docs/ci/build.md
 
       - name: Platform Up
@@ -49,54 +100,20 @@ jobs:
           runme run k9:ci:registry:trust
           runme run k9:ci:registry:login
 
-      - name: Push (commit/drv tags only)
-        env:
-          CONTAINER_TAG: "build-pending"
-        run: |
-          set -e
-          REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
-          CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
-
-          [ -f .konductor ] || { echo "Error: .konductor not found"; exit 1; }
-
-          git_commit=$(sed -n 's/^git_commit = "\(.*\)"$/\1/p' .konductor)
-          git_dirty=$(sed -n 's/^git_dirty = \(.*\)$/\1/p' .konductor)
-          nix_drv=$(sed -n 's/^nix_drv = "\(.*\)"$/\1/p' .konductor)
-          flake_lock=$(sed -n 's/^flake_lock_sha256 = "\(.*\)"$/\1/p' .konductor)
-
-          TAGS=()
-          if [ "$git_dirty" = "0" ] && [ -n "$git_commit" ] && [ "$git_commit" != "unknown" ]; then
-              TAGS+=("qcow2-${git_commit}")
-          fi
-          if [ -n "$nix_drv" ] && [ "$nix_drv" != "unknown" ]; then
-              TAGS+=("qcow2-${nix_drv}")
-          fi
-          if [ -n "$flake_lock" ] && [ "$flake_lock" != "unknown" ]; then
-              TAGS+=("qcow2-${flake_lock}")
-          fi
-
-          [ "${#TAGS[@]}" -gt 0 ] || { echo "Error: no tags to push"; exit 1; }
-
-          SRC="$REGISTRY/$IMAGE:${TAGS[0]}"
-          docker tag "$REGISTRY/$IMAGE:latest-qcow2" "$SRC"
-
-          echo "Pushing ${#TAGS[@]} tags:"
-          for tag in "${TAGS[@]}"; do
-              docker tag "$SRC" "$REGISTRY/$IMAGE:$tag"
-              skopeo copy --dest-cert-dir "$CERT_DIR" \
-                  docker-daemon:"$REGISTRY/$IMAGE:$tag" \
-                  docker://"$REGISTRY/$IMAGE:$tag"
-              echo "  ✓ $tag"
-          done
-
-          OCI_DIGEST=$(skopeo inspect --cert-dir "$CERT_DIR" docker://"$REGISTRY/$IMAGE:${TAGS[0]}" | jq -r '.Digest')
-          echo "oci_digest = \"$OCI_DIGEST\"" >> .konductor
-
-          echo ""
-          echo "✓ Pushed: $REGISTRY/$IMAGE"
-          printf "  %s\n" "${TAGS[@]}"
-          echo "Digest: $OCI_DIGEST"
+      - name: Push
+        run: runme run k9:ci:qcow2:push:image
 
       - name: Verify Tags
         run: runme run k9:ci:registry:tags
+
+      - name: Validate Deploy
+        run: runme run k9:ci:qcow2:validate:deploy
+
+      - name: Validate Services
+        run: runme run k9:ci:qcow2:validate:services
+
+      - name: Validate Runner
+        run: runme run k9:ci:qcow2:validate:runner
+
+      - name: Promote
+        run: runme run k9:ci:qcow2:promote

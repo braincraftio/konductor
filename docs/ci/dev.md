@@ -204,6 +204,14 @@ else
 fi
 
 sudo -E nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRIDE_INPUTS
+
+# Restore group permissions after sudo operations.
+# nixos-rebuild runs as root from the flake directory, which can create/update
+# .git/index and other files as root:kc2. Without this, kc2 group members
+# (kc2admin, katmorg, etc.) get "Permission denied" on git and direnv.
+sudo chown -R kc2:kc2 /opt/konductor/src
+sudo chmod -R g+rwX /opt/konductor/src/.git /opt/konductor/src/.certs
+
 echo "✓ NixOS rebuilt. Run 'direnv reload' to pick up environment changes."
 ```
 
@@ -215,6 +223,15 @@ Vendor all flake inputs into `./_sources` for fully offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
+
+# In CI, GITHUB_TOKEN is a Forgejo job token — not valid on github.com.
+# The workspace .envrc injects it into NIX_CONFIG as access-tokens, which
+# causes nix to send invalid credentials to api.github.com (HTTP 401).
+# Unset both as defense-in-depth (the .envrc also skips injection in CI).
+unset GITHUB_TOKEN
+if [[ "${NIX_CONFIG:-}" == *access-tokens* ]]; then
+  export NIX_CONFIG="$(echo "$NIX_CONFIG" | grep -v '^access-tokens')"
+fi
 
 echo "Vendoring flake inputs into ./_sources ..."
 sudo -E rm -rf _sources
@@ -335,6 +352,10 @@ to local paths for offline builds.
 
 ```bash {"name":"k9:ci:dev:vendor-online","excludeFromRunAll":"true","tag":"k9:ci:dev,type:entry"}
 set -euo pipefail
+
+# Unset GITHUB_TOKEN to prevent nix from sending the Forgejo job token to GitHub API.
+unset GITHUB_TOKEN
+gh auth status 2>&1 || true
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

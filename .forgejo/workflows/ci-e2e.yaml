@@ -12,16 +12,34 @@ jobs:
     name: Validate + Promote to latest-qcow2
     runs-on: konductor
     timeout-minutes: 60
+    env:
+      WORKSPACE_TOKEN: ${{ secrets.WORKSPACE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Unshallow Workspace
+        run: |
+          set -e
+          [ -n "$WORKSPACE_ROOT" ] || { echo "Error: WORKSPACE_ROOT not set"; exit 1; }
+          if [ -f "${WORKSPACE_ROOT}/.git/shallow" ]; then
+            echo "Workspace is shallow, fetching full history..."
+            REMOTE_URL=$(git -C "$WORKSPACE_ROOT" remote get-url origin)
+            AUTH_URL=$(echo "$REMOTE_URL" | sed "s|https://|https://x-access-token:${WORKSPACE_TOKEN}@|")
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$AUTH_URL"
+            git -C "$WORKSPACE_ROOT" fetch --unshallow
+            git -C "$WORKSPACE_ROOT" remote set-url origin "$REMOTE_URL"
+            echo "✓ Workspace unshallowed: $(git -C "$WORKSPACE_ROOT" rev-list --count HEAD) commits"
+          else
+            echo "✓ Workspace already has full history"
+          fi
+
       - name: Setup direnv Environment
         run: |
           direnv allow "${WORKSPACE_ROOT}"
-          direnv allow "${WORKSPACE_ROOT}/k9"
-          cd "${WORKSPACE_ROOT}/k9"
+          direnv allow "${WORKSPACE_ROOT}/flake"
+          cd "${WORKSPACE_ROOT}/flake"
           DIRENV_JSON=$(direnv export json 2>/dev/null || echo "{}")
           if [ "$DIRENV_JSON" != "{}" ] && [ -n "$DIRENV_JSON" ]; then
             echo "$DIRENV_JSON" | jq -r '
@@ -42,7 +60,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
 
           INPUT_TAG="${{ inputs.image_tag }}"
           if [ -n "$INPUT_TAG" ]; then
@@ -69,7 +87,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
           skopeo inspect --cert-dir "$CERT_DIR" docker://"${FULL_IMAGE}" > /dev/null \
             || { echo "✗ Image not found: ${FULL_IMAGE}"; exit 1; }
@@ -90,7 +108,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
           echo "Promoting ${IMAGE_TAG} -> latest-qcow2"

@@ -34,7 +34,7 @@ _qemu_ver=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator versio
 _hw_vendor=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || _hw_vendor=""
 _hw_product=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || _hw_product=""
 _hw_serial=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || _hw_serial=""
-_oci_image="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-containercraft/konductor}"
+_oci_image="${CONTAINER_REGISTRY:-registry.docker.arpa}/${CONTAINER_IMAGE:-projv-engprod/konductor}"
 
 _tags="[\"${CONTAINER_TAG:-latest-qcow2}\""
 [ "$_dirty" = "0" ] && _tags+=", \"qcow2-${_commit}\"" || _tags+=", \"qcow2-dirty\""

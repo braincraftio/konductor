@@ -39,7 +39,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 2. **Package**: Wraps QCOW2 as OCI containerDisk for KubeVirt
 3. **Push**: Publishes to local registry with deterministic tags (git commit, nix derivation)
 4. **Validate**: Deploys to KubeVirt cluster, verifies SSH, services, and runner workflows
-5. **Promote**: Copies validated image to public registries (docker.io, ghcr.io)
+5. **Promote**: Copies validated image to platform registry ($PROMOTE_REGISTRY)
 
 **Key features:**
 
@@ -123,7 +123,7 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 │                           ↓                                                 │
 │  PROMOTION PHASE (promote.md) — manual, not in ci:pipeline                 │
 │  ┌────────────────────────────────────────────────────────────┐             │
-│  │ promote:image   Copy to docker.io / ghcr.io with all tags  │             │
+│  │ promote:image   Copy to $PROMOTE_REGISTRY with all tags     │             │
 │  └────────────────────────────────────────────────────────────┘             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -373,20 +373,17 @@ Promote validated image to public registry.
 └────────────────────────────────────────┘
 ```
 
-**Use case:** Publishing releases to docker.io or ghcr.io.
+**Use case:** Publishing validated image to the platform registry.
 
 ```bash {"name":"k9:ci:workflow:promote","excludeFromRunAll":"true","tag":"k9:ci:workflow,type:example"}
-# Set credentials
-export DOCKER_TOKEN="<your-docker-hub-token>"
-
-# Promote to docker.io
+# Promote uses PROMOTE_REGISTRY and PROMOTE_IMAGE from .env
+# Default: registry.ucs.central01.helix.cisco.com/projv-engprod/konductor
 runme run k9:ci:qcow2:promote
 
-# Or promote to ghcr.io
-export GITHUB_TOKEN="<your-github-token>"
-export PROMOTE_REGISTRY="ghcr.io"
-export PROMOTE_IMAGE="your-org/konductor"
-runme run k9:ci:qcow2:promote
+# Override for a different target registry:
+# export PROMOTE_REGISTRY="registry.ucs.central02.helix.cisco.com"
+# export PROMOTE_IMAGE="projv-engprod/konductor"
+# runme run k9:ci:qcow2:promote
 ```
 
 ---
@@ -562,7 +559,7 @@ cat .konductor
 
 ### OCI Container
 
-**Registry:** `registry.docker.arpa/containercraft/konductor`
+**Registry:** `registry.docker.arpa/projv-engprod/konductor`
 
 **Tags:**
 
@@ -590,7 +587,7 @@ cat .konductor
 [konductor]
 git_commit = "<40-char SHA>"
 git_branch = "main"
-git_remote = "https://github.com/containercraft/konductor.git"
+git_remote = "https://git.ucs.central01.helix.cisco.com/projv-engprod/flake"
 git_dirty = 0
 nix_version = "2.24.0"
 nix_hash = "sha256-..."
@@ -604,7 +601,7 @@ build_hw_vendor = "Dell Inc."
 build_hw_product = "PowerEdge R730"
 build_hw_serial = "ABC123"
 strict = false
-oci_image = "registry.docker.arpa/containercraft/konductor"
+oci_image = "registry.docker.arpa/projv-engprod/konductor"
 oci_tags = ["latest-qcow2", "qcow2-abc123", "qcow2-def456"]
 image_sha256 = "def456..."
 image_size = "3.8G"
@@ -673,7 +670,7 @@ docker pull "${oci_image}:qcow2-${git_commit}"
 ```bash {"name":"k9:ci:example:verify-digest","excludeFromRunAll":"true","tag":"k9:ci:example,type:example"}
 # Compare digest from provenance with actual image
 expected=$(grep '^oci_digest = ' .konductor | cut -d'"' -f2)
-actual=$(skopeo inspect docker://registry.docker.arpa/containercraft/konductor:latest-qcow2 | jq -r '.Digest')
+actual=$(skopeo inspect docker://registry.docker.arpa/projv-engprod/konductor:latest-qcow2 | jq -r '.Digest')
 [ "$expected" = "$actual" ] && echo "✓ Digest match" || echo "✗ Digest mismatch"
 ```
 

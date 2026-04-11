@@ -146,4 +146,4 @@ Loaded via direnv from `.env.example` (defaults) and `.env` (local overrides):
 - `GITHUB_TOKEN` - GitHub authentication
 - `GITEA_TOKEN` - Gitea/Forgejo authentication
 - `CONTAINER_REGISTRY` - Container registry (default: docker.io)
-- `CONTAINER_IMAGE` - Image name (default: containercraft/konductor)
+- `CONTAINER_IMAGE` - Image name (default: projv-engprod/konductor)

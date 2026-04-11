@@ -129,7 +129,7 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 **What it does:**
 
 1. Provisions Forgejo user and access token
-2. Creates repositories: `braincraft/k9` (main repo) and `braincraft/workspace` (shared tooling)
+2. Creates repositories: `projv-engprod/k9` (main repo) and `projv-engprod/workspace` (shared tooling)
 3. Pushes workspace repository
 4. Pushes k9 repository
 5. Triggers workflow via API: `validate-environment.yaml`
@@ -148,7 +148,7 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 **Duration:** 5-10 minutes
 
 ```bash {"name":"k9:ci:qcow2:validate:runner","excludeFromRunAll":"true","tag":"k9:ci:qcow2:validate,k9:ci:pipeline:all,type:entry,requires:k8s,duration:slow"}
-set -eo pipefail
+set -eox pipefail
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  validate:runner — Validate Forgejo Runner"
@@ -162,8 +162,8 @@ export KUBECONFIG="${WORKSPACE_ROOT}/.config/talos/clusters/docker-dev/generated
 
 FORGEJO_NS="forgejo"
 FORGEJO_DEPLOY="deployment/forgejo-deployment"
-REPO_NAME="k9"
-REPO_OWNER="braincraft"
+REPO_NAME="flake"
+REPO_OWNER="projv-engprod"
 TOKEN_NAME="ci-runner-test-$(date +%s)"
 BRANCH="${GITHUB_REF_NAME:-main}"
 WORKFLOW="validate-environment.yaml"
@@ -228,12 +228,12 @@ GIT_CA_CERT="${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt"
 
 git -C .. remote remove runner-test 2>/dev/null || true
 git -C .. remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/workspace.git"
-GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+GIT_SSL_CAINFO="$GIT_CA_CERT" git -C .. push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 git -C .. remote remove runner-test 2>/dev/null || true
 
 git remote remove runner-test 2>/dev/null || true
 git remote add runner-test "https://${REPO_OWNER}:${TOKEN}@git.docker.arpa/${REPO_OWNER}/${REPO_NAME}.git"
-GIT_SSL_CAINFO="$GIT_CA_CERT" git push --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1 || true
+GIT_SSL_CAINFO="$GIT_CA_CERT" git push --quiet --force runner-test "HEAD:refs/heads/$BRANCH" 2>&1
 
 echo ""
 echo "▶ Phase 5: Trigger workflow..."

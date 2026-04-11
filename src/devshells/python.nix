@@ -17,10 +17,9 @@ baseShell.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ packages.pythonPackages;
 
   shellHook = old.shellHook + ''
-    # Python: activate SSOT venv from UV_PROJECT_ENVIRONMENT (set in .envrc/.env.example)
-    if [ -n "$UV_PROJECT_ENVIRONMENT" ] && [ -d "$UV_PROJECT_ENVIRONMENT" ]; then
-      source "$UV_PROJECT_ENVIRONMENT/bin/activate" 2>/dev/null || true
-    fi
+    # Python env MUST be first in PATH — mkShell puts bare python3 from
+    # withPackages build deps ahead of the -env wrapper.
+    export PATH="${packages.pythonEnv}/bin:$PATH"
 
     echo "Python ${langs.python.display} ready"
 
