@@ -47,7 +47,7 @@ Set these in `.env` or export before running:
 ```bash
 # Registry configuration
 export CONTAINER_REGISTRY="registry.docker.arpa"
-export CONTAINER_IMAGE="projv-engprod/konductor"
+export CONTAINER_IMAGE="containercraft/konductor"
 export CONTAINER_TAG="latest-qcow2"
 
 # VM port forwarding (host ports, avoid conflicts with host services)
@@ -323,7 +323,7 @@ MEM_AVAIL_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 echo ""
 echo "Image pipeline:"
 _build_registry="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-_build_image="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+_build_image="${CONTAINER_IMAGE:-containercraft/konductor}"
 _build_tag="${CONTAINER_TAG:-latest-qcow2}"
 _promote_registry="${PROMOTE_REGISTRY:-(not set)}"
 _promote_image="${PROMOTE_IMAGE:-${_build_image}}"
@@ -747,7 +747,7 @@ ssh $SSH_OPTS kc2admin@localhost "sudo mv /tmp/${BUNDLE} /opt/konductor/${BUNDLE
 
 # Clone from bundle and set up as if cloned from Forgejo origin.
 # This ensures flake store paths match the host (cache hit rate).
-FORGEJO_URL="https://git.ucs.central01.helix.cisco.com/projv-engprod/flake.git"
+FORGEJO_URL="https://git.docker.arpa/containercraft/flake.git"
 echo "Cloning to /opt/konductor/src/..."
 ssh $SSH_OPTS kc2admin@localhost "sudo -E git clone --quiet /opt/konductor/${BUNDLE} /opt/konductor/src"
 ssh $SSH_OPTS kc2admin@localhost "cd /opt/konductor/src && sudo -E git checkout -q -B main ${COMMIT} && sudo -E git remote set-url origin ${FORGEJO_URL}"
@@ -774,7 +774,7 @@ fi
 # Set ownership to kc2:kc2 and restore group-write + setgid on directories.
 # git clone creates directories as 755, losing the 2775 that tmpfiles.rules
 # sets on /opt/konductor. Without g+ws on directories, kc2 group members
-# (additional users like katmorg, dyreddin, etc.) can't create files here
+# (additional users) can't create files here
 # (e.g., nix build result symlink fails with Permission denied).
 ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor && sudo chmod -R a+rX /opt/konductor && sudo fd --type directory --hidden --no-ignore . /opt/konductor --exec chmod g+ws {}'
 rm -f "/tmp/${BUNDLE}"
@@ -851,7 +851,7 @@ echo "✓ Devshells cached"
 # Restore group permissions after sudo operations.
 # nixos-rebuild and nix build run as root from /opt/konductor/src, which
 # can create/update .git/index and other files as root:kc2. Without this,
-# kc2 group members (kc2admin, katmorg, etc.) get "Permission denied" on
+# kc2 group members (kc2admin, etc.) get "Permission denied" on
 # git operations and direnv .envrc evaluation.
 ssh $SSH_OPTS kc2admin@localhost 'sudo chown -R kc2:kc2 /opt/konductor/src && sudo chmod -R g+rwX /opt/konductor/src/.git'
 
@@ -929,7 +929,7 @@ _qemu_ver=$(qemu-system-x86_64 --version | head -1 | sed 's/QEMU emulator versio
 _hw_vendor=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null | tr -d '\n') || _hw_vendor=""
 _hw_product=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null | tr -d '\n') || _hw_product=""
 _hw_serial=$(sudo cat /sys/devices/virtual/dmi/id/product_serial 2>/dev/null | tr -d '\n') || _hw_serial=""
-_oci_image="registry.docker.arpa/${CONTAINER_IMAGE:-projv-engprod/konductor}"
+_oci_image="registry.docker.arpa/${CONTAINER_IMAGE:-containercraft/konductor}"
 
 # Build tags array
 _tags="[\"${CONTAINER_TAG:-latest-qcow2}\""
@@ -1183,7 +1183,7 @@ fi
 echo "docker: $(which docker)"
 echo "buildx: $(docker buildx version 2>&1)"
 REGISTRY="registry.docker.arpa"
-IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 TAG="${CONTAINER_TAG:-latest-qcow2}"
 FULL_IMAGE="${REGISTRY}/${IMAGE}:${TAG}"
 

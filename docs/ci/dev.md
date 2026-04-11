@@ -208,7 +208,7 @@ sudo -E nixos-rebuild switch --flake '.#konductor' --no-write-lock-file $OVERRID
 # Restore group permissions after sudo operations.
 # nixos-rebuild runs as root from the flake directory, which can create/update
 # .git/index and other files as root:kc2. Without this, kc2 group members
-# (kc2admin, katmorg, etc.) get "Permission denied" on git and direnv.
+# (kc2admin, etc.) get "Permission denied" on git and direnv.
 sudo chown -R kc2:kc2 /opt/konductor/src
 sudo chmod -R g+rwX /opt/konductor/src/.git /opt/konductor/src/.certs
 

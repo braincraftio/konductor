@@ -44,9 +44,9 @@ jobs:
         run: |
           set -e
           INFRA_DIR="${WORKSPACE_ROOT}/infrastructure"
-          echo "Cloning projv-engprod/infrastructure to ${INFRA_DIR}..."
+          echo "Cloning containercraft/infrastructure to ${INFRA_DIR}..."
           git clone --quiet --depth 1 \
-            "https://x-access-token:${WORKSPACE_TOKEN}@git.ucs.central01.helix.cisco.com/projv-engprod/infrastructure.git" \
+            "https://x-access-token:${WORKSPACE_TOKEN}@git.docker.arpa/containercraft/infrastructure.git" \
             "$INFRA_DIR"
           echo "✓ Cloned $(git -C "$INFRA_DIR" log -1 --format='%h %s')"
 

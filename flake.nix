@@ -85,7 +85,7 @@
     };
 
     # Forked Forgejo runner with workspace isolation
-    # TODO: switch back to git.ucs.central01.helix.cisco.com/projv-engprod/runner
+    # TODO: switch back to git.docker.arpa/containercraft/runner
     #        once nix daemon git auth for Gitea is resolved (netrc-file or equivalent)
     # Update: nix flake update forgejo-runner-src
     forgejo-runner-src = {

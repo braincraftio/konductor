@@ -115,7 +115,7 @@ List tags for konductor image.
 ```bash {"name":"k9:ci:registry:tags","excludeFromRunAll":"true","tag":"k9:ci:registry,k9:ci:pipeline:all,type:entry,type:readonly"}
 set -e
 REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 curl -sk -u "${REGISTRY_USERNAME:-admin}:${REGISTRY_PASSWORD:-admin}" \
     "https://$REGISTRY/v2/$IMAGE/tags/list" | jq
 ```

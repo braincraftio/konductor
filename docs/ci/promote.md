@@ -30,8 +30,8 @@ Promote validated image from docker daemon to the production cluster registry.
 
 **Environment variables:**
 
-- `PROMOTE_REGISTRY` - Destination registry (e.g. `registry.ucs.central01.helix.cisco.com`)
-- `PROMOTE_IMAGE` - Destination image name (default: `projv-engprod/konductor`)
+- `PROMOTE_REGISTRY` - Destination registry (e.g. `docker.io`)
+- `PROMOTE_IMAGE` - Destination image name (default: `containercraft/konductor`)
 - `CONTAINER_TAG` - Base tag (default: `latest-qcow2`)
 
 **Prerequisites:** Image validated (`validate:deploy` passed), registry trust configured
@@ -51,7 +51,7 @@ echo ""
 [ -f .konductor ] || { echo "✗ Provenance file .konductor not found"; exit 1; }
 
 DST_REGISTRY="${PROMOTE_REGISTRY:?PROMOTE_REGISTRY must be set}"
-IMAGE="${PROMOTE_IMAGE:-projv-engprod/konductor}"
+IMAGE="${PROMOTE_IMAGE:-containercraft/konductor}"
 BASE_TAG="${CONTAINER_TAG:-latest-qcow2}"
 CERT_DIR="${WORKSPACE_ROOT}/.certs/${DST_REGISTRY}"
 

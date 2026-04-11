@@ -60,7 +60,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
 
           INPUT_TAG="${{ inputs.image_tag }}"
           if [ -n "$INPUT_TAG" ]; then
@@ -87,7 +87,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
           skopeo inspect --cert-dir "$CERT_DIR" docker://"${FULL_IMAGE}" > /dev/null \
             || { echo "✗ Image not found: ${FULL_IMAGE}"; exit 1; }
@@ -108,7 +108,7 @@ jobs:
         run: |
           set -e
           REGISTRY="${CONTAINER_REGISTRY:-registry.docker.arpa}"
-          IMAGE="${CONTAINER_IMAGE:-projv-engprod/konductor}"
+          IMAGE="${CONTAINER_IMAGE:-containercraft/konductor}"
           CERT_DIR="${WORKSPACE_ROOT}/.certs/$REGISTRY"
 
           echo "Promoting ${IMAGE_TAG} -> latest-qcow2"
