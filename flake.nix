@@ -79,9 +79,9 @@
     };
 
     # Open Sesame: headless encrypted secret vaults with SSH agent unlock
+    # No follows — derivation hashes must match scopecreep-zip.cachix.org
     open-sesame = {
       url = "github:ScopeCreep-zip/open-sesame";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Forked Forgejo runner with workspace isolation
