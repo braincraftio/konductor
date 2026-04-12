@@ -213,6 +213,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1774106199,
+        "narHash": "sha256-US5Tda2sKmjrg2lNHQL3jRQ6p96cgfWh3J1QBliQ8Ws=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "6c9a78c09ff4d6c21d0319114873508a6ec01655",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixvim": {
       "inputs": {
         "flake-parts": [
@@ -269,16 +285,14 @@
     },
     "open-sesame": {
       "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1775172748,
-        "narHash": "sha256-5fYzlOKn1o3oSvYjKnn4ZkzpAR+wG2EzxvT5q9CN17o=",
+        "lastModified": 1776026654,
+        "narHash": "sha256-C9dfaiqZymmOSwXxueFSsxMiVGUV9aJ0gWp2TztI1/Q=",
         "owner": "ScopeCreep-zip",
         "repo": "open-sesame",
-        "rev": "6f911b75c6ad3ffc27d6fe3852f838dcfae96802",
+        "rev": "44dfab24cec6b81e368df279182874bd6bf1b52f",
         "type": "github"
       },
       "original": {
