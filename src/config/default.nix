@@ -8,6 +8,11 @@
 , ...
 }:
 
+let
+  # Import languages to get pythonEnv for pyright wrapper.
+  # languages.nix depends only on pkgs and versions (no circular dependency).
+  languages = import ../packages/languages.nix { inherit pkgs versions lib; };
+in
 {
   # ===========================================================================
   # Shell Configuration
@@ -52,6 +57,7 @@
     commitlint = import ./linters/commitlint { inherit pkgs; };
     stylelint = import ./linters/stylelint { inherit pkgs; };
     htmlhint = import ./linters/htmlhint { inherit pkgs; };
+    pyright = import ./linters/pyright { inherit pkgs; pythonEnv = languages.pythonEnv; };
   };
 
   # ===========================================================================
