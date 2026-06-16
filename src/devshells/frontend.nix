@@ -1,14 +1,15 @@
 # src/devshells/frontend.nix
 # Frontend development shell for desktop applications (Tauri, Electron, etc.)
 #
-# Extends 'konductor' with:
+# Accumulative hierarchy: base → full → konductor → frontend
+#
+# Adds to konductor:
 #   - Playwright browser dependencies for E2E testing
 #   - Tauri 2.x build dependencies (GTK, WebKitGTK, OpenSSL, etc.) [Linux only]
 #
-# This is the appropriate shell for building desktop GUI applications.
 # Use this shell for projects like SpiritStream (Tauri), not #full or #rust.
 
-{ baseShell
+{ konductorShell
 , pkgs
 , packages
 , versions
@@ -18,22 +19,11 @@
 }:
 
 let
-  konductorShell = import ./konductor.nix {
-    inherit
-      baseShell
-      pkgs
-      packages
-      versions
-      programs
-      config
-      ;
-  };
   inherit (packages) tauri;
 in
 konductorShell.overrideAttrs (old: {
   name = "frontend";
 
-  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
   nativeBuildInputs = old.nativeBuildInputs
     ++ [ pkgs.playwright-driver.browsers ]
     # Tauri 2.x desktop application build dependencies (Linux only)

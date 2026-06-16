@@ -948,7 +948,7 @@ let
           ];
           # CI toolchain in runner's user profile (/nix/var/nix/profiles/per-user/runner)
           # Defense in depth: packages available even if systemPackages changes
-          packages = devshellPackages.ciPackages
+          packages = devshellPackages.fullPackages
             ++ programs.forgejo.runnerPackages
             ++ programs.forgejo.cliPackages
             ++ konductor.packages;
@@ -3118,8 +3118,8 @@ let
       partitionTableType = "efi";
       memSize = 16384;
       cpuCount = 4; # Cap inner VM cores to avoid starving KubeVirt/host
-      # Bake CI devshell closure into image so `nix develop #ci` is instant
-      additionalPaths = [ devshells.ci ];
+      # Bake konductor devshell closure into image so `nix develop #konductor` is instant
+      additionalPaths = [ devshells.konductor ];
     };
 
     # Nix configuration

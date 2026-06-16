@@ -62,7 +62,7 @@ in
     # https://docs.anthropic.com/en/docs/claude-code/settings#code-intelligence
     # gopls → provided in goPackages (languages.nix)
     lua-language-server # Lua LSP server
-    # pyright → hermetic wrapper in config/linters/pyright/
+    # pyright → pythonEnv (pulumi.nix pyrightPkg) + config/linters/pyright/ wrapper
     # rust-analyzer → provided as extension in rustPackages (languages.nix)
     # typescript-language-server → provided in nodejsPackages (languages.nix)
     nil # Nix LSP server

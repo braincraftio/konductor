@@ -176,7 +176,7 @@
         {
           # Development shells from src/devshells
           # Cross-platform shells available everywhere
-          # Linux-only shells (konductor, ci, frontend) conditionally included
+          # Linux-only shells (konductor, frontend) conditionally included
           devShells = {
             inherit (devshells)
               default
@@ -191,7 +191,7 @@
           // pkgs.lib.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
             # x86_64-linux only: requires libguestfs-appliance (qemu_kvm, libvirt, virt-manager, etc.)
             # frontend extends konductor, so it's also Linux-only
-            inherit (devshells) konductor ci frontend;
+            inherit (devshells) konductor frontend;
           };
 
           # Packages (build outputs, not shells)

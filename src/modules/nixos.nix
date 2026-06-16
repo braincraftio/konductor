@@ -27,7 +27,7 @@ in
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = common.mkPackages {
-      inherit cfg pkgs lib versions catppuccinSources;
+      inherit pkgs lib versions catppuccinSources;
     };
     environment.variables = common.mkEnv;
   };

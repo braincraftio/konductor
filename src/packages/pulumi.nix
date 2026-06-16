@@ -58,9 +58,9 @@ let
 
   pulumiKubernetes = mkPulumiPypiPackage {
     pname = "pulumi_kubernetes";
-    version = "4.23.0";
-    url = "https://files.pythonhosted.org/packages/cc/00/983975f1bcf02601f12b4afb60a4dfdf9f81ab11cbf2493aa349781684ae/pulumi_kubernetes-4.23.0-py3-none-any.whl";
-    hash = "sha256-SGbAAlkXDl4WBMCjM1BjA26AwpAAv5uIo4DNYA/kTE4=";
+    version = "4.29.0";
+    url = "https://files.pythonhosted.org/packages/bd/71/596f4b03c340cda2439bf49770ddb17a9656fe3471b4a9b67b33295526ae/pulumi_kubernetes-4.29.0-py3-none-any.whl";
+    hash = "sha256-QjvULbwbtSHVGKvRbnsdAjQQR/CIUsZcX34K/dijKEY=";
     meta.description = "Pulumi Kubernetes provider SDK";
   };
 
@@ -89,6 +89,36 @@ let
   };
 
   # =========================================================================
+  # pyright — required as a Python package for two consumers:
+  # 1. Pulumi's language plugin (Pulumi.yaml typechecker: pyright) runs
+  #    pyright as a subprocess and expects it in pythonEnv/bin/
+  # 2. The hermetic CLI wrapper (config/linters/pyright/) provides
+  #    --pythonpath injection for direct terminal/CI invocations
+  # =========================================================================
+  pyrightPkg = pkgs.python313Packages.buildPythonPackage {
+    pname = "pyright";
+    version = "1.1.407";
+    format = "wheel";
+
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/dc/93/b69052907d032b00c40cb656d21438ec00b3a471733de137a3f65a49a0a0/pyright-1.1.407-py3-none-any.whl";
+      hash = "sha256-bdQZ9U/ME/A7UihXltZeY5eGNz9DPiQ/i5TPk6dETSE=";
+    };
+
+    propagatedBuildInputs = with pkgs.python313Packages; [
+      nodeenv
+      typing-extensions
+    ];
+
+    doCheck = false;
+
+    meta = with lib; {
+      description = "Python command line wrapper for pyright";
+      license = licenses.mit;
+    };
+  };
+
+  # =========================================================================
   # Python packages for python.withPackages (merged in languages.nix)
   # =========================================================================
   # This is a function that takes the python package set (ps) and returns
@@ -103,7 +133,7 @@ let
     ps."pulumi-random"      # nixpkgs: 4.14.0
 
     # Pulumi provider SDKs -- from PyPI wheels (not in nixos-25.11 python313Packages)
-    pulumiKubernetes      # 4.23.0
+    pulumiKubernetes      # 4.29.0
     pulumiTls             # 5.2.1
     pulumiDockerBuild     # 0.0.14
     pulumiCloudflare      # 6.14.0
@@ -120,12 +150,24 @@ let
     ps.gitpython    # Git operations without subprocess calls
     ps.kubernetes   # Kubernetes Python client for cluster metadata discovery
     ps.pyyaml       # YAML parsing for kubeconfig
+    ps.packaging    # Version parsing for Helm chart resolution
 
     # Transitive deps (explicitly listed for clarity)
     ps.requests
     ps.dill
     ps.parver
     ps.setuptools   # Required by some provider SDKs at runtime
+
+    # DO NOT REMOVE: Pulumi.yaml sets typechecker: pyright which causes
+    # pulumi-language-python to run pyright as a subprocess from
+    # pythonEnv/bin/. Removing pyrightPkg from this list breaks
+    # pulumi preview/up with:
+    #   "The typechecker option is set to pyright, but pyright is
+    #    not installed"
+    # The hermetic CLI wrapper (config/linters/pyright/) serves a
+    # different purpose: direct terminal/CI invocations with
+    # --pythonpath for nix site-packages resolution.
+    pyrightPkg
   ];
 
 in
@@ -147,12 +189,10 @@ in
   in pkgs.symlinkJoin {
     name = "pulumi-with-python";
     paths = [
-      pulumiWrapper                          # Wrapped pulumi CLI (PULUMI_PYTHON_CMD)
       pkgs.pulumi                            # Original pulumi (for other binaries)
       pkgs.pulumictl                         # Pulumi utilities
       pkgs.pulumiPackages.pulumi-python      # Python language plugin
-      # pythonWithPulumi is NOT in paths -- the devshell python3 comes from
-      # the merged python.withPackages in languages.nix
+      pulumiWrapper                          # Last: wrapper wins symlinkJoin conflict (sets PULUMI_PYTHON_CMD)
     ];
     meta = with pkgs.lib; {
       description = "Pulumi IaC with NixOS-native Python environment";

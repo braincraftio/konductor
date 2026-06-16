@@ -12,8 +12,7 @@
 #   rust      - Rust development
 #   dev       - Human workflow (IDE: neovim + tmux + forgejo-cli)
 #   full      - Everything (all languages + dev)
-#   konductor - Self-hosting (full + container/VM build tools) [Linux only]
-#   ci        - CI/CD runner (all languages + forgejo + build tools) [Linux only]
+#   konductor - Self-hosting + CI (full + build tools + forgejo runner) [Linux only]
 #
 # Platform Support:
 #   All shells work on Linux and macOS except konductor and ci which require
@@ -54,6 +53,29 @@ let
       lib
       versions
       packages
+      ;
+  };
+
+  # Accumulative shell chain: base → full → konductor → frontend
+  fullShell = import ./full.nix {
+    inherit
+      baseShell
+      pkgs
+      packages
+      versions
+      programs
+      config
+      ;
+  };
+
+  konductorShell = import ./konductor.nix {
+    inherit
+      fullShell
+      pkgs
+      packages
+      versions
+      programs
+      config
       ;
   };
 
@@ -108,50 +130,18 @@ in
       ;
   };
 
-  # Full: Everything - all languages + dev tools
-  full = import ./full.nix {
-    inherit
-      baseShell
-      pkgs
-      packages
-      versions
-      programs
-      config
-      ;
-  };
+  # Full: Everything — all languages + IDE + container tooling
+  full = fullShell;
 
-  # Konductor: Self-hosting - full + container/VM build tools [Linux only]
-  # Use inside QCOW2 VM to get docker, qemu, libvirt, etc.
-  # Note: Only exported on Linux systems (conditional in flake.nix)
-  konductor = import ./konductor.nix {
-    inherit
-      baseShell
-      pkgs
-      packages
-      versions
-      programs
-      config
-      ;
-  };
+  # Konductor: Self-hosting + CI — full + build tools + forgejo runner [Linux only]
+  # Accumulative: base → full → konductor
+  konductor = konductorShell;
 
-  # CI: Forgejo Actions runner environment [Linux only]
-  # All languages + forgejo runner/cli + container/VM build tools
-  # Note: Only exported on Linux systems (conditional in flake.nix)
-  ci = import ./ci.nix {
-    inherit
-      baseShell
-      pkgs
-      packages
-      versions
-      programs
-      config
-      ;
-  };
-
-  # Frontend: Full shell + Playwright browsers
+  # Frontend: Konductor + Playwright + Tauri [Linux only]
+  # Accumulative: base → full → konductor → frontend
   frontend = import ./frontend.nix {
     inherit
-      baseShell
+      konductorShell
       pkgs
       packages
       versions

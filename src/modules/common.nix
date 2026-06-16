@@ -6,7 +6,7 @@
 #
 # Exports:
 #   mkOptions    - NixOS/HM/darwin option definitions
-#   mkPackages   - Base + language packages (for environment.systemPackages / home.packages)
+#   mkPackages   - Full devshell packages (SSOT: packages/default.nix fullPackages)
 #   mkPrograms   - IDE program packages: neovim, tmux, ttyd (for home.packages)
 #   mkHomeFiles  - Config files for home.file (bashrc, starship, atuin, etc.)
 #   mkFullEnv    - All environment variables including tool config paths
@@ -18,7 +18,6 @@
 let
   # Import canonical sources
   versions = import ../lib/versions.nix;
-  langs = versions.languages;
   shellContent = import ../lib/shell-content.nix { inherit lib; };
 
 in
@@ -29,42 +28,6 @@ in
 
   mkOptions = {
     enable = lib.mkEnableOption "Konductor development environment";
-
-    enablePython = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable Python ${langs.python.display} toolchain";
-    };
-
-    enableGo = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable Go ${langs.go.display} toolchain";
-    };
-
-    enableNode = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable Node.js ${langs.node.display} toolchain";
-    };
-
-    enableRust = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable Rust ${langs.rust.display} toolchain";
-    };
-
-    enableDevOps = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Enable DevOps/Cloud tooling";
-    };
-
-    enableAI = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable AI coding assistants";
-    };
   };
 
   # ===========================================================================
@@ -73,7 +36,7 @@ in
   # Mirrors the package composition in src/devshells/default.nix:
   #   catppuccinSources → config → packages → composed list
 
-  mkPackages = { cfg, pkgs, lib, versions, catppuccinSources }:
+  mkPackages = { pkgs, lib, versions, catppuccinSources }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
       # catppuccinSources enables k9s Catppuccin theme (same as devshells + qcow2)
@@ -82,13 +45,10 @@ in
       # Single source of truth for package composition
       packages = import ../packages { inherit pkgs lib config versions; };
     in
-    packages.default
+    # fullPackages = base + IDE + all languages + container tooling (SSOT with full.nix)
+    packages.fullPackages
     ++ lib.optionals pkgs.stdenv.isLinux packages.konductor.packages
-    ++ [ pkgs.nerd-fonts.jetbrains-mono ]
-    ++ lib.optionals cfg.enablePython packages.pythonPackages
-    ++ lib.optionals cfg.enableGo packages.goPackages
-    ++ lib.optionals cfg.enableNode packages.nodejsPackages
-    ++ lib.optionals cfg.enableRust packages.rustPackages;
+    ++ [ pkgs.nerd-fonts.jetbrains-mono ];
 
   # ===========================================================================
   # Program Packages (IDE tools: neovim, tmux, ttyd)

@@ -48,10 +48,10 @@ in
 
   config = lib.mkIf cfg.enable {
     home = {
-      # Base + language packages + atuin (mirrors konductor.nix nativeBuildInputs)
+      # Full devshell packages (SSOT: packages/default.nix fullPackages)
       packages = common.mkPackages
         {
-          inherit cfg pkgs lib versions catppuccinSources;
+          inherit pkgs lib versions catppuccinSources;
         }
       # IDE programs: neovim, tmux, ttyd
       ++ common.mkPrograms { inherit programs packages; }

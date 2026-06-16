@@ -2,14 +2,16 @@
 # Single Source of Truth for all package composition
 #
 # Architecture:
-#   default  = core + network + system + cli + linters + formatters + ai
-#   (Languages and IDE are composed at devshell level)
+#   default      = core + network + system + cli + linters + formatters + ai
+#   fullPackages = default + IDE + all languages + container tooling
 #
 # This file exports:
 #   - Individual category lists (core, network, system, cli, etc.)
 #   - Individual language lists (pythonPackages, goPackages, etc.)
 #   - IDE packages (idePackages)
-#   - Konductor self-hosting packages (konductorPackages)
+#   - Container tooling (containerPackages)
+#   - Full composite (fullPackages) — SSOT for full.nix, konductor.nix, modules
+#   - Konductor self-hosting packages (konductor)
 #   - Composed 'default' set for base devshell/OCI/QCOW2
 
 { pkgs, lib, config ? null, versions }:
@@ -80,16 +82,27 @@ rec {
   idePackages = ide.packages;
 
   # ===========================================================================
-  # CI PACKAGES (runner user default environment)
+  # CONTAINER TOOLING
   # ===========================================================================
-  # All tools needed for CI/CD - used by:
-  #   - src/devshells/ci.nix (CI devshell)
-  #   - src/qcow2/default.nix (users.users.runner.packages)
-  ciPackages = default
+  # Linux: docker, docker-compose, docker-buildx from Nix
+  # macOS: Docker Desktop provides these via Homebrew cask
+  # skopeo: cross-platform, always from Nix
+  containerPackages =
+    lib.optionals pkgs.stdenv.isLinux (with pkgs; [ docker docker-compose docker-buildx ])
+    ++ [ pkgs.skopeo ];
+
+  # ===========================================================================
+  # FULL PACKAGES (base + IDE + languages + container tooling)
+  # ===========================================================================
+  # Single composite for full.nix, konductor.nix, and modules/common.nix.
+  # Excludes programs (neovim, tmux) and atuin — composed at the consumer level.
+  fullPackages = default
+    ++ idePackages
     ++ pythonPackages
     ++ goPackages
     ++ nodejsPackages
-    ++ rustPackages;
+    ++ rustPackages
+    ++ containerPackages;
 
   # ===========================================================================
   # KONDUCTOR SELF-HOSTING (added in konductor shell)

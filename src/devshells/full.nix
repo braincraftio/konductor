@@ -23,23 +23,16 @@ in
 baseShell.overrideAttrs (old: {
   name = "full";
 
-  # All packages from ./packages.nix (single source of truth)
-  # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
+  # Full package set from packages/default.nix (single source of truth)
+  # Programs (neovim, tmux) and atuin come from separate inputs
   nativeBuildInputs =
     old.nativeBuildInputs
-    # IDE tools (neovim + tmux from programs, rest from packages.nix)
+    ++ packages.fullPackages
+    # Programs (neovim, tmux — require flake inputs, not in packages SSOT)
     ++ programs.neovim.packages
     ++ programs.tmux.packages
-    ++ packages.idePackages
-    # All languages from packages.nix
-    ++ packages.pythonPackages
-    ++ packages.goPackages
-    ++ packages.nodejsPackages
-    ++ packages.rustPackages
     # Atuin shell history (includes bash-preexec)
-    ++ config.shell.atuin.packages
-    # Container tooling (docker with compose v2 plugin)
-    ++ (with pkgs; [ docker docker-compose docker-buildx skopeo ]);
+    ++ config.shell.atuin.packages;
 
   shellHook = old.shellHook + ''
     # SSH identity detection (dynamic, needs $HOME)
