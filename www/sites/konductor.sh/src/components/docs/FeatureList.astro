@@ -1,0 +1,23 @@
+---
+interface Props {
+  items: { title: string; description: string; icon?: string }[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="grid grid-cols-1 gap-4 my-8 not-prose">
+  {items.map((item) => (
+    <div class="flex gap-4 p-4 rounded-lg bg-surface-subtle/50 border border-border-subtle">
+      {item.icon && (
+        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+          {item.icon}
+        </div>
+      )}
+      <div>
+        <h4 class="text-base font-bold text-text-primary mb-1">{item.title}</h4>
+        <p class="text-sm text-text-secondary leading-relaxed">{item.description}</p>
+      </div>
+    </div>
+  ))}
+</div>

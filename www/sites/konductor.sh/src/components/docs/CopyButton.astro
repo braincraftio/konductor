@@ -1,0 +1,63 @@
+---
+interface Props {
+  text?: string;
+  label?: string;
+  className?: string;
+}
+
+const { text, label = 'Copy', className = '' } = Astro.props;
+---
+
+<button
+  class={`copy-page-button inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 bg-surface-paper text-text-secondary hover:text-text-primary hover:bg-surface-raised border border-border-default hover:border-border-strong ${className}`}
+  data-copy-text={text || ''}
+>
+  <svg class="copy-page-icon w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+  </svg>
+  <svg class="copy-page-check w-3.5 h-3.5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+  </svg>
+  <span class="copy-page-label">{label}</span>
+</button>
+
+<script>
+  document.addEventListener('click', async (e) => {
+    const btn = (e.target as Element)?.closest?.('.copy-page-button');
+    if (!btn) return;
+
+    const explicit = (btn as HTMLElement).dataset.copyText;
+    let content = explicit || '';
+
+    if (!content) {
+      const article = document.querySelector('article');
+      if (article) content = article.innerText;
+    }
+
+    if (!content) return;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      const icon = btn.querySelector('.copy-page-icon')!;
+      const check = btn.querySelector('.copy-page-check')!;
+      const label = btn.querySelector('.copy-page-label')!;
+      const originalLabel = label.textContent;
+
+      icon.classList.add('hidden');
+      check.classList.remove('hidden');
+      label.textContent = 'Copied!';
+      btn.classList.add('bg-success-bg', 'text-success-base', 'border-success-border');
+      btn.classList.remove('bg-surface-paper', 'text-text-secondary', 'border-border-default');
+
+      setTimeout(() => {
+        icon.classList.remove('hidden');
+        check.classList.add('hidden');
+        label.textContent = originalLabel;
+        btn.classList.remove('bg-success-bg', 'text-success-base', 'border-success-border');
+        btn.classList.add('bg-surface-paper', 'text-text-secondary', 'border-border-default');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  });
+</script>

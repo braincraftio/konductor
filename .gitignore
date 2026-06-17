@@ -54,6 +54,10 @@ pnpm-lock.yaml
 **/.astro/
 **/dist/
 
+# Generated data (copied/evaluated from src/lib/versions.nix at build time)
+**/src/data/versions.json
+**/src/data/versions.nix
+
 # Test results
 **/test-results/
 **/test-results/**/

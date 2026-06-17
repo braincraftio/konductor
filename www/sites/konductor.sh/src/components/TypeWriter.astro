@@ -1,0 +1,60 @@
+---
+---
+
+<span id="typewriter" class="block min-h-[1.2em]">
+  <span id="typewriter-text" class="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent animate-gradient bg-300%"></span>
+  <span class="inline-block w-[3px] h-[0.85em] ml-[2px] align-baseline rounded-full bg-gradient-to-b from-brand-primary to-brand-accent animate-blink"></span>
+</span>
+
+<script>
+  const words = [
+    'DevShells',
+    'Containers',
+    'Virtual Machines',
+    'Environments',
+    'Toolchains',
+    'Infrastructure',
+    'Cloud',
+    'Tests',
+    'Analysis',
+    'Agents',
+  ];
+
+  const TYPING_SPEED = 100;
+  const BACKSPACE_SPEED = 60;
+  const PAUSE_AFTER_TYPING = 2400;
+  const PAUSE_AFTER_BACKSPACE = 500;
+
+  const el = document.getElementById('typewriter-text')!;
+  let wordIndex = 0;
+  let charIndex = 0;
+  let isDeleting = false;
+
+  function tick() {
+    const currentWord = words[wordIndex];
+
+    if (!isDeleting) {
+      charIndex++;
+      el.textContent = currentWord.substring(0, charIndex);
+
+      if (charIndex === currentWord.length) {
+        setTimeout(() => { isDeleting = true; tick(); }, PAUSE_AFTER_TYPING);
+        return;
+      }
+      setTimeout(tick, TYPING_SPEED);
+    } else {
+      charIndex--;
+      el.textContent = currentWord.substring(0, charIndex);
+
+      if (charIndex === 0) {
+        isDeleting = false;
+        wordIndex = (wordIndex + 1) % words.length;
+        setTimeout(tick, PAUSE_AFTER_BACKSPACE);
+        return;
+      }
+      setTimeout(tick, BACKSPACE_SPEED);
+    }
+  }
+
+  tick();
+</script>

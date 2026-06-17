@@ -1,0 +1,474 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AURORA DESIGN SYSTEM — Tailwind v4 CSS-first Architecture
+
+   Architecture:
+     @theme     → registers token names, generates utility classes
+     :root      → sets light mode values
+     [dark]     → sets dark mode values
+     @layer     → base styles, components, utilities
+
+   Naming convention:
+     @theme uses --color-<name>  → generates text-<name>, bg-<name>, etc.
+     :root uses  --<name>        → raw value that @theme references
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOKEN REGISTRY — generates all Tailwind utility classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  /* Surfaces */
+  --color-surface-base: var(--surface-base);
+  --color-surface-paper: var(--surface-paper);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-subtle: var(--surface-subtle);
+
+  /* Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-inverse: var(--text-inverse);
+
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  /* Brand */
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+
+  /* Focus */
+  --color-focus: var(--focus);
+  --color-focus-ring: var(--focus-ring);
+
+  /* Status: success */
+  --color-success-bg: var(--success-bg);
+  --color-success-base: var(--success-base);
+  --color-success-border: var(--success-border);
+
+  /* Status: warning */
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-base: var(--warning-base);
+  --color-warning-border: var(--warning-border);
+
+  /* Status: danger */
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-base: var(--danger-base);
+  --color-danger-border: var(--danger-border);
+
+  /* Status: info */
+  --color-info-bg: var(--info-bg);
+  --color-info-base: var(--info-base);
+  --color-info-border: var(--info-border);
+
+  /* Raw palette */
+  --color-lavender-300: var(--lavender-300);
+  --color-lavender-400: var(--lavender-400);
+  --color-lavender-450: var(--lavender-450);
+  --color-lavender-500: var(--lavender-500);
+  --color-mint-300: var(--mint-300);
+  --color-mint-400: var(--mint-400);
+  --color-mint-450: var(--mint-450);
+  --color-mint-500: var(--mint-500);
+  --color-peach-300: var(--peach-300);
+  --color-peach-400: var(--peach-400);
+  --color-peach-450: var(--peach-450);
+  --color-peach-500: var(--peach-500);
+
+  /* Shadows */
+  --shadow-lavender: var(--sh-lavender);
+  --shadow-mint: var(--sh-mint);
+  --shadow-peach: var(--sh-peach);
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RAW PALETTE — fixed color values, never change per theme
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Cream (warm backgrounds) */
+  --cream-50: oklch(98% 0.01 85);
+  --cream-100: oklch(97% 0.015 85);
+  --cream-200: oklch(95% 0.02 85);
+  --cream-300: oklch(92% 0.025 85);
+  --cream-400: oklch(88% 0.03 85);
+
+  /* Slate (cool with lavender tint) */
+  --slate-50: oklch(98% 0.015 295);
+  --slate-100: oklch(96% 0.020 295);
+  --slate-200: oklch(92% 0.028 295);
+  --slate-300: oklch(84% 0.035 295);
+  --slate-400: oklch(71% 0.045 295);
+  --slate-500: oklch(55% 0.055 295);
+  --slate-600: oklch(43% 0.065 295);
+  --slate-700: oklch(33% 0.075 295);
+  --slate-800: oklch(25% 0.080 295);
+  --slate-900: oklch(18% 0.085 295);
+
+  /* Lavender (brand primary) */
+  --lavender-300: oklch(85% 0.08 300);
+  --lavender-400: oklch(78% 0.12 300);
+  --lavender-450: oklch(74% 0.14 300);
+  --lavender-500: oklch(70% 0.16 300);
+
+  /* Mint (brand secondary) */
+  --mint-300: oklch(87% 0.08 160);
+  --mint-400: oklch(80% 0.12 160);
+  --mint-450: oklch(76% 0.14 160);
+  --mint-500: oklch(72% 0.16 160);
+
+  /* Peach (brand accent) */
+  --peach-300: oklch(88% 0.08 60);
+  --peach-400: oklch(82% 0.12 60);
+  --peach-450: oklch(78% 0.14 60);
+  --peach-500: oklch(75% 0.16 60);
+
+  /* Sky (focus) */
+  --sky-300: oklch(88% 0.08 220);
+  --sky-400: oklch(82% 0.12 220);
+  --sky-500: oklch(75% 0.16 220);
+
+  /* Colored shadows */
+  --sh-lavender: 0 4px 16px -2px oklch(70% 0.16 300 / 0.15), 0 8px 32px -4px oklch(70% 0.16 300 / 0.10);
+  --sh-mint: 0 4px 16px -2px oklch(72% 0.16 160 / 0.15), 0 8px 32px -4px oklch(72% 0.16 160 / 0.10);
+  --sh-peach: 0 4px 16px -2px oklch(75% 0.16 60 / 0.15), 0 8px 32px -4px oklch(75% 0.16 60 / 0.10);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT THEME (default)
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --surface-base: var(--cream-100);
+  --surface-paper: white;
+  --surface-raised: white;
+  --surface-subtle: var(--cream-200);
+
+  --text-primary: var(--slate-800);
+  --text-secondary: var(--slate-600);
+  --text-tertiary: var(--slate-500);
+  --text-disabled: var(--slate-400);
+  --text-inverse: white;
+
+  --border-subtle: color-mix(in oklch, var(--slate-200) 50%, var(--cream-300));
+  --border-default: color-mix(in oklch, var(--slate-300) 60%, var(--cream-300));
+  --border-strong: var(--slate-400);
+
+  --brand-primary: var(--lavender-450);
+  --brand-primary-hover: var(--lavender-500);
+  --brand-secondary: var(--mint-450);
+  --brand-accent: var(--peach-450);
+
+  --focus: var(--sky-400);
+  --focus-ring: color-mix(in oklch, var(--sky-400) 25%, transparent);
+
+  --success-base: oklch(72% 0.19 145);
+  --success-bg: color-mix(in oklch, oklch(92% 0.12 145) 30%, var(--cream-50));
+  --success-border: oklch(92% 0.12 145);
+
+  --warning-base: oklch(78% 0.17 85);
+  --warning-bg: color-mix(in oklch, oklch(92% 0.12 85) 30%, var(--cream-50));
+  --warning-border: oklch(92% 0.12 85);
+
+  --danger-base: oklch(68% 0.19 25);
+  --danger-bg: color-mix(in oklch, oklch(92% 0.12 25) 30%, var(--cream-50));
+  --danger-border: oklch(92% 0.12 25);
+
+  --info-base: oklch(72% 0.17 240);
+  --info-bg: color-mix(in oklch, oklch(92% 0.12 240) 30%, var(--cream-50));
+  --info-border: oklch(92% 0.12 240);
+
+  /* Code blocks — subtly darker than page background for contrast */
+  --code-bg: var(--cream-300);
+  --code-border: var(--cream-400);
+  --code-text: var(--slate-800);
+
+  /* Inline code — needs enough contrast against cream backgrounds */
+  --inline-code-text: var(--lavender-500);
+
+  /* Pagefind overrides — match Aurora light theme */
+  --pf-background: var(--surface-paper);
+  --pf-text: var(--text-primary);
+  --pf-text-secondary: var(--text-secondary);
+  --pf-text-muted: var(--text-tertiary);
+  --pf-border: var(--border-default);
+  --pf-border-focus: var(--border-strong);
+  --pf-hover: var(--surface-subtle);
+  --pf-mark: var(--brand-primary);
+  --pf-outline-focus: var(--focus);
+  --pf-font: 'Inter', system-ui, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  --surface-base: color-mix(in oklch, var(--slate-900) 95%, var(--lavender-500) 5%);
+  --surface-paper: color-mix(in oklch, var(--slate-800) 90%, var(--lavender-400) 10%);
+  --surface-raised: color-mix(in oklch, var(--slate-800) 92%, var(--lavender-400) 8%);
+  --surface-subtle: color-mix(in oklch, var(--slate-700) 88%, var(--lavender-400) 12%);
+
+  --text-primary: var(--cream-100);
+  --text-secondary: var(--cream-300);
+  --text-tertiary: var(--slate-400);
+  --text-disabled: var(--slate-500);
+  --text-inverse: var(--slate-900);
+
+  --border-subtle: color-mix(in oklch, var(--slate-700) 70%, transparent);
+  --border-default: var(--slate-700);
+  --border-strong: var(--slate-600);
+
+  --brand-primary: var(--lavender-400);
+  --brand-primary-hover: var(--lavender-300);
+  --brand-secondary: var(--mint-400);
+  --brand-accent: var(--peach-400);
+
+  --focus: var(--sky-300);
+  --focus-ring: color-mix(in oklch, var(--sky-300) 30%, transparent);
+
+  --success-base: oklch(92% 0.12 145);
+  --success-bg: color-mix(in oklch, oklch(55% 0.19 145) 20%, var(--slate-800));
+  --success-border: oklch(55% 0.19 145);
+
+  --warning-base: oklch(92% 0.12 85);
+  --warning-bg: color-mix(in oklch, oklch(62% 0.17 85) 20%, var(--slate-800));
+  --warning-border: oklch(62% 0.17 85);
+
+  --danger-base: oklch(92% 0.12 25);
+  --danger-bg: color-mix(in oklch, oklch(52% 0.19 25) 20%, var(--slate-800));
+  --danger-border: oklch(52% 0.19 25);
+
+  --info-base: oklch(92% 0.12 240);
+  --info-bg: color-mix(in oklch, oklch(55% 0.17 240) 20%, var(--slate-800));
+  --info-border: oklch(55% 0.17 240);
+
+  /* Code blocks — darker in dark mode */
+  --code-bg: var(--slate-900);
+  --code-border: var(--slate-700);
+  --code-text: var(--cream-100);
+
+  /* Inline code — lavender pops on dark backgrounds */
+  --inline-code-text: var(--lavender-300);
+
+  /* Colored shadows — reduced intensity on dark surfaces */
+  --sh-lavender: 0 4px 16px -2px oklch(70% 0.16 300 / 0.08), 0 8px 32px -4px oklch(70% 0.16 300 / 0.05);
+  --sh-mint: 0 4px 16px -2px oklch(72% 0.16 160 / 0.08), 0 8px 32px -4px oklch(72% 0.16 160 / 0.05);
+  --sh-peach: 0 4px 16px -2px oklch(75% 0.16 60 / 0.08), 0 8px 32px -4px oklch(75% 0.16 60 / 0.05);
+}
+
+/* Pagefind dark overrides — match Aurora dark theme, consistent with code blocks */
+[data-pf-theme="dark"] {
+  --pf-background: var(--code-bg);
+  --pf-text: var(--cream-100);
+  --pf-text-secondary: var(--cream-300);
+  --pf-text-muted: var(--slate-400);
+  --pf-border: var(--slate-700);
+  --pf-border-focus: var(--slate-600);
+  --pf-skeleton: var(--slate-800);
+  --pf-skeleton-shine: var(--slate-700);
+  --pf-hover: var(--slate-800);
+  --pf-mark: var(--lavender-300);
+  --pf-scroll-shadow: rgba(255, 255, 255, 0.05);
+  --pf-outline-focus: var(--sky-300);
+  --pf-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --pf-modal-backdrop: rgba(0, 0, 0, 0.7);
+  --pf-font: 'Inter', system-ui, sans-serif;
+}
+
+/* High contrast */
+@media (prefers-contrast: high) {
+  :root {
+    --border-subtle: var(--border-default);
+    --border-default: var(--border-strong);
+    --text-tertiary: var(--text-secondary);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE STYLES
+   Background, color, font-family, and antialiasing are applied via Tailwind
+   utilities on <body> in Layout.astro (bg-surface-base text-text-primary
+   font-sans antialiased). Only rules that cannot be expressed as utilities
+   belong here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* Expressive Code containment — prevent code blocks from overflowing
+   constrained parents like cards, grid cells, or flex children */
+.expressive-code {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.expressive-code pre {
+  overflow-x: auto;
+}
+
+/* Inline code — Expressive Code owns fenced code blocks;
+   this targets only inline `code` outside of code blocks */
+:not(pre) > code {
+  background-color: var(--surface-subtle);
+  color: var(--inline-code-text);
+  font-family: 'Space Mono', monospace;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-subtle);
+  font-size: 0.875em;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  border: none;
+  transition: all 200ms cubic-bezier(0.175, 0.885, 0.32, 1.05);
+  position: relative;
+  isolation: isolate;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 100ms;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in oklch, var(--brand-primary) 85%, var(--brand-primary-hover)) 100%);
+  color: var(--text-inverse);
+  border: 1px solid color-mix(in oklch, var(--brand-primary-hover) 50%, transparent);
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.03), 0 1px 2px oklch(0% 0 0 / 0.04), 0 2px 4px oklch(0% 0 0 / 0.02), var(--sh-lavender);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.03), 0 2px 4px -1px oklch(0% 0 0 / 0.06), 0 4px 8px -2px oklch(0% 0 0 / 0.04), 0 8px 16px -4px oklch(0% 0 0 / 0.02), var(--sh-lavender);
+}
+
+.btn-secondary {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.04), 0 1px 1px oklch(0% 0 0 / 0.04);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.03), 0 1px 2px oklch(0% 0 0 / 0.04), 0 2px 4px oklch(0% 0 0 / 0.02);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NARRATIVE TONE SYSTEM
+   Semantic color context for content sections. Wrap a section in .tone-warm
+   or .tone-cool to set --section-accent and --section-shadow. Child components
+   (cards, headings, borders) inherit the tone through the cascade.
+
+   Tones carry meaning:
+     warm (peach)    = problem, cost, tension, urgency
+     cool (lavender) = solution, architecture, resolution, value
+     mint (green)    = output, targets, growth, ecosystem
+     neutral         = default, no tone override (inherits page defaults)
+
+   Usage:
+     <div class="tone-warm">
+       <h2 style="color: var(--section-accent)">Problem</h2>
+       <div style="border-color: var(--section-accent-border); box-shadow: var(--section-shadow)">
+     </div>
+   ═══════════════════════════════════════════════════════════════════════════ */
+.tone-warm {
+  --section-accent: var(--brand-accent);
+  --section-accent-border: color-mix(in oklch, var(--brand-accent) 30%, transparent);
+  --section-shadow: var(--sh-peach);
+}
+
+.tone-cool {
+  --section-accent: var(--brand-primary);
+  --section-accent-border: color-mix(in oklch, var(--brand-primary) 30%, transparent);
+  --section-shadow: var(--sh-lavender);
+}
+
+.tone-mint {
+  --section-accent: var(--brand-secondary);
+  --section-accent-border: color-mix(in oklch, var(--brand-secondary) 30%, transparent);
+  --section-shadow: var(--sh-mint);
+}
+
+/* Spec line — monospace centered callout for listing outputs or capabilities
+   Usage: <p class="spec-line">devshells · containers · VMs · modules</p> */
+.spec-line {
+  font-family: 'Space Mono', monospace;
+  text-align: center;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  padding: 1rem 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Text halo for glass navbar contrast */
+.text-halo {
+  text-shadow:
+    0 0 8px var(--surface-paper),
+    0 0 16px var(--surface-paper),
+    0 0 24px var(--surface-paper);
+}
+
+/* Gradient text animation */
+.bg-300\% { background-size: 300% 300%; }
+.animate-gradient { animation: gradient 6s ease infinite; }
+@keyframes gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Cursor blink */
+.animate-blink { animation: blink 1s ease-in-out infinite; }
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Button shimmer */
+.animate-shimmer { animation: shimmer 1.5s ease-in-out forwards; }
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}

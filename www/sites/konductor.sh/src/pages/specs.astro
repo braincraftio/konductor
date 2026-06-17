@@ -1,0 +1,236 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Section from '../components/docs/Section.astro';
+import RefCard from '../components/docs/RefCard.astro';
+import { Code } from 'astro-expressive-code/components';
+import versions from '../data/versions.json';
+import versionsNixRaw from '../data/versions.nix?raw';
+
+const { languages, nixos, nix, image } = versions;
+---
+
+<Layout title="Specifications | Konductor.sh" description="Current version manifest for Konductor, derived from src/lib/versions.nix.">
+    <Navbar />
+
+    <main data-pagefind-body class="min-h-screen flex flex-col items-center pt-24 md:pt-32 p-4 md:p-8">
+        <div class="max-w-5xl w-full space-y-16 pb-24">
+            <!-- Header + banner as one tight unit -->
+            <div class="space-y-3 text-center md:text-left">
+                <h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-tight text-text-primary">
+                    Specifications
+                </h1>
+
+                <!-- versions.nix discovery banner -->
+                <div
+                    id="versions-banner"
+                    class="relative cursor-pointer select-none border-t border-b border-brand-primary/20 py-2 px-3 flex items-center justify-between group transition-all duration-200 hover:border-brand-primary/40"
+                >
+                    <button
+                        id="versions-toggle"
+                        class="flex items-center gap-2 text-xs font-mono text-text-tertiary group-hover:text-brand-primary transition-colors bg-transparent border-none cursor-pointer p-0"
+                        aria-expanded="false"
+                        aria-controls="versions-content"
+                    >
+                        <span class="transition-transform duration-200" id="versions-chevron">▸</span>
+                        src/lib/versions.nix
+                    </button>
+                    <a
+                        href="https://github.com/braincraftio/konductor/blob/main/src/lib/versions.nix"
+                        class="text-xs text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-brand-primary transition-all duration-200"
+                        onclick="event.stopPropagation()"
+                    >
+                        view source →
+                    </a>
+                    <div class="absolute bottom-0 left-0 right-0 h-px bg-brand-primary/20 group-hover:animate-bounce-hint origin-bottom"></div>
+                </div>
+                <div
+                    id="versions-content"
+                    class="grid transition-[grid-template-rows] duration-500 ease-in-out"
+                    style="grid-template-rows: 0fr;"
+                >
+                    <div class="overflow-hidden">
+                        <div class="pt-3">
+                            <Code code={versionsNixRaw} lang="nix" title="src/lib/versions.nix" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Platform -->
+            <Section tone="cool" title="Platform">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+                    <RefCard
+                        title="NixOS Channel"
+                        description="Release channel for nixpkgs and all flake inputs that track it (nixvim, home-manager)."
+                        footer={nixos.channel}
+                        meta={`nixos-${nixos.channel}`}
+                    />
+                    <RefCard
+                        title="Nix (Lix)"
+                        description="Minimum version required for flake support and trusted substituters."
+                        footer={`≥ ${nix.minimum}`}
+                        meta={`recommended: ${nix.recommended}`}
+                    />
+                </div>
+            </Section>
+
+            <!-- Runtimes -->
+            <Section tone="cool" title="Runtimes" divider>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
+                    <RefCard
+                        title="Python"
+                        description='uv, ruff, mypy, bandit. Auto-activates <code>.venv</code>.'
+                        footer={languages.python.display}
+                        copy="nix develop .#python"
+                        meta="nix develop .#python"
+                    />
+                    <RefCard
+                        title="Go"
+                        description="gopls, delve, golangci-lint. Creates workspace dirs."
+                        footer={languages.go.display}
+                        copy="nix develop .#go"
+                        meta="nix develop .#go"
+                    />
+                    <RefCard
+                        title="Node.js"
+                        description="pnpm, biome, prettier, eslint. Adds pnpm global bin."
+                        footer={languages.node.display}
+                        copy="nix develop .#node"
+                        meta="nix develop .#node"
+                    />
+                    <RefCard
+                        title="Rust"
+                        description="Pinned via rust-overlay. Cargo, clippy, rust-analyzer."
+                        footer={languages.rust.display}
+                        copy="nix develop .#rust"
+                        meta="nix develop .#rust"
+                    />
+                </div>
+            </Section>
+
+            <!-- Targets -->
+            <Section tone="cool" title="Targets" divider>
+                <p class="spec-line">devshells · OCI containers · QCOW2 VMs · NixOS modules</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+                    <RefCard
+                        title="OCI Container"
+                        description='Base tools + neovim + tmux. No language runtimes. Add via <code>nix develop</code> inside.'
+                        footer={image.name}
+                        copy={`docker run --rm -it ${image.name}:latest`}
+                        meta="x86_64 + aarch64 linux"
+                    />
+                    <RefCard
+                        title="QCOW2 Virtual Machine"
+                        description={`Full NixOS ${nixos.channel} with everything pre-installed. SSH in and start working.`}
+                        footer="nix build .#qcow2"
+                        copy="nix build .#qcow2"
+                        meta="x86_64-linux only (KVM)"
+                        metaWarning={true}
+                    />
+                </div>
+            </Section>
+
+            <!-- Supply Chain -->
+            <Section title="Supply Chain" divider>
+                <p class="text-sm text-text-tertiary leading-relaxed">
+                    Every dependency is a flake input pinned to an exact commit in <code>flake.lock</code>.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse min-w-[500px]">
+                        <thead>
+                            <tr class="border-b border-border-default">
+                                <th class="text-left p-3 text-text-tertiary font-medium text-xs">Input</th>
+                                <th class="text-left p-3 text-text-tertiary font-medium text-xs">Source</th>
+                                <th class="text-left p-3 text-text-tertiary font-medium text-xs">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-text-tertiary">
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">nixpkgs</td>
+                                <td class="p-3 font-mono text-xs">NixOS/nixpkgs/nixos-{nixos.channel}</td>
+                                <td class="p-3 text-xs">Package repository</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">nixvim</td>
+                                <td class="p-3 font-mono text-xs">nix-community/nixvim</td>
+                                <td class="p-3 text-xs">Neovim configuration framework</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">home-manager</td>
+                                <td class="p-3 font-mono text-xs">nix-community/home-manager</td>
+                                <td class="p-3 text-xs">User environment management</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">rust-overlay</td>
+                                <td class="p-3 font-mono text-xs">oxalica/rust-overlay</td>
+                                <td class="p-3 text-xs">Pinned Rust toolchains</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">nix2container</td>
+                                <td class="p-3 font-mono text-xs">nlewo/nix2container</td>
+                                <td class="p-3 text-xs">OCI image builder</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">catppuccin</td>
+                                <td class="p-3 font-mono text-xs">catppuccin/nix</td>
+                                <td class="p-3 text-xs">Theme assets (k9s, tmux)</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">open-sesame</td>
+                                <td class="p-3 font-mono text-xs">ScopeCreep-zip/open-sesame</td>
+                                <td class="p-3 text-xs">Encrypted secret vaults</td>
+                            </tr>
+                            <tr class="border-b border-border-subtle">
+                                <td class="p-3 font-mono text-xs text-text-secondary">forgejo-runner-src</td>
+                                <td class="p-3 font-mono text-xs">braincraft/runner</td>
+                                <td class="p-3 text-xs">Forked CI runner</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-mono text-xs text-text-tertiary" colspan="3">+ flake-utils, flake-parts, nixlib, nixpkgs-unstable, systems, nuschtosSearch, ixx</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </Section>
+
+            <!-- CTA -->
+            <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                <a href="/about" class="btn btn-secondary">
+                    About Konductor
+                </a>
+                <a href="/manual" class="btn btn-primary">
+                    Get Started
+                </a>
+            </div>
+
+        </div>
+    </main>
+</Layout>
+
+<style>
+    @keyframes bounce-hint {
+        0%, 100% { transform: scaleY(1); }
+        40% { transform: scaleY(3); }
+        60% { transform: scaleY(2); }
+    }
+    .group:hover .animate-bounce-hint {
+        animation: bounce-hint 0.6s ease-in-out;
+    }
+</style>
+
+<script>
+    const banner = document.getElementById('versions-banner')!;
+    const content = document.getElementById('versions-content')!;
+    const chevron = document.getElementById('versions-chevron')!;
+    const toggle = document.getElementById('versions-toggle')!;
+    let open = false;
+
+    banner.addEventListener('click', (e) => {
+        if ((e.target as Element)?.closest?.('a[href]')) return;
+        open = !open;
+        content.style.gridTemplateRows = open ? '1fr' : '0fr';
+        chevron.textContent = open ? '▾' : '▸';
+        toggle.setAttribute('aria-expanded', String(open));
+    });
+</script>

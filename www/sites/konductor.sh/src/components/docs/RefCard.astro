@@ -1,0 +1,116 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  footer?: string;
+  meta?: string;
+  metaWarning?: boolean;
+  copy?: string;
+  badge?: string;
+  badgeColor?: 'success' | 'warning' | 'info' | 'default';
+  className?: string;
+}
+
+const {
+  title,
+  description,
+  footer,
+  meta,
+  metaWarning = false,
+  copy,
+  badge,
+  badgeColor = 'default',
+  className = '',
+} = Astro.props;
+
+const isClickable = !!copy;
+
+const badgeStyles: Record<string, string> = {
+  default: 'bg-surface-subtle text-text-tertiary',
+  success: 'bg-surface-subtle text-brand-secondary',
+  warning: 'bg-surface-subtle text-warning-base',
+  info: 'bg-surface-subtle text-info-base',
+};
+
+const Tag = isClickable ? 'button' : 'div';
+---
+
+<Tag
+  class:list={[
+    'ref-card group/card flex flex-col min-w-0 p-4 bg-surface-paper border border-border-default rounded-lg text-left transition-all duration-200 overflow-hidden not-prose',
+    isClickable && 'cursor-pointer hover:border-brand-primary/40 hover:shadow-sm active:scale-[0.98]',
+    className,
+  ]}
+  {...isClickable ? { 'data-copy': copy, type: 'button' } : {}}
+>
+  <div class="flex items-start justify-between gap-2 mb-2">
+    <span class="font-semibold text-text-secondary">{title}</span>
+    {badge && (
+      <span class={`flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded ${badgeStyles[badgeColor]}`}>
+        {badge}
+      </span>
+    )}
+  </div>
+
+  <p class="text-sm text-text-secondary flex-1" set:html={description} />
+
+  {footer && (
+    <div class="mt-3 flex items-center gap-2">
+      <code class="text-xs font-mono flex-1 min-w-0 text-text-secondary">{footer}</code>
+      {isClickable && (
+        <>
+          <span class="ref-card-icon flex-shrink-0 text-text-tertiary group-hover/card:text-brand-primary transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+          </span>
+          <span class="ref-card-check flex-shrink-0 text-success-base hidden">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+        </>
+      )}
+    </div>
+  )}
+
+  {meta && (
+    <div class={`mt-2 pt-2 border-t border-border-subtle text-xs ${metaWarning ? 'font-medium text-warning-base' : 'text-text-tertiary'}`}>
+      {meta}
+    </div>
+  )}
+</Tag>
+
+<script>
+  document.addEventListener('click', async (e) => {
+    const card = (e.target as Element)?.closest?.('.ref-card[data-copy]');
+    if (!card) return;
+
+    const text = (card as HTMLElement).dataset.copy;
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+
+      const icon = card.querySelector('.ref-card-icon');
+      const check = card.querySelector('.ref-card-check');
+
+      if (icon && check) {
+        icon.classList.add('hidden');
+        check.classList.remove('hidden');
+
+        card.classList.add('border-success-border');
+        card.classList.remove('border-border-default');
+
+        setTimeout(() => {
+          icon.classList.remove('hidden');
+          check.classList.add('hidden');
+          card.classList.remove('border-success-border');
+          card.classList.add('border-border-default');
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  });
+</script>

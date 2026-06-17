@@ -1,0 +1,120 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Section from '../components/docs/Section.astro';
+---
+
+<Layout title="About | Konductor.sh" description="Why Konductor exists and how it eliminates configuration debt through architecture.">
+    <Navbar />
+
+    <main data-pagefind-body class="min-h-screen flex flex-col items-center pt-24 md:pt-32 p-4 md:p-8">
+        <div class="max-w-3xl w-full space-y-16 pb-24">
+            <!-- Header -->
+            <header class="space-y-6 text-center md:text-left">
+                <h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-tight">
+                    <span class="text-brand-accent">It grows with headcount.</span><br/>
+                    <span class="text-text-tertiary">Nobody measures it.</span>
+                </h1>
+                <p class="text-xl text-text-secondary leading-relaxed font-light max-w-2xl">
+                    Configuration debt compounds across teams, surfaces, and tools. CI failures, onboarding delays, "works on my machine."
+                </p>
+            </header>
+
+            <article class="space-y-16">
+
+                <!-- The Problem -->
+                <Section tone="warm" title="The Cost Nobody Budgets For">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-5 bg-surface-paper rounded-xl" style="border: 1px solid var(--border-subtle); box-shadow: var(--section-shadow)">
+                            <h3 class="font-bold mb-2" style="color: var(--section-accent)">Waste</h3>
+                            <p class="text-sm text-text-secondary leading-relaxed">CI failures from environment drift. AI agents rebuilding context every session. Educational cost of "what are the requirements again?"</p>
+                        </div>
+                        <div class="p-5 bg-surface-paper rounded-xl" style="border: 1px solid var(--border-subtle); box-shadow: var(--section-shadow)">
+                            <h3 class="font-bold mb-2" style="color: var(--section-accent)">Drift</h3>
+                            <p class="text-sm text-text-secondary leading-relaxed">CI vs "it works on my machine." Yet another YAML engineer. Formatters that format differently on different laptops.</p>
+                        </div>
+                        <div class="p-5 bg-surface-paper rounded-xl" style="border: 1px solid var(--border-subtle); box-shadow: var(--section-shadow)">
+                            <h3 class="font-bold mb-2" style="color: var(--section-accent)">Uncertainty</h3>
+                            <p class="text-sm text-text-secondary leading-relaxed">How many engineers to build it from scratch? How many to debug an outage? How many to change a default?</p>
+                        </div>
+                    </div>
+                </Section>
+
+                <!-- The Turn -->
+                <Section tone="cool" title='"Should Not" → "Cannot"' divider>
+                    <p class="text-text-secondary leading-relaxed">
+                        Policy says developers <em>should not</em> use different linter configs. Architecture makes it so they <em>cannot</em>. The formatter binary IS the formatting standard. Its config is baked into the <code>/nix/store</code> path. There is no dotfile to override, no local config to diverge.
+                    </p>
+
+                    <div class="bg-surface-paper rounded-xl overflow-x-auto" style="border: 1px solid var(--border-subtle); box-shadow: var(--section-shadow)">
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="border-b border-border-default">
+                                    <th class="text-left p-3 text-text-tertiary font-medium"></th>
+                                    <th class="text-left p-3 font-medium text-brand-accent">Policy</th>
+                                    <th class="text-left p-3 font-medium" style="color: var(--section-accent)">Architecture</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-text-secondary">
+                                <tr class="border-b border-border-subtle">
+                                    <td class="p-3 font-semibold text-text-secondary">Junior</td>
+                                    <td class="p-3 text-text-tertiary">should not ship inconsistent formatting</td>
+                                    <td class="p-3">the formatter binary IS the config</td>
+                                </tr>
+                                <tr class="border-b border-border-subtle">
+                                    <td class="p-3 font-semibold text-text-secondary">Senior</td>
+                                    <td class="p-3 text-text-tertiary">should not maintain separate configs per team</td>
+                                    <td class="p-3">one sealed source, consumed everywhere</td>
+                                </tr>
+                                <tr class="border-b border-border-subtle">
+                                    <td class="p-3 font-semibold text-text-secondary">Agent</td>
+                                    <td class="p-3 text-text-tertiary">should not use different tool versions</td>
+                                    <td class="p-3">same sealed binaries in every <code>$PATH</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold text-text-secondary">Runner</td>
+                                    <td class="p-3 text-text-tertiary">should not drift from developer environments</td>
+                                    <td class="p-3">same Nix expression as every developer</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-text-secondary leading-relaxed">
+                        Editors are orthogonal to guarantees. Pick vim, vscode, emacs, helix. The sealed wrapper produces identical output. The debate becomes preference, not risk.
+                    </p>
+                </Section>
+
+                <!-- The Resolution -->
+                <Section tone="mint" title="One Source, Many Surfaces" divider>
+                    <p class="spec-line">devshells · containers · VMs · NixOS modules</p>
+
+                    <p class="text-text-secondary leading-relaxed">
+                        The same Nix expression produces devshells, OCI containers, NixOS virtual machines, and system modules. Adding a deployment target is adding a line to <code>flake.nix</code>.
+                    </p>
+                </Section>
+
+                <!-- Ecosystem -->
+                <Section title="Ecosystem" divider>
+                    <p class="text-text-secondary leading-relaxed">
+                        Konductor is part of the <a href="https://braincraft.io" class="text-brand-primary hover:underline">BrainCraft</a> ecosystem, a family of open-source projects pursuing sovereign, reproducible infrastructure from the metal up.
+                    </p>
+                    <p class="text-text-secondary leading-relaxed">
+                        Contributions welcome. Start with the <a href="/manual/getting-started/installation" class="text-brand-primary hover:underline">installation guide</a>, open an issue, or submit a pull request on <a href="https://github.com/braincraftio/konductor" class="text-brand-primary hover:underline">GitHub</a>.
+                    </p>
+                </Section>
+
+                <!-- CTA -->
+                <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                    <a href="/specs" class="btn btn-secondary">
+                        View Specifications
+                    </a>
+                    <a href="/manual" class="btn btn-primary">
+                        Get Started
+                    </a>
+                </div>
+
+            </article>
+        </div>
+    </main>
+</Layout>

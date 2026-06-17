@@ -1,0 +1,61 @@
+---
+import '../styles/global.css';
+
+interface Props {
+	title?: string;
+	description?: string;
+}
+
+const {
+	title = 'Konductor.sh',
+	description = 'Konductor: Hermetic polyglot development environments from one Nix flake.',
+} = Astro.props;
+---
+
+<html lang="en" data-theme="dark" data-pf-theme="dark" style="color-scheme: dark">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="description" content={description} />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+		<script is:inline>
+			(function() {
+				var c = document.cookie.match(/(?:^|; )aurora-theme=(\w+)/);
+				var theme = c ? c[1] : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+				document.documentElement.setAttribute('data-theme', theme);
+				document.documentElement.setAttribute('data-pf-theme', theme === 'dark' ? 'dark' : '');
+				document.documentElement.style.colorScheme = theme;
+			})();
+		</script>
+	</head>
+	<body class="bg-surface-base text-text-primary font-sans antialiased selection:bg-brand-primary selection:text-text-inverse">
+		<slot />
+		<footer class="border-t border-border-subtle py-8 mt-16">
+			<div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-text-tertiary">
+				<span class="font-mono">&copy; {new Date().getFullYear()} BrainCraft.io</span>
+				<div class="flex items-center gap-6">
+					<a href="https://github.com/braincraftio/konductor" class="hover:text-text-primary transition-colors">GitHub</a>
+					<a href="/manual" class="hover:text-text-primary transition-colors">Manual</a>
+					<a href="/specs" class="hover:text-text-primary transition-colors">Specs</a>
+				</div>
+			</div>
+		</footer>
+		<link href="/pagefind/pagefind-component-ui.css" rel="stylesheet" />
+		<script src="/pagefind/pagefind-component-ui.js" type="module"></script>
+		<pagefind-modal id="pf-modal"></pagefind-modal>
+		<script is:inline>
+			(function() {
+				var m = document.getElementById('pf-modal');
+				if (m) {
+					var t = document.documentElement.getAttribute('data-theme');
+					m.setAttribute('data-pf-theme', t === 'dark' ? 'dark' : '');
+				}
+			})();
+		</script>
+	</body>
+</html>

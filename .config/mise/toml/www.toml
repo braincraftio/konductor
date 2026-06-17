@@ -1,0 +1,112 @@
+# www.toml - Website build and development tasks for Konductor
+#
+# Provides:
+# - Astro site install, build, dev, preview
+# - Site located at www/sites/konductor.sh
+#
+# All tools (pnpm, node) provided by nix devshell.
+# Task naming convention: www:action
+
+# =============================================================================
+# WEBSITE TASKS
+# =============================================================================
+
+["www"]
+description = "Show website build help"
+alias = ["w"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+print_header "Konductor Website Tasks"
+
+printf '%b━━━ Commands ━━━%b\n' "${CYAN:-}" "${NC:-}"
+printf '  www:install    Install dependencies (pnpm install)\n'
+printf '  www:build      Build static site (astro build)\n'
+printf '  www:dev        Start dev server (astro dev)\n'
+printf '  www:preview    Preview production build (astro preview)\n'
+printf '\n'
+
+printf '%b━━━ Quick Start ━━━%b\n' "${GREEN:-}" "${NC:-}"
+printf '  mise run www:install   # first time\n'
+printf '  mise run www:dev       # start hacking\n'
+printf '\n'
+'''
+
+["www:install"]
+description = "Install website dependencies"
+alias = ["wi"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
+
+print_header "Installing Website Dependencies"
+
+print_status info "Running pnpm install..."
+pnpm -C "${SITE_DIR}" install
+
+print_status success "Dependencies installed"
+'''
+
+["www:build"]
+description = "Build website for production"
+alias = ["wb"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${MISE_PROJECT_ROOT}/.config/mise/lib"
+. "${SCRIPT_DIR}/common.sh"
+
+SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
+DATA_DIR="${SITE_DIR}/src/data"
+
+print_header "Building Website"
+
+print_status info "Generating versions data from src/lib/versions.nix..."
+mkdir -p "${DATA_DIR}"
+nix eval --json -f "${MISE_PROJECT_ROOT}/src/lib/versions.nix" > "${DATA_DIR}/versions.json"
+cp "${MISE_PROJECT_ROOT}/src/lib/versions.nix" "${DATA_DIR}/versions.nix"
+
+print_status info "Running astro build..."
+pnpm -C "${SITE_DIR}" build
+
+print_status success "Build complete: ${SITE_DIR}/dist/"
+'''
+
+["www:dev"]
+description = "Start website dev server"
+alias = ["wd"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
+DATA_DIR="${SITE_DIR}/src/data"
+
+mkdir -p "${DATA_DIR}"
+nix eval --json -f "${MISE_PROJECT_ROOT}/src/lib/versions.nix" > "${DATA_DIR}/versions.json"
+cp "${MISE_PROJECT_ROOT}/src/lib/versions.nix" "${DATA_DIR}/versions.nix"
+
+pnpm -C "${SITE_DIR}" dev
+'''
+
+["www:preview"]
+description = "Preview production build"
+alias = ["wp"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
+
+pnpm -C "${SITE_DIR}" preview
+'''

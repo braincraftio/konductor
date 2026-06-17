@@ -1,0 +1,138 @@
+---
+const navLinks = [
+  { name: 'About', href: '/about' },
+  { name: 'Specs', href: '/specs' },
+  { name: 'Manual', href: '/manual' },
+];
+---
+
+<header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b bg-transparent border-transparent py-5">
+  <div id="navbar-inner" class="px-6 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="/" class="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary rounded-lg p-1">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-base font-mono font-bold text-lg leading-none shadow-lg group-hover:scale-105 transition-transform duration-300">
+        K
+      </div>
+      <span class="font-bold text-lg tracking-tight text-text-primary group-hover:text-brand-primary transition-colors">
+        Konductor<span class="text-text-tertiary">.sh</span>
+      </span>
+    </a>
+
+    <!-- Desktop Nav -->
+    <nav class="hidden md:flex items-center gap-8">
+      <div class="flex items-center gap-6 border-r border-border-subtle pr-6 mr-2">
+        {navLinks.map((link) => (
+          <a href={link.href} class="text-sm font-medium text-text-secondary hover:text-brand-primary transition-colors hover:-translate-y-0.5 transform duration-200">
+            {link.name}
+          </a>
+        ))}
+      </div>
+
+      <div class="flex items-center gap-4">
+        <a href="https://braincraft.io" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-text-tertiary hover:text-text-primary transition-colors uppercase tracking-wider">
+          BrainCraft
+        </a>
+
+        <pagefind-modal-trigger></pagefind-modal-trigger>
+
+        <button id="theme-toggle" class="p-2 ml-2 rounded-full text-text-secondary hover:text-brand-primary hover:bg-surface-subtle transition-all duration-200" aria-label="Toggle theme">
+          <svg id="icon-dark" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          <svg id="icon-light" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile Menu Toggle -->
+    <button id="mobile-toggle" class="md:hidden p-2 text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-md" aria-label="Toggle menu">
+      <svg id="icon-menu" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+      <svg id="icon-close" class="w-6 h-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="hidden md:hidden absolute top-full left-0 right-0 bg-surface-paper border-b border-border-subtle shadow-xl p-6 space-y-6">
+    <div class="flex flex-col gap-4">
+      {navLinks.map((link) => (
+        <a href={link.href} class="text-base font-medium text-text-primary hover:text-brand-primary py-2 border-b border-border-subtle/50">
+          {link.name}
+        </a>
+      ))}
+    </div>
+    <div class="flex flex-col gap-3 pt-2">
+      <span class="text-xs font-bold text-text-tertiary uppercase tracking-widest">Ecosystem</span>
+      <a href="https://braincraft.io" class="text-sm font-medium text-text-secondary hover:text-text-primary">
+        BrainCraft
+      </a>
+    </div>
+    <div class="flex items-center gap-4 pt-4 border-t border-border-subtle/50">
+      <pagefind-modal-trigger></pagefind-modal-trigger>
+    </div>
+  </div>
+</header>
+
+<script>
+  const navbar = document.getElementById('navbar')!;
+  const navbarInner = document.getElementById('navbar-inner')!;
+  const themeToggle = document.getElementById('theme-toggle')!;
+  const iconDark = document.getElementById('icon-dark')!;
+  const iconLight = document.getElementById('icon-light')!;
+  const mobileToggle = document.getElementById('mobile-toggle')!;
+  const mobileMenu = document.getElementById('mobile-menu')!;
+  const iconMenu = document.getElementById('icon-menu')!;
+  const iconClose = document.getElementById('icon-close')!;
+
+  // Scroll behavior
+  function updateScroll() {
+    const scrolled = window.scrollY > 20;
+    if (scrolled) {
+      navbar.className = 'fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b bg-surface-paper/30 backdrop-blur-md border-border-default py-3 shadow-md';
+      navbarInner.classList.add('text-halo');
+    } else {
+      navbar.className = 'fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b bg-transparent border-transparent py-5';
+      navbarInner.classList.remove('text-halo');
+    }
+  }
+  window.addEventListener('scroll', updateScroll);
+  updateScroll();
+
+  // Theme icons
+  function updateThemeIcons() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    if (theme === 'light') {
+      iconDark.classList.remove('hidden');
+      iconLight.classList.add('hidden');
+    } else {
+      iconDark.classList.add('hidden');
+      iconLight.classList.remove('hidden');
+    }
+  }
+  updateThemeIcons();
+
+  // Theme toggle
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    document.documentElement.setAttribute('data-pf-theme', next === 'dark' ? 'dark' : '');
+    document.documentElement.style.colorScheme = next;
+    document.cookie = `aurora-theme=${next};path=/;max-age=31536000;SameSite=Lax`;
+    var pfModal = document.getElementById('pf-modal');
+    if (pfModal) pfModal.setAttribute('data-pf-theme', next === 'dark' ? 'dark' : '');
+    updateThemeIcons();
+  });
+
+  // Mobile menu
+  mobileToggle.addEventListener('click', () => {
+    mobileMenu.classList.toggle('hidden');
+    iconMenu.classList.toggle('hidden');
+    iconClose.classList.toggle('hidden');
+  });
+</script>

@@ -1,0 +1,34 @@
+---
+interface Props {
+  type?: 'info' | 'warning' | 'danger' | 'success';
+  title?: string;
+}
+
+const { type = 'info', title } = Astro.props;
+
+const styles: Record<string, string> = {
+  info: 'bg-info-bg border-info-border text-text-secondary',
+  warning: 'bg-warning-bg border-warning-border text-text-secondary',
+  danger: 'bg-danger-bg border-danger-border text-text-secondary',
+  success: 'bg-success-bg border-success-border text-text-secondary',
+};
+
+const icons: Record<string, string> = {
+  info: 'ℹ️',
+  warning: '⚠️',
+  danger: '🚨',
+  success: '✅',
+};
+---
+
+<div class={`my-8 p-4 rounded-lg border-l-4 ${styles[type]} not-prose`}>
+  <div class="flex gap-3">
+    <div class="flex-shrink-0 text-xl">{icons[type]}</div>
+    <div>
+      {title && <h5 class="font-bold text-text-primary mb-1">{title}</h5>}
+      <div class="text-sm leading-relaxed">
+        <slot />
+      </div>
+    </div>
+  </div>
+</div>

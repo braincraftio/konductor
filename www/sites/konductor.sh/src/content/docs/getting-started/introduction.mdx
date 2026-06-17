@@ -1,0 +1,114 @@
+---
+title: "Introduction"
+description: "What Konductor is, how it works, and why the architecture matters."
+section: "Getting Started"
+order: 1
+---
+
+import Note from '../../../components/docs/Note.astro';
+
+Konductor is a Nix flake that produces hermetic development environments. One expression defines your tools, versions, linters, formatters, and IDE configuration. That expression outputs devshells for your laptop, OCI containers for CI, NixOS virtual machines for self-hosting, and system modules for permanent installations.
+
+The word "hermetic" is load-bearing. Every tool binary has its configuration baked into the `/nix/store` path. There is no dotfile to override, no global install to conflict with, no version manager to drift. The environment you enter on your laptop is byte-identical to the one your CI runner uses and the one pre-installed inside the QCOW2 VM.
+
+## The Data Flow
+
+Everything starts from one file. `src/lib/versions.nix` declares every version-locked value in the project. It has no dependencies on `pkgs` — it's pure data. The rest of the system imports it.
+
+```text frame="none"
+src/lib/versions.nix        pure data — versions, channels, image metadata
+        ↓
+src/packages/               composition — groups tools by category
+        ↓
+src/devshells/              environments — base shell + language overrides
+        ↓
+flake.nix outputs           devShells · packages · modules
+```
+
+When you change a version in `versions.nix`, that change propagates to every devshell, every container image, every VM, and every NixOS module. There is no second place to update. There is no sync step. The architecture enforces it.
+
+## Hermetic Wrappers
+
+Konductor manages 13 linters and 8 formatters. Each one is wrapped with a Nix derivation that injects its configuration at build time. The shellcheck binary doesn't read `.shellcheckrc` from your project directory — its config is sealed inside the `/nix/store` hash. The prettier binary carries its `.prettierrc.yaml` and plugin dependencies baked in.
+
+This means:
+
+- A junior developer cannot ship code with different formatting than a senior developer
+- An AI agent cannot use a different linter version than the human who prompted it
+- A CI runner cannot drift from the development environment it's testing
+
+The debate over tool configuration becomes a code review on one Nix file, not a policy document that people forget to read.
+
+## Shell Composition
+
+Shells build on each other using Nix's `overrideAttrs` pattern. The base shell provides core tools. Language shells extend it with a runtime and its toolchain. The full shell combines everything. Each layer adds packages and environment variables without duplicating what came before.
+
+```text frame="none"
+default
+  ├── python               Python 3.13 + uv, ruff, mypy, bandit
+  ├── go                   Go 1.25 + gopls, delve, golangci-lint
+  ├── node                 Node.js 22 + pnpm, biome, prettier
+  ├── rust                 Rust 1.92.0 + cargo, clippy, rust-analyzer
+  ├── dev                  neovim, tmux, forgejo-cli
+  └── full                 all languages + IDE + containers
+       └── konductor       +qemu, libvirt, OVMF        (x86_64-linux)
+            └── frontend   +Playwright, Tauri 2.x      (x86_64-linux)
+```
+
+You pick the shell that matches your work. `nix develop .#python` gives you Python with everything the base shell provides. `nix develop .#full` gives you everything. The [shell reference](/manual/reference/shells) documents what each shell includes, the environment variables it sets, and the platforms it supports.
+
+## Multi-Target Output
+
+<p className="spec-line">devshells · containers · VMs · NixOS modules</p>
+
+The same Nix expression that produces your devshell also produces deployable artifacts. This is not a separate build system — it's the same `src/packages/` composition consumed by different outputs.
+
+**DevShells** run on your laptop or inside a container. They're the primary development interface. Enter one with `nix develop` and your `PATH` has every tool the shell provides.
+
+**OCI Containers** are lightweight images built with `nix2container`. They include the base toolset (linters, formatters, neovim, tmux) but not language runtimes — you add those by running `nix develop` inside the container. This keeps images small and composable.
+
+**QCOW2 Virtual Machines** are full NixOS systems with the complete konductor environment pre-installed. SSH in and start working — no setup required. They include Docker, QEMU, libvirt, and the Forgejo CI runner for self-hosted development infrastructure.
+
+**System Modules** integrate Konductor into existing NixOS, nix-darwin, or Home Manager configurations. Toggle languages on or off with module options.
+
+## Cross-Platform Support
+
+The flake targets four architectures via `nix-systems/default`:
+
+- `x86_64-linux` — full support, all outputs including QCOW2 and konductor shell
+- `aarch64-linux` — devshells and OCI containers
+- `x86_64-darwin` — devshells (macOS Intel)
+- `aarch64-darwin` — devshells (macOS Apple Silicon)
+
+The `.envrc` at the repo root detects your platform and auto-selects the appropriate shell — `konductor` on Linux with KVM, `full` on macOS, `full` inside containers.
+
+## Supply Chain
+
+Every external dependency is a Nix flake input pinned to an exact commit hash in `flake.lock`. The project currently tracks 14 inputs including nixpkgs, nixvim, home-manager, rust-overlay, nix2container, and catppuccin. The Forgejo CI runner is a fork built from source — one line in `flake.nix`, merged from upstream on the project's schedule.
+
+The [specifications page](/specs) lists every input, its source, and its purpose. The `versions.nix` file that drives the version manifest is viewable and expandable directly on that page.
+
+## What This Is Not
+
+Konductor is not a package manager, a container orchestrator, or a cloud platform. It is the development environment layer — the substrate that your project's tooling runs on. It does not manage your application code, your infrastructure, or your deployments. It manages the tools you use to build those things, and it guarantees those tools are identical everywhere they run.
+
+## Next Steps
+
+<div className="my-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <a href="/manual/getting-started/installation" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+    <span className="font-semibold text-text-secondary block mb-1">Installation</span>
+    <span className="text-sm text-text-tertiary">Install Nix and enter your first devshell</span>
+  </a>
+  <a href="/manual/reference/shells" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+    <span className="font-semibold text-text-secondary block mb-1">Shell Environments</span>
+    <span className="text-sm text-text-tertiary">Which shell to use and what each one provides</span>
+  </a>
+  <a href="/manual/guides/building-images" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+    <span className="font-semibold text-text-secondary block mb-1">Building Images</span>
+    <span className="text-sm text-text-tertiary">Export your environment as a container or VM</span>
+  </a>
+  <a href="/specs" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+    <span className="font-semibold text-text-secondary block mb-1">Specifications</span>
+    <span className="text-sm text-text-tertiary">Current version manifest and supply chain</span>
+  </a>
+</div>

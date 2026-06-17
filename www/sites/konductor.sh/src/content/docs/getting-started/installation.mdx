@@ -1,0 +1,120 @@
+---
+title: "Installation"
+description: "Install Nix and enter your first Konductor devshell."
+section: "Getting Started"
+order: 2
+---
+
+import RefCard from '../../../components/docs/RefCard.astro';
+import Note from '../../../components/docs/Note.astro';
+
+Every tool in Konductor — every linter, formatter, language runtime, and IDE plugin — is sealed into the Nix expression. The binary IS the config. When you enter a devshell, you get the exact same environment as every other developer, every CI runner, and every VM in the fleet. No setup instructions. No "works on my machine."
+
+## Install Nix
+
+Konductor requires Nix with flakes enabled. This installs [Lix](https://lix.systems), a Nix variant that enables flakes by default.
+
+```bash
+curl -sSf -L https://install.lix.systems/lix | sh -s -- install \
+  --no-confirm \
+  --extra-conf "experimental-features = nix-command flakes" \
+  --extra-conf "warn-dirty = false" \
+  --extra-conf "accept-flake-config = true" \
+  --extra-conf "trusted-users = root @wheel @admin $(whoami)"
+```
+
+Add Nix to your shell profile (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+fi
+```
+
+Verify:
+
+```bash
+nix --version
+```
+
+<Note type="info" title="Why trusted-users matters">
+  The flake declares binary caches (nix-community, scopecreep-zip) that pre-build common packages. Without `trusted-users`, Nix ignores these caches and builds everything from source — your first `nix develop` will take significantly longer.
+</Note>
+
+## Enter a DevShell
+
+Three ways in. Pick the one that fits your workflow.
+
+<div className="my-8 grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+  <RefCard
+    title="Try it"
+    description="No clone required. Register once, then enter any shell from any directory."
+    footer="nix develop konductor#full"
+    copy="nix registry add konductor github:braincraftio/konductor && nix develop konductor#full"
+    meta="fastest path"
+  />
+  <RefCard
+    title="Clone it"
+    description="Full repo access. All shells, task automation, git hooks, contribution workflow."
+    footer="nix develop .#full"
+    copy="git clone https://github.com/braincraftio/konductor.git && cd konductor && nix develop .#full"
+    meta="contributor path"
+  />
+  <RefCard
+    title="direnv"
+    description="Automatic shell on <code>cd</code>. Zero friction for daily use. Auto-selects the right shell per platform."
+    footer="cd konductor"
+    copy="cd konductor"
+    meta="daily driver"
+    badge="recommended"
+    badgeColor="success"
+  />
+</div>
+
+The registry shorthand works from anywhere — no clone needed:
+
+```bash
+nix registry add konductor github:braincraftio/konductor
+nix develop konductor#full
+```
+
+From a clone, you get the full contributor experience — direnv integration, git hooks, mise tasks:
+
+```bash
+git clone https://github.com/braincraftio/konductor.git
+cd konductor
+nix develop .#full
+```
+
+With [direnv](https://direnv.net) installed, entering the repo directory auto-activates the devshell. The `.envrc` detects your platform and selects the right shell — `konductor` on Linux (with KVM), `full` on macOS, `full` in containers.
+
+## What You Get
+
+When you enter a shell, Konductor prints what's available:
+
+```text frame="none"
+╔══════════════════════════════════════════════════════════════╗
+║                    Konductor DevShell                        ║
+╚══════════════════════════════════════════════════════════════╝
+
+Available shells:
+  nix develop              Default (current)
+  nix develop .#python     Python 3.13
+  nix develop .#go         Go 1.25
+  nix develop .#node       Node.js 22
+  nix develop .#rust       Rust 1.92.0
+  nix develop .#dev        IDE (neovim + tmux)
+  nix develop .#full       Everything
+  nix develop .#konductor  Self-hosting (full + docker/qemu/libvirt)
+
+Commands:  mise run help
+```
+
+Every tool in that shell is hermetically wrapped. The shellcheck binary has its config baked into the `/nix/store` path — you cannot use a different linter config even if you try. The formatter binary IS the formatting standard. This isn't policy, it's architecture.
+
+The same Nix expression that gives you this devshell also produces OCI container images and full NixOS virtual machines. One source, many surfaces. What CI tests and what production runs are the same sealed tools on different deployment targets.
+
+## Next Steps
+
+- [Shell Environments](/manual/reference/shells) — which shell to use and what each one provides
+- [Building Images](/manual/guides/building-images) — export your environment as a container or VM

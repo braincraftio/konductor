@@ -36,7 +36,7 @@ legacy_version_file = false
 always_keep_download = false
 
 # Trust configuration
-trusted_config_paths = ["{{ config_root }}", "{{ config_root }}/.config"]
+trusted_config_paths = [ "{{ config_root }}", "{{ config_root }}/.config" ]
 
 # Task configuration variables
 [vars]
@@ -120,6 +120,7 @@ includes = [
   ".config/mise/toml/format.toml",
   ".config/mise/toml/docker.toml",
   ".config/mise/toml/setup.toml",
+  ".config/mise/toml/www.toml",
 ]
 
 # Hooks - Automatic Nix shell activation

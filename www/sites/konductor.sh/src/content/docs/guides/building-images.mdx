@@ -1,0 +1,156 @@
+---
+title: "Building Images"
+description: "Export your development environment as an OCI container or QCOW2 VM."
+section: "Guides"
+order: 1
+---
+
+import RefCard from '../../../components/docs/RefCard.astro';
+import Note from '../../../components/docs/Note.astro';
+
+Konductor exports your exact development environment as a deployable artifact. The environment you develop in is identical to the one you deploy.
+
+## Build Targets
+
+<div className="my-8 grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+  <RefCard
+    title="OCI Container"
+    description="Lightweight base image. Core tools, linters, formatters, neovim, tmux. Add languages via <code>nix develop</code> inside the container."
+    footer="nix build .#oci"
+    copy="nix build .#oci"
+    meta="x86_64 + aarch64 — linux"
+  />
+  <RefCard
+    title="QCOW2 Virtual Machine"
+    description="Full NixOS with everything pre-installed. All languages, IDE, docker, qemu, libvirt. SSH in and start working."
+    footer="nix build .#qcow2"
+    copy="nix build .#qcow2"
+    meta="x86_64-linux only (requires KVM)"
+    metaWarning={true}
+  />
+</div>
+
+## OCI Container
+
+### Quick Start
+
+```bash
+docker run --rm -it ghcr.io/braincraftio/konductor:latest
+```
+
+Run as admin (sudo access):
+
+```bash
+docker run --rm -it -u kc2admin ghcr.io/braincraftio/konductor:latest
+```
+
+Build from source:
+
+```bash
+nix build .#oci
+docker load < result
+```
+
+### What's Included
+
+Base packages, linters, formatters, AI tools, neovim, and tmux. **No language runtimes** — the OCI image is intentionally lightweight. Use `nix develop konductor#python` (or `#go`, `#node`, `#rust`, `#full`) inside the container to add languages on demand.
+
+### User Model
+
+<div className="overflow-x-auto">
+
+| User | UID | Role |
+|------|-----|------|
+| `kc2` | 1001 | Default user (unprivileged) |
+| `kc2admin` | 1002 | Admin with passwordless sudo (wheel) |
+| `runner` | 1003 | CI/CD workflows (forgejo-runner) |
+
+</div>
+
+Default entrypoint is `bash -l` as `kc2`. Working directory is `/workspace`.
+
+## QCOW2 Virtual Machine
+
+Full NixOS 25.11 VM with the complete konductor environment pre-installed. SSH in and start working — no `nix develop` required.
+
+### Quick Start
+
+From the `konductor` devshell:
+
+```bash
+runme run nix-build-qcow2-deploy
+ssh localhost
+```
+
+Your SSH key is automatically injected via cloud-init. The devshell configures SSH to connect on port 2222 — `ssh localhost` just works.
+
+For interactive debugging with serial console:
+
+```bash
+mise run nix:qcow2:deploy:console
+```
+
+### What's Pre-installed
+
+Everything from the `full` shell plus self-hosting tools: docker, docker-compose, buildkit, skopeo, crane, qemu, libvirt, virt-sparsify, OVMF, forgejo-runner, ttyd, code-server.
+
+### User Model
+
+<div className="overflow-x-auto">
+
+| User | UID | Role |
+|------|-----|------|
+| *(dynamic)* | 1000 | Your host user — created by cloud-init with SSH key |
+| `kc2` | 1001 | Unprivileged user |
+| `kc2admin` | 1002 | Admin with passwordless sudo (wheel) |
+| `runner` | 1003 | CI/CD runner (forgejo-runner agent) |
+| `forgejo` | 1004 | Git forge server |
+
+</div>
+
+All users are members of the `kc2` group (GID 1001) for shared directory access. Shared directories (`/workspace`, `/opt/konductor`, `/home/Git`) use setgid (2775) so new files inherit the group.
+
+### Services
+
+Docker and libvirt are installed but **not auto-started** for lean boot. Cloud-init starts them when needed, or start manually:
+
+```bash
+systemctl start docker
+systemctl start libvirtd
+```
+
+<Note type="info" title="Fast Builder">
+  The QCOW2 image uses a custom builder that copies files **inside** the VM via virtiofs instead of the standard `cptofs` (which runs a Linux kernel in userspace with 4KB buffers). This is 5-10x faster for large closures — 100k files in minutes instead of 40+.
+</Note>
+
+### Workspace Mount
+
+When launched with `-virtfs`, your host repo is mounted at `/workspace` via 9p. Changes persist to the host immediately. The mount is handled automatically by a systemd service with retry logic.
+
+```bash
+qemu-system-x86_64 -m 4096 -smp 2 -enable-kvm \
+  -drive file=result/nixos.qcow2,if=virtio,format=qcow2 \
+  -drive file=/tmp/konductor-cloud-init/seed.iso,media=cdrom \
+  -nic user,hostfwd=tcp::2222-:22 \
+  -virtfs local,path=.,mount_tag=host,security_model=mapped-xattr \
+  -nographic -serial mon:stdio
+```
+
+## Automation
+
+```bash
+# OCI — single architecture
+mise run docker:build
+
+# OCI — multi-arch (amd64 + arm64)
+mise run docker:buildx:bake
+
+# QCOW2 — build image only
+mise run nix:qcow2
+
+# QCOW2 — build + start VM
+mise run nix:qcow2:deploy
+
+# QCOW2 — build + start with serial console
+mise run nix:qcow2:deploy:console
+```

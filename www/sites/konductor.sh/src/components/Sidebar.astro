@@ -1,0 +1,51 @@
+---
+interface DocEntry {
+  slug: string;
+  data: {
+    title: string;
+    section: string;
+    order: number;
+  };
+}
+
+interface Props {
+  sections: string[];
+  groupedDocs: Record<string, DocEntry[]>;
+  currentSlug: string;
+}
+
+const { sections, groupedDocs, currentSlug } = Astro.props;
+---
+
+<aside class="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 pt-24 pb-8 px-6 bg-surface-base z-30">
+  <div class="absolute top-24 bottom-0 right-0 w-px bg-border-subtle"></div>
+  <nav class="flex-1 overflow-y-auto space-y-8 no-scrollbar">
+    {sections.map(section => {
+      const docs = groupedDocs[section];
+      if (!docs || docs.length === 0) return null;
+      return (
+        <div class="space-y-3">
+          <h5 class="text-xs font-bold text-text-tertiary uppercase tracking-wider">
+            {section}
+          </h5>
+          <ul class="space-y-1">
+            {docs.map(doc => (
+              <li>
+                <a
+                  href={`/manual/${doc.slug}`}
+                  class={`block py-1.5 text-sm transition-colors duration-200 ${
+                    currentSlug === doc.slug
+                      ? 'text-brand-primary'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {doc.data.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    })}
+  </nav>
+</aside>
