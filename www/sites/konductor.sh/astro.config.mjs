@@ -5,7 +5,8 @@ import pagefind from 'astro-pagefind';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  site: 'https://konductor.sh',
+  site: 'https://braincraftio.github.io',
+  base: '/konductor',
   // expressiveCode() MUST come before mdx() — it needs to process
   // fenced code blocks before MDX compilation.
   integrations: [expressiveCode(), mdx(), pagefind()],
