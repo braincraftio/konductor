@@ -19,7 +19,21 @@ interface Props {
 const { sections, groupedDocs, currentSlug } = Astro.props;
 ---
 
-<aside class="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 pt-24 pb-8 px-6 bg-surface-base z-30">
+<!-- Toggle button — fixed, always visible on md+ -->
+<button
+  id="sidebar-toggle"
+  class="hidden md:flex fixed top-24 left-[15.5rem] z-40 w-6 h-6 items-center justify-center rounded-full bg-surface-paper border border-border-default shadow-sm text-text-tertiary hover:text-brand-primary hover:border-brand-primary/40 transition-all duration-200"
+  aria-label="Toggle sidebar"
+>
+  <svg id="sidebar-icon-close" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+  </svg>
+  <svg id="sidebar-icon-open" class="w-3.5 h-3.5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  </svg>
+</button>
+
+<aside id="sidebar" class="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 pt-24 pb-8 px-6 bg-surface-base z-30 transition-transform duration-300">
   <div class="absolute top-24 bottom-0 right-0 w-px bg-border-subtle"></div>
   <nav class="flex-1 overflow-y-auto space-y-8 no-scrollbar">
     {sections.map(section => {
@@ -51,3 +65,30 @@ const { sections, groupedDocs, currentSlug } = Astro.props;
     })}
   </nav>
 </aside>
+
+<script>
+  const sidebar = document.getElementById('sidebar')!;
+  const toggle = document.getElementById('sidebar-toggle')!;
+  const iconClose = document.getElementById('sidebar-icon-close')!;
+  const iconOpen = document.getElementById('sidebar-icon-open')!;
+  const main = document.querySelector('main.flex-1') as HTMLElement;
+  let collapsed = false;
+
+  toggle.addEventListener('click', () => {
+    collapsed = !collapsed;
+
+    if (collapsed) {
+      sidebar.style.transform = 'translateX(-100%)';
+      toggle.style.left = '0.5rem';
+      iconClose.classList.add('hidden');
+      iconOpen.classList.remove('hidden');
+      if (main) main.style.paddingLeft = '0';
+    } else {
+      sidebar.style.transform = 'translateX(0)';
+      toggle.style.left = '15.5rem';
+      iconClose.classList.remove('hidden');
+      iconOpen.classList.add('hidden');
+      if (main) main.style.paddingLeft = '';
+    }
+  });
+</script>
