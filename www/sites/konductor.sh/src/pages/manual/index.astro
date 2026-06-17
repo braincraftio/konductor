@@ -1,9 +1,13 @@
+---
+import { href } from '../../utils/paths';
+const target = href('/manual/getting-started/introduction');
+---
 <html>
   <head>
-    <meta http-equiv="refresh" content="0;url=/manual/getting-started/introduction" />
-    <link rel="canonical" href="/manual/getting-started/introduction" />
+    <meta http-equiv="refresh" content={`0;url=${target}`} />
+    <link rel="canonical" href={target} />
   </head>
   <body>
-    <a href="/manual/getting-started/introduction">Continue to Introduction</a>
+    <a href={target}>Continue to Introduction</a>
   </body>
 </html>

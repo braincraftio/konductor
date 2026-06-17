@@ -1,15 +1,17 @@
 ---
+import { href } from '../utils/paths';
+
 const navLinks = [
-  { name: 'About', href: '/about' },
-  { name: 'Specs', href: '/specs' },
-  { name: 'Manual', href: '/manual' },
+  { name: 'About', href: href('/about') },
+  { name: 'Specs', href: href('/specs') },
+  { name: 'Manual', href: href('/manual') },
 ];
 ---
 
 <header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b bg-transparent border-transparent py-5">
   <div id="navbar-inner" class="px-6 flex items-center justify-between">
     <!-- Logo -->
-    <a href="/" class="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary rounded-lg p-1">
+    <a href={href('/')} class="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary rounded-lg p-1">
       <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-base font-mono font-bold text-lg leading-none shadow-lg group-hover:scale-105 transition-transform duration-300">
         K
       </div>

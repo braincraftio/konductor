@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar.astro';
 import TypeWriter from '../components/TypeWriter.astro';
 import { Image } from 'astro:assets';
 import konductorImage from '../../public/images/konductor.png';
+import { href } from '../utils/paths';
 ---
 
 <Layout title="Konductor.sh | Hermetic Dev Environments" description="Reproducible dev environments from one Nix flake. DevShells, containers, and VMs.">
@@ -23,7 +24,7 @@ import konductorImage from '../../public/images/konductor.png';
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-                    <a href="/manual" class="btn btn-primary w-full sm:w-auto group relative overflow-hidden">
+                    <a href={href('/manual')} class="btn btn-primary w-full sm:w-auto group relative overflow-hidden">
                         <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shimmer"></div>
                         Get Started
                         <svg class="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

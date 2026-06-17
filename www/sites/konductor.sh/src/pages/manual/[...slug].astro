@@ -4,6 +4,7 @@ import Navbar from '../../components/Navbar.astro';
 import Sidebar from '../../components/Sidebar.astro';
 import CopyButton from '../../components/docs/CopyButton.astro';
 import { getCollection, render } from 'astro:content';
+import { href } from '../../utils/paths';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
@@ -63,7 +64,7 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
             <div class="max-w-4xl mx-auto px-8 py-12 lg:px-12 lg:py-16">
                 <div class="flex items-center gap-2 text-sm text-text-tertiary mb-8 font-medium justify-between">
                     <div class="flex items-center gap-2">
-                        <a href="/manual/getting-started/introduction" class="hover:text-text-primary transition-colors">Manual</a>
+                        <a href={href('/manual/getting-started/introduction')} class="hover:text-text-primary transition-colors">Manual</a>
                         <span>/</span>
                         <span class="text-text-secondary">{entry.data.section}</span>
                     </div>
@@ -104,7 +105,7 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                 <!-- Pagination -->
                 <div class="mt-20 pt-8 border-t border-border-default grid grid-cols-1 md:grid-cols-2 gap-6">
                     {prevDoc ? (
-                        <a href={`/manual/${prevDoc.id}`} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300">
+                        <a href={href(`/manual/${prevDoc.id}`)} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300">
                             <span class="text-xs font-bold text-text-tertiary uppercase tracking-widest group-hover:text-brand-primary mb-2 block transition-colors">Previous</span>
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-text-tertiary group-hover:text-brand-primary transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -118,7 +119,7 @@ const nextDoc = currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] 
                     )}
 
                     {nextDoc && (
-                        <a href={`/manual/${nextDoc.id}`} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300 text-right">
+                        <a href={href(`/manual/${nextDoc.id}`)} class="group block p-6 rounded-xl border border-border-default hover:border-brand-primary/40 hover:bg-surface-subtle/50 transition-all duration-300 text-right">
                             <span class="text-xs font-bold text-text-tertiary uppercase tracking-widest group-hover:text-brand-primary mb-2 block transition-colors">Next</span>
                             <div class="flex items-center justify-end gap-2">
                                 <span class="text-lg font-semibold text-text-primary group-hover:text-brand-primary transition-colors">{nextDoc.data.title}</span>

@@ -6,6 +6,7 @@ order: 1
 ---
 
 import Note from '../../../components/docs/Note.astro';
+import { href } from '../../../utils/paths';
 
 Konductor is a Nix flake that produces hermetic development environments. One expression defines your tools, versions, linters, formatters, and IDE configuration. That expression outputs devshells for your laptop, OCI containers for CI, NixOS virtual machines for self-hosting, and system modules for permanent installations.
 
@@ -55,7 +56,7 @@ default
             └── frontend   +Playwright, Tauri 2.x      (x86_64-linux)
 ```
 
-You pick the shell that matches your work. `nix develop .#python` gives you Python with everything the base shell provides. `nix develop .#full` gives you everything. The [shell reference](/manual/reference/shells) documents what each shell includes, the environment variables it sets, and the platforms it supports.
+You pick the shell that matches your work. `nix develop .#python` gives you Python with everything the base shell provides. `nix develop .#full` gives you everything. The <a href={href('/manual/reference/shells')}>shell reference</a> documents what each shell includes, the environment variables it sets, and the platforms it supports.
 
 ## Multi-Target Output
 
@@ -86,7 +87,7 @@ The `.envrc` at the repo root detects your platform and auto-selects the appropr
 
 Every external dependency is a Nix flake input pinned to an exact commit hash in `flake.lock`. The project currently tracks 14 inputs including nixpkgs, nixvim, home-manager, rust-overlay, nix2container, and catppuccin. The Forgejo CI runner is a fork built from source — one line in `flake.nix`, merged from upstream on the project's schedule.
 
-The [specifications page](/specs) lists every input, its source, and its purpose. The `versions.nix` file that drives the version manifest is viewable and expandable directly on that page.
+The <a href={href('/specs')}>specifications page</a> lists every input, its source, and its purpose. The `versions.nix` file that drives the version manifest is viewable and expandable directly on that page.
 
 ## What This Is Not
 
@@ -95,19 +96,19 @@ Konductor is not a package manager, a container orchestrator, or a cloud platfor
 ## Next Steps
 
 <div className="my-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
-  <a href="/manual/getting-started/installation" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+  <a href={href('/manual/getting-started/installation')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
     <span className="font-semibold text-text-secondary block mb-1">Installation</span>
     <span className="text-sm text-text-tertiary">Install Nix and enter your first devshell</span>
   </a>
-  <a href="/manual/reference/shells" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+  <a href={href('/manual/reference/shells')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
     <span className="font-semibold text-text-secondary block mb-1">Shell Environments</span>
     <span className="text-sm text-text-tertiary">Which shell to use and what each one provides</span>
   </a>
-  <a href="/manual/guides/building-images" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+  <a href={href('/manual/guides/building-images')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
     <span className="font-semibold text-text-secondary block mb-1">Building Images</span>
     <span className="text-sm text-text-tertiary">Export your environment as a container or VM</span>
   </a>
-  <a href="/specs" className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
+  <a href={href('/specs')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
     <span className="font-semibold text-text-secondary block mb-1">Specifications</span>
     <span className="text-sm text-text-tertiary">Current version manifest and supply chain</span>
   </a>

@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { href } from '../utils/paths';
 
 interface Props {
 	title?: string;
@@ -40,8 +41,8 @@ const {
 				<span class="font-mono">&copy; {new Date().getFullYear()} BrainCraft.io</span>
 				<div class="flex items-center gap-6">
 					<a href="https://github.com/braincraftio/konductor" class="hover:text-text-primary transition-colors">GitHub</a>
-					<a href="/manual" class="hover:text-text-primary transition-colors">Manual</a>
-					<a href="/specs" class="hover:text-text-primary transition-colors">Specs</a>
+					<a href={href('/manual')} class="hover:text-text-primary transition-colors">Manual</a>
+					<a href={href('/specs')} class="hover:text-text-primary transition-colors">Specs</a>
 				</div>
 			</div>
 		</footer>

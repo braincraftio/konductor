@@ -7,6 +7,7 @@ order: 2
 
 import RefCard from '../../../components/docs/RefCard.astro';
 import Note from '../../../components/docs/Note.astro';
+import { href } from '../../../utils/paths';
 
 Every tool in Konductor — every linter, formatter, language runtime, and IDE plugin — is sealed into the Nix expression. The binary IS the config. When you enter a devshell, you get the exact same environment as every other developer, every CI runner, and every VM in the fleet. No setup instructions. No "works on my machine."
 
@@ -116,5 +117,5 @@ The same Nix expression that gives you this devshell also produces OCI container
 
 ## Next Steps
 
-- [Shell Environments](/manual/reference/shells) — which shell to use and what each one provides
-- [Building Images](/manual/guides/building-images) — export your environment as a container or VM
+- <a href={href('/manual/reference/shells')}>Shell Environments</a> — which shell to use and what each one provides
+- <a href={href('/manual/guides/building-images')}>Building Images</a> — export your environment as a container or VM

@@ -1,4 +1,6 @@
 ---
+import { href } from '../utils/paths';
+
 interface DocEntry {
   slug: string;
   data: {
@@ -32,7 +34,7 @@ const { sections, groupedDocs, currentSlug } = Astro.props;
             {docs.map(doc => (
               <li>
                 <a
-                  href={`/manual/${doc.id}`}
+                  href={href(`/manual/${doc.id}`)}
                   class={`block py-1.5 text-sm transition-colors duration-200 ${
                     currentSlug === doc.id
                       ? 'text-brand-primary'

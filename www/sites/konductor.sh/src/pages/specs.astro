@@ -6,6 +6,7 @@ import RefCard from '../components/docs/RefCard.astro';
 import { Code } from 'astro-expressive-code/components';
 import versions from '../data/versions.json';
 import versionsNixRaw from '../data/versions.nix?raw';
+import { href } from '../utils/paths';
 
 const { languages, nixos, nix, image } = versions;
 ---
@@ -196,10 +197,10 @@ const { languages, nixos, nix, image } = versions;
 
             <!-- CTA -->
             <div class="flex flex-col sm:flex-row gap-4 pt-4">
-                <a href="/about" class="btn btn-secondary">
+                <a href={href('/about')} class="btn btn-secondary">
                     About Konductor
                 </a>
-                <a href="/manual" class="btn btn-primary">
+                <a href={href('/manual')} class="btn btn-primary">
                     Get Started
                 </a>
             </div>
