@@ -88,7 +88,7 @@ rec {
   # macOS: Docker Desktop provides these via Homebrew cask
   # skopeo: cross-platform, always from Nix
   containerPackages =
-    lib.optionals pkgs.stdenv.isLinux (with pkgs; [ docker docker-compose docker-buildx ])
+    lib.optionals pkgs.stdenv.isLinux (with pkgs; [ docker_29 docker-compose docker-buildx ])
     ++ [ pkgs.skopeo ];
 
   # ===========================================================================

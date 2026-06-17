@@ -16,7 +16,7 @@
 {
   packages = with pkgs; [
     # Container tooling
-    docker
+    docker_29
     docker-compose
     docker-buildx
     buildkit
