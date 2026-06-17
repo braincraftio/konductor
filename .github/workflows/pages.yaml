@@ -1,0 +1,69 @@
+name: Deploy konductor.sh to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/sites/konductor.sh/**'
+      - 'src/lib/versions.nix'
+      - '.github/workflows/pages.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: www/sites/konductor.sh/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm -C www/sites/konductor.sh install --frozen-lockfile
+
+      - name: Generate versions data
+        run: |
+          mkdir -p www/sites/konductor.sh/src/data
+          nix eval --json -f src/lib/versions.nix > www/sites/konductor.sh/src/data/versions.json
+          cp src/lib/versions.nix www/sites/konductor.sh/src/data/versions.nix
+
+      - name: Build
+        run: pnpm -C www/sites/konductor.sh build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: www/sites/konductor.sh/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
