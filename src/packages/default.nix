@@ -23,7 +23,7 @@ let
   system = import ./system.nix { inherit pkgs lib; };
   languages = import ./languages.nix { inherit pkgs lib versions; };
   cli = import ./cli.nix { inherit pkgs config; inherit (languages) pulumiPkg; };
-  linters = import ./linters.nix { inherit pkgs config; };
+  linters = import ./linters.nix { inherit pkgs lib config; };
   formatters = import ./formatters.nix { inherit pkgs lib config; };
   ai = import ./ai.nix { inherit pkgs; };
   ide = import ./ide.nix { inherit pkgs; };

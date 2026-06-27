@@ -1,7 +1,7 @@
 # src/packages/linters.nix
 # Linting tools - composed from config wrappers
 
-{ pkgs, config ? null }:
+{ pkgs, lib, config ? null }:
 
 let
   # If config is provided, use wrapped versions; otherwise unwrapped
@@ -22,7 +22,7 @@ in
       config.linters.bandit.package
       config.linters.markdownlint.package
       config.linters.commitlint.package
-      config.linters.pyright.package
+      (lib.hiPrio config.linters.pyright.package)
 
       # Linters without config files
       pkgs.actionlint
