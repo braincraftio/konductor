@@ -48,7 +48,7 @@
               claude-code = uPrev.vscode-extensions.anthropic.claude-code.overrideAttrs (old: {
                 src = uPrev.fetchurl {
                   inherit (old.src) url name;
-                  sha256 = "sha256-XA4xSd/sg9vhOGqcCNliHzloBxPZsgXW/dSkKp/RzM0=";
+                  sha256 = "sha256-tCasNLg/Tu3uP69Mve9Kcqam1+JQkA/XyCMPy6aNPJM=";
                 };
               });
             };
