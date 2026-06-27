@@ -1,0 +1,12 @@
+{
+  "name": "konductor-practitioner",
+  "description": "General practitioner patterns for Nix, hermetic tooling, conventional commits, and systemd debugging. Project-agnostic skills and agents distilled from the Konductor platform but useful in any Nix/Linux codebase.",
+  "version": "0.1.0",
+  "author": {
+    "name": "BrainCraft.io",
+    "url": "https://github.com/braincraftio/konductor"
+  },
+  "homepage": "https://github.com/braincraftio/konductor",
+  "repository": "https://github.com/braincraftio/konductor",
+  "license": "MIT"
+}

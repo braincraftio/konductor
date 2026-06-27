@@ -35,6 +35,11 @@ in
   # ===========================================================================
   opencode = import ./opencode { inherit pkgs; };
 
+  # Claude Code harness — wrapped CLI + user-tier config + two plugins.
+  # Exposes .package (the wrapped `claude`), .configDirDrv, .devshellHook,
+  # .konductorPlugin, .practitionerPlugin, and .extend (lib.makeExtensible).
+  claude-code = import ./claude-code { inherit pkgs lib; };
+
   # ===========================================================================
   # System Info Tools
   # ===========================================================================

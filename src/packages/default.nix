@@ -25,7 +25,7 @@ let
   cli = import ./cli.nix { inherit pkgs config; inherit (languages) pulumiPkg; };
   linters = import ./linters.nix { inherit pkgs lib config; };
   formatters = import ./formatters.nix { inherit pkgs lib config; };
-  ai = import ./ai.nix { inherit pkgs; };
+  ai = import ./ai.nix { inherit pkgs config; };
   ide = import ./ide.nix { inherit pkgs; };
   konductor = import ./konductor.nix { inherit pkgs; };
   tauri = import ./tauri.nix { inherit pkgs lib; };

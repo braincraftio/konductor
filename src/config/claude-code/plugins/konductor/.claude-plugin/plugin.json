@@ -1,0 +1,12 @@
+{
+  "name": "konductor",
+  "description": "Konductor project harness: skills, agents, hooks, and MCP servers for the Konductor NixOS/QCOW2/KubeVirt development platform (Pulumi IaC, Talos, runme task pipelines, hermetic Nix devshells).",
+  "version": "0.1.0",
+  "author": {
+    "name": "BrainCraft.io",
+    "url": "https://github.com/braincraftio/konductor"
+  },
+  "homepage": "https://github.com/braincraftio/konductor",
+  "repository": "https://github.com/braincraftio/konductor",
+  "license": "MIT"
+}
