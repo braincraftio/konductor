@@ -15,6 +15,37 @@ open. A partial read of one file is not an examination of the directory. So: run
 This is a strong SHOULD, not a ritual. It exists because the failure it prevents
 is silent: act on a tree you only sampled and you produce a confident, wrong map.
 
+### Depth (`-L n`) — go deep by default, the whole tree at once
+
+`n` is the max depth `tree` descends. **The wrapper caps at 6 when `-L` is
+omitted** — so bare `tree` is NOT the full tree; it silently stops at depth 6
+and hands you survey theater. Seeing everything requires an explicit, large `-L`.
+
+**Default to maximal visibility.** Reach for this by reflex on any unfamiliar
+tree:
+
+```bash
+tree -a -L 200 <path>     # everything: full depth + hidden, in one shot
+```
+
+That is the aggressive default — total visibility, nothing truncated, nothing
+hidden. Do not dither over picking `n`; pick a number large enough that depth is
+never the limiting factor (200 is effectively unbounded for source trees).
+
+**Cap ONLY when the tree is proven huge** — a vendored monorepo or
+`opnsense/core`-scale closure where full depth genuinely floods context. Then,
+and only then:
+
+1. `tree -L 1` (or `-L 2`) to learn the top-level shape — a table of contents,
+   never the examination.
+2. **Immediately drill the relevant subtree at full depth**:
+   `tree -a -L 200 <path>/<area>`. You have not surveyed an area until you have
+   seen it at full depth.
+
+A shallow `-L` you cannot justify by size is the unprincipled sampling this skill
+exists to kill. Deep is the default; shallow is the rare, deliberate, size-driven
+exception that you always follow with a full-depth drill.
+
 ### What "defensible" means (and how it is NOT discharged)
 
 - Discharged by: you ran the survey, **read** it, and can state what is in the
@@ -105,10 +136,10 @@ dumps. So tighten, do not loosen:
 ## Quick reference
 
 ```bash
-tree                          # filtered survey (gitignore + treeignore, depth 6)
-tree -L 3 src/                # scope depth and path
-tree -a                       # include hidden
-tree --raw -a -L 10           # raw eza, no konductor filtering
+tree -a -L 200 <path>         # DEFAULT: full depth + hidden, whole tree in one shot
+tree -a -L 200 --raw <path>   # same, no konductor filtering (ignored/build dirs too)
+tree -L 1 <path>              # top-level shape ONLY — for proven-huge trees, then drill
+tree                          # bare tree caps at depth 6 — NOT the full tree
 
 rg --files                    # enumerate searchable files (filtered)
 rg --files --hidden --no-ignore   # enumerate EVERYTHING
