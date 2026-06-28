@@ -129,8 +129,26 @@ Types: `feat` (MINOR), `fix` (PATCH), `docs`, `style`, `refactor`, `perf`,
 
 Description: imperative, lowercase, no trailing period, <72 chars, WHAT not HOW.
 Body (blank line after subject, wrap ~72): include when multiple changes, 3+
-files, non-obvious implementation, or a breaking change needs detail. Explain
-WHAT and WHY with the failure mode and the mechanism of the fix.
+files, non-obvious implementation, or a breaking change needs detail. State
+WHAT the change does and the mechanism by which it does it; for a fix, state
+the failure mode and the mechanism of the fix.
+
+**No narrative — diff-derived objective fact only.** The body is a changelog
+entry, not a story of the work. Reject these tells before committing:
+- Process/discovery framing: "evaluating X emitted…", "I noticed…", "while
+  investigating…", "running the build showed…". State the failure mode as
+  fact, not as something you observed happening.
+- Decision/rationale prose: "without introducing…", "to keep it simple…",
+  "I chose X over Y because…", "this avoids…". State what the change does, not
+  why you picked it or what you didn't do.
+- Past/future framing: "this used to…", "we will later…". Use objective
+  present tense.
+- Speculation or intent. Only operationalized detail extractable from the
+  diff: paths, identifiers, values, version bumps, exit codes.
+
+A formatter-induced reflow (whitespace-only) is stated as one labeled line of
+fact ("nixfmt reflows the surrounding block; no semantics change"), never
+narrated.
 
 ### Step 8 — Footers
 `Fixes #123`, `Refs #456`, `BREAKING CHANGE:` (uppercase). NEVER include
