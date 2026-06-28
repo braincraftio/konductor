@@ -17,10 +17,11 @@
 
 {
   # ── Model / behavior — konductor defaults ──
-  # Sonnet 4.6 (1M context arrives automatically on Max/Team/Enterprise; on
-  # API/pinned providers append [1m]). `model` is read once at session start;
-  # use /model to switch mid-session.
-  model = "claude-sonnet-4-6";
+  # Opus 4.6 with the 1M-token context window. The [1m] suffix forces the 1M
+  # window on the Anthropic API / pinned providers (it arrives automatically on
+  # Max/Team/Enterprise but is harmless to assert). `model` is read once at
+  # session start; use /model to switch mid-session.
+  model = "claude-opus-4-6[1m]";
   effortLevel = "low";
   alwaysThinkingEnabled = false;
   theme = "dark-daltonized";

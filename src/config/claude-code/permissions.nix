@@ -11,7 +11,11 @@
 # destructive git, recursive removal, and reads of secret material.
 
 {
-  defaultMode = "acceptEdits";
+  # default mode: reads run without prompting, but every file edit and Bash
+  # command surfaces an interactive CLI yes/no approval prompt. NOT acceptEdits
+  # (auto-approves edits), plan (read-only), auto (classifier-gated), dontAsk
+  # (auto-denies), or bypassPermissions (skips all checks).
+  defaultMode = "default";
 
   allow = [
     # Read-only inspection
