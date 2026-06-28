@@ -1,0 +1,31 @@
+---
+# Konductor hermetic default config for ansible-lint.
+#
+# Forced via -c by the wrapper so a bare `ansible-lint` invocation has sane
+# defaults everywhere. A project's own .ansible-lint.yml (passed explicitly or
+# discovered when ansible-lint runs from the project dir) governs that project;
+# this is the floor, not a ceiling.
+#
+# The skipped rules are false positives for API-driven OPNsense/network
+# collections, not relaxations of real checks:
+#
+#   args[module] (experimental) cannot resolve arguments supplied once per play
+#   via module_defaults groups rather than on each task; the rule does not
+#   evaluate module_defaults. It also writes a temp file named from the JSON
+#   args and crashes (Errno 36, filename too long) on long Jinja expressions.
+#
+#   fqcn[canonical] flags collection module aliases (e.g. oxlorg.opnsense.*) as
+#   non-canonical when the alias is the documented public interface.
+#
+# All other rules run at the production profile.
+
+profile: production
+
+skip_list:
+  - 'args[module]'    # arguments supplied via module_defaults group, not per-task
+  - 'fqcn[canonical]' # collection module aliases are the public interface
+
+exclude_paths:
+  - .direnv/
+  - .git/
+  - tests/

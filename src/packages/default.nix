@@ -70,7 +70,8 @@ rec {
   # AI tools
   aiPackages = ai.packages;
 
-  # Ansible engine (ansible-core + httpx); lint tooling is the linters category
+  # Ansible toolchain: engine (ansible-core + httpx) + the hermetic ansible-lint
+  # wrapper, shipped together. full-shell-only (see fullPackages).
   ansiblePackages = ansible.packages;
 
   # Alias wrappers package (provides k, ll, la, etc. as executables)
