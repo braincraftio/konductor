@@ -88,11 +88,19 @@ fi
 IFS='|' read -r IS_GIT BRANCH_NAME STAGED MODIFIED <"$CACHE_FILE"
 
 # ── Context bar (heavy filled, light empty) ───────────────────────────────
+# Repeat a (possibly multibyte UTF-8) glyph N times. NOTE: `tr ' ' '━'` does
+# NOT work — tr is byte-oriented and mangles the 3-byte box-drawing chars into
+# mojibake. Build the run with a bash loop, which is UTF-8 safe.
+repeat_glyph() {
+  local glyph=$1 count=$2 out=""
+  while [ "$count" -gt 0 ]; do out="${out}${glyph}"; count=$((count - 1)); done
+  printf '%s' "$out"
+}
 FILLED=$((PCT * 10 / 100))
 EMPTY=$((10 - FILLED))
 BAR=""
-[ "$FILLED" -gt 0 ] && BAR="${FG_BASE}$(printf "%${FILLED}s" | tr ' ' '━')"
-[ "$EMPTY" -gt 0 ] && BAR="${BAR}${FG_DIM}$(printf "%${EMPTY}s" | tr ' ' '─')"
+[ "$FILLED" -gt 0 ] && BAR="${FG_BASE}$(repeat_glyph '━' "$FILLED")"
+[ "$EMPTY" -gt 0 ] && BAR="${BAR}${FG_DIM}$(repeat_glyph '─' "$EMPTY")"
 BAR="${BAR}${FG_BASE}"
 
 COST_FMT=$(awk -v c="$COST" 'BEGIN { printf "$%.2f", c+0 }')
