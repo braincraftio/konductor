@@ -118,3 +118,5 @@ Desktop.ini
 tmp/
 .certs
 _sources
+.ansible
+.ansible

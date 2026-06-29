@@ -1,8 +1,13 @@
 # src/config/linters/ansible-lint/default.nix
 # Hermetic wrapper for ansible-lint
 #
-# Config is maintained in native YAML format (.ansible-lint.yml) for easy
-# contribution. The wrapper forces config via -c flag.
+# Config (native YAML, for easy contribution) is a FLOOR, not a ceiling: it is
+# injected via -c ONLY when the project has no ansible-lint config of its own.
+# When a project ships .ansible-lint.yml / .ansible-lint.yaml / .config/
+# ansible-lint.yml (in the cwd or an ancestor), the wrapper runs bare and lets
+# ansible-lint's native discovery use the project config — a forced -c would
+# REPLACE it (ansible-lint -c does not merge), silently overriding project skips.
+# An explicit -c/-config-file in "$@" always wins; the wrapper never double-sets.
 #
 # ansible-lint imports ansible internals at runtime, so the ansible engine must
 # be on PATH. runtimeInputs carries konductor's own ansible-core+httpx
@@ -36,7 +41,37 @@ in
       ansibleOnPath
     ];
     text = ''
-      exec ansible-lint -c "${configFile}/.ansible-lint.yml" "$@"
+      # Floor-not-ceiling config resolution. Pass the konductor default via -c
+      # ONLY when neither the caller nor the project supplies one.
+      inject_config=1
+
+      # 1. Caller already set a config flag → never override it.
+      for arg in "$@"; do
+        case "$arg" in
+          -c | --config-file | -c=* | --config-file=*) inject_config=0; break ;;
+        esac
+      done
+
+      # 2. Project ships its own config (cwd or any ancestor) → let ansible-lint
+      #    discover it natively; injecting -c would replace it.
+      if [ "$inject_config" -eq 1 ]; then
+        dir=$PWD
+        while :; do
+          if [ -f "$dir/.ansible-lint.yml" ] || [ -f "$dir/.ansible-lint.yaml" ] \
+            || [ -f "$dir/.ansible-lint" ] || [ -f "$dir/.config/ansible-lint.yml" ]; then
+            inject_config=0
+            break
+          fi
+          [ "$dir" = "/" ] && break
+          dir=$(dirname "$dir")
+        done
+      fi
+
+      if [ "$inject_config" -eq 1 ]; then
+        exec ansible-lint -c "${configFile}/.ansible-lint.yml" "$@"
+      else
+        exec ansible-lint "$@"
+      fi
     '';
   };
 
