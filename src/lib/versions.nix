@@ -15,10 +15,27 @@
   };
 
   languages = {
-    python = { version = "313";   display = "3.13";   };
-    go     = { version = "1_25";  display = "1.25";   };
-    node   = { version = "22";    display = "22";     };
-    rust   = { version = "1.92.0"; display = "1.92.0"; };
+    python = {
+      version = "313";
+      display = "3.13";
+    };
+    go = {
+      version = "1_25";
+      display = "1.25";
+    };
+    node = {
+      version = "22";
+      display = "22";
+    };
+    rust = {
+      version = "1.92.0";
+      display = "1.92.0";
+    };
+  };
+
+  ansible = {
+    mitogen = "0.3.50";
+    serverscomCollection = "1.4.1";
   };
 
   image = {
