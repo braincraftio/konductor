@@ -39,6 +39,8 @@
     "Bash(gh run view:*)"
     # No-auth MCP queries shipped enabled by konductor
     "mcp__deepwiki__ask_question"
+    # Read-only kubernetes MCP query
+    "mcp__kubernetes__list-k8s-resources"
   ];
 
   deny = [

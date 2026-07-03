@@ -1,11 +1,20 @@
 # src/overlays/default.nix
 # Overlay composition
 
-{ nixpkgs-unstable, ... }:
+{ nixpkgs-unstable, k0s-nix, ... }:
 
 [
   # Version-pinned packages
   (import ./versions.nix)
+
+  # k0s Kubernetes distribution binaries (pkgs.k0s, pkgs.k0s_1_27..k0s_1_35)
+  # from the k0s-nix flake input. Version selection for konductor consumers:
+  # src/lib/versions.nix kubernetes.k0s.attr. Linux-only packages; Darwin
+  # surfaces never reference them (k0sctl is the cross-platform client).
+  k0s-nix.overlays.default
+
+  # k0sctl tip-of-spear pin (ahead of both nixpkgs channels)
+  (import ./k0s.nix)
 
   # Vim plugin fixes (lualine sandbox test failures)
   (import ./vim-plugins.nix)

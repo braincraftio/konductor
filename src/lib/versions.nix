@@ -38,6 +38,23 @@
     serverscomCollection = "1.4.1";
   };
 
+  # Kubernetes distribution tooling — tip-of-spear policy.
+  # k0s.attr selects the package from the k0s-nix overlay (k0s_1_27..k0s_1_35);
+  # the embedded Kubernetes version is coupled to k0s upstream (1.35.x ↔ k8s
+  # 1.35.x) and is not managed here. k0sctl is pinned via src/overlays/k0s.nix
+  # because nixpkgs channels lag upstream releases; bumping k0sctl = update
+  # version here + src/vendor hashes in that overlay.
+  kubernetes = {
+    k0s = {
+      attr = "k0s_1_35";
+      display = "1.35";
+    };
+    k0sctl = {
+      version = "0.31.1";
+      display = "0.31.1";
+    };
+  };
+
   image = {
     name = "ghcr.io/braincraftio/konductor";
   };

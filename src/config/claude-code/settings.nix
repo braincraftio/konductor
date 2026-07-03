@@ -62,6 +62,11 @@
   # git-commit skill, so suppress Claude's built-in git instructions snapshot. ──
   includeGitInstructions = false;
 
+  # ── Project MCP servers — auto-approve .mcp.json servers in trusted repos.
+  # Konductor repos ship .mcp.json (deepwiki, nixos, github, gitea, kubernetes);
+  # per-server per-machine approval prompts defeat the hermetic harness. ──
+  enableAllProjectMcpServers = true;
+
   # NOTE: outputStyle is intentionally UNSET (opt-in via /output-style).
 
   env = {

@@ -84,6 +84,12 @@ in
       unstable.talosctl # Talos Linux CLI (1.12.0)
       unstable.omnictl # Sidero Omni CLI (1.4.4)
 
+      # k0s cluster management (cross-platform client; the k0s node binary
+      # itself is Linux-only and ships in the konductor self-hosting tier).
+      # Pinned via src/overlays/k0s.nix — not unstable.*, because nixpkgs
+      # channels lag upstream k0sctl patch releases.
+      k0sctl # k0s cluster bootstrap/management CLI
+
       # Infrastructure as Code
       # Pulumi with NixOS-native Python environment (src/packages/pulumi.nix)
       # Replaces: pulumi, pulumictl, pulumiPackages.pulumi-python

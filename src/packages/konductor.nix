@@ -8,10 +8,11 @@
 # Includes:
 #   - Container tooling (docker, buildkit)
 #   - VM/QCOW2 tooling (qemu, libvirt)
+#   - Kubernetes node runtime (k0s — on-demand, never auto-started)
 #   - Cloud-init ISO creation
 #   - CI/CD essentials
 
-{ pkgs }:
+{ pkgs, versions }:
 
 {
   packages = with pkgs; [
@@ -22,6 +23,14 @@
     buildkit
     skopeo
     crane
+
+    # Kubernetes node runtime — the k0s single-binary distribution (embeds
+    # kubelet/apiserver/containerd/etcd at matched versions). Static upstream
+    # binary via the k0s-nix overlay; version selected by
+    # src/lib/versions.nix kubernetes.k0s.attr. On-demand capability only:
+    # nothing here starts a cluster — `services.k0s` (flake nixosModules.k0s)
+    # is the declarative path, `k0s controller --single` the ad-hoc one.
+    pkgs.${versions.kubernetes.k0s.attr}
 
     # VM/QCOW2 tooling
     qemu_kvm

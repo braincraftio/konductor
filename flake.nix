@@ -93,6 +93,16 @@
       flake = false;
     };
 
+    # k0s Kubernetes distribution: binary packages (k0s_1_27..k0s_1_35) +
+    # services.k0s NixOS module. Tracks main (author treats main as stable;
+    # CI-tested per commit). MIT-licensed for nixpkgs upstreamability — issues
+    # we hit get contributed upstream rather than forked around.
+    # Update: nix flake update k0s-nix
+    k0s-nix = {
+      url = "github:johbo/k0s-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     systems.url = "github:nix-systems/default";
   };
 
@@ -114,7 +124,7 @@
       # Import overlays
       overlays = import ./src/overlays {
         inherit (nixpkgs) lib;
-        inherit (inputs) nixpkgs-unstable;
+        inherit (inputs) nixpkgs-unstable k0s-nix;
       };
 
     in
@@ -256,6 +266,10 @@
       nixosModules = {
         konductor = import ./src/modules/nixos.nix;
         default = import ./src/modules/nixos.nix;
+        # k0s Kubernetes distribution (services.k0s.*) — re-exported from
+        # k0s-nix so konductor consumers get the module from one flake.
+        # Disabled by default (mkEnableOption); on-demand capability.
+        k0s = inputs.k0s-nix.nixosModules.default;
       };
 
       # Home Manager module - convention from nix-community/home-manager

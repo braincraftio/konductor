@@ -36,7 +36,7 @@ let
   ai = import ./ai.nix { inherit pkgs config; };
   ansible = import ./ansible { inherit pkgs lib versions; };
   ide = import ./ide.nix { inherit pkgs; };
-  konductor = import ./konductor.nix { inherit pkgs; };
+  konductor = import ./konductor.nix { inherit pkgs versions; };
   tauri = import ./tauri.nix { inherit pkgs lib; };
 
   # Alias wrappers - executable scripts that provide hermetic "aliases"

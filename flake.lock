@@ -146,6 +146,26 @@
         "type": "github"
       }
     },
+    "k0s-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1782314312,
+        "narHash": "sha256-ihJLJ7F5iEMsyeM+LB8Ruw5WAh0sipt+jkS2x3U/OCs=",
+        "owner": "johbo",
+        "repo": "k0s-nix",
+        "rev": "c4c7c7ec3e6016aab6bedcfdc8797b414a516fc2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "johbo",
+        "repo": "k0s-nix",
+        "type": "github"
+      }
+    },
     "nix-index-database": {
       "inputs": {
         "nixpkgs": [
@@ -331,6 +351,7 @@
         "forgejo-runner-src": "forgejo-runner-src",
         "home-manager": "home-manager",
         "ixx": "ixx",
+        "k0s-nix": "k0s-nix",
         "nix2container": "nix2container",
         "nixlib": "nixlib",
         "nixpkgs": "nixpkgs",

@@ -635,6 +635,13 @@ let
       inputs.home-manager.nixosModules.home-manager
       # QEMU guest profile for virtio drivers and guest agent
       "${modulesPath}/profiles/qemu-guest.nix"
+      # k0s Kubernetes distribution (services.k0s.*) — DISABLED by default
+      # (mkEnableOption). On-demand capability: enable via nixos-rebuild from
+      # /opt/konductor/src with `services.k0s = { enable = true; role = ...; }`.
+      # The k0s binary is on PATH regardless (konductor self-hosting tier) for
+      # ad-hoc `k0s controller --single` runs. Kernel prereqs below are inert
+      # until a node actually starts.
+      inputs.k0s-nix.nixosModules.default
     ];
 
     # Basic system configuration
@@ -1633,6 +1640,20 @@ let
           # See: BUG_REPORT.docker-compose-nixos-qcow2.md
           "05-docker-unmanaged" = {
             matchConfig.Name = "docker* br-* veth*";
+            linkConfig = {
+              Unmanaged = "yes";
+              RequiredForOnline = "no";
+            };
+          };
+          # Prevent systemd-networkd from managing k0s CNI interfaces.
+          # Same race class as docker above: k0s's CNI (kuberouter default:
+          # kube-bridge + veths; calico alternative: cali*/tunl*/vxlan*)
+          # creates interfaces dynamically via netlink. veth* is already
+          # covered by 05-docker-unmanaged. "06-" keeps these ahead of
+          # "10-ethernet" (Type=ether would otherwise claim them). Inert
+          # while k0s is not running (no interface = no match).
+          "06-kube-unmanaged" = {
+            matchConfig.Name = "kube-bridge kube-dummy* cali* tunl* vxlan*";
             linkConfig = {
               Unmanaged = "yes";
               RequiredForOnline = "no";
@@ -2949,6 +2970,20 @@ let
       kernelPackages = pkgs.linuxPackages_latest;
 
       # =====================================================================
+      # Kubernetes Node Prerequisites (k0s — on-demand)
+      # =====================================================================
+      # Required before any kube node (k0s kuberouter/calico CNI) can program
+      # the datapath: overlayfs for containerd snapshots, br_netfilter so
+      # bridged pod traffic traverses iptables, conntrack for kube-proxy/NAT.
+      # Docker loads some of these lazily at runtime; k0s must not depend on
+      # that ordering accident. Inert (a few KB of module text) until used.
+      kernelModules = [
+        "overlay"
+        "br_netfilter"
+        "nf_conntrack"
+      ];
+
+      # =====================================================================
       # Bootloader Configuration (EFI)
       # =====================================================================
       # Required for nixosConfigurations (nixos-rebuild on running VMs).
@@ -2999,6 +3034,14 @@ let
 
         # Increase readahead for sequential I/O (matches rbd_readahead_max_bytes)
         "vm.vfs_cache_pressure" = 50;
+
+        # Kubernetes node prerequisites (k0s — see boot.kernelModules above).
+        # Bridged pod traffic must traverse netfilter; nodes route pod CIDRs.
+        # ip_forward is already required by docker; asserted here declaratively
+        # rather than inherited from dockerd's runtime sysctl write.
+        "net.bridge.bridge-nf-call-iptables" = 1;
+        "net.bridge.bridge-nf-call-ip6tables" = 1;
+        "net.ipv4.ip_forward" = 1;
       };
 
       # Virtio drivers for performance
