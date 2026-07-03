@@ -59,6 +59,14 @@ final: prev: {
       done
     '';
 
+    passthru.tests.version = prev.testers.testVersion {
+      package = final.k0sctl;
+      command = "k0sctl version";
+      # versioninfo.Version ldflags don't take effect; upstream quirk:
+      # https://github.com/carlmjohnson/versioninfo/discussions/12
+      version = "version: (devel)\ncommit: v${version}\n";
+    };
+
     meta = with prev.lib; {
       description = "Bootstrapping and management tool for k0s clusters";
       homepage = "https://k0sproject.io/";
