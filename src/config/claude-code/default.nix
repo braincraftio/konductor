@@ -14,6 +14,17 @@
 #        konductor-practitioner → /konductor-practitioner:* (general)
 #      Plugins own their own hooks (${CLAUDE_PLUGIN_ROOT}), .mcp.json, .lsp.json.
 #
+#   3. SYSTEM PROMPT (system-prompt.md, an immutable store path) → dispatched by
+#      the wrapper via --system-prompt-file / --append-system-prompt-file,
+#      gated by KONDUCTOR_CLAUDE_SYSTEM_PROMPT_{ENABLED,FILE,FILE_MODE} env vars
+#      read at wrapper runtime (not build time — set them in .envrc / .env for
+#      per-workspace override). Full dispatch table in claude-wrapper.sh. A
+#      user's own --system-prompt[-file] / --append-system-prompt[-file] on the
+#      CLI always remains live and always composes after the wrapper's own
+#      flags in argv (last --system-prompt wins; --append-system-prompt is
+#      additive regardless of order — verified against the shipped claude
+#      binary, not assumed).
+#
 # Why a writable seed dir instead of CLAUDE_CONFIG_DIR=<store path> directly:
 #   Claude WRITES to CLAUDE_CONFIG_DIR (.claude.json oauth, sessions/, plans/,
 #   caches). A read-only /nix/store path fails on first write with EACCES (the
@@ -62,6 +73,16 @@ lib.makeExtensible (
     practitionerPlugin = ./plugins/konductor-practitioner;
 
     # =========================================================================
+    # Hermetic system prompt (immutable store path, loaded via
+    # --system-prompt-file / --append-system-prompt-file by the wrapper).
+    # Runtime on/off/layering is controlled by KONDUCTOR_CLAUDE_SYSTEM_PROMPT_*
+    # env vars read in claude-wrapper.sh — see that file's header for the full
+    # dispatch table. This derivation only fixes the CONTENT hermetically; the
+    # wrapper fixes the DISPATCH deterministically.
+    # =========================================================================
+    systemPromptFile = ./system-prompt.md;
+
+    # =========================================================================
     # Derived derivations — ALL reference final.* so .extend propagates, and
     # ALL are exposed for a-la-carte downstream consumption.
     # =========================================================================
@@ -83,18 +104,17 @@ lib.makeExtensible (
     };
 
     # Devshell / CI consumer: nativeBuildInputs = [ devshellHook ].
-    # makeSetupHook substitutes @configDir@ / @plugin*@ in the separate .sh file.
-    devshellHook =
-      pkgs.makeSetupHook
-        {
-          name = "konductor-claude-code-hook";
-          substitutions = {
-            configDir = final.configDirDrv;
-            konductorPlugin = final.konductorPlugin;
-            practitionerPlugin = final.practitionerPlugin;
-          };
-        }
-        ./setup-hook.sh;
+    # makeSetupHook substitutes @configDir@ / @plugin*@ / @systemPromptFile@ in
+    # the separate .sh file.
+    devshellHook = pkgs.makeSetupHook {
+      name = "konductor-claude-code-hook";
+      substitutions = {
+        configDir = final.configDirDrv;
+        konductorPlugin = final.konductorPlugin;
+        practitionerPlugin = final.practitionerPlugin;
+        systemPromptFile = final.systemPromptFile;
+      };
+    } ./setup-hook.sh;
 
     # =========================================================================
     # The wrapped `claude` CLI — the binary konductor ships.
@@ -111,6 +131,9 @@ lib.makeExtensible (
     #   - writable seed dir       → EACCES on store-path writes
     #   - ~/.claude.json passthru → shared auth, no re-login, dangling-ok
     #   - --plugin-dir store path → immutable, zero-install plugin load
+    #   - system prompt dispatch  → deterministic ENABLED/FILE/FILE_MODE table,
+    #                               hard-errors on the ENABLED=true + MODE=replace
+    #                               contradiction rather than guessing a winner
     #   - inherit passthru/meta   → keep updateScript, unfree license, platforms
     wrappedClaude =
       pkgs.runCommand "claude"
@@ -120,6 +143,7 @@ lib.makeExtensible (
           configDir = final.configDirDrv;
           konductorPlugin = final.konductorPlugin;
           practitionerPlugin = final.practitionerPlugin;
+          systemPromptFile = final.systemPromptFile;
           claude = pkgs.unstable.claude-code;
 
           passthru = (pkgs.unstable.claude-code.passthru or { }) // {
@@ -128,6 +152,7 @@ lib.makeExtensible (
             settings = final.settingsDrv;
             konductorPlugin = final.konductorPlugin;
             practitionerPlugin = final.practitionerPlugin;
+            systemPromptFile = final.systemPromptFile;
             devshellHook = final.devshellHook;
             extend = final.extend;
           };
