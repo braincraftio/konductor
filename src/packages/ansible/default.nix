@@ -40,11 +40,12 @@ let
     pythonImportsCheck = [ "mitogen" ];
   };
 
-  # ansible-core with mitogen + httpx in its Python closure.
+  # ansible-core with mitogen + httpx + kubernetes in its Python closure.
   ansibleCore = python3Packages.ansible-core.override {
     extraPackages = _ps: [
       mitogen
       python3Packages.httpx
+      python3Packages.kubernetes
     ];
   };
 
