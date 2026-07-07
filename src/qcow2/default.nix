@@ -188,13 +188,7 @@ let
       github.copilot-chat # GitHub Copilot Chat
     ]
     ++ [
-      # Extensions not in nixpkgs or with stale nixpkgs hashes — fetched from VS Code Marketplace
-      (pkgs.vscode-utils.extensionFromVscodeMarketplace {
-        name = "claude-code";
-        publisher = "anthropic";
-        version = "2.1.201";
-        sha256 = "sha256-/uvQIg773WUzalc9XFtBrocsGye3v5y1rvKyJVpXWS0=";
-      })
+      # Extensions not in nixpkgs — fetched from VS Code Marketplace
       (pkgs.vscode-utils.extensionFromVscodeMarketplace {
         name = "runme";
         publisher = "stateful";
