@@ -192,8 +192,8 @@ let
       (pkgs.vscode-utils.extensionFromVscodeMarketplace {
         name = "claude-code";
         publisher = "anthropic";
-        version = "2.0.50";
-        sha256 = "sha256-Pd4rRLS613/zSn8Pvr/cozaIAqrG06lmUC6IxHm97XQ=";
+        version = "2.1.201";
+        sha256 = "sha256-/uvQIg773WUzalc9XFtBrocsGye3v5y1rvKyJVpXWS0=";
       })
       (pkgs.vscode-utils.extensionFromVscodeMarketplace {
         name = "runme";
