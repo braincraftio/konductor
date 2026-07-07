@@ -937,7 +937,6 @@ def cmd_status(args: list[str]) -> int:
         ("Hypervisor CA",    config.HYPERVISOR_CA_CERT, True),
         ("Hypervisor key",   config.HYPERVISOR_CA_KEY,  False),
         ("CA bundle",        config.CA_BUNDLE,          False),
-        ("Cluster CA",       config.CLUSTER_CA,         True),
     ]
 
     # Also check mount points (deploy-time only)

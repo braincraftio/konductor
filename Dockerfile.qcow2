@@ -8,11 +8,5 @@
 # Build: runme run --filename $QCOW2_BUILD_FILE build:qcow2:container
 
 FROM scratch
-
 ARG QCOW2_FILE=konductor.qcow2
-ARG PROVENANCE=.konductor
-ARG BUILD_LOG=build-vm.log
-
 COPY ${QCOW2_FILE} /disk/nixos.qcow2
-COPY ${PROVENANCE} /disk/.konductor
-COPY ${BUILD_LOG} /disk/build.log

@@ -473,9 +473,8 @@ class TestBundle:
         sys_ca = tmp_path / "system-ca.crt"
         sys_ca.write_bytes(ca_cert.public_bytes(Encoding.PEM))
 
-        # No hypervisor or cluster CAs
+        # No hypervisor CA
         hyp_ca = tmp_path / "nonexistent-hyp.crt"
-        cluster_ca = tmp_path / "nonexistent-cluster.crt"
 
         bundle_path = tmp_path / "bundle" / "ca-bundle.crt"
 
@@ -484,7 +483,6 @@ class TestBundle:
             system_ca=sys_ca,
             vm_ca=vm_ca,
             hypervisor_ca=hyp_ca,
-            cluster_ca=cluster_ca,
         )
 
         assert bundle_path.exists()
@@ -499,14 +497,13 @@ class TestBundle:
             system_ca=tmp_path / "nope1",
             vm_ca=tmp_path / "nope2",
             hypervisor_ca=tmp_path / "nope3",
-            cluster_ca=tmp_path / "nope4",
         )
         assert count == 0
         assert bundle_path.exists()
 
-    def test_bundle_all_four_sources(self, ca_key, ca_cert, tmp_path):
+    def test_bundle_all_three_sources(self, ca_key, ca_cert, tmp_path):
         pem = ca_cert.public_bytes(Encoding.PEM)
-        for name in ["sys.crt", "vm.crt", "hyp.crt", "cluster.crt"]:
+        for name in ["sys.crt", "vm.crt", "hyp.crt"]:
             (tmp_path / name).write_bytes(pem)
 
         bundle_path = tmp_path / "bundle" / "out.crt"
@@ -515,9 +512,8 @@ class TestBundle:
             system_ca=tmp_path / "sys.crt",
             vm_ca=tmp_path / "vm.crt",
             hypervisor_ca=tmp_path / "hyp.crt",
-            cluster_ca=tmp_path / "cluster.crt",
         )
-        assert count == 4
+        assert count == 3
 
 
 # =====================================================================
@@ -672,7 +668,6 @@ class TestPKIStatus:
         monkeypatch.setattr(cfg, "HYPERVISOR_CA_CERT", hyp_dir / "ca.crt")
         monkeypatch.setattr(cfg, "HYPERVISOR_CA_KEY", hyp_dir / "tls.key")
         monkeypatch.setattr(cfg, "CA_BUNDLE", bundle_path)
-        monkeypatch.setattr(cfg, "CLUSTER_CA", tmp_path / "cluster-ca.crt")
         monkeypatch.setattr(cfg, "HYPERVISOR_MOUNT_CA", tmp_path / "mnt-ca.crt")
         monkeypatch.setattr(cfg, "HYPERVISOR_MOUNT_KEY", tmp_path / "mnt-tls.key")
         monkeypatch.setattr(cfg, "FINGERPRINT_PATH", tmp_path / ".konductor")

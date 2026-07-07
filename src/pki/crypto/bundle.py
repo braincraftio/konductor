@@ -4,7 +4,6 @@ Creates a combined trust bundle from all available certificate sources:
   1. System CAs (/etc/ssl/certs/ca-certificates.crt)
   2. VM CA (/etc/konductor/pki/vm/ca.crt)
   3. Hypervisor CA (/etc/konductor/pki/hypervisor/ca.crt)
-  4. Cloud-init cluster CA (/etc/konductor/cluster-ca.crt)
 
 Output path: /etc/konductor/pki/bundle/ca-bundle.crt
 This is THE canonical bundle path. All consumers use this path.
@@ -23,7 +22,6 @@ def build_bundle(
     system_ca: Path | None = None,
     vm_ca: Path | None = None,
     hypervisor_ca: Path | None = None,
-    cluster_ca: Path | None = None,
 ) -> int:
     """Build CA trust bundle from all available sources.
 
@@ -34,7 +32,6 @@ def build_bundle(
     system_ca = system_ca or config.SYSTEM_CA
     vm_ca = vm_ca or config.VM_CA_CERT
     hypervisor_ca = hypervisor_ca or config.HYPERVISOR_CA_CERT
-    cluster_ca = cluster_ca or config.CLUSTER_CA
 
     ensure_dir(output.parent, config.MODE_DIRECTORY)
 
@@ -59,21 +56,13 @@ def build_bundle(
     else:
         info("VM CA: not generated yet (skipped)")
 
-    # Hypervisor CA
+    # Hypervisor CA (the parent cluster's cert-manager root CA)
     if hypervisor_ca.exists():
         parts.append(f"\n# Konductor Hypervisor CA\n{hypervisor_ca.read_text()}")
         cert_count += 1
         ok(f"Hypervisor CA: {hypervisor_ca}")
     else:
         info("Hypervisor CA: not mounted (skipped)")
-
-    # Cloud-init cluster CA
-    if cluster_ca.exists():
-        parts.append(f"\n# Cloud-init Cluster CA\n{cluster_ca.read_text()}")
-        cert_count += 1
-        ok(f"Cluster CA: {cluster_ca}")
-    else:
-        info("Cluster CA: not injected (skipped)")
 
     if not parts:
         info("No CA certificates found, creating empty bundle")

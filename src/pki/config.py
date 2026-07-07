@@ -40,9 +40,6 @@ CA_BUNDLE = PKI_BUNDLE_DIR / "ca-bundle.crt"
 # System CA certificates (NixOS managed)
 SYSTEM_CA = Path("/etc/ssl/certs/ca-certificates.crt")
 
-# Cloud-init injected cluster CA
-CLUSTER_CA = Path("/etc/konductor/cluster-ca.crt")
-
 # Build fingerprint
 FINGERPRINT_PATH = Path("/.konductor")
 
