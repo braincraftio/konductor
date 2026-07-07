@@ -40,21 +40,23 @@ let
   # Upstream build.py hardcodes verbose `display -p` startup messages with no
   # config option to disable. Since init.tmux is our generated artifact (not
   # upstream code), we strip these from the output as a build post-process step.
-  whichKeyBuilt = pkgs.runCommand "konductor-tmux-which-key"
-    {
-      nativeBuildInputs = [ pkgs.python3 ];
-    } ''
-    mkdir -p $out
-    cp ${whichKeyConfig} $out/config.yaml
-    cp ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/build.py $out/
-    cp -rL ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/pyyaml $out/
-    cd $out
-    python3 build.py config.yaml init.tmux
+  whichKeyBuilt =
+    pkgs.runCommand "konductor-tmux-which-key"
+      {
+        nativeBuildInputs = [ pkgs.python3 ];
+      }
+      ''
+        mkdir -p $out
+        cp ${whichKeyConfig} $out/config.yaml
+        cp ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/build.py $out/
+        cp -rL ${pkgs.tmuxPlugins.tmux-which-key}/share/tmux-plugins/tmux-which-key/plugin/pyyaml $out/
+        cd $out
+        python3 build.py config.yaml init.tmux
 
-    # Strip verbose startup messages from generated output
-    # (upstream hardcodes these in build.py template with no disable option)
-    sed -i '/^display -p/d' init.tmux
-  '';
+        # Strip verbose startup messages from generated output
+        # (upstream hardcodes these in build.py template with no disable option)
+        sed -i '/^display -p/d' init.tmux
+      '';
 
   # Bashrc for tmux shells - SSOT with devshells, qcow2, OCI
   # Sources bash-completion first, then the hermetic Konductor bashrc
@@ -210,6 +212,42 @@ let
 
     Theme: Catppuccin Frappe (mauve accent)
     Press 'q' to close this help.
+  '';
+
+  # ===========================================================================
+  # OSC 52 CLIPBOARD SCRIPT
+  # ===========================================================================
+  # Emits OSC 52 escape sequences to set the terminal clipboard.
+  # Works universally across: ttyd (browser), kitty, alacritty, ghostty,
+  # iTerm2, WezTerm, foot, and any terminal supporting OSC 52.
+  # Eliminates dependency on xsel/wl-copy/pbcopy — the terminal itself
+  # handles clipboard access, including browser Clipboard API via ttyd.
+  #
+  # Used by tmux-yank via @override_copy_command and by extrakto via
+  # @extrakto_clip_tool. tmux's native set-clipboard also emits OSC 52,
+  # but copy-pipe (used by tmux-yank) replaces it — this script restores
+  # OSC 52 clipboard support through the copy-pipe pathway.
+
+  osc52clip = pkgs.writeShellScriptBin "osc52clip" ''
+    #!/usr/bin/env bash
+    # Read stdin, base64 encode, emit OSC 52 to set terminal clipboard.
+    # OSC 52 format: ESC ] 52 ; c ; <base64-data> ESC \
+    #   c = clipboard selection (vs p = primary)
+    #   ESC \ = ST (String Terminator)
+    #
+    # When running inside tmux, write to the tmux tty (the outer terminal)
+    # via the passthrough sequence so OSC 52 reaches the actual terminal
+    # emulator (ttyd, kitty, etc.) rather than being consumed by tmux.
+
+    data=$(cat)
+    encoded=$(printf '%s' "$data" | base64 -w 0 2>/dev/null || printf '%s' "$data" | base64 2>/dev/null)
+
+    if [ -n "$TMUX" ]; then
+      # tmux passthrough: ESC Ptmux; ESC <sequence> ESC \
+      printf '\ePtmux;\e\e]52;c;%s\e\e\\\e\\' "$encoded"
+    else
+      printf '\e]52;c;%s\e\\' "$encoded"
+    fi
   '';
 
   # ===========================================================================
@@ -540,7 +578,7 @@ let
     # Mnemonic: 'e' for extract
     set -g @extrakto_key "e"
     set -g @extrakto_split_size "15"
-    set -g @extrakto_clip_tool "auto"
+    set -g @extrakto_clip_tool "${osc52clip}/bin/osc52clip"
     set -g @extrakto_fzf_tool "${pkgs.fzf}/bin/fzf"
     set -g @extrakto_fzf_layout "reverse"
     set -g @extrakto_filter_order "word line path url quote"
@@ -552,9 +590,13 @@ let
     set -g @tmux-fzf-launch-key "F"
 
     # -------------------------------------------------------------------------
-    # tmux-yank: Enhanced clipboard
+    # tmux-yank: Enhanced clipboard via OSC 52
     # -------------------------------------------------------------------------
-    # Research: @yank_selection for keyboard, @yank_selection_mouse for mouse
+    # @override_copy_command takes priority over all platform detection
+    # (pbcopy, wl-copy, xsel, xclip). osc52clip emits OSC 52 escape
+    # sequences which work universally: ttyd (browser clipboard), kitty,
+    # alacritty, ghostty, iTerm2, WezTerm, foot, and any OSC 52 terminal.
+    set -g @override_copy_command '${osc52clip}/bin/osc52clip'
     set -g @yank_selection 'clipboard'
     set -g @yank_selection_mouse 'clipboard'
     set -g @yank_with_mouse 'on'
@@ -760,11 +802,11 @@ in
 
     # Dependencies
     pkgs.fzf
-  ] ++ lib.optionals pkgs.stdenv.isLinux [
-    pkgs.xsel
-    pkgs.wl-clipboard
-  ] ++ lib.optionals pkgs.stdenv.isDarwin [
-    pkgs.reattach-to-user-namespace
+
+    # OSC 52 clipboard — universal clipboard via terminal escape sequences.
+    # Replaces xsel/wl-clipboard/pbcopy with a single mechanism that works
+    # in ttyd (browser), SSH, and all modern terminal emulators.
+    osc52clip
   ];
 
   # No shell hook needed - all config is static Nix store paths
