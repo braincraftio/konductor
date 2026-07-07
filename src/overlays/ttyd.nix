@@ -70,13 +70,17 @@ else
         # Generate base64-encoded font CSS
         FONT_CSS="<style id=\"konductor-fonts\">"
 
-        # Regular weight
+        # Regular weight — local() preferred over embedded for better rendering
         FONT_CSS="$FONT_CSS
           @font-face {
             font-family: \"JetBrainsMono Nerd Font Mono\";
-            src: url(\"data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")\") format(\"truetype\");
+            src: local(\"JetBrainsMono Nerd Font Mono\"),
+                 local(\"JetBrainsMono NF Mono\"),
+                 local(\"JetBrainsMonoNerdFontMono-Regular\"),
+                 url(\"data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")\") format(\"truetype\");
             font-weight: normal;
             font-style: normal;
+            font-display: swap;
           }"
 
         # Bold weight (if available)
@@ -84,9 +88,13 @@ else
           FONT_CSS="$FONT_CSS
           @font-face {
             font-family: \"JetBrainsMono Nerd Font Mono\";
-            src: url(\"data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")\") format(\"truetype\");
+            src: local(\"JetBrainsMono Nerd Font Mono Bold\"),
+                 local(\"JetBrainsMono NF Mono Bold\"),
+                 local(\"JetBrainsMonoNerdFontMono-Bold\"),
+                 url(\"data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")\") format(\"truetype\");
             font-weight: bold;
             font-style: normal;
+            font-display: swap;
           }"
         fi
 
