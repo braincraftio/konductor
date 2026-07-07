@@ -242,11 +242,12 @@ let
     data=$(cat)
     encoded=$(printf '%s' "$data" | base64 -w 0 2>/dev/null || printf '%s' "$data" | base64 2>/dev/null)
 
-    # Always emit plain OSC 52. tmux with set-clipboard on intercepts
-    # OSC 52 from applications and forwards it to the outer terminal.
-    # DCS passthrough (\ePtmux;...\e\\) is not needed and ttyd's
-    # xterm.js does not process DCS-wrapped sequences.
-    printf '\e]52;c;%s\e\\' "$encoded"
+    # Write OSC 52 directly to the controlling terminal (/dev/tty).
+    # copy-pipe runs this command with stdin piped from the selection
+    # and stdout NOT connected to the terminal. Writing to stdout would
+    # send the escape sequence into tmux's pipe, not to ttyd/xterm.js.
+    # /dev/tty always refers to the controlling terminal of the process.
+    printf '\e]52;c;%s\e\\' "$encoded" > /dev/tty
   '';
 
   # ===========================================================================
