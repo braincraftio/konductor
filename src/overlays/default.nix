@@ -77,6 +77,7 @@
                         or "https://anthropic.gallery.vsassets.io/_apis/public/gallery/publisher/anthropic/extension/claude-code/${old.version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage";
                     sha256 = "sha256-Gd6AAiM1g5ZKhjE4JhGvmErI+aVZ3gmbd9PIl4ZvyhQ=";
                     extension = "zip";
+                    stripRoot = false;
                   };
                   # fetchzip unpacks to a directory; override sourceRoot since the
                   # default unpackVsixSetupHook expects a zip file, not a directory.
