@@ -22,16 +22,25 @@ else
     nerdFont = self.nerd-fonts.jetbrains-mono;
 
     # Font file path (Mono variant for single-width terminal glyphs)
-    # Structure: $out/share/fonts/truetype/NerdFonts/<fontDirName>/
     fontDir = "${nerdFont}/share/fonts/truetype/NerdFonts/JetBrainsMono";
+
+    # Yarn Berry offline cache for ttyd frontend rebuild
+    yarn-berry = self.yarn-berry_3;
+    ttydFrontendOfflineCache = yarn-berry.fetchYarnBerryDeps {
+      yarnLock = "${super.ttyd.src}/html/yarn.lock";
+      hash = "sha256-2VhypFRl195JJ9+AYDC/yZhLpFjKZcSLA1sZ25IYh1g=";
+    };
 
   in
   {
-    # Override ttyd with embedded fonts
     ttyd = super.ttyd.overrideAttrs (old: {
       pname = "ttyd-konductor";
 
-      # Patch template.html to inject @font-face declarations
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+        self.nodejs
+        yarn-berry
+      ];
+
       postPatch = (old.postPatch or "") + ''
         echo "Embedding Nerd Fonts into ttyd template..."
 
@@ -99,9 +108,41 @@ else
           echo "Fonts and OSC 52 clipboard handler injected into html/src/template.html"
         else
           echo "ERROR: html/src/template.html not found"
-          find . -name "template.html" -o -name "*.html" | head -10
           exit 1
         fi
+      '';
+
+      # Rebuild frontend with patched template.html
+      # The yarn project is in html/ subdirectory, not the source root.
+      # yarnBerryConfigHook assumes root — we run yarn install manually.
+      preBuild = ''
+        echo "Installing ttyd frontend dependencies..."
+        cd $NIX_BUILD_TOP/source/html
+
+        # Replicate yarnBerryConfigHook for subdirectory yarn project
+        export HOME=$(mktemp -d)
+        YARN_IGNORE_PATH=1 yarn config set enableTelemetry false
+        YARN_IGNORE_PATH=1 yarn config set enableGlobalCache false
+
+        rm -rf ./.yarn/cache
+        mkdir -p ./.yarn
+        cp -r --reflink=auto ${ttydFrontendOfflineCache}/cache ./.yarn/cache
+        chmod u+w -R ./.yarn/cache
+        if [ -d ${ttydFrontendOfflineCache}/checkouts ]; then
+          cp -r --reflink=auto ${ttydFrontendOfflineCache}/checkouts ./.yarn/checkouts
+          chmod u+w -R ./.yarn/checkouts
+        fi
+
+        YARN_IGNORE_PATH=1 yarn install --mode=skip-build --inline-builds
+        patchShebangs node_modules
+        YARN_IGNORE_PATH=1 yarn install --inline-builds
+
+        echo "Building ttyd frontend (webpack + gulp)..."
+        NODE_ENV=production npx webpack
+        npx gulp
+
+        cd $NIX_BUILD_TOP/source/build
+        echo "Frontend rebuilt — src/html.h regenerated"
       '';
 
       meta = old.meta // {
