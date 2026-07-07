@@ -1,7 +1,10 @@
 # src/packages/ai.nix
 # AI coding assistants and tools
 
-{ pkgs, config ? null }:
+{
+  pkgs,
+  config ? null,
+}:
 
 let
   # When the wrapped Claude harness is available (config provided), ship it:
@@ -18,8 +21,6 @@ in
   packages = [
     # Claude Code ecosystem
     claudeCode # Anthropic Claude Code CLI (konductor-wrapped when config present)
-    # unstable.claude-code-acp # ACP-compatible agent — removed from nixpkgs-unstable
-    pkgs.unstable.vscode-extensions.anthropic.claude-code # Official VS Code extension
 
     # Other AI assistants
     pkgs.codex # OpenAI Codex CLI

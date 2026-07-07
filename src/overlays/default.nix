@@ -61,31 +61,6 @@
         config.allowUnfree = true;
         overlays = [
           direnvCgoOverlay
-          # Fix non-deterministic VSIX hash for anthropic.claude-code.
-          # The VS Code Marketplace re-packages VSIX archives for the same version,
-          # changing zip metadata (timestamps, compression) without changing file
-          # contents. fetchurl hashes the raw archive and breaks on re-packaging.
-          # fetchzip unpacks first, strips metadata, then hashes contents — stable
-          # across re-packaging as long as the extension files are identical.
-          (_: uPrev: {
-            vscode-extensions = uPrev.vscode-extensions // {
-              anthropic = (uPrev.vscode-extensions.anthropic or { }) // {
-                claude-code = uPrev.vscode-extensions.anthropic.claude-code.overrideAttrs (old: {
-                  src = uPrev.fetchzip {
-                    url =
-                      old.src.url
-                        or "https://anthropic.gallery.vsassets.io/_apis/public/gallery/publisher/anthropic/extension/claude-code/${old.version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage";
-                    sha256 = "sha256-Gd6AAiM1g5ZKhjE4JhGvmErI+aVZ3gmbd9PIl4ZvyhQ=";
-                    extension = "zip";
-                    stripRoot = false;
-                  };
-                  # fetchzip unpacks to a directory; override sourceRoot since the
-                  # default unpackVsixSetupHook expects a zip file, not a directory.
-                  sourceRoot = ".";
-                });
-              };
-            };
-          })
         ];
       };
     }
