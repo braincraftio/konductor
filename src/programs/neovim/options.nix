@@ -11,7 +11,14 @@
     maplocalleader = "\\";
 
     # Root detection (LSP > git > cwd)
-    root_spec = [ "lsp" [ ".git" "lua" ] "cwd" ];
+    root_spec = [
+      "lsp"
+      [
+        ".git"
+        "lua"
+      ]
+      "cwd"
+    ];
 
     # Auto-format on save (can be toggled with <leader>uf)
     autoformat = true;

@@ -22,6 +22,10 @@ in
     # Claude Code ecosystem
     claudeCode # Anthropic Claude Code CLI (konductor-wrapped when config present)
 
+    # MCP servers referenced by the konductor plugin .mcp.json.
+    # These must be on PATH for the MCP config to resolve at runtime.
+    pkgs.mcp-nixos # NixOS/nixpkgs/home-manager package and option search
+
     # Other AI assistants
     pkgs.codex # OpenAI Codex CLI
     pkgs.github-copilot-cli # GitHub Copilot CLI

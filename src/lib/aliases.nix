@@ -11,8 +11,6 @@
   la = "eza -la";
   l = "eza -l";
   cat = "bat --paging=never";
-  grep = "rg";
-  find = "fd";
   top = "btm";
   du = "dust";
   # tree - removed, using wrapped eza --tree from src/config/tree/

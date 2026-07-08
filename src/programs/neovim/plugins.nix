@@ -650,14 +650,24 @@ in
     };
 
     # Seamless tmux ⇄ neovim pane navigation (christoomey/vim-tmux-navigator).
-    # Provides the C-hjkl / C-\ normal-mode mappings whose :TmuxNavigate*
-    # commands do wincmd first and shell out to `tmux select-pane` when
-    # already at the edge window — this is the "get back OUT of neovim"
-    # half. The tmux half (is_vim passthrough + @vim_navigator_mapping_*)
-    # is loaded in src/programs/tmux/default.nix.
-    # NOTE: the plain <C-w>h-style keymaps this replaces lived in
-    # keymaps.nix; re-adding C-hjkl maps there would shadow these.
-    tmux-navigator.enable = true;
+    # Provides the :TmuxNavigate* commands that do wincmd first and shell
+    # out to `tmux select-pane` when at the edge window. The tmux half
+    # (is_vim passthrough + @vim_navigator_mapping_*) is in tmux/default.nix.
+    #
+    # g:tmux_navigator_no_mappings = 1 (options.nix) disables the plugin's
+    # own key maps. All n-mode and t-mode C-hjkl maps are in keymaps.nix
+    # using <cmd> instead of the plugin's \<C-w>: which leaks command text
+    # into terminal programs (claude-code, opencode).
+    tmux-navigator = {
+      enable = true;
+      settings = {
+        # Disable the plugin's own key maps. Its t-mode maps use \<C-w>:
+        # which leaks command text into terminal programs (claude-code,
+        # opencode). All n-mode and t-mode C-hjkl maps are in keymaps.nix
+        # using <cmd> which bypasses terminal input entirely.
+        no_mappings = 1;
+      };
+    };
 
     # =========================================================================
     # CODING LAYER

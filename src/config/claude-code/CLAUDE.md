@@ -56,12 +56,10 @@ not "whatever npm resolved."
 The same closure that ships `claude` ships its toolchain and its assets together.
 There is no version skew and no "tool might be missing" branch:
 
-- `rg`, `fd`, and the `eza`-backed `tree` are in the **same flake closure** as the
-  wrapped `claude`. A session that has this harness has those tools, by
-  construction.
-- `grep` and `find` on PATH are konductor **alias-wrappers that `exec` `rg`/`fd`**
-  (see `src/lib/alias-wrappers.nix`). `cat` is `bat` when interactive. There is no
-  GNU-grep fallback to write defensively for.
+- `rg`, `fd`, `grep` (GNU), `find` (GNU findutils), and the `eza`-backed `tree`
+  are all in the **same flake closure** as the wrapped `claude`. Both modern and
+  traditional tools are on PATH — use whichever has the right semantics for the
+  task. `cat` is `bat` when interactive.
 - A plugin asset **cannot load in a session that lacks these tools**, because the
   closure that carries the asset carries the tools.
 

@@ -113,10 +113,56 @@ _:
       action = ">gv";
     }
 
-    # Terminal navigation — TmuxNavigate* (not plain wincmd) so the tmux
-    # edge handoff also works from terminal buffers (Snacks terminal,
-    # Claude/OpenCode panels). The plugin's default maps cover normal mode
-    # only; t-mode needs these explicit maps.
+    # Tmux ⇄ Neovim navigation — all modes explicit.
+    # g:tmux_navigator_no_mappings = 1 (options.nix) disables the plugin's
+    # own maps because its t-mode maps use \<C-w>: which leaks command text
+    # into terminal programs (claude-code, opencode). We set both n-mode
+    # and t-mode maps here using <cmd> which bypasses terminal input.
+    {
+      mode = "n";
+      key = "<C-h>";
+      action = "<cmd>TmuxNavigateLeft<CR>";
+      options = {
+        desc = "Go to left window/pane";
+        silent = true;
+      };
+    }
+    {
+      mode = "n";
+      key = "<C-j>";
+      action = "<cmd>TmuxNavigateDown<CR>";
+      options = {
+        desc = "Go to lower window/pane";
+        silent = true;
+      };
+    }
+    {
+      mode = "n";
+      key = "<C-k>";
+      action = "<cmd>TmuxNavigateUp<CR>";
+      options = {
+        desc = "Go to upper window/pane";
+        silent = true;
+      };
+    }
+    {
+      mode = "n";
+      key = "<C-l>";
+      action = "<cmd>TmuxNavigateRight<CR>";
+      options = {
+        desc = "Go to right window/pane";
+        silent = true;
+      };
+    }
+    {
+      mode = "n";
+      key = "<C-\\>";
+      action = "<cmd>TmuxNavigatePrevious<CR>";
+      options = {
+        desc = "Go to previous window/pane";
+        silent = true;
+      };
+    }
     {
       mode = "t";
       key = "<C-h>";

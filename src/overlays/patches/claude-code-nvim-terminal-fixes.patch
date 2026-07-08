@@ -1,0 +1,74 @@
+Three upstream bug fixes for greggh/claude-code.nvim (pinned at 55c0cb5):
+
+1. E444 "Cannot close last window" — handle_existing_instance calls
+   nvim_win_close without pcall. When the claude split is the only
+   window, toggle crashes. (unfiled upstream)
+
+2. TermClose "Invalid buffer id" — TermClose callback calls
+   nvim_buf_get_name on a buffer that may already be invalid.
+   (issue #124, PR #132 open unreviewed)
+
+3. Duplicate terminal buffer in split mode — split path uses :terminal
+   on the inherited buffer instead of creating a dedicated buffer via
+   nvim_create_buf + termopen like the float path does.
+   (issue #121, no PR)
+
+--- a/lua/claude-code/file_refresh.lua
++++ b/lua/claude-code/file_refresh.lua
+@@ -101,6 +101,7 @@
+     group = augroup,
+     pattern = '*',
+     callback = function(args)
++      if not vim.api.nvim_buf_is_valid(args.buf) then return end
+       local buf_name = vim.api.nvim_buf_get_name(args.buf)
+       if buf_name:match('claude%-code') then
+         vim.o.updatetime = claude_code.claude_code.saved_updatetime
+--- a/lua/claude-code/terminal.lua
++++ b/lua/claude-code/terminal.lua
+@@ -295,7 +295,7 @@
+   if #win_ids > 0 then
+     -- Claude Code is visible, close the window
+     for _, win_id in ipairs(win_ids) do
+-      vim.api.nvim_win_close(win_id, true)
++      pcall(vim.api.nvim_win_close, win_id, true)
+     end
+   else
+     -- Claude Code buffer exists but is not visible, open it in a split or float
+@@ -352,26 +352,30 @@
+       vim.cmd 'startinsert'
+     end
+   else
+-    -- Regular split window
+-    create_split(config.window.position, config)
++    -- Regular split window: create a dedicated buffer first to avoid
++    -- sharing the original window's buffer (vsplit makes both windows
++    -- display the same terminal). Matches the float code path.
++    local new_bufnr = vim.api.nvim_create_buf(false, true) -- unlisted, scratch
++    vim.api.nvim_set_option_value('bufhidden', 'hide', {buf = new_bufnr})
++
++    create_split(config.window.position, config, new_bufnr)
+
+     -- Determine if we should use the git root directory
+     local base_cmd = build_command_with_git_root(config, git, config.command)
+-    local cmd = 'terminal ' .. base_cmd
+
+-    vim.cmd(cmd)
+-    vim.cmd 'setlocal bufhidden=hide'
++    -- Run terminal in the dedicated buffer
++    vim.fn.termopen(base_cmd)
+
+     -- Create a unique buffer name
+     local buffer_name = generate_buffer_name(instance_id, config)
+-    vim.cmd('file ' .. buffer_name)
++    vim.api.nvim_buf_set_name(new_bufnr, buffer_name)
+
+     -- Configure window options using helper function
+     local current_win = vim.api.nvim_get_current_win()
+     configure_window_options(current_win, config)
+
+     -- Store buffer number for this instance
+-    claude_code.claude_code.instances[instance_id] = vim.fn.bufnr('%')
++    claude_code.claude_code.instances[instance_id] = new_bufnr
+
+     -- Automatically enter insert mode in terminal unless configured to start in normal mode
+     if config.window.enter_insert and not config.window.start_in_normal_mode then

@@ -43,13 +43,15 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out/bin
 
     # Create wrapper scripts for each alias
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: command: ''
-      command cat > $out/bin/${name} << 'WRAPPER'
-    #!/usr/bin/env bash
-    exec ${command} "$@"
-    WRAPPER
-      chmod +x $out/bin/${name}
-    '') aliases)}
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: command: ''
+          command cat > $out/bin/${name} << 'WRAPPER'
+        #!/usr/bin/env bash
+        exec ${command} "$@"
+        WRAPPER
+          chmod +x $out/bin/${name}
+      '') aliases
+    )}
 
     # Smart cat wrapper: bat for interactive file viewing, plain cat otherwise
     # Use bat only when BOTH stdin and stdout are TTYs (interactive terminal)
@@ -63,46 +65,6 @@ pkgs.stdenv.mkDerivation {
     fi
     CATWRAPPER
     chmod +x $out/bin/cat
-
-    # Smart grep wrapper: use ripgrep with GNU grep flag compatibility
-    # Handles combined short flags like -qE, -Eq, -iE, etc.
-    # Strips -E (extended regex) since rg uses extended regex by default
-    # Strips -G (basic regex) since rg doesn't support it (falls back gracefully)
-    # Maps -F to --fixed-strings, -P to --pcre2
-    command cat > $out/bin/grep << 'GREPWRAPPER'
-    #!/usr/bin/env bash
-    args=()
-    for arg in "$@"; do
-      case "$arg" in
-        # Long flags - handle directly
-        --extended-regexp) ;; # rg uses extended regex by default
-        --basic-regexp) ;;    # unsupported, silently ignore
-        --fixed-strings) args+=("--fixed-strings") ;;
-        --perl-regexp) args+=("--pcre2") ;;
-        # Short flags starting with dash - may be combined
-        -*)
-          # Strip E and G from combined short flags, translate F and P
-          cleaned=$(echo "$arg" | sed 's/E//g; s/G//g')
-          # Handle -F and -P translations
-          if [[ "$arg" == *F* ]]; then
-            args+=("--fixed-strings")
-            cleaned=$(echo "$cleaned" | sed 's/F//g')
-          fi
-          if [[ "$arg" == *P* ]]; then
-            args+=("--pcre2")
-            cleaned=$(echo "$cleaned" | sed 's/P//g')
-          fi
-          # If anything remains after stripping (e.g., -q, -i, -n, etc.), keep it
-          if [[ "$cleaned" != "-" && -n "$cleaned" ]]; then
-            args+=("$cleaned")
-          fi
-          ;;
-        *) args+=("$arg") ;;
-      esac
-    done
-    exec ${pkgs.ripgrep}/bin/rg "''${args[@]}"
-    GREPWRAPPER
-    chmod +x $out/bin/grep
 
     # Generate completions for kubectl wrapper (k)
     # kubectl completion bash generates the full completion script

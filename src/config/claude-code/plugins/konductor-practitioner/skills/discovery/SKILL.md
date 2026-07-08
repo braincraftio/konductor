@@ -69,25 +69,27 @@ Surveying in these cases is waste: it spends latency and floods the context wind
 with breadth irrelevant to the task, which degrades the reasoning that follows.
 Match survey breadth to the task; do not run a full-depth tree to touch one line.
 
-## The toolchain is the same binary — use whichever reads clearly
+## The toolchain — modern and traditional tools coexist
 
-In the konductor closure `grep` and `find` on PATH are alias-wrappers that `exec`
-`rg` and `fd`. `cat` is `bat` when interactive. There is no GNU-tool fallback and
-no portability question — `rg`/`fd`/`tree` are in the same flake closure as
-`claude` and are always present.
+In the konductor closure `rg`, `fd`, `grep` (GNU), `find` (GNU findutils), and
+`tree` (eza-backed) are all on PATH. `cat` is `bat` when interactive. Use the
+tool whose semantics match the task:
 
-So the point is never the *spelling*, it is the *semantics*:
+- **`rg`** — ignore-aware, skips hidden files by default. Fast for code search.
+  A trap when the thing you seek is gitignored or hidden.
+- **`fd`** — ignore-aware, skips hidden by default, smart-case, regex by default
+  (`-g` for glob), `-t f|d|l` to filter by type.
+- **`grep`** — GNU grep. Standard POSIX/GNU flag syntax (`-E`, `-r`, `-l`, `-o`).
+  Use when piping streams, when the command is documented with grep flags, or
+  when you need GNU-specific behavior.
+- **`find`** — GNU findutils. Standard `-name`, `-type`, `-maxdepth`, `-exec`.
+  Use for filesystem traversal with GNU find semantics.
+- **`tree`** — `eza --tree` with `--git-ignore` + `.treeignore`, depth 6.
 
-- **`rg`** is ignore-aware and skips hidden files by default. That is usually what
-  you want; it is a trap when the thing you seek is gitignored or hidden.
-- **`fd`** is ignore-aware and skips hidden by default, smart-case, regex by
-  default (`-g` for glob), `-t f|d|l` to filter by type.
-- **`tree`** is `eza --tree` with `--git-ignore` + `.treeignore`, depth 6.
-
-Use `grep`/`find` spellings freely when they read more clearly or you are matching
-a documented command — they resolve to the same tools. Do not contort a clear
-`grep -o` on a stream into an awkward `rg` form to satisfy a spelling rule. There
-is no spelling rule. There is a semantics rule, below.
+Use the tool that reads clearly for the task. `rg` and `fd` are preferred for
+code search and file discovery (ignore-aware defaults are usually correct).
+`grep` and `find` are preferred when piping, when matching documented commands,
+or when GNU flag compatibility matters.
 
 ## Ignore-blindness — the load-bearing caveat
 
@@ -161,6 +163,6 @@ fd -H -u name                 # include hidden + ignored
 | Survey-first for a single known-target lookup | One `rg`/`fd` is the task |
 | "Ran tree, saw everything" while assets are hidden | `tree -a` / `--raw` when target may be ignored |
 | Unconditional `--no-ignore --hidden` flooding context | Filtered first; escalate only when target may be hidden |
-| Contorting `grep -o` into awkward `rg` for a spelling rule | Use the clear spelling; they exec the same binary |
+| Using `grep` when `rg` is clearer (or vice versa) for the task | Use the tool whose semantics match: `rg` for code search, `grep` for pipes/GNU flags |
 | Subagent dumps raw tree to the parent | Return the conclusion, cite paths |
 | Subagent reports "not present" without enumerating | Back it with a survey incl. hidden set |

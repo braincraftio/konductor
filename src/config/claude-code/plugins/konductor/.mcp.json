@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "nixos": {
+      "command": "mcp-nixos",
+      "args": []
+    }
+  }
+}
