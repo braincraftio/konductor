@@ -187,6 +187,28 @@ _:
       action = "<cmd>TmuxNavigateRight<CR>";
       options.desc = "Go to right window/pane";
     }
+    # Terminal scrolling — <C-u>/<C-d> (half-page) instead of <C-b>/<C-f>
+    # (full-page). <C-b> collides with Claude Code CLI's "background
+    # command" keybinding; <C-f> disabled for symmetry. These exit terminal
+    # mode, scroll, then re-enter insert mode.
+    {
+      mode = "t";
+      key = "<C-u>";
+      action = "<C-\\><C-n><C-u>i";
+      options = {
+        desc = "Scroll half-page up";
+        silent = true;
+      };
+    }
+    {
+      mode = "t";
+      key = "<C-d>";
+      action = "<C-\\><C-n><C-d>i";
+      options = {
+        desc = "Scroll half-page down";
+        silent = true;
+      };
+    }
     # <Esc><Esc>: In AI buffers, toggle off; otherwise exit terminal mode
     {
       mode = "t";

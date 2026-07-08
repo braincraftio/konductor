@@ -914,13 +914,19 @@ in
         keymaps = {
           toggle = {
             normal = false; # Using <leader>vv from keymaps.nix
-            terminal = "<C-o>"; # Interrupt/close Claude from terminal mode
+            # OFF: <C-o> collides with Claude Code CLI's conversation
+            # details keybinding. Use <Esc><Esc> (keymaps.nix) to toggle
+            # the claude panel from terminal mode instead.
+            terminal = false;
           };
-          # OFF: claude-code's buffer-local C-hjkl wincmd maps would shadow
-          # the global t-mode TmuxNavigate* maps (keymaps.nix) and break the
-          # tmux edge handoff from inside the Claude panel.
+          # OFF: buffer-local C-hjkl wincmd maps shadow the global t-mode
+          # TmuxNavigate* maps (keymaps.nix) and break tmux edge handoff.
           window_navigation = false;
-          scrolling = true;
+          # OFF: <C-b> (page-up) collides with Claude Code CLI's
+          # "background running command" keybinding. <C-f> disabled for
+          # symmetry. Use <C-u>/<C-d> (half-page) in keymaps.nix instead,
+          # or <Esc><Esc> to exit terminal mode then scroll normally.
+          scrolling = false;
         };
       };
     };
