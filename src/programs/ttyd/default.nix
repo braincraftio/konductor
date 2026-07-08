@@ -23,6 +23,18 @@
 #   --port 7681          Standard web terminal port
 #   --max-clients 10     Reasonable session limit
 #   --interface 0.0.0.0  Bind all interfaces
+#   --check-origin       Refuse cross-origin WebSocket (disable via env below)
+#
+# Config-driven options (systemd EnvironmentFile from konductor-init, or export):
+#   KONDUCTOR_TTYD_CHECK_ORIGIN=true|false        default true
+#   KONDUCTOR_TTYD_ENABLE_SIXEL=true|false        default false (inline images)
+#   KONDUCTOR_TTYD_ENABLE_TRZSZ=true|false        default false (drag-drop transfer)
+#   KONDUCTOR_TTYD_TRZSZ_DRAG_TIMEOUT=<ms>        default 3000
+#   KONDUCTOR_TTYD_DISABLE_LEAVE_ALERT=true|false default false
+#   KONDUCTOR_TTYD_TITLE=<string>                 unset (fixed browser title)
+#   KONDUCTOR_TTYD_AUTH_HEADER=<header-name>      unset (-H; auth proxy identity —
+#     enable ONLY behind an authenticating proxy that strips/sets this header,
+#     ttyd returns 407 for requests without it)
 #
 # Reference:
 #   https://github.com/tsl0922/ttyd
@@ -35,36 +47,11 @@ let
   # ===========================================================================
   # CATPPUCCIN FRAPPÉ THEME (xterm.js ITheme)
   # ===========================================================================
-  # https://catppuccin.com/palette
+  # SSOT: src/lib/theme.nix — do not add hex literals here.
   # Matches: tmux, neovim, opencode configs in this repo
 
-  catppuccinFrappe = {
-    # Base colors
-    background = "#303446"; # base
-    foreground = "#c6d0f5"; # text
-    cursor = "#f2d5cf"; # rosewater
-    cursorAccent = "#303446"; # base
-    selectionBackground = "#626880"; # surface2
-    selectionForeground = "#c6d0f5"; # text
-    # ANSI Normal (0-7)
-    black = "#51576d"; # surface1
-    red = "#e78284"; # red
-    green = "#a6d189"; # green
-    yellow = "#e5c890"; # yellow
-    blue = "#8caaee"; # blue
-    magenta = "#ca9ee6"; # mauve
-    cyan = "#81c8be"; # teal
-    white = "#b5bfe2"; # subtext1
-    # ANSI Bright (8-15)
-    brightBlack = "#626880"; # surface2
-    brightRed = "#e78284"; # red
-    brightGreen = "#a6d189"; # green
-    brightYellow = "#e5c890"; # yellow
-    brightBlue = "#8caaee"; # blue
-    brightMagenta = "#f4b8e4"; # pink
-    brightCyan = "#99d1db"; # sky
-    brightWhite = "#c6d0f5"; # text
-  };
+  konductorTheme = import ../../lib/theme.nix;
+  catppuccinFrappe = konductorTheme.xterm;
 
   # Convert theme to JSON string for ttyd -t option
   themeJson = builtins.toJSON catppuccinFrappe;
@@ -116,6 +103,7 @@ let
     HAS_CWD=false
     HAS_MAX_CLIENTS=false
     HAS_WRITABLE=false
+    HAS_CHECK_ORIGIN=false
 
     # Collect user-provided ttyd flags
     USER_FLAGS=()
@@ -167,13 +155,21 @@ let
           USER_FLAGS+=("$1" "$2")
           shift 2
           ;;
+        # check-origin: tracked so the wrapper default doesn't duplicate it
+        -O|--check-origin)
+          HAS_CHECK_ORIGIN=true
+          USER_FLAGS+=("$1")
+          shift
+          ;;
         # Options that take a value (pass through)
-        -c|--credential|-H|--auth-header|-u|--uid|-g|--gid|-s|--signal|-a|--url-arg|-t|--client-option|-T|--terminal-type|-b|--base-path|-P|--ping-interval|-C|--ssl-cert|-K|--ssl-key|-A|--ssl-ca|-U|--socket-owner|-d|--debug)
+        # NOTE: -a/--url-arg is NOT here — it is no_argument in ttyd's getopt
+        # table (server.c); listing it as value-taking swallowed the next arg.
+        -c|--credential|-H|--auth-header|-u|--uid|-g|--gid|-s|--signal|-t|--client-option|-T|--terminal-type|-b|--base-path|-P|--ping-interval|-f|--srv-buf-size|-C|--ssl-cert|-K|--ssl-key|-A|--ssl-ca|-U|--socket-owner|-d|--debug)
           USER_FLAGS+=("$1" "$2")
           shift 2
           ;;
         # Boolean flags (pass through)
-        -O|--check-origin|-o|--once|-q|--exit-no-conn|-B|--browser|-6|--ipv6|-S|--ssl|-v|--version|-h|--help)
+        -a|--url-arg|-o|--once|-q|--exit-no-conn|-B|--browser|-6|--ipv6|-S|--ssl|-v|--version|-h|--help)
           USER_FLAGS+=("$1")
           shift
           ;;
@@ -220,7 +216,64 @@ let
       -t "scrollback=10000"
     )
 
+    # =========================================================================
+    # Config-driven options (KONDUCTOR_TTYD_* environment)
+    # =========================================================================
+    # Set by konductor-init orchestrator via systemd EnvironmentFile
+    # (/var/lib/konductor/services.toml), or exported manually.
+    # Invalid values are hard errors (EX_USAGE) — no silent fallback.
+    require_bool() {
+      case "$2" in
+        true|false) return 0 ;;
+        *)
+          echo "ttyd-konductor: invalid $1='$2' (valid: true, false)" >&2
+          exit 64
+          ;;
+      esac
+    }
+
+    CHECK_ORIGIN="''${KONDUCTOR_TTYD_CHECK_ORIGIN:-true}"
+    ENABLE_SIXEL="''${KONDUCTOR_TTYD_ENABLE_SIXEL:-false}"
+    ENABLE_TRZSZ="''${KONDUCTOR_TTYD_ENABLE_TRZSZ:-false}"
+    DISABLE_LEAVE_ALERT="''${KONDUCTOR_TTYD_DISABLE_LEAVE_ALERT:-false}"
+    TRZSZ_DRAG_TIMEOUT="''${KONDUCTOR_TTYD_TRZSZ_DRAG_TIMEOUT:-3000}"
+    require_bool KONDUCTOR_TTYD_CHECK_ORIGIN "$CHECK_ORIGIN"
+    require_bool KONDUCTOR_TTYD_ENABLE_SIXEL "$ENABLE_SIXEL"
+    require_bool KONDUCTOR_TTYD_ENABLE_TRZSZ "$ENABLE_TRZSZ"
+    require_bool KONDUCTOR_TTYD_DISABLE_LEAVE_ALERT "$DISABLE_LEAVE_ALERT"
+    case "$TRZSZ_DRAG_TIMEOUT" in
+      ""|*[!0-9]*)
+        echo "ttyd-konductor: invalid KONDUCTOR_TTYD_TRZSZ_DRAG_TIMEOUT='$TRZSZ_DRAG_TIMEOUT' (positive integer, milliseconds)" >&2
+        exit 64
+        ;;
+    esac
+
+    # check-origin: refuse WebSocket connections whose Origin != Host.
+    # WebSockets are exempt from CORS — without this, any website a user
+    # visits can open wss:// to this port from their browser.
+    if ! $HAS_CHECK_ORIGIN && [ "$CHECK_ORIGIN" = "true" ]; then
+      FINAL_ARGS+=("--check-origin")
+    fi
+
+    if [ "$ENABLE_SIXEL" = "true" ]; then
+      FINAL_ARGS+=(-t "enableSixel=true")
+    fi
+    if [ "$ENABLE_TRZSZ" = "true" ]; then
+      FINAL_ARGS+=(-t "enableTrzsz=true" -t "trzszDragInitTimeout=$TRZSZ_DRAG_TIMEOUT")
+    fi
+    if [ "$DISABLE_LEAVE_ALERT" = "true" ]; then
+      FINAL_ARGS+=(-t "disableLeaveAlert=true")
+    fi
+    if [ -n "''${KONDUCTOR_TTYD_TITLE:-}" ]; then
+      FINAL_ARGS+=(-t "titleFixed=''${KONDUCTOR_TTYD_TITLE}")
+    fi
+    if [ -n "''${KONDUCTOR_TTYD_AUTH_HEADER:-}" ]; then
+      FINAL_ARGS+=(-H "''${KONDUCTOR_TTYD_AUTH_HEADER}")
+    fi
+
     # Add user-provided flags
+    # Client options merge last-wins server-side (json_object_object_add),
+    # so user -t values override wrapper/env-provided ones.
     FINAL_ARGS+=("''${USER_FLAGS[@]}")
 
     # Default command: login shell

@@ -26,36 +26,23 @@ let
   # ===========================================================================
   # CATPPUCCIN FRAPPE THEME (exported for NixOS module)
   # ===========================================================================
-  # https://catppuccin.com/palette
-  # Matches: tmux, neovim, opencode, ttyd configs in this repo
+  # SSOT: src/lib/theme.nix — do not add hex literals here.
+  # Note: selectionBackground unified to solid surface2 (was rgba overlay1
+  # @ 30%) for parity with ttyd's xterm.js selection rendering.
 
-  catppuccinFrappe = {
-    # Base colors
-    background = "#303446"; # base
-    foreground = "#c6d0f5"; # text
-    cursor = "#f2d5cf"; # rosewater
-    cursorAccent = "#303446"; # base
-    selectionBackground = "rgba(131, 139, 167, 0.3)"; # overlay1 @ 30%
-    selectionForeground = "#c6d0f5"; # text
-    # ANSI Normal (0-7)
-    black = "#51576d"; # surface1
-    red = "#e78284"; # red
-    green = "#a6d189"; # green
-    yellow = "#e5c890"; # yellow
-    blue = "#8caaee"; # blue
-    magenta = "#ca9ee6"; # mauve
-    cyan = "#81c8be"; # teal
-    white = "#b5bfe2"; # subtext1
-    # ANSI Bright (8-15)
-    brightBlack = "#626880"; # surface2
-    brightRed = "#e78284"; # red
-    brightGreen = "#a6d189"; # green
-    brightYellow = "#e5c890"; # yellow
-    brightBlue = "#8caaee"; # blue
-    brightMagenta = "#f4b8e4"; # pink
-    brightCyan = "#99d1db"; # sky
-    brightWhite = "#c6d0f5"; # text
-  };
+  konductorTheme = import ../../lib/theme.nix;
+  catppuccinFrappe = konductorTheme.xterm;
+
+  # CSS custom properties (--ctp-*) generated from the palette, injected
+  # into index.html's :root at build time (@konductorThemeCssVars@).
+  themeCssVars = lib.concatStringsSep "\n      " (
+    lib.mapAttrsToList (name: value: "--ctp-${name}: ${value};") konductorTheme.palette
+  );
+
+  # xterm.js ITheme JSON — injected into the Terminal() constructor
+  # at build time (@konductorTerminalThemeJson@). Eliminates the 20
+  # hardcoded hex values that were an SSOT violation (Finding 3).
+  terminalThemeJson = builtins.toJSON konductorTheme.xterm;
 
   # ===========================================================================
   # FONT CONFIGURATION
@@ -116,7 +103,10 @@ let
     src = ./.;
 
     # Hash for npm dependencies (node-pty + ws)
-    # Regenerate with: nix-build -E 'let pkgs = import <nixpkgs> {}; in (import ./src/programs/ghostty-web { inherit pkgs; inherit (pkgs) lib; }).server'
+    # Regenerate: set to pkgs.lib.fakeHash, rebuild, copy the "got:" hash:
+    #   nix build --impure --expr '((import ./src/programs/ghostty-web) {
+    #     pkgs = (builtins.getFlake ("path:" + toString ./.)).inputs.nixpkgs.legacyPackages.x86_64-linux;
+    #     inherit ((builtins.getFlake ("path:" + toString ./.)).inputs.nixpkgs.legacyPackages.x86_64-linux) lib; }).server'
     npmDepsHash = "sha256-hF4d0Gm+JklEOB6t/zMtTZHSl7Tnk2WehhE0iUFOQHw=";
 
     # Native module build requirements for node-pty
@@ -158,49 +148,81 @@ let
         exit 1
       fi
 
-      # Find font files
-      REGULAR_FONT=$(find ${fontDir} -name "*Regular*.ttf" | head -1)
-      BOLD_FONT=$(find ${fontDir} -name "*Bold*.ttf" | grep -v "Italic" | head -1)
-
-      if [ -z "$REGULAR_FONT" ]; then
-        echo "ERROR: Could not find Regular font in ${fontDir}"
-        exit 1
-      fi
-
-      echo "Using fonts:"
-      echo "  Regular: $REGULAR_FONT"
-      echo "  Bold: $BOLD_FONT"
+      # Exact font files — deterministic selection. Globs (*Regular*.ttf)
+      # match the Propo (proportional) and NL (no-ligature) families too,
+      # and `find | head -1` returns filesystem enumeration order.
+      REGULAR_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Regular.ttf"
+      BOLD_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Bold.ttf"
+      ITALIC_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Italic.ttf"
+      BOLD_ITALIC_FONT="${fontDir}/JetBrainsMonoNerdFontMono-BoldItalic.ttf"
+      for f in "$REGULAR_FONT" "$BOLD_FONT" "$ITALIC_FONT" "$BOLD_ITALIC_FONT"; do
+        if [ ! -f "$f" ]; then
+          echo "ERROR: Font file not found: $f"
+          ls -la ${fontDir}/
+          exit 1
+        fi
+      done
 
       # Copy index.html and make it writable
       cp ${./index.html} $out/lib/ghostty-web/static/index.html
       chmod +w $out/lib/ghostty-web/static/index.html
 
-      # Generate embedded font CSS and inject into index.html
+      # Theme CSS variables from src/lib/theme.nix (SSOT)
+      substituteInPlace $out/lib/ghostty-web/static/index.html \
+        --replace-fail '@konductorThemeCssVars@' '${themeCssVars}'
+
+      # Terminal theme JSON from src/lib/theme.nix (SSOT)
+      substituteInPlace $out/lib/ghostty-web/static/index.html \
+        --replace-fail '@konductorTerminalThemeJson@' '${terminalThemeJson}'
+
+      # Generate embedded font CSS and inject into index.html.
+      # local() preferred over embedded (OS rasterizer, full hinting);
+      # embedded base64 is the airgap fallback. font-display: swap avoids FOIT.
       EMBEDDED_FONTS="<!-- Embedded JetBrains Mono Nerd Font (build-time, airgap-safe) -->
         <style id=\"konductor-embedded-fonts\">
           @font-face {
             font-family: 'JetBrainsMono Nerd Font Mono';
-            src: url('data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")') format('truetype');
+            src: local('JetBrainsMono Nerd Font Mono'),
+                 local('JetBrainsMonoNerdFontMono-Regular'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")') format('truetype');
             font-weight: normal;
             font-style: normal;
-          }"
-
-      if [ -n "$BOLD_FONT" ]; then
-        EMBEDDED_FONTS="$EMBEDDED_FONTS
+            font-display: swap;
+          }
           @font-face {
             font-family: 'JetBrainsMono Nerd Font Mono';
-            src: url('data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")') format('truetype');
+            src: local('JetBrainsMono Nerd Font Mono Bold'),
+                 local('JetBrainsMonoNerdFontMono-Bold'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")') format('truetype');
             font-weight: bold;
             font-style: normal;
-          }"
-      fi
-
-      EMBEDDED_FONTS="$EMBEDDED_FONTS
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'JetBrainsMono Nerd Font Mono';
+            src: local('JetBrainsMono Nerd Font Mono Italic'),
+                 local('JetBrainsMonoNerdFontMono-Italic'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$ITALIC_FONT")') format('truetype');
+            font-weight: normal;
+            font-style: italic;
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'JetBrainsMono Nerd Font Mono';
+            src: local('JetBrainsMono Nerd Font Mono Bold Italic'),
+                 local('JetBrainsMonoNerdFontMono-BoldItalic'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$BOLD_ITALIC_FONT")') format('truetype');
+            font-weight: bold;
+            font-style: italic;
+            font-display: swap;
+          }
         </style>"
 
-      # Inject before </head> tag
+      # Inject at the explicit placeholder (not the closing-head tag —
+      # substituteInPlace replaces every occurrence of its pattern, so
+      # structural HTML tokens are unsafe anchors)
       substituteInPlace $out/lib/ghostty-web/static/index.html \
-        --replace '</head>' "$EMBEDDED_FONTS</head>"
+        --replace-fail '@konductorEmbeddedFonts@' "$EMBEDDED_FONTS"
 
       echo "Fonts embedded successfully"
 

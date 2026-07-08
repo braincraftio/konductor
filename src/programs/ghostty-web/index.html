@@ -4,20 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Konductor Terminal</title>
-  <!-- JetBrains Mono from Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* Nerd Font Symbols for TUI icons (tmux, neovim, lazygit, starship, etc.) */
-    @font-face {
-      font-family: 'Symbols Nerd Font Mono';
-      src: url('https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@v3.3.0/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFontMono-Regular.ttf') format('truetype');
-      font-weight: normal;
-      font-style: normal;
-      font-display: swap;
-    }
-  </style>
+  <!-- JetBrainsMono Nerd Font Mono, embedded at build time from
+       src/lib/theme.nix-adjacent font config in default.nix.
+       Airgap-safe: no CDN fetches; Nerd Font glyphs are in the
+       patched Mono faces. -->
+  @konductorEmbeddedFonts@
   <style>
     * {
       margin: 0;
@@ -27,38 +18,12 @@
 
     /* =======================================================================
      * Catppuccin Frappé Theme
-     * https://catppuccin.com/palette
-     * Matches: tmux, neovim, opencode configs in this repo
+     * Generated at build time from src/lib/theme.nix (SSOT) — the
+     * placeholder below is replaced by default.nix installPhase.
+     * Do not hand-write hex values here.
      * ======================================================================= */
     :root {
-      /* Base colors */
-      --ctp-rosewater: #f2d5cf;
-      --ctp-flamingo: #eebebe;
-      --ctp-pink: #f4b8e4;
-      --ctp-mauve: #ca9ee6;
-      --ctp-red: #e78284;
-      --ctp-maroon: #ea999c;
-      --ctp-peach: #ef9f76;
-      --ctp-yellow: #e5c890;
-      --ctp-green: #a6d189;
-      --ctp-teal: #81c8be;
-      --ctp-sky: #99d1db;
-      --ctp-sapphire: #85c1dc;
-      --ctp-blue: #8caaee;
-      --ctp-lavender: #babbf1;
-      /* Surface colors */
-      --ctp-text: #c6d0f5;
-      --ctp-subtext1: #b5bfe2;
-      --ctp-subtext0: #a5adce;
-      --ctp-overlay2: #949cbb;
-      --ctp-overlay1: #838ba7;
-      --ctp-overlay0: #737994;
-      --ctp-surface2: #626880;
-      --ctp-surface1: #51576d;
-      --ctp-surface0: #414559;
-      --ctp-base: #303446;
-      --ctp-mantle: #292c3c;
-      --ctp-crust: #232634;
+      @konductorThemeCssVars@
     }
 
     html, body {
@@ -184,41 +149,14 @@
         return;
       }
 
-      // Catppuccin Frappé terminal theme
-      // Matches tmux, neovim, opencode configs
-      // Font: JetBrainsMono Nerd Font Mono embedded at build time (airgap-safe)
+      // Terminal theme — injected at build time from src/lib/theme.nix (SSOT).
+      // Font: JetBrainsMono Nerd Font Mono embedded at build time (airgap-safe).
       const terminal = new Terminal({
         cursorBlink: true,
         fontSize: 14,
-        fontFamily: "'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace",
+        fontFamily: "'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', monospace",
         scrollback: 10000,
-        theme: {
-          // Base colors
-          background: '#303446',    // base
-          foreground: '#c6d0f5',    // text
-          cursor: '#f2d5cf',        // rosewater
-          cursorAccent: '#303446',  // base
-          selectionBackground: 'rgba(131, 139, 167, 0.3)',  // overlay1 @ 30%
-          selectionForeground: '#c6d0f5',  // text
-          // ANSI Normal
-          black: '#51576d',         // surface1
-          red: '#e78284',           // red
-          green: '#a6d189',         // green
-          yellow: '#e5c890',        // yellow
-          blue: '#8caaee',          // blue
-          magenta: '#ca9ee6',       // mauve
-          cyan: '#81c8be',          // teal
-          white: '#b5bfe2',         // subtext1
-          // ANSI Bright
-          brightBlack: '#626880',   // surface2
-          brightRed: '#e78284',     // red
-          brightGreen: '#a6d189',   // green
-          brightYellow: '#e5c890',  // yellow
-          brightBlue: '#8caaee',    // blue
-          brightMagenta: '#f4b8e4', // pink
-          brightCyan: '#99d1db',    // sky
-          brightWhite: '#c6d0f5',   // text
-        },
+        theme: @konductorTerminalThemeJson@,
       });
 
       const fitAddon = new FitAddon();

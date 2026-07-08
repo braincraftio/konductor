@@ -115,45 +115,70 @@ let
         exit 1
       fi
 
-      REGULAR_FONT=$(find ${fontDir} -name "*Regular*.ttf" | head -1)
-      BOLD_FONT=$(find ${fontDir} -name "*Bold*.ttf" | grep -v "Italic" | head -1)
-
-      if [ -z "$REGULAR_FONT" ]; then
-        echo "ERROR: Could not find Regular font in ${fontDir}"
-        exit 1
-      fi
-
-      echo "Using fonts:"
-      echo "  Regular: $REGULAR_FONT"
-      echo "  Bold: $BOLD_FONT"
+      # Exact font files — deterministic selection (globs match Propo/NL
+      # families; find|head-1 order is filesystem-dependent)
+      REGULAR_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Regular.ttf"
+      BOLD_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Bold.ttf"
+      ITALIC_FONT="${fontDir}/JetBrainsMonoNerdFontMono-Italic.ttf"
+      BOLD_ITALIC_FONT="${fontDir}/JetBrainsMonoNerdFontMono-BoldItalic.ttf"
+      for f in "$REGULAR_FONT" "$BOLD_FONT" "$ITALIC_FONT" "$BOLD_ITALIC_FONT"; do
+        if [ ! -f "$f" ]; then
+          echo "ERROR: Font file not found: $f"
+          ls -la ${fontDir}/
+          exit 1
+        fi
+      done
 
       cp ${./index.html} $out/lib/restty-web/static/index.html
       chmod +w $out/lib/restty-web/static/index.html
 
+      # local() preferred over embedded (OS rasterizer, full hinting);
+      # embedded base64 is the airgap fallback. font-display: swap avoids FOIT.
       EMBEDDED_FONTS="<!-- Embedded JetBrains Mono Nerd Font (build-time, airgap-safe) -->
         <style id=\"konductor-embedded-fonts\">
           @font-face {
             font-family: 'JetBrainsMono Nerd Font Mono';
-            src: url('data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")') format('truetype');
+            src: local('JetBrainsMono Nerd Font Mono'),
+                 local('JetBrainsMonoNerdFontMono-Regular'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$REGULAR_FONT")') format('truetype');
             font-weight: normal;
             font-style: normal;
-          }"
-
-      if [ -n "$BOLD_FONT" ]; then
-        EMBEDDED_FONTS="$EMBEDDED_FONTS
+            font-display: swap;
+          }
           @font-face {
             font-family: 'JetBrainsMono Nerd Font Mono';
-            src: url('data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")') format('truetype');
+            src: local('JetBrainsMono Nerd Font Mono Bold'),
+                 local('JetBrainsMonoNerdFontMono-Bold'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$BOLD_FONT")') format('truetype');
             font-weight: bold;
             font-style: normal;
-          }"
-      fi
-
-      EMBEDDED_FONTS="$EMBEDDED_FONTS
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'JetBrainsMono Nerd Font Mono';
+            src: local('JetBrainsMono Nerd Font Mono Italic'),
+                 local('JetBrainsMonoNerdFontMono-Italic'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$ITALIC_FONT")') format('truetype');
+            font-weight: normal;
+            font-style: italic;
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'JetBrainsMono Nerd Font Mono';
+            src: local('JetBrainsMono Nerd Font Mono Bold Italic'),
+                 local('JetBrainsMonoNerdFontMono-BoldItalic'),
+                 url('data:font/ttf;base64,$(base64 -w0 "$BOLD_ITALIC_FONT")') format('truetype');
+            font-weight: bold;
+            font-style: italic;
+            font-display: swap;
+          }
         </style>"
 
+      # Inject at the explicit placeholder (not the closing-head tag —
+      # substituteInPlace replaces every occurrence of its pattern, so
+      # structural HTML tokens are unsafe anchors)
       substituteInPlace $out/lib/restty-web/static/index.html \
-        --replace '</head>' "$EMBEDDED_FONTS</head>"
+        --replace-fail '@konductorEmbeddedFonts@' "$EMBEDDED_FONTS"
 
       echo "Fonts embedded successfully"
 

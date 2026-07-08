@@ -649,6 +649,16 @@ in
       };
     };
 
+    # Seamless tmux ⇄ neovim pane navigation (christoomey/vim-tmux-navigator).
+    # Provides the C-hjkl / C-\ normal-mode mappings whose :TmuxNavigate*
+    # commands do wincmd first and shell out to `tmux select-pane` when
+    # already at the edge window — this is the "get back OUT of neovim"
+    # half. The tmux half (is_vim passthrough + @vim_navigator_mapping_*)
+    # is loaded in src/programs/tmux/default.nix.
+    # NOTE: the plain <C-w>h-style keymaps this replaces lived in
+    # keymaps.nix; re-adding C-hjkl maps there would shadow these.
+    tmux-navigator.enable = true;
+
     # =========================================================================
     # CODING LAYER
     # =========================================================================
@@ -761,7 +771,10 @@ in
         formatters_by_ft = {
           lua = [ "stylua" ];
           nix = [ "nixfmt" ];
-          python = [ "ruff_format" "ruff_organize_imports" ];
+          python = [
+            "ruff_format"
+            "ruff_organize_imports"
+          ];
           go = [
             "gofumpt"
             "goimports"
@@ -781,9 +794,22 @@ in
           nixfmt.command = "${pkgs.nixfmt-rfc-style}/bin/nixfmt";
           stylua.command = "${pkgs.stylua}/bin/stylua";
           ruff_format.command = "${pkgs.ruff}/bin/ruff";
-          ruff_format.args = [ "format" "--stdin-filename" "$FILENAME" "-" ];
+          ruff_format.args = [
+            "format"
+            "--stdin-filename"
+            "$FILENAME"
+            "-"
+          ];
           ruff_organize_imports.command = "${pkgs.ruff}/bin/ruff";
-          ruff_organize_imports.args = [ "check" "--select" "I" "--fix" "--stdin-filename" "$FILENAME" "-" ];
+          ruff_organize_imports.args = [
+            "check"
+            "--select"
+            "I"
+            "--fix"
+            "--stdin-filename"
+            "$FILENAME"
+            "-"
+          ];
           gofumpt.command = "${pkgs.gofumpt}/bin/gofumpt";
           goimports.command = "${pkgs.gotools}/bin/goimports";
           prettier.command = "${pkgs.nodePackages.prettier}/bin/prettier";
@@ -880,7 +906,10 @@ in
             normal = false; # Using <leader>vv from keymaps.nix
             terminal = "<C-o>"; # Interrupt/close Claude from terminal mode
           };
-          window_navigation = true;
+          # OFF: claude-code's buffer-local C-hjkl wincmd maps would shadow
+          # the global t-mode TmuxNavigate* maps (keymaps.nix) and break the
+          # tmux edge handoff from inside the Claude panel.
+          window_navigation = false;
           scrolling = true;
         };
       };
@@ -975,28 +1004,28 @@ in
             sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
           };
         }).overrideAttrs
-          (old: {
-            doCheck = false;
-            postInstall = (old.postInstall or "") + ''
-                            mkdir -p $out/plugin
-                            cat > $out/plugin/render-markdown-setup.lua << 'EOF'
-              -- Auto-initialize render-markdown on plugin load
-              local ok, render_markdown = pcall(require, "render-markdown")
-              if ok then
-                render_markdown.setup({
-                  enabled = true,
-                  preset = "obsidian",
-                  render_modes = { "n", "c", "t" },
-                  anti_conceal = { enabled = true },
-                  heading = { enabled = true },
-                  code = { enabled = true, style = "full" },
-                  -- Disable latex rendering (requires latex treesitter parser)
-                  latex = { enabled = false },
-                })
-              end
-              EOF
-            '';
-          })
+        (old: {
+          doCheck = false;
+          postInstall = (old.postInstall or "") + ''
+                          mkdir -p $out/plugin
+                          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+            -- Auto-initialize render-markdown on plugin load
+            local ok, render_markdown = pcall(require, "render-markdown")
+            if ok then
+              render_markdown.setup({
+                enabled = true,
+                preset = "obsidian",
+                render_modes = { "n", "c", "t" },
+                anti_conceal = { enabled = true },
+                heading = { enabled = true },
+                code = { enabled = true, style = "full" },
+                -- Disable latex rendering (requires latex treesitter parser)
+                latex = { enabled = false },
+              })
+            end
+            EOF
+          '';
+        })
       )
     ];
 

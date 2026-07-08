@@ -22,6 +22,9 @@ let
   # Import shared readline configuration (eliminates duplicate inputrc)
   readline = import ../../lib/readline.nix { inherit pkgs; };
 
+  # Catppuccin Frappé palette SSOT (src/lib/theme.nix)
+  theme = import ../../lib/theme.nix;
+
   # Import SSOT bashrc content (same as devshells, qcow2, OCI)
   bashrcContent = builtins.readFile ../../config/shell/.bashrc;
 
@@ -323,6 +326,11 @@ let
     # Required for Neovim FocusGained/FocusLost autocmds (autoread, etc.)
     set -g focus-events on
 
+    # Multi-device attach: size windows to the most recently active client
+    # instead of the smallest attached client. A phone peeking at a session
+    # no longer shrinks the desktop view (durable web sessions attach from
+    # laptop / tablet / desktop concurrently).
+    set -g window-size latest
     setw -g aggressive-resize on
     set -g status-interval 5
     set -g renumber-windows on
@@ -688,19 +696,14 @@ let
     # NESTED TMUX SUPPORT (F12 toggle)
     # =========================================================================
     # F12 disables outer tmux, grays status bar, allows inner tmux to receive keys
-    # Research: Use hardcoded colors (catppuccin frappe grays) - theme variables
-    # don't expand reliably in bind context
-    #
-    # Frappe palette reference:
-    #   surface0: #414559, surface1: #51576d
-    #   overlay0: #737994, overlay1: #838ba7
-    #   crust: #232634, text: #c6d0f5
+    # Colors are Nix-interpolated from src/lib/theme.nix (SSOT) because tmux
+    # @thm_* theme variables don't expand reliably in bind context.
 
     bind -T root F12 \
         set prefix None \;\
         set key-table off \;\
-        set status-style "fg=#737994,bg=#414559" \;\
-        set window-status-current-style "fg=#c6d0f5,bg=#51576d" \;\
+        set status-style "fg=${theme.ui.inactiveForeground},bg=${theme.ui.inactiveBackground}" \;\
+        set window-status-current-style "fg=${theme.ui.activeForeground},bg=${theme.ui.activeBackground}" \;\
         refresh-client -S \;\
         display-message "Outer tmux OFF - F12 to restore"
 

@@ -13,7 +13,8 @@
 #   go{motion} - OpenCode operator (review with motion, e.g., goap = review paragraph)
 #
 # Navigation:
-#   Ctrl+hjkl  - Move between splits (works in terminal too)
+#   Ctrl+hjkl  - Move between splits AND tmux panes (vim-tmux-navigator;
+#                works in terminal buffers too, hands off at edge windows)
 #   jk         - Exit insert/terminal mode (universal escape)
 #   <leader>w* - Window management group
 #
@@ -43,31 +44,10 @@ _:
       options.desc = "Exit insert mode";
     }
 
-    # Window navigation (Ctrl + hjkl)
-    {
-      mode = "n";
-      key = "<C-h>";
-      action = "<C-w>h";
-      options.desc = "Go to left window";
-    }
-    {
-      mode = "n";
-      key = "<C-j>";
-      action = "<C-w>j";
-      options.desc = "Go to lower window";
-    }
-    {
-      mode = "n";
-      key = "<C-k>";
-      action = "<C-w>k";
-      options.desc = "Go to upper window";
-    }
-    {
-      mode = "n";
-      key = "<C-l>";
-      action = "<C-w>l";
-      options.desc = "Go to right window";
-    }
+    # Window navigation (Ctrl + hjkl): provided by plugins.tmux-navigator
+    # (plugins.nix) — :TmuxNavigate* does wincmd AND hands off to
+    # `tmux select-pane` at the edge window. Defining plain <C-w>h maps
+    # here would shadow the plugin and break the tmux edge handoff.
 
     # Window resize (Ctrl + arrows)
     {
@@ -133,30 +113,33 @@ _:
       action = ">gv";
     }
 
-    # Terminal navigation
+    # Terminal navigation — TmuxNavigate* (not plain wincmd) so the tmux
+    # edge handoff also works from terminal buffers (Snacks terminal,
+    # Claude/OpenCode panels). The plugin's default maps cover normal mode
+    # only; t-mode needs these explicit maps.
     {
       mode = "t";
       key = "<C-h>";
-      action = "<cmd>wincmd h<CR>";
-      options.desc = "Go to left window";
+      action = "<cmd>TmuxNavigateLeft<CR>";
+      options.desc = "Go to left window/pane";
     }
     {
       mode = "t";
       key = "<C-j>";
-      action = "<cmd>wincmd j<CR>";
-      options.desc = "Go to lower window";
+      action = "<cmd>TmuxNavigateDown<CR>";
+      options.desc = "Go to lower window/pane";
     }
     {
       mode = "t";
       key = "<C-k>";
-      action = "<cmd>wincmd k<CR>";
-      options.desc = "Go to upper window";
+      action = "<cmd>TmuxNavigateUp<CR>";
+      options.desc = "Go to upper window/pane";
     }
     {
       mode = "t";
       key = "<C-l>";
-      action = "<cmd>wincmd l<CR>";
-      options.desc = "Go to right window";
+      action = "<cmd>TmuxNavigateRight<CR>";
+      options.desc = "Go to right window/pane";
     }
     # <Esc><Esc>: In AI buffers, toggle off; otherwise exit terminal mode
     {

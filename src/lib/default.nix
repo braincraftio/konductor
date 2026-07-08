@@ -11,8 +11,18 @@ let
   shellContent = import ./shell-content.nix { inherit lib; };
   meta = import ./meta.nix { inherit versions; };
   utils = import ./utils.nix { inherit lib; };
+  theme = import ./theme.nix;
 in
 
 {
-  inherit versions users env aliases shellContent meta utils;
+  inherit
+    versions
+    users
+    env
+    aliases
+    shellContent
+    meta
+    utils
+    theme
+    ;
 }
