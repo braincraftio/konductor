@@ -310,6 +310,9 @@ let
   # PKI module for VM identity and certificate chain of trust
   pkiModule = import ../modules/pki.nix;
 
+  # FreeIPA domain integration module (deploy-time optional via cloud-init)
+  domainModule = import ../modules/domain.nix;
+
   # Certificate precedence detection script (Tier 1 → 2 → 3 fallback)
   certPrecedenceScript = import ../lib/cert-precedence.nix { inherit pkgs; };
 
@@ -734,6 +737,7 @@ let
       imports = [
         mountService
         pkiModule
+        domainModule
         inputs.home-manager.nixosModules.home-manager
         # QEMU guest profile for virtio drivers and guest agent
         "${modulesPath}/profiles/qemu-guest.nix"
