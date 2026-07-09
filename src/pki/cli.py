@@ -770,12 +770,14 @@ def _trust_remove() -> int:
         env_file.unlink()
         ok(f"Removed: {env_file}")
 
-    # 2. Remove Docker registry trust
-    registry_ca_dir = Path("/etc/docker/certs.d/registry.ucs.arpa")
-    if registry_ca_dir.exists():
+    # 2. Remove Docker registry trust (all configured registries)
+    certs_d = Path("/etc/docker/certs.d")
+    if certs_d.exists():
         import shutil
-        shutil.rmtree(registry_ca_dir)
-        ok(f"Removed: {registry_ca_dir}")
+        for registry_dir in certs_d.iterdir():
+            if registry_dir.is_dir():
+                shutil.rmtree(registry_dir)
+                ok(f"Removed: {registry_dir}")
 
     # 3. Rebuild bundle without hypervisor CA
     if config.HYPERVISOR_CA_CERT.exists():
@@ -815,7 +817,7 @@ def _install_docker_trust(docker_registries: list[str]) -> None:
     """Configure Docker to trust registries with custom CA.
 
     Args:
-        docker_registries: List of registry domains (e.g., ["registry.ucs.arpa", "docker.io"])
+        docker_registries: List of registry domains (e.g., ["registry.braincraft.io", "docker.io"])
     """
     bundle_path = config.CA_BUNDLE
 

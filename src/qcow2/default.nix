@@ -2926,7 +2926,13 @@ let
       systemd.timers.forgejo-runner-register = {
         description = "Retry Forgejo Runner Registration Timer";
         wantedBy = [ "timers.target" ];
-        unitConfig.ConditionPathExists = "!/home/runner/.config/forgejo-runner/.runner";
+        unitConfig.ConditionPathExists = [
+          # Only activate when registration credentials exist (profile-provided)
+          "/etc/konductor/forgejo-runner/secret"
+          "/etc/konductor/forgejo-runner/url"
+          # Stop once registration is complete
+          "!/home/runner/.config/forgejo-runner/.runner"
+        ];
         timerConfig = {
           OnBootSec = "30s";
           OnUnitActiveSec = "30s";

@@ -28,16 +28,22 @@
 #   ca_certificate_base64: $(base64 -w0 /etc/konductor/pki/vm/ca.crt)
 #   ca_private_key_base64: $(base64 -w0 /etc/konductor/pki/vm/ca.key)
 
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.konductor.pki;
 
   # Default domain based on hostname or fallback
   defaultDomain =
-    if config.networking.hostName != "localhost"
-    then "${config.networking.hostName}.arpa"
-    else "konductor.arpa";
+    if config.networking.hostName != "localhost" then
+      "${config.networking.hostName}.arpa"
+    else
+      "konductor.arpa";
 
   # Python with cryptography for X.509 cert generation
   pythonWithCrypto = pkgs.python3.withPackages (ps: [ ps.cryptography ]);
@@ -83,7 +89,10 @@ in
     };
 
     keyAlgorithm = lib.mkOption {
-      type = lib.types.enum [ "ec" "rsa" ];
+      type = lib.types.enum [
+        "ec"
+        "rsa"
+      ];
       default = "ec";
       description = "Key algorithm: ec (P-384 CA, P-256 leaf) or rsa (4096-bit)";
     };
@@ -166,7 +175,8 @@ in
         pathConfig = {
           PathChanged = [
             (toString cfg.hypervisorCaPath)
-          ] ++ lib.optional (cfg.hypervisorKeyPath != null) (toString cfg.hypervisorKeyPath);
+          ]
+          ++ lib.optional (cfg.hypervisorKeyPath != null) (toString cfg.hypervisorKeyPath);
           Unit = "konductor-pki-refresh.service";
         };
       };
@@ -235,7 +245,11 @@ in
           # Wait for:
           # - konductor-pki-vm: Tier 3 self-signed CA must exist first
           # - konductor-mount@pki: hypervisor CA disk must be mounted at /mnt/pki/
-          after = [ "local-fs.target" "konductor-pki-vm.service" "konductor-mount@pki.service" ];
+          after = [
+            "local-fs.target"
+            "konductor-pki-vm.service"
+            "konductor-mount@pki.service"
+          ];
           wantedBy = [ "multi-user.target" ];
 
           # git is required by the Python PKI fingerprint module to read
@@ -324,7 +338,10 @@ in
         # be baked into the image at build time, skipping konductor-pki-vm.
         konductor-pki-permissions = {
           description = "Set Konductor PKI file permissions";
-          after = [ "konductor-pki-vm.service" "konductor-pki-signed.service" ];
+          after = [
+            "konductor-pki-vm.service"
+            "konductor-pki-signed.service"
+          ];
           wantedBy = [ "multi-user.target" ];
 
           unitConfig = {
@@ -365,8 +382,15 @@ in
         # Runs after cloud-init in case CA is injected via user-data.
         konductor-pki-hypervisor = lib.mkIf (cfg.hypervisorCaPath != null) {
           description = "Import Konductor hypervisor CA";
-          after = [ "local-fs.target" "konductor-mount@pki.service" ];
+          after = [
+            "local-fs.target"
+            "konductor-mount@pki.service"
+          ];
           wantedBy = [ "multi-user.target" ];
+
+          # git: required by fingerprint module for provenance self-attestation
+          # during pki status output after hypervisor CA import.
+          path = [ pkgs.git ];
 
           unitConfig = {
             ConditionPathExists = toString cfg.hypervisorCaPath;
@@ -385,9 +409,9 @@ in
 
               ${pythonPki} -m pki hypervisor \
                 --ca "${toString cfg.hypervisorCaPath}" \
-                ${lib.optionalString (cfg.hypervisorKeyPath != null)
-                  "--key \"${toString cfg.hypervisorKeyPath}\""
-                }
+                ${lib.optionalString (
+                  cfg.hypervisorKeyPath != null
+                ) "--key \"${toString cfg.hypervisorKeyPath}\""}
 
               echo "Hypervisor CA import complete"
 
@@ -407,7 +431,8 @@ in
           after = [
             "konductor-pki-vm.service"
             "konductor-pki-signed.service"
-          ] ++ lib.optional (cfg.hypervisorCaPath != null) "konductor-pki-hypervisor.service";
+          ]
+          ++ lib.optional (cfg.hypervisorCaPath != null) "konductor-pki-hypervisor.service";
           wantedBy = [ "multi-user.target" ];
 
           serviceConfig = {
@@ -438,6 +463,14 @@ in
           after = [ "konductor-pki-bundle.service" ];
           wants = [ "konductor-pki-bundle.service" ];
           wantedBy = [ "multi-user.target" ];
+
+          # openssl: Python pki trust module shells out to openssl for
+          # certificate chain verification after installing to system trust.
+          # git: required by fingerprint module for provenance self-attestation.
+          path = with pkgs; [
+            openssl
+            git
+          ];
 
           unitConfig = {
             # Only run if hypervisor CA exists (KubeVirt VMs with mounted CA)
