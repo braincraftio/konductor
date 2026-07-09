@@ -90,7 +90,7 @@ let
           . "${domainEnv}"
           set +a
 
-          IPA_FQDN="$(hostname).$IPA_DOMAIN"
+          IPA_FQDN="$(cat /etc/hostname).$IPA_DOMAIN"
 
           cat > "$SSSD_CONF" <<SSSDEOF
     [sssd]
