@@ -94,7 +94,6 @@ let
 
           cat > "$SSSD_CONF" <<SSSDEOF
     [sssd]
-    config_file_version = 2
     services = nss, pam, ssh, sudo, autofs, ifp
     domains = $IPA_DOMAIN
 
@@ -137,7 +136,6 @@ let
           # Standalone: minimal config, no domain, no crash
           cat > "$SSSD_CONF" <<SSSDEOF
     [sssd]
-    config_file_version = 2
     services = nss, pam
 
     [nss]
@@ -309,7 +307,6 @@ in
     sshAuthorizedKeysIntegration = true;
     config = ''
       [sssd]
-      config_file_version = 2
       services = nss, pam
 
       [nss]
@@ -349,6 +346,28 @@ in
   # /nfshome mountpoint for autofs
   # =========================================================================
   systemd.tmpfiles.rules = [ "d /nfshome 0755 root root -" ];
+
+  # =========================================================================
+  # FreeIPA shell symlinks — canonical NixOS IPA pattern
+  # (nixos/modules/security/ipa.nix lines 317-325)
+  #
+  # FreeIPA sets user loginShell to /bin/bash (POSIX convention).
+  # NixOS has no /bin/bash — bash lives in /nix/store. sshd checks
+  # shell existence before allowing login, rejecting domain users
+  # with "shell /bin/bash does not exist".
+  #
+  # Create /bin/bash symlink via tmpfiles (same mechanism as the
+  # upstream NixOS security.ipa module).
+  # =========================================================================
+  systemd.tmpfiles.settings."10-ipa-shells" = lib.foldl' (
+    acc: pkg:
+    (
+      acc
+      // {
+        ${pkg.shellPath}."L+".argument = "${pkg}${pkg.shellPath}";
+      }
+    )
+  ) { } [ pkgs.bash ];
 
   # =========================================================================
   # Packages for domain operations
