@@ -785,7 +785,7 @@ in
   # Package list including wrapped tmux, plugins, and dependencies
   packages = [
     tmuxWrapped
-    pkgs.tmuxp
+    # tmuxp removed: broken on nixpkgs master (libtmux version mismatch)
 
     # Core Plugins
     pkgs.tmuxPlugins.sensible

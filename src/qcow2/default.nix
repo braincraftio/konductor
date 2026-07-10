@@ -392,8 +392,8 @@ let
         icu # Unicode/i18n
         curl # HTTP client
         libsecret # Secret storage
-        xorg.libX11 # X11 (for clipboard, etc.)
-        xorg.libxcb # XCB
+        libx11 # X11 (for clipboard, etc.)
+        libxcb # XCB
       ];
     runScript = "${pkgs.nodejs_20}/bin/node";
   };
@@ -556,6 +556,7 @@ let
     };
 
     home = {
+      enableNixpkgsReleaseCheck = false;
       inherit (versions.nixos) stateVersion;
       file = {
         ".bashrc".text = konductorConfig.shell.bash.bashrcContent;
@@ -2976,13 +2977,13 @@ let
         # See: .config/mise/toml/talos.compose.toml
         resolved = {
           enable = true;
-          # Use Google/Cloudflare as fallback DNS
-          fallbackDns = [
-            "8.8.8.8"
-            "1.1.1.1"
-          ];
-          # DNSSEC causes issues with private zones, disable it
-          dnssec = "false";
+          settings.Resolve = {
+            FallbackDNS = [
+              "8.8.8.8"
+              "1.1.1.1"
+            ];
+            DNSSEC = "false";
+          };
         };
 
         # =========================================================================

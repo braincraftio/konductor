@@ -1,4 +1,7 @@
-{ pkgs, pythonEnv ? null }:
+{
+  pkgs,
+  pythonEnv ? null,
+}:
 # =============================================================================
 # Pulumi Python Environment (NixOS-native with python.withPackages)
 # =============================================================================
@@ -60,6 +63,8 @@ let
     ];
 
     doCheck = false;
+    pythonRelaxDeps = [ "protobuf" ];
+    nativeBuildInputs = [ pkgs.python313Packages.pythonRelaxDepsHook ];
     pythonImportsCheck = [ "pulumi" ];
 
     meta = with lib; {
@@ -73,7 +78,14 @@ let
   # =========================================================================
   # Each depends on the wheeled pulumiCore above (not nixpkgs pulumi) so the
   # provider/SDK versions stay mutually compatible.
-  mkPulumiPypiPackage = { pname, version, url, hash, meta ? {} }:
+  mkPulumiPypiPackage =
+    {
+      pname,
+      version,
+      url,
+      hash,
+      meta ? { },
+    }:
     pkgs.python313Packages.buildPythonPackage {
       inherit pname version;
       format = "wheel";
@@ -82,9 +94,13 @@ let
         inherit url hash;
       };
 
+      pythonRelaxDeps = true;
+      nativeBuildInputs = [ pkgs.python313Packages.pythonRelaxDepsHook ];
+
       propagatedBuildInputs = [
         pulumiCore
         pkgs.python313Packages.parver
+        pkgs.python313Packages.requests
         pkgs.python313Packages.semver
       ];
 
@@ -93,9 +109,12 @@ let
 
       pythonImportsCheck = [ pname ];
 
-      meta = with lib; {
-        license = licenses.asl20;
-      } // meta;
+      meta =
+        with lib;
+        {
+          license = licenses.asl20;
+        }
+        // meta;
     };
 
   pulumiKubernetes = mkPulumiPypiPackage {
@@ -185,35 +204,35 @@ let
   # Defined in `let` so `package` and `env` can reference it without self-import.
   pythonDeps = ps: [
     # Pulumi core SDK -- PyPI wheel
-    pulumiCore            # 3.244.0
+    pulumiCore # 3.244.0
 
     # Pulumi provider SDKs -- PyPI wheels
-    pulumiKubernetes      # 4.32.0
-    pulumiTls             # 5.5.0
-    pulumiDockerBuild     # 0.0.19
-    pulumiCloudflare      # 6.17.0
-    pulumiRandom          # 4.21.0
-    pulumiAws             # 7.34.0
+    pulumiKubernetes # 4.32.0
+    pulumiTls # 5.5.0
+    pulumiDockerBuild # 0.0.19
+    pulumiCloudflare # 6.17.0
+    pulumiRandom # 4.21.0
+    pulumiAws # 7.34.0
 
     # Dependencies with native extensions (ensure proper linking)
-    ps.grpcio       # C++ extension -- the original motivation for this approach
+    ps.grpcio # C++ extension -- the original motivation for this approach
     ps."grpcio-tools"
     ps.protobuf
 
     # Runtime dependencies from infrastructure/pulumi/pyproject.toml
-    ps.bcrypt       # Password hashing for Docker registry htpasswd
-    ps.pydantic     # Data validation using Python type annotations
-    ps.semver       # Semantic version parsing for git tags
-    ps.gitpython    # Git operations without subprocess calls
-    ps.kubernetes   # Kubernetes Python client for cluster metadata discovery
-    ps.pyyaml       # YAML parsing for kubeconfig
-    ps.packaging    # Version parsing for Helm chart resolution
+    ps.bcrypt # Password hashing for Docker registry htpasswd
+    ps.pydantic # Data validation using Python type annotations
+    ps.semver # Semantic version parsing for git tags
+    ps.gitpython # Git operations without subprocess calls
+    ps.kubernetes # Kubernetes Python client for cluster metadata discovery
+    ps.pyyaml # YAML parsing for kubeconfig
+    ps.packaging # Version parsing for Helm chart resolution
 
     # Transitive deps (explicitly listed for clarity)
     ps.requests
     ps.dill
     ps.parver
-    ps.setuptools   # Required by some provider SDKs at runtime
+    ps.setuptools # Required by some provider SDKs at runtime
 
     # DO NOT REMOVE: Pulumi.yaml sets typechecker: pyright which causes
     # pulumi-language-python to run pyright as a subprocess from
@@ -243,33 +262,41 @@ in
   # a standalone Go binary, so sourcing it from unstable does not affect the
   # stable-python withPackages env.
   # Uses pythonEnv from languages.nix (single derivation for all consumers).
-  package = let
-    resolvedPythonEnv = assert pythonEnv != null; pythonEnv;
-    pulumiWrapper = pkgs.writeShellScriptBin "pulumi" ''
-      export PULUMI_PYTHON_CMD="${resolvedPythonEnv}/bin/python"
-      exec ${pkgs.unstable.pulumi-bin}/bin/pulumi "$@"
-    '';
-  in pkgs.symlinkJoin {
-    name = "pulumi-with-python";
-    paths = [
-      pkgs.unstable.pulumi-bin               # CLI + bundled language hosts (3.244.0)
-      pkgs.pulumictl                         # Pulumi utilities
-      pulumiWrapper                          # Last: wrapper wins symlinkJoin conflict (sets PULUMI_PYTHON_CMD)
-    ];
-    meta = with pkgs.lib; {
-      description = "Pulumi IaC with NixOS-native Python environment";
-      homepage = "https://pulumi.com";
-      license = licenses.asl20;
-      platforms = platforms.unix;
+  package =
+    let
+      resolvedPythonEnv =
+        assert pythonEnv != null;
+        pythonEnv;
+      pulumiWrapper = pkgs.writeShellScriptBin "pulumi" ''
+        export PULUMI_PYTHON_CMD="${resolvedPythonEnv}/bin/python"
+        exec ${pkgs.unstable.pulumi-bin}/bin/pulumi "$@"
+      '';
+    in
+    pkgs.symlinkJoin {
+      name = "pulumi-with-python";
+      paths = [
+        pkgs.unstable.pulumi-bin # CLI + bundled language hosts (3.244.0)
+        pkgs.pulumictl # Pulumi utilities
+        pulumiWrapper # Last: wrapper wins symlinkJoin conflict (sets PULUMI_PYTHON_CMD)
+      ];
+      meta = with pkgs.lib; {
+        description = "Pulumi IaC with NixOS-native Python environment";
+        homepage = "https://pulumi.com";
+        license = licenses.asl20;
+        platforms = platforms.unix;
+      };
     };
-  };
 
   # =========================================================================
   # Environment variables for devshells
   # =========================================================================
-  env = let
-    resolvedPythonEnv = assert pythonEnv != null; pythonEnv;
-  in {
-    PULUMI_PYTHON_CMD = "${resolvedPythonEnv}/bin/python";
-  };
+  env =
+    let
+      resolvedPythonEnv =
+        assert pythonEnv != null;
+        pythonEnv;
+    in
+    {
+      PULUMI_PYTHON_CMD = "${resolvedPythonEnv}/bin/python";
+    };
 }

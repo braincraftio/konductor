@@ -13,7 +13,11 @@
 #   - Snacks consolidation: picker, explorer, terminal, dashboard, etc.
 #   - LazyVim conventions: keybinding patterns and UX
 
-{ pkgs, lib, inputs }:
+{
+  pkgs,
+  lib,
+  inputs,
+}:
 
 let
   nixvimPkgs = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
@@ -29,6 +33,9 @@ let
   nixvimConfig = nixvimPkgs.makeNixvim {
     # Allow unfree packages (claude-code)
     nixpkgs.config.allowUnfree = true;
+
+    # nixpkgs fork (master) identifies as 26.11; nixvim tracks 26.05
+    version.enableNixpkgsReleaseCheck = false;
 
     # Colorscheme
     colorschemes.catppuccin = {

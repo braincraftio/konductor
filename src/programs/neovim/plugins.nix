@@ -572,7 +572,6 @@ in
         http # Required for rest.nvim
         javascript
         json
-        jsonc
         lua
         luadoc
         make
@@ -822,7 +821,7 @@ in
           ];
           gofumpt.command = "${pkgs.gofumpt}/bin/gofumpt";
           goimports.command = "${pkgs.gotools}/bin/goimports";
-          prettier.command = "${pkgs.nodePackages.prettier}/bin/prettier";
+          prettier.command = "${pkgs.prettier}/bin/prettier";
           shfmt.command = "${pkgs.shfmt}/bin/shfmt";
           taplo.command = "${pkgs.taplo}/bin/taplo";
         };

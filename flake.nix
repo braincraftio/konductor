@@ -16,8 +16,10 @@
   #   - home-manager.url branch below (must match nixpkgs)
   # ===========================================================================
   inputs = {
-    # NixOS 25.11 - sync with src/lib/versions.nix nixos.channel
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    # NixOS 26.05 - sync with src/lib/versions.nix nixos.channel
+    # gssproxy: fork until PR merges, then switch to upstream
+    #nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:usrbinkat/nixpkgs/gssproxy-package-and-module";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     flake-utils.url = "github:numtide/flake-utils";
@@ -55,20 +57,19 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
+    # nixvim uses its own pinned nixpkgs for building (avoids
+    # nixos-render-docs patch conflicts with nixpkgs master)
     nixvim = {
-      url = "github:nix-community/nixvim/nixos-25.11";
+      url = "github:nix-community/nixvim/nixos-26.05";
       inputs = {
-        nixpkgs.follows = "nixpkgs";
         systems.follows = "systems";
         flake-parts.follows = "flake-parts";
-        nuschtosSearch.follows = "nuschtosSearch";
       };
     };
 
     # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -136,7 +137,13 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
-          config.allowUnfree = true;
+          config = {
+            allowUnfree = true;
+            permittedInsecurePackages = [
+              "nodejs-20.20.2"
+              "nodejs-slim-20.20.2"
+            ];
+          };
         };
 
         # Import versions for devshells
@@ -228,7 +235,13 @@
           pkgs = import nixpkgs {
             inherit system;
             overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
-            config.allowUnfree = true;
+            config = {
+              allowUnfree = true;
+              permittedInsecurePackages = [
+                "nodejs-20.20.2"
+                "nodejs-slim-20.20.2"
+              ];
+            };
           };
           versions = import ./src/lib/versions.nix;
           programs = import ./src/programs {

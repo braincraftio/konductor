@@ -17,13 +17,13 @@ in
 {
   package = pkgs.writeShellApplication {
     name = "stylelint";
-    runtimeInputs = [ pkgs.nodePackages.stylelint ];
+    runtimeInputs = [ pkgs.stylelint ];
     text = ''
       exec stylelint --config "${configFile}/.stylelintrc.json" "$@"
     '';
   };
 
-  unwrapped = pkgs.nodePackages.stylelint;
+  unwrapped = pkgs.stylelint;
   inherit configFile;
 
   meta = {

@@ -10,8 +10,8 @@
 
 {
   nixos = {
-    channel = "25.11";
-    stateVersion = "25.11";
+    channel = "26.05";
+    stateVersion = "26.05";
   };
 
   languages = {

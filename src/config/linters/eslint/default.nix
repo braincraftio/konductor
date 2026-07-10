@@ -17,13 +17,13 @@ in
 {
   package = pkgs.writeShellApplication {
     name = "eslint";
-    runtimeInputs = [ pkgs.nodePackages.eslint ];
+    runtimeInputs = [ pkgs.eslint ];
     text = ''
       exec eslint --config "${configFile}/eslint.config.js" "$@"
     '';
   };
 
-  unwrapped = pkgs.nodePackages.eslint;
+  unwrapped = pkgs.eslint;
   inherit configFile;
 
   meta = {

@@ -89,7 +89,7 @@ in
 {
   package = pkgs.writeShellApplication {
     name = "prettier";
-    runtimeInputs = [ pkgs.nodePackages.prettier ];
+    runtimeInputs = [ pkgs.prettier ];
     text = ''
       exec prettier \
         --config "${configFile}/.prettierrc.yaml" \
@@ -104,7 +104,7 @@ in
     # '';
   };
 
-  unwrapped = pkgs.nodePackages.prettier;
+  unwrapped = pkgs.prettier;
   inherit configFile;
   # DISABLED: re-enable when slidev plugin is restored
   # inherit configFile prettierPluginSlidev;
