@@ -2977,13 +2977,11 @@ let
         # See: .config/mise/toml/talos.compose.toml
         resolved = {
           enable = true;
-          settings.Resolve = {
-            FallbackDNS = [
-              "8.8.8.8"
-              "1.1.1.1"
-            ];
-            DNSSEC = "false";
-          };
+          fallbackDns = [
+            "8.8.8.8"
+            "1.1.1.1"
+          ];
+          dnssec = "false";
         };
 
         # =========================================================================
