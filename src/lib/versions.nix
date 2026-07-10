@@ -11,7 +11,7 @@
 {
   nixos = {
     channel = "26.05";
-    stateVersion = "26.05";
+    stateVersion = "25.11";
   };
 
   languages = {
