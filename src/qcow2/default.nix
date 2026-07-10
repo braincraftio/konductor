@@ -317,53 +317,6 @@ let
   certPrecedenceScript = import ../lib/cert-precedence.nix { inherit pkgs; };
 
   # =====================================================================
-  # Web Session Entry (durable roaming sessions)
-  # =====================================================================
-  # Runs as the ttyd child, once per browser connection. Wraps the session
-  # in a LOGIN shell so the profile.d chain (skel provisioning, linger,
-  # konductor-env.sh, ssh-agent hook) runs before tmux attach — plain
-  # `bash` here previously skipped all of it.
-  #
-  # The tmux SERVER lives in the per-user konductor-tmux.service (user
-  # manager cgroup) — browser tab close / ttyd restart kills only the
-  # attaching client. has-session||new-session makes attach self-healing
-  # if that unit isn't running.
-  #
-  # KONDUCTOR_SESSION_MODE (services.toml [ttyd].session_mode, via
-  # EnvironmentFile → ttyd → this child):
-  #   grouped — per-device grouped session over shared windows: each device
-  #             gets independent window focus; destroy-unattached prunes
-  #             the grouped view on disconnect (base session untouched)
-  #   shared  — all devices mirror one attach of session k9
-  #   none    — plain login shell (pre-durability behavior)
-  konductorWebSession = pkgs.writeShellScript "konductor-web-session" ''
-    MODE="''${KONDUCTOR_SESSION_MODE:-grouped}"
-    BASH_BIN=${pkgs.bashInteractive}/bin/bash
-
-    case "$MODE" in
-      none)
-        exec "$BASH_BIN" -l
-        ;;
-      shared)
-        exec "$BASH_BIN" -lc '
-          TMUX_BIN=/run/current-system/sw/bin/tmux
-          "$TMUX_BIN" has-session -t k9 2>/dev/null || "$TMUX_BIN" new-session -d -s k9
-          exec "$TMUX_BIN" attach-session -t k9'
-        ;;
-      grouped)
-        exec "$BASH_BIN" -lc '
-          TMUX_BIN=/run/current-system/sw/bin/tmux
-          "$TMUX_BIN" has-session -t k9 2>/dev/null || "$TMUX_BIN" new-session -d -s k9
-          exec "$TMUX_BIN" new-session -t k9 \; set-option destroy-unattached on'
-        ;;
-      *)
-        echo "konductor-web-session: invalid KONDUCTOR_SESSION_MODE='$MODE' (valid: grouped, shared, none)" >&2
-        exit 64
-        ;;
-    esac
-  '';
-
-  # =====================================================================
   # VS Code Remote SSH Support (buildFHSEnv + node patching)
   # =====================================================================
   # VS Code Remote SSH downloads pre-compiled node binaries that expect
@@ -646,29 +599,8 @@ let
             ''} %i"
 
             # Step 2: Open firewall port
-            # PORT and KONDUCTOR_TRUSTED_SOURCE_CIDR from EnvironmentFile
-            # (written by konductor-init.service). When a trusted source CIDR
-            # is configured ([network].trusted_source_cidr in services.toml),
-            # the accept rule is restricted to it — REQUIRED when auth_header
-            # is enabled: ttyd trusts the identity header, so only the
-            # gateway data plane may reach the port (see
-            # docs/AUTHELIA_INTEGRATION.md, Enforcement invariant).
-            "+${pkgs.writeShellScript "open-firewall-${serviceName}" ''
-              set -euo pipefail
-              INSTANCE="$1"
-              PORT="$2"
-              CIDR="''${3:-}"
-              # nft treats @ as a set-reference operator; the comment must be
-              # a single double-quoted token to prevent @ from being parsed.
-              COMMENT="\"konductor-${serviceName}@$INSTANCE-port$PORT\""
-              if [ -n "$CIDR" ]; then
-                ${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow ip saddr "$CIDR" tcp dport "$PORT" accept comment "$COMMENT"
-                echo "✓ Firewall open: $PORT (source restricted to $CIDR)"
-              else
-                ${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport "$PORT" accept comment "$COMMENT"
-                echo "✓ Firewall open: $PORT (any source)"
-              fi
-            ''} %i \${PORT} \${KONDUCTOR_TRUSTED_SOURCE_CIDR}"
+            # PORT variable from EnvironmentFile (written by konductor-init.service)
+            ''+${pkgs.nftables}/bin/nft add rule inet nixos-fw input-allow tcp dport ''${PORT} accept comment \"konductor-${serviceName}@%i-port''${PORT}\"''
           ];
 
           # Environment files (merged at runtime)
@@ -1499,13 +1431,7 @@ let
             # Multi-user service infrastructure
             yj # TOML to JSON converter (for konductor-init.service)
             yq-go # YAML/TOML/JSON processor
-            # Web terminal capabilities (config-driven via services.toml [ttyd])
-            libsixel # img2sixel — sixel inline images (enableSixel)
-            chafa # image → sixel/ANSI renderer
           ])
-          # trzsz (trz / tsz) — server side of browser drag-drop file transfer.
-          # Packaged in-repo: nixpkgs ships only trzsz-ssh (tssh, local client).
-          ++ [ (pkgs.callPackage ../packages/trzsz.nix { }) ]
           # Open Sesame headless: encrypted secret vaults with SSH agent unlock
           # System-wide so cloud-init dynamic users also have the sesame CLI
           # Note: .default is open-sesame-desktop (GUI); .open-sesame is headless
@@ -1522,7 +1448,9 @@ let
                 priority = -10;
               };
             }))
-          ];
+          ]
+          ++ (with pkgs; [
+          ]);
 
         # Environment Variables
         # Includes base env + language-specific + konductor settings
@@ -1593,40 +1521,6 @@ let
             };
           };
           services = {
-            # =================================================================
-            # Durable tmux server (multi-device roaming web sessions)
-            # =================================================================
-            # Owns the tmux server in the USER MANAGER's cgroup, decoupled from
-            # konductor-ttyd@<user>.service. Today the tmux server is spawned
-            # inside the ttyd service cgroup, so tab close / service stop /
-            # gateway blips kill the server and every process in it. With this
-            # unit, those events kill only the attaching client.
-            # Linger (built-in users via NixOS config, cloud-init users via
-            # profile.d) starts this at boot with no login required.
-            # Session "k9" matches the wrapped tmux default (src/programs/tmux).
-            # Resilience note: web attaches also has-session||new-session, so
-            # this unit is pre-creation + lifecycle ownership, not a SPOF.
-            konductor-tmux = {
-              unitConfig = {
-                Description = "Konductor durable tmux server";
-                Documentation = "https://github.com/tmux/tmux";
-              };
-              wantedBy = [ "default.target" ];
-              serviceConfig = {
-                # oneshot+RemainAfterExit: tmux daemonizes; the server process
-                # stays in this unit's cgroup. Restart= is not allowed for
-                # oneshot — recovery is handled by the attach path instead.
-                Type = "oneshot";
-                RemainAfterExit = true;
-                Environment = [ "PATH=/run/wrappers/bin:/run/current-system/sw/bin" ];
-                ExecStart = pkgs.writeShellScript "konductor-tmux-start" ''
-                  TMUX=/run/current-system/sw/bin/tmux
-                  "$TMUX" has-session -t k9 2>/dev/null || exec "$TMUX" new-session -d -s k9
-                '';
-                ExecStop = "/run/current-system/sw/bin/tmux kill-server";
-              };
-            };
-
             # Create directories required by open-sesame ReadWritePaths BEFORE
             # the services start. systemd sets up mount namespaces (for ProtectHome,
             # ProtectSystem) BEFORE ExecStartPre runs. If ReadWritePaths targets
@@ -2593,53 +2487,6 @@ let
                               # Extract port_bases for calculations
                               PORT_BASES=$(echo "$CONFIG_JSON" | jq -r '.port_bases // {}')
 
-                              # ─────────────────────────────────────────────────────────────────────
-                              # [ttyd] table — session durability + capability configuration
-                              # ─────────────────────────────────────────────────────────────────────
-                              TTYD_CONFIG=$(echo "$CONFIG_JSON" | jq -r '.ttyd // {}')
-                              SESSION_MODE=$(echo "$TTYD_CONFIG" | jq -r '.session_mode // "grouped"')
-                              case "$SESSION_MODE" in
-                                grouped|shared|none) ;;
-                                *)
-                                  echo "✗  Invalid [ttyd].session_mode='$SESSION_MODE' (valid: grouped, shared, none)"
-                                  exit 1
-                                  ;;
-                              esac
-                              TTYD_ENABLE_SIXEL=$(echo "$TTYD_CONFIG" | jq -r '.enable_sixel // false')
-                              TTYD_ENABLE_TRZSZ=$(echo "$TTYD_CONFIG" | jq -r '.enable_trzsz // false')
-                              TTYD_TRZSZ_DRAG_TIMEOUT=$(echo "$TTYD_CONFIG" | jq -r '.trzsz_drag_timeout // 3000')
-                              TTYD_AUTH_HEADER=$(echo "$TTYD_CONFIG" | jq -r '.auth_header // ""')
-                              # Leave-alert default is coupled to durability: with a durable session
-                              # tab close is harmless, so the alert defaults off (mode != none).
-                              TTYD_DISABLE_LEAVE_ALERT=$(echo "$TTYD_CONFIG" | jq -r --arg mode "$SESSION_MODE" '.disable_leave_alert // ($mode != "none")')
-                              echo "✓  ttyd: session_mode=$SESSION_MODE sixel=$TTYD_ENABLE_SIXEL trzsz=$TTYD_ENABLE_TRZSZ leave_alert_disabled=$TTYD_DISABLE_LEAVE_ALERT"
-
-                              # ─────────────────────────────────────────────────────────────────────
-                              # [network] table — per-user service port source restriction
-                              # ─────────────────────────────────────────────────────────────────────
-                              # REQUIRED when [ttyd].auth_header is set: identity headers are
-                              # trusted, so only the gateway may reach the ports directly.
-                              TRUSTED_SOURCE_CIDR=$(echo "$CONFIG_JSON" | jq -r '.network.trusted_source_cidr // ""')
-                              if [ -n "$TRUSTED_SOURCE_CIDR" ]; then
-                                if ! echo "$TRUSTED_SOURCE_CIDR" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'; then
-                                  echo "✗  Invalid [network].trusted_source_cidr='$TRUSTED_SOURCE_CIDR' (expected IPv4 CIDR, e.g. 10.244.0.0/16)"
-                                  exit 1
-                                fi
-                                echo "✓  network: per-user service ports restricted to $TRUSTED_SOURCE_CIDR"
-                              fi
-                              if [ -n "$TTYD_AUTH_HEADER" ] && [ -z "$TRUSTED_SOURCE_CIDR" ]; then
-                                echo "╔══════════════════════════════════════════════════════════════╗"
-                                echo "║  SECURITY: [ttyd].auth_header WITHOUT trusted_source_cidr    ║"
-                                echo "╠══════════════════════════════════════════════════════════════╣"
-                                echo "║  ttyd trusts the identity header unconditionally.            ║"
-                                echo "║  Without source restriction, ANY client reaching ports       ║"
-                                echo "║  7000-10499 can send Remote-User: <victim> and get a shell   ║"
-                                echo "║  as that user. Set [network].trusted_source_cidr to the      ║"
-                                echo "║  gateway egress CIDR, or remove [ttyd].auth_header.          ║"
-                                echo "║  See: docs/AUTHELIA_INTEGRATION.md §Enforcement invariant    ║"
-                                echo "╚══════════════════════════════════════════════════════════════╝"
-                              fi
-
                               # Extract user_services section
                               USER_SERVICES=$(echo "$CONFIG_JSON" | jq -r '
                                 .user_services // {} |
@@ -2696,7 +2543,6 @@ let
                               PORT=$CALC_PORT
                               USER_UID=$USER_UID
                               WORKSPACE=/workspace
-                              KONDUCTOR_TRUSTED_SOURCE_CIDR=$TRUSTED_SOURCE_CIDR
                 EOF
 
                                   # Generate drop-in
@@ -2724,21 +2570,8 @@ let
                                   # which is created by base unit's ExecStartPre and sourced by ExecStart wrapper
                                   case "$svc_name" in
                                     ttyd)
-                                      # Session + capability env: KONDUCTOR_TTYD_* consumed by the
-                                      # ttyd-konductor wrapper, KONDUCTOR_SESSION_MODE by
-                                      # konductor-web-session (inherited through ttyd's child env)
-                                      cat >> "$ENV_FILE" << EOF
-                              KONDUCTOR_SESSION_MODE=$SESSION_MODE
-                              KONDUCTOR_TTYD_ENABLE_SIXEL=$TTYD_ENABLE_SIXEL
-                              KONDUCTOR_TTYD_ENABLE_TRZSZ=$TTYD_ENABLE_TRZSZ
-                              KONDUCTOR_TTYD_TRZSZ_DRAG_TIMEOUT=$TTYD_TRZSZ_DRAG_TIMEOUT
-                              KONDUCTOR_TTYD_DISABLE_LEAVE_ALERT=$TTYD_DISABLE_LEAVE_ALERT
-                EOF
-                                      if [ -n "$TTYD_AUTH_HEADER" ]; then
-                                        echo "KONDUCTOR_TTYD_AUTH_HEADER=$TTYD_AUTH_HEADER" >> "$ENV_FILE"
-                                      fi
                                       cat >> "$DROPIN_PATH/50-config.conf" << EOF
-                ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${programs.ttyd.wrapped}/bin/ttyd-konductor -p \''${PORT} -S -C \$CERT_PATH -K \$KEY_PATH -- ${konductorWebSession}'
+                ExecStart=/bin/sh -c '. $CERT_ENV_FILE && exec ${programs.ttyd.wrapped}/bin/ttyd-konductor -p \''${PORT} -S -C \$CERT_PATH -K \$KEY_PATH -- ${pkgs.bashInteractive}/bin/bash'
                 EOF
                                       ;;
                                     restty)
@@ -2977,11 +2810,13 @@ let
         # See: .config/mise/toml/talos.compose.toml
         resolved = {
           enable = true;
-          fallbackDns = [
-            "8.8.8.8"
-            "1.1.1.1"
-          ];
-          dnssec = "false";
+          settings.Resolve = {
+            FallbackDNS = [
+              "8.8.8.8"
+              "1.1.1.1"
+            ];
+            DNSSEC = "false";
+          };
         };
 
         # =========================================================================
