@@ -438,6 +438,9 @@ in
         RemainAfterExit = true;
         EnvironmentFile = domainEnv;
         ExecStart = domainJoinScript;
+        # rpc-gssd ConditionPathExists=/etc/krb5.keytab fires at boot before
+        # domain-join creates the keytab, so rpc-gssd skips. Start it now.
+        ExecStartPost = "+${pkgs.systemd}/bin/systemctl start rpc-gssd.service";
       };
     };
   };
