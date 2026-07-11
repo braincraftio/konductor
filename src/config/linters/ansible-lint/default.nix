@@ -32,12 +32,23 @@ let
   # ships (ansible-core + httpx); fall back to nixpkgs ansible-core standalone so
   # the wrapper is usable a-la-carte without the ansible package category.
   ansibleOnPath = if ansibleEngine != null then ansibleEngine else pkgs.ansible;
+
+  # Pin ansible-lint to Python 3.13 — must match the ansible toolchain in
+  # packages/ansible (python313Packages.ansible-core). pkgs.ansible-lint is
+  # built via pkgs/by-name with the default python3Packages (which tracks
+  # the nixpkgs default Python). When nixpkgs bumps default Python (e.g.,
+  # 3.14), rpds-py native extension ABI mismatches with Python 3.13
+  # dependencies already in the closure, causing "No module named
+  # 'rpds.rpds'" at runtime. Override callPackage to inject python313Packages.
+  ansibleLintPkg = pkgs.ansible-lint.override {
+    python3Packages = pkgs.python313Packages;
+  };
 in
 {
   package = pkgs.writeShellApplication {
     name = "ansible-lint";
     runtimeInputs = [
-      pkgs.ansible-lint
+      ansibleLintPkg
       ansibleOnPath
     ];
     text = ''
@@ -75,7 +86,7 @@ in
     '';
   };
 
-  unwrapped = pkgs.ansible-lint;
+  unwrapped = ansibleLintPkg;
   inherit configFile;
 
   meta = {
