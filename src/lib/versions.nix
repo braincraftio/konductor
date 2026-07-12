@@ -59,6 +59,15 @@
     name = "ghcr.io/braincraftio/konductor";
   };
 
+  # Shell history — tip-of-spear policy to prevent SQLite migration skew
+  # between konductor devshells and home-manager consumers on different
+  # nixpkgs channels. Pinned via src/overlays/atuin.nix; bumping = update
+  # version here + src/vendor hashes in that overlay.
+  atuin = {
+    version = "18.17.0";
+    display = "18.17.0";
+  };
+
   nix = {
     minimum = "2.24.0";
     recommended = "2.24.10";

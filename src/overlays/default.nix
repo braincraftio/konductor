@@ -16,6 +16,10 @@
   # k0sctl tip-of-spear pin (ahead of both nixpkgs channels)
   (import ./k0s.nix)
 
+  # atuin tip-of-spear pin — prevents SQLite migration skew between
+  # devshell and home-manager consumers on different nixpkgs channels
+  (import ./atuin.nix)
+
   # Vim plugin fixes (lualine sandbox test failures)
   (import ./vim-plugins.nix)
 
