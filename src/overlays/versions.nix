@@ -7,6 +7,12 @@ let
 in
 
 _final: prev: {
+  # pipx test suite has formatting assertion failures on nixos-26.05
+  # (PEP 440 spacing change: "pkg@ url" vs "pkg @ url"). Disable tests.
+  pipx = prev.pipx.overridePythonAttrs (_old: {
+    doCheck = false;
+  });
+
   # Konductor namespace for version-locked packages
   konductor = {
     # Python with pinned version
@@ -24,7 +30,10 @@ _final: prev: {
 
     # Rust with pinned version (from rust-overlay)
     rustc = prev.rust-bin.stable."${langs.rust.version}".default.override {
-      extensions = [ "rust-src" "rust-analyzer" ];
+      extensions = [
+        "rust-src"
+        "rust-analyzer"
+      ];
     };
   };
 }
