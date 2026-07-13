@@ -43,6 +43,45 @@
     );
   })
 
+  # ld64-957.1 SIGTRAP fix — ld64 crashes linking ObjC framework code
+  # on macOS 26 (Darwin 25.x). Host .tbd stubs are incompatible with
+  # ld64's TAPI parser. Force lld for all affected packages (same
+  # pattern as glib/emacs/gtk3/codex in upstream nixpkgs master,
+  # ref NixOS/nixpkgs#116700). The consumed nixpkgs fork
+  # (usrbinkat/nixpkgs/gssproxy-package-and-module) is behind master
+  # and does not yet include these fixes.
+  (
+    _final: prev:
+    let
+      # Rust packages: pass -fuse-ld=lld through the compiler driver via RUSTFLAGS
+      useLldRust =
+        pkg:
+        pkg.overrideAttrs (
+          old:
+          prev.lib.optionalAttrs prev.stdenv.isDarwin {
+            RUSTFLAGS = (old.RUSTFLAGS or "") + " -C link-arg=-fuse-ld=lld";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.llvmPackages.lld ];
+          }
+        );
+      # C/C++/ObjC packages: pass -fuse-ld=lld via NIX_CFLAGS_LINK (compiler driver flag)
+      # Also add -headerpad_max_install_names so nixpkgs fixupPhase can rewrite rpaths
+      useLldCC =
+        pkg:
+        pkg.overrideAttrs (
+          old:
+          prev.lib.optionalAttrs prev.stdenv.isDarwin {
+            NIX_CFLAGS_LINK = (old.NIX_CFLAGS_LINK or "") + " -fuse-ld=lld -Wl,-headerpad_max_install_names";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.llvmPackages.lld ];
+          }
+        );
+    in
+    {
+      cargo-watch = useLldRust prev.cargo-watch;
+      starship = useLldRust prev.starship;
+      livekit-libwebrtc = useLldCC prev.livekit-libwebrtc;
+    }
+  )
+
   # Unstable packages overlay — apply direnv CGO fix here too since
   # mise and other unstable packages depend on unstable.direnv
   (
