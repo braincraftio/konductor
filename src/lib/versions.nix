@@ -64,8 +64,8 @@
   # nixpkgs channels. Pinned via src/overlays/atuin.nix; bumping = update
   # version here + src/vendor hashes in that overlay.
   atuin = {
-    version = "18.17.0";
-    display = "18.17.0";
+    version = "18.16.1";
+    display = "18.16.1";
   };
 
   nix = {

@@ -1,37 +1,31 @@
 # src/overlays/atuin.nix
-# Atuin pinned to tip-of-spear, independent of nixpkgs channel drift.
+# Atuin pinned ahead of nixos-26.05, independent of nixpkgs channel drift.
 #
-# nixos-26.05 ships atuin 18.15.2 — three releases behind upstream.
-# Migration skew between konductor devshells (which may run a different
-# nixpkgs) and home-manager consumers caused SQLite migration conflicts
-# (migration 20260224000100 applied by newer atuin, absent in older).
-# This overlay asserts the version so all surfaces — devshells, home-manager
-# module, NixOS module, QCOW2 — ship the same atuin regardless of their
-# nixpkgs channel.
+# nixos-26.05 ships atuin 18.10.0. Migration skew between konductor
+# devshells and home-manager consumers on different nixpkgs channels
+# caused SQLite migration conflicts (migration 20260224000100 applied
+# by newer atuin, absent in older). This overlay asserts a single version
+# across all surfaces — devshells, home-manager, NixOS, QCOW2.
 #
-# The derivation mirrors upstream nixpkgs pkgs/by-name/at/atuin/package.nix.
+# Pinned to 18.16.1 (nixpkgs-unstable's version) rather than 18.17.0
+# because 18.17.0 requires rustc >= 1.96.1 which exceeds the nixpkgs
+# rustc (1.91.1). Using prev.rustPlatform keeps the overlay self-contained
+# with zero consumer overhead — no rust-overlay dependency required.
+#
+# The derivation mirrors nixpkgs-unstable pkgs/by-name/at/atuin/package.nix.
 #
 # Version bump procedure:
 #   1. src/lib/versions.nix — atuin.version
 #   2. this file — src hash + cargoHash for the new tag
+#   3. verify new version builds with nixpkgs-bundled rustc (no rust-overlay)
 
 let
   versions = import ../lib/versions.nix;
   inherit (versions) atuin;
 in
 
-_final: prev:
-let
-  # atuin 18.17.0 requires rustc >= 1.96.1; nixos-26.05 ships 1.95.0.
-  # Use rust-overlay (applied before this overlay) to get a sufficient toolchain.
-  rustToolchain = prev.rust-bin.stable."1.96.1".default;
-  rustPlatform = prev.makeRustPlatform {
-    cargo = rustToolchain;
-    rustc = rustToolchain;
-  };
-in
-{
-  atuin = rustPlatform.buildRustPackage {
+_final: prev: {
+  atuin = prev.rustPlatform.buildRustPackage {
     pname = "atuin";
     inherit (atuin) version;
 
@@ -39,10 +33,10 @@ in
       owner = "atuinsh";
       repo = "atuin";
       tag = "v${atuin.version}";
-      hash = "sha256-cciogPSlbfiC9U3Dv+IGyuRI9PU9X4LdlequCFiG/a0=";
+      hash = "sha256-XrJFetPs7TsbX5Cxekj+h3hlmQLoOpB7U+c36NM/jeA=";
     };
 
-    cargoHash = "sha256-QX1JupLZafRdMUZjl58iFjiPgLSTYZazRVyU88n5QP8=";
+    cargoHash = "sha256-eqxeE7+UxBTdaYjlonOz6pYQ3mar8lNUd/K0CSuzquc=";
 
     # atuin's default features include 'check-updates', which do not make sense
     # for distribution builds. List all other default features.
