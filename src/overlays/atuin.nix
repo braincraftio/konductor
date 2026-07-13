@@ -20,8 +20,18 @@ let
   inherit (versions) atuin;
 in
 
-_final: prev: {
-  atuin = prev.rustPlatform.buildRustPackage {
+_final: prev:
+let
+  # atuin 18.17.0 requires rustc >= 1.96.1; nixos-26.05 ships 1.95.0.
+  # Use rust-overlay (applied before this overlay) to get a sufficient toolchain.
+  rustToolchain = prev.rust-bin.stable."1.96.1".default;
+  rustPlatform = prev.makeRustPlatform {
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
+in
+{
+  atuin = rustPlatform.buildRustPackage {
     pname = "atuin";
     inherit (atuin) version;
 
