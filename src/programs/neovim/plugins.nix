@@ -679,7 +679,7 @@ in
         # Nix
         nil_ls = {
           enable = true;
-          settings.formatting.command = [ "${pkgs.nixfmt-rfc-style}/bin/nixfmt" ];
+          settings.formatting.command = [ "${pkgs.nixfmt}/bin/nixfmt" ];
         };
         # Lua
         lua_ls = {
@@ -800,7 +800,7 @@ in
         };
         # Explicit formatter configurations with Nix store paths
         formatters = {
-          nixfmt.command = "${pkgs.nixfmt-rfc-style}/bin/nixfmt";
+          nixfmt.command = "${pkgs.nixfmt}/bin/nixfmt";
           stylua.command = "${pkgs.stylua}/bin/stylua";
           ruff_format.command = "${pkgs.ruff}/bin/ruff";
           ruff_format.args = [
