@@ -95,6 +95,17 @@ in
       source "/etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh"
     fi
 
+    # Deduplicate XDG_DATA_DIRS — nix.sh and hm-session-vars.sh both prepend
+    # nix store paths, and hm-session-vars re-sources nix.sh, causing 7x
+    # duplication of .nix-profile/share and nix/profiles/default/share.
+    # The COSMIC launcher indexes each XDG_DATA_DIRS entry independently,
+    # so duplicates produce duplicate entries in the application launcher.
+    if [ -n "''${XDG_DATA_DIRS:-}" ]; then
+      XDG_DATA_DIRS="$(printf '%s' "$XDG_DATA_DIRS" | awk -v RS=: -v ORS=: '!seen[$0]++')"
+      XDG_DATA_DIRS="''${XDG_DATA_DIRS%:}"
+      export XDG_DATA_DIRS
+    fi
+
     # Source user bashrc for aliases and shell config
     if [ -f ~/.bashrc ]; then
       source ~/.bashrc
