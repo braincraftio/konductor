@@ -613,9 +613,13 @@ let
     # tmux-resurrect: Session persistence
     # -------------------------------------------------------------------------
     # Research: @resurrect-strategy-nvim 'session' integrates with :mksession
-    set -g @resurrect-capture-pane-contents 'on'
+    # Pane content capture disabled: replaying scrollback from TUI apps
+    # (neovim, claude, vim) produces unreadable escape-sequence garbage.
+    # Session layout, working directories, and processes still restore.
+    # Neovim sessions restore via @resurrect-strategy-nvim 'session'.
+    set -g @resurrect-capture-pane-contents 'off'
     set -g @resurrect-strategy-nvim 'session'
-    set -g @resurrect-processes 'nvim vim ssh "~rails server" "~npm start"'
+    set -g @resurrect-processes 'ssh mosh-client'
 
     # -------------------------------------------------------------------------
     # tmux-continuum: Automatic session saving
