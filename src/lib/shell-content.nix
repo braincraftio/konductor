@@ -48,9 +48,9 @@ let
 
   # Environment variable exports for standalone shells (containers, VMs)
   envExports = ''
-    # Locale
-    export LANG=${env.LANG}
-    export LC_ALL=${env.LC_ALL}
+    # Locale (hardcoded for hermetic environments without /etc/default/locale)
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
 
     # Editor
     export EDITOR=${env.EDITOR}
@@ -81,9 +81,22 @@ in
     # which sets PATH, env vars, etc. Re-sourcing /etc/profile would re-run
     # /usr/libexec/path_helper which puts /usr/bin:/bin before Nix paths,
     # undoing the correct PATH ordering set by nix-darwin.
+    # If nix paths are already on PATH (inherited from the desktop session
+    # via systemd environment generators or PAM), pre-set the nix-daemon.sh
+    # guard so /etc/profile doesn't prepend them again. The guard is a plain
+    # shell variable in nix-daemon.sh (not exported), so it resets in every
+    # new process — we must set it before sourcing /etc/profile.
+    if [[ ":$PATH:" == *"/.nix-profile/bin:"* ]]; then
+      __ETC_PROFILE_NIX_SOURCED=1
+    fi
+
     if [ -f /etc/profile ] && [ "$(uname)" != "Darwin" ]; then
       source /etc/profile
     fi
+
+    # Export the guard so child processes (tmux panes, subshells) that
+    # re-source /etc/profile also skip the nix-daemon.sh PATH prepend.
+    export __ETC_PROFILE_NIX_SOURCED=1
 
     # Source home-manager session variables (ATUIN_CONFIG_DIR, BASH_ENV, etc.)
     # Required for standalone home-manager; NixOS/darwin set these via PAM

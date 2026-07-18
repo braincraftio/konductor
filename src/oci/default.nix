@@ -1,7 +1,12 @@
 # src/oci/default.nix
 # OCI container target
 
-{ pkgs, lib, inputs, nix2container }:
+{
+  pkgs,
+  lib,
+  inputs,
+  nix2container,
+}:
 
 let
   versions = import ../lib/versions.nix;
@@ -14,11 +19,23 @@ let
 
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions catppuccinSources; };
+  config = import ../config {
+    inherit
+      pkgs
+      lib
+      versions
+      catppuccinSources
+      ;
+  };
 
   # Import packages with wrapped config (hermetic linters/formatters)
   packages = import ../packages {
-    inherit pkgs lib config versions;
+    inherit
+      pkgs
+      lib
+      config
+      versions
+      ;
   };
 
   # Import programs (neovim, tmux) - same as flake devShells
@@ -32,18 +49,17 @@ let
   };
 
   # Generate nixbld user entries for passwd
-  nixbldPasswdEntries = lib.concatMapStrings
-    (i:
-      "nixbld${toString i}:x:${toString (nixbld.startUid + i - 1)}:${toString nixbld.gid}:Nix build user ${toString i}:/var/empty:/sbin/nologin\n"
-    )
-    (lib.range 1 nixbld.count);
+  nixbldPasswdEntries = lib.concatMapStrings (
+    i:
+    "nixbld${toString i}:x:${
+      toString (nixbld.startUid + i - 1)
+    }:${toString nixbld.gid}:Nix build user ${toString i}:/var/empty:/sbin/nologin\n"
+  ) (lib.range 1 nixbld.count);
 
   # Generate nixbld user entries for shadow
-  nixbldShadowEntries = lib.concatMapStrings
-    (i:
-      "nixbld${toString i}:!:1::::::\n"
-    )
-    (lib.range 1 nixbld.count);
+  nixbldShadowEntries = lib.concatMapStrings (i: "nixbld${toString i}:!:1::::::\n") (
+    lib.range 1 nixbld.count
+  );
 
   # System configuration files
   passwdFile = pkgs.writeTextDir "etc/passwd" ''
@@ -55,7 +71,9 @@ let
     ${nixbldPasswdEntries}'';
 
   # Generate nixbld group members list
-  nixbldMembers = lib.concatStringsSep "," (map (i: "nixbld${toString i}") (lib.range 1 nixbld.count));
+  nixbldMembers = lib.concatStringsSep "," (
+    map (i: "nixbld${toString i}") (lib.range 1 nixbld.count)
+  );
 
   groupFile = pkgs.writeTextDir "etc/group" ''
     root:x:0:
@@ -198,15 +216,24 @@ let
   '';
 
   # Pre-configured flake registry
-  nixRegistry = pkgs.writeTextDir "etc/nix/registry.json" (builtins.toJSON {
-    version = 2;
-    flakes = [
-      {
-        from = { type = "indirect"; id = "konductor"; };
-        to = { type = "github"; owner = "braincraftio"; repo = "konductor"; };
-      }
-    ];
-  });
+  nixRegistry = pkgs.writeTextDir "etc/nix/registry.json" (
+    builtins.toJSON {
+      version = 2;
+      flakes = [
+        {
+          from = {
+            type = "indirect";
+            id = "konductor";
+          };
+          to = {
+            type = "github";
+            owner = "braincraftio";
+            repo = "konductor";
+          };
+        }
+      ];
+    }
+  );
 
   # Git system-level configuration (/etc/gitconfig)
   # User ~/.gitconfig can override - keeps credential helpers at system level with stable paths
@@ -247,33 +274,34 @@ let
   # Root filesystem combining all system files
   rootEnv = pkgs.buildEnv {
     name = "konductor-root";
-    paths = packages.default
+    paths =
+      packages.default
       ++ programs.neovim.packages
       ++ programs.tmux.packages
       ++ [
-      passwdFile
-      groupFile
-      shadowFile
-      gshadowFile
-      sudoersFile
-      nsswitchFile
-      pamSudo
-      pamSu
-      pamOther
-      skelFiles
-      profileScript
-      homeDirectories
-      standardDirs
-      pkgs.dockerTools.caCertificates
-      pkgs.sudo
-      pkgs.linux-pam
-      # Nix for on-the-fly environment switching
-      pkgs.nix
-      pkgs.cachix
-      nixConf
-      nixRegistry
-      gitconfigFile
-    ];
+        passwdFile
+        groupFile
+        shadowFile
+        gshadowFile
+        sudoersFile
+        nsswitchFile
+        pamSudo
+        pamSu
+        pamOther
+        skelFiles
+        profileScript
+        homeDirectories
+        standardDirs
+        pkgs.dockerTools.caCertificates
+        pkgs.sudo
+        pkgs.linux-pam
+        # Nix for on-the-fly environment switching
+        pkgs.nix
+        pkgs.cachix
+        nixConf
+        nixRegistry
+        gitconfigFile
+      ];
     pathsToLink = [ "/" ];
   };
 
@@ -345,8 +373,8 @@ in
         "PATH=/bin"
         "SSL_CERT_FILE=${env.SSL_CERT_FILE}"
         "NIX_SSL_CERT_FILE=${env.NIX_SSL_CERT_FILE}"
-        "LANG=${env.LANG}"
-        "LC_ALL=${env.LC_ALL}"
+        "LANG=C.UTF-8"
+        "LC_ALL=C.UTF-8"
         "HOME=/home/kc2"
         "USER=kc2"
         "TERM=${env.TERM}"
@@ -359,7 +387,10 @@ in
       ];
       WorkingDir = "/workspace";
       User = "${toString users.kc2.uid}:${toString users.kc2.gid}";
-      Entrypoint = [ "/bin/bash" "-l" ];
+      Entrypoint = [
+        "/bin/bash"
+        "-l"
+      ];
       Cmd = [ ];
       Volumes = {
         "/workspace" = { };

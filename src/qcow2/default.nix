@@ -1529,6 +1529,10 @@ let
         variables = lib.mapAttrs (_name: value: lib.mkForce value) (
           env
           // {
+            # Locale — hermetic VM has no /etc/default/locale from a parent OS.
+            # C.UTF-8 is correct for headless server VMs (no COSMIC compositor).
+            LANG = "C.UTF-8";
+            LC_ALL = "C.UTF-8";
             # BASH_ENV: Ensures non-interactive bash (bash -c, bash script.sh)
             # sources NixOS environment. Without this, tools like runme that
             # spawn bash subprocesses won't have /run/current-system/sw/bin in PATH.
