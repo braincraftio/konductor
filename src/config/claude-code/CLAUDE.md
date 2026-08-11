@@ -129,6 +129,32 @@ live under paths (`.claude-plugin/`, dotfile configs like `.mcp.json` /
   bare `${drv}`; `lib.recursiveUpdate` for nested merges; reference derived values
   through `final.*` so `.extend` propagates. See the `nix-idioms` skill.
 
+## Runtime configuration and settings layering
+
+The wrapper **does not** create `settings.local.json`. That's the user's file for
+runtime mutations (`/login`, UI preference changes). Claude Code auto-merges when
+both exist: `settings.json` (hermetic base) + `settings.local.json` (user
+overrides), with local winning for scalar values and permission rules merging.
+
+**For provider-specific config** (AWS Bedrock, GCP Vertex, Azure), set env vars in
+the consuming flake's home-manager config, NOT in konductor's shipped defaults:
+
+```nix
+# ~/.config/home-manager/hosts/cisco.nix
+home.sessionVariables = {
+  CLAUDE_CODE_USE_BEDROCK = "1";
+  AWS_REGION = "us-east-1";
+  AWS_PROFILE = "default";
+  ANTHROPIC_DEFAULT_SONNET_MODEL = "us.anthropic.claude-sonnet-4-5-20250929-v1:0[1m]";
+  ANTHROPIC_DEFAULT_OPUS_MODEL = "us.anthropic.claude-opus-4-6-v1[1m]";
+  ANTHROPIC_DEFAULT_HAIKU_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+};
+```
+
+Or in project `.envrc` for per-workspace overrides. The `/login` command writes to
+`settings.local.json` when that path is writable; the konductor wrapper seeds a
+writable `~/.config/konductor-claude/` so writes succeed.
+
 ## Verifying a change
 
 After editing, the build is the verification:
