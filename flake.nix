@@ -22,6 +22,9 @@
     nixpkgs.url = "github:usrbinkat/nixpkgs/gssproxy-package-and-module";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
+    # flake-utils and systems are retained for nuschtosSearch, ixx, and
+    # nixvim follows declarations. Per-system iteration uses
+    # lib.genAttrs supportedSystems directly.
     flake-utils.url = "github:numtide/flake-utils";
     flake-utils.inputs.systems.follows = "systems";
 
@@ -124,13 +127,14 @@
     {
       self,
       nixpkgs,
-      flake-utils,
       ...
     }@inputs:
     let
+      lib = nixpkgs.lib;
+
       # Import overlays
       overlays = import ./src/overlays {
-        inherit (nixpkgs) lib;
+        inherit lib;
         inherit (inputs) nixpkgs-unstable k0s-nix;
       };
 
@@ -142,111 +146,22 @@
         narHash = self.narHash;
       };
 
-    in
+      # Single system list — one source of truth for all per-system outputs.
+      # flake-utils and systems inputs are retained only for downstream
+      # follows (nuschtosSearch, ixx, nixvim). Iteration uses lib.genAttrs.
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
 
-    # Per-system outputs (devShells, packages)
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
-          config = {
-            allowUnfree = true;
-            permittedInsecurePackages = [
-              "nodejs-20.20.2"
-              "nodejs-slim-20.20.2"
-            ];
-          };
-        };
-
-        # Import versions for devshells
-        versions = import ./src/lib/versions.nix;
-
-        # Import programs (neovim, tmux)
-        programs = import ./src/programs {
-          inherit pkgs inputs;
-          inherit (nixpkgs) lib;
-        };
-
-        # Import devshells (single source of truth for all development shells)
-        devshells = import ./src/devshells {
-          inherit
-            pkgs
-            inputs
-            versions
-            programs
-            sourceInfo
-            ;
-          inherit (nixpkgs) lib;
-        };
-
-        # OCI container (Linux-only)
-        oci = import ./src/oci {
-          inherit pkgs inputs;
-          inherit (nixpkgs) lib;
-          inherit (inputs.nix2container.packages.${system}) nix2container;
-        };
-
-        # QCOW2 VM (Linux-only)
-        # Uses native nixpkgs image building (no nixos-generators)
-        qcow2 = import ./src/qcow2 {
-          inherit
-            pkgs
-            nixpkgs
-            inputs
-            system
-            versions
-            programs
-            devshells
-            ;
-          inherit (nixpkgs) lib;
-        };
-
-      in
-      {
-        # Development shells from src/devshells
-        # Cross-platform shells available everywhere
-        # Linux-only shells (konductor, frontend) conditionally included
-        devShells = {
-          inherit (devshells)
-            default
-            python
-            go
-            node
-            rust
-            dev
-            full
-            ;
-        }
-        // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          # x86_64-linux only: requires libguestfs-appliance (qemu_kvm, libvirt, virt-manager, etc.)
-          # frontend extends konductor, so it's also Linux-only
-          inherit (devshells) konductor frontend;
-        };
-
-        # Packages (build outputs, not shells)
-        packages =
-          pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            # OCI is Linux-only (Docker/podman)
-            oci = oci.image;
-          }
-          // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-            # qcow2 requires libguestfs-appliance which only supports x86_64-linux
-            qcow2 = qcow2.image;
-          };
-      }
-    )
-
-    # Cross-system outputs (modules, overlays, nixosConfigurations)
-    // {
-      overlays.default = nixpkgs.lib.composeManyExtensions overlays;
-
-      # NixOS configurations for live rebuilds on running VMs
-      # Usage: sudo nixos-rebuild switch --flake .#konductor
-      nixosConfigurations.konductor =
+      # Per-system bindings computed once via genAttrs, indexed everywhere.
+      # Both forAllSystems and nixosConfigurations read from this table,
+      # sharing thunks instead of re-evaluating pkgs/overlays/src imports.
+      systemBindings = lib.genAttrs supportedSystems (
+        system:
         let
-          system = "x86_64-linux";
           pkgs = import nixpkgs {
             inherit system;
             overlays = [ inputs.rust-overlay.overlays.default ] ++ overlays;
@@ -259,9 +174,21 @@
             };
           };
           versions = import ./src/lib/versions.nix;
+          catppuccinSources = inputs.catppuccin.packages.${system};
+          konductorConfig = import ./src/config {
+            inherit
+              pkgs
+              versions
+              catppuccinSources
+              lib
+              ;
+          };
+          packages = import ./src/packages {
+            inherit pkgs versions lib;
+            config = konductorConfig;
+          };
           programs = import ./src/programs {
-            inherit pkgs inputs;
-            inherit (nixpkgs) lib;
+            inherit pkgs inputs lib;
           };
           devshells = import ./src/devshells {
             inherit
@@ -269,8 +196,9 @@
               inputs
               versions
               programs
+              sourceInfo
+              lib
               ;
-            inherit (nixpkgs) lib;
           };
           qcow2 = import ./src/qcow2 {
             inherit
@@ -281,12 +209,191 @@
               versions
               programs
               devshells
+              lib
               ;
-            inherit (nixpkgs) lib;
           };
+          oci = import ./src/oci {
+            inherit pkgs inputs lib;
+            inherit (inputs.nix2container.packages.${system}) nix2container;
+          };
+
+          # Installable package: nix profile install github:braincraftio/konductor
+          # Same composition as the full devshell: fullPackages + neovim + tmux + atuin
+          konductorEnv = pkgs.buildEnv {
+            name = "konductor-env";
+            paths =
+              packages.fullPackages
+              ++ programs.neovim.packages
+              ++ programs.tmux.packages
+              ++ konductorConfig.shell.atuin.packages;
+            meta.description = "Konductor polyglot development environment";
+          };
+
+          # Per-tool version checks: each depends only on its own package
+          # closure, so bumping one tool does not invalidate other checks.
+          # Follows nixpkgs testers.testVersion pattern.
+          toolChecks = {
+            nvim =
+              pkgs.runCommand "check-nvim"
+                {
+                  nativeBuildInputs = programs.neovim.packages;
+                  meta.timeout = 60;
+                }
+                ''
+                  nvim --version > /dev/null && touch $out
+                '';
+            tmux =
+              pkgs.runCommand "check-tmux"
+                {
+                  nativeBuildInputs = programs.tmux.packages;
+                  meta.timeout = 60;
+                }
+                ''
+                  tmux -V > /dev/null && touch $out
+                '';
+            git =
+              pkgs.runCommand "check-git"
+                {
+                  nativeBuildInputs = [ pkgs.git ];
+                  meta.timeout = 60;
+                }
+                ''
+                  git --version > /dev/null && touch $out
+                '';
+            jq =
+              pkgs.runCommand "check-jq"
+                {
+                  nativeBuildInputs = [ pkgs.jq ];
+                  meta.timeout = 60;
+                }
+                ''
+                  jq --version > /dev/null && touch $out
+                '';
+            rg =
+              pkgs.runCommand "check-rg"
+                {
+                  nativeBuildInputs = [ pkgs.ripgrep ];
+                  meta.timeout = 60;
+                }
+                ''
+                  rg --version > /dev/null && touch $out
+                '';
+            atuin =
+              pkgs.runCommand "check-atuin"
+                {
+                  nativeBuildInputs = [ pkgs.atuin ];
+                  meta.timeout = 60;
+                }
+                ''
+                  atuin --version > /dev/null && touch $out
+                '';
+            starship =
+              pkgs.runCommand "check-starship"
+                {
+                  nativeBuildInputs = [ pkgs.starship ];
+                  meta.timeout = 60;
+                }
+                ''
+                  starship --version > /dev/null && touch $out
+                '';
+            kubectl =
+              pkgs.runCommand "check-kubectl"
+                {
+                  nativeBuildInputs = [ pkgs.unstable.kubectl ];
+                  meta.timeout = 60;
+                }
+                ''
+                  kubectl version --client > /dev/null && touch $out
+                '';
+          };
+
+          # Bundle integration: verifies buildEnv composition succeeds without
+          # collisions and the resulting env is a valid store path. This rebuilds
+          # on any constituent change but catches collision regressions that
+          # per-tool checks cannot detect.
+          bundleCheck =
+            pkgs.runCommand "check-bundle"
+              {
+                nativeBuildInputs = [ konductorEnv ];
+                meta.timeout = 120;
+              }
+              ''
+                test -d ${konductorEnv}/bin && touch $out
+              '';
+        in
+        {
+          inherit
+            pkgs
+            versions
+            packages
+            programs
+            devshells
+            qcow2
+            oci
+            konductorConfig
+            konductorEnv
+            toolChecks
+            bundleCheck
+            ;
+        }
+      );
+
+      # Per-system output builder using the shared systemBindings table
+      forAllSystems = f: lib.genAttrs supportedSystems (system: f system systemBindings.${system});
+
+    in
+
+    # Per-system outputs (devShells, packages, checks)
+    {
+      devShells = forAllSystems (
+        system: sb:
+        {
+          inherit (sb.devshells)
+            default
+            python
+            go
+            node
+            rust
+            dev
+            full
+            ;
+        }
+        // lib.optionalAttrs (system == "x86_64-linux") {
+          inherit (sb.devshells) konductor frontend;
+        }
+      );
+
+      packages = forAllSystems (
+        system: sb:
+        {
+          default = sb.konductorEnv;
+        }
+        // lib.optionalAttrs sb.pkgs.stdenv.hostPlatform.isLinux {
+          oci = sb.oci.image;
+        }
+        // lib.optionalAttrs (system == "x86_64-linux") {
+          qcow2 = sb.qcow2.image;
+        }
+      );
+
+      # Functional checks: nix flake check
+      # Per-tool checks depend only on their own closure (per-tool cache invalidation).
+      # Bundle check verifies buildEnv composition (catches collisions).
+      checks = forAllSystems (_system: sb: sb.toolChecks // { inherit (sb) bundleCheck; });
+    }
+
+    # Cross-system outputs (modules, overlays, nixosConfigurations)
+    // {
+      overlays.default = lib.composeManyExtensions overlays;
+
+      # NixOS configurations for live rebuilds on running VMs
+      # Usage: sudo nixos-rebuild switch --flake .#konductor
+      nixosConfigurations.konductor =
+        let
+          inherit (systemBindings."x86_64-linux") qcow2;
         in
         nixpkgs.lib.nixosSystem {
-          inherit system;
+          system = "x86_64-linux";
           modules = [ qcow2.konductorModule ];
         };
 
