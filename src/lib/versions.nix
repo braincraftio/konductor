@@ -28,8 +28,8 @@
       display = "22";
     };
     rust = {
-      version = "1.92.0";
-      display = "1.92.0";
+      version = "1.98.0";
+      display = "1.98.0";
     };
   };
 
@@ -64,8 +64,8 @@
   # nixpkgs channels. Pinned via src/overlays/atuin.nix; bumping = update
   # version here + src/vendor hashes in that overlay.
   atuin = {
-    version = "18.16.1";
-    display = "18.16.1";
+    version = "18.20.1";
+    display = "18.20.1";
   };
 
   nix = {

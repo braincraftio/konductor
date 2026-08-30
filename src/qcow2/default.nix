@@ -556,7 +556,6 @@ let
     };
 
     home = {
-      enableNixpkgsReleaseCheck = false;
       inherit (versions.nixos) stateVersion;
       file = {
         ".bashrc".text = konductorConfig.shell.bash.bashrcContent;

@@ -34,9 +34,6 @@ let
     # Allow unfree packages (claude-code)
     nixpkgs.config.allowUnfree = true;
 
-    # nixpkgs fork (master) identifies as 26.11; nixvim tracks 26.05
-    version.enableNixpkgsReleaseCheck = false;
-
     # Colorscheme
     colorschemes.catppuccin = {
       enable = true;

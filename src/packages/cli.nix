@@ -4,9 +4,10 @@
 # Shell tools (git, ssh, k9s) use hermetic wrappers from src/config/
 # when config is provided.
 
-{ pkgs
-, config ? null
-, pulumiPkg
+{
+  pkgs,
+  config ? null,
+  pulumiPkg,
 }:
 
 let
@@ -69,6 +70,8 @@ in
       unstable.mise # Task runner and version manager
       direnv # Directory-based environments
       unstable.runme # Executable markdown documentation
+      nix-prefetch-git # Hash computation for fetchFromGitHub/fetchgit
+      nix-prefetch-github # Hash computation for GitHub sources
 
       # Kubernetes tools (unstable for faster updates)
       unstable.kubectl # Kubernetes CLI
@@ -101,6 +104,5 @@ in
     ]);
 
   shellHook = "";
-  env = (if hasConfig then config.shell.bash.env // config.shell.atuin.env else { })
-    // pulumiPkg.env;
+  env = (if hasConfig then config.shell.bash.env // config.shell.atuin.env else { }) // pulumiPkg.env;
 }

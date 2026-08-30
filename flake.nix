@@ -57,8 +57,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # nixvim uses its own pinned nixpkgs for building (avoids
-    # nixos-render-docs patch conflicts with nixpkgs master)
+    # nixvim uses its own pinned nixpkgs for building; no
+    # nixpkgs.follows to avoid nixos-render-docs rebuild conflicts
     nixvim = {
       url = "github:nix-community/nixvim/nixos-26.05";
       inputs = {
@@ -95,12 +95,13 @@
     };
 
     # k0s Kubernetes distribution: binary packages (k0s_1_27..k0s_1_35) +
-    # services.k0s NixOS module. Tracks main (author treats main as stable;
-    # CI-tested per commit). MIT-licensed for nixpkgs upstreamability — issues
-    # we hit get contributed upstream rather than forked around.
+    # services.k0s NixOS module. Tracks main (maintainers treat main as
+    # stable; CI-tested per commit). MIT-licensed for nixpkgs
+    # upstreamability — issues we hit get contributed upstream rather
+    # than forked around.
     # Update: nix flake update k0s-nix
     k0s-nix = {
-      url = "github:johbo/k0s-nix";
+      url = "github:nix-community/k0s-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

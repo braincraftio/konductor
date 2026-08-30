@@ -14,13 +14,14 @@
 # OpenCode theme from: ../config/opencode/
 # Atuin shell history from: ../config/shell/atuin.nix
 
-{ fullShell
-, pkgs
-, packages
-, versions
-, programs
-, config
-, ...
+{
+  fullShell,
+  pkgs,
+  packages,
+  versions,
+  programs,
+  config,
+  ...
 }:
 
 let
@@ -46,11 +47,13 @@ fullShell.overrideAttrs (old: {
   shellHook = ''
     # Runtime libraries (dynamic: appends to existing LD_LIBRARY_PATH)
     # Prepended before old.shellHook so LD_LIBRARY_PATH is available early
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-      pkgs.stdenv.cc.cc.lib
-      pkgs.xz
-      pkgs.zstd
-    ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH="${
+      pkgs.lib.makeLibraryPath [
+        pkgs.stdenv.cc.cc.lib
+        pkgs.xz
+        pkgs.zstd
+      ]
+    }"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   ''
   + old.shellHook
   + ''
@@ -64,24 +67,7 @@ fullShell.overrideAttrs (old: {
     ${programs.forgejo.shellHook}
 
     if [ -z "''${KONDUCTOR_QUIET:-}" ]; then
-      echo ""
-      echo "╔══════════════════════════════════════════════════════════════╗"
-      echo "║              Konductor Self-Hosting Shell                    ║"
-      echo "╚══════════════════════════════════════════════════════════════╝"
-      echo ""
-      echo "Languages:"
-      echo "  Python ${langs.python.display} | Go ${langs.go.display}"
-      echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
-      echo ""
-      echo "Build Tools:"
-      echo "  docker, docker-compose, buildkit, skopeo, crane"
-      echo "  qemu, libvirt, virt-sparsify, OVMF"
-      echo ""
-      echo "CI Tools:"
-      echo "  forgejo-runner, fj (forgejo-cli), tea (gitea-cli), gh (github-cli)"
-      echo ""
-      echo "Commands:  mise run help"
-      echo ""
+      echo "konductor: py${langs.python.display} go${langs.go.display} node${langs.node.display} rust${langs.rust.display} k0s${versions.kubernetes.k0s.display}"
     fi
 
     # Clean up shellHook from env output

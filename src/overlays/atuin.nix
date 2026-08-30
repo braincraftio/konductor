@@ -1,31 +1,35 @@
 # src/overlays/atuin.nix
 # Atuin pinned ahead of nixos-26.05, independent of nixpkgs channel drift.
 #
-# nixos-26.05 ships atuin 18.10.0. Migration skew between konductor
+# nixos-26.05 ships atuin 18.15.2. Migration skew between konductor
 # devshells and home-manager consumers on different nixpkgs channels
-# caused SQLite migration conflicts (migration 20260224000100 applied
-# by newer atuin, absent in older). This overlay asserts a single version
-# across all surfaces — devshells, home-manager, NixOS, QCOW2.
+# caused SQLite migration conflicts. This overlay asserts a single
+# version across all surfaces — devshells, home-manager, NixOS, QCOW2.
 #
-# Pinned to 18.16.1 (nixpkgs-unstable's version) rather than 18.17.0
-# because 18.17.0 requires rustc >= 1.96.1 which exceeds the nixpkgs
-# rustc (1.91.1). Using prev.rustPlatform keeps the overlay self-contained
-# with zero consumer overhead — no rust-overlay dependency required.
-#
-# The derivation mirrors nixpkgs-unstable pkgs/by-name/at/atuin/package.nix.
+# atuin >= 18.17.0 requires rustc >= 1.96.1; nixos-26.05 ships 1.95.0.
+# Build uses rust-overlay toolchain pinned in versions.nix.
 #
 # Version bump procedure:
 #   1. src/lib/versions.nix — atuin.version
 #   2. this file — src hash + cargoHash for the new tag
-#   3. verify new version builds with nixpkgs-bundled rustc (no rust-overlay)
 
 let
   versions = import ../lib/versions.nix;
   inherit (versions) atuin;
 in
 
-_final: prev: {
-  atuin = prev.rustPlatform.buildRustPackage {
+_final: prev:
+let
+  # nixos-26.05 ships rustc 1.95.0; atuin >= 18.17.0 requires rustc >= 1.96.1.
+  # Build with the rust-overlay toolchain pinned in versions.nix.
+  rustToolchain = prev.rust-bin.stable.${versions.languages.rust.version}.minimal;
+  rustPlatform = prev.makeRustPlatform {
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
+in
+{
+  atuin = rustPlatform.buildRustPackage {
     pname = "atuin";
     inherit (atuin) version;
 
@@ -33,10 +37,10 @@ _final: prev: {
       owner = "atuinsh";
       repo = "atuin";
       tag = "v${atuin.version}";
-      hash = "sha256-XrJFetPs7TsbX5Cxekj+h3hlmQLoOpB7U+c36NM/jeA=";
+      hash = "sha256-FjfG2w4HnYNdT7cztVzSGtcgj/9fLupgSu8bzV+uLtE=";
     };
 
-    cargoHash = "sha256-eqxeE7+UxBTdaYjlonOz6pYQ3mar8lNUd/K0CSuzquc=";
+    cargoHash = "sha256-HXRFjemrIVuBYpM3ISMtvnNEWFMfmfkhavNFgk5VbI4=";
 
     # atuin's default features include 'check-updates', which do not make sense
     # for distribution builds. List all other default features.
@@ -50,7 +54,14 @@ _final: prev: {
       "sync"
     ];
 
-    nativeBuildInputs = [ prev.installShellFiles ];
+    nativeBuildInputs = [
+      prev.installShellFiles
+      prev.pkg-config
+    ];
+
+    buildInputs = [
+      prev.openssl
+    ];
 
     postInstall = prev.lib.optionalString (prev.stdenv.buildPlatform.canExecute prev.stdenv.hostPlatform) ''
       installShellCompletion --cmd atuin \
