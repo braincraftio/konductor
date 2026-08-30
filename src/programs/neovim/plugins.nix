@@ -720,7 +720,7 @@ in
         # TOML
         taplo.enable = true;
         # Markdown (Darwin 25.x: marksman requires .NET which pulls LLVM 20.x, not cached)
-        marksman.enable = !stdenv.isDarwin;
+        marksman.enable = !stdenv.hostPlatform.isDarwin;
       };
     };
 

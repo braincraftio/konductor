@@ -35,7 +35,7 @@
   (_final: prev: {
     direnv = prev.direnv.overrideAttrs (
       old:
-      prev.lib.optionalAttrs prev.stdenv.isDarwin {
+      prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
         env = (old.env or { }) // {
           CGO_ENABLED = "1";
         };
@@ -58,7 +58,7 @@
         pkg:
         pkg.overrideAttrs (
           old:
-          prev.lib.optionalAttrs prev.stdenv.isDarwin {
+          prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
             RUSTFLAGS = (old.RUSTFLAGS or "") + " -C link-arg=-fuse-ld=lld";
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.llvmPackages.lld ];
           }
@@ -69,7 +69,7 @@
         pkg:
         pkg.overrideAttrs (
           old:
-          prev.lib.optionalAttrs prev.stdenv.isDarwin {
+          prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
             NIX_CFLAGS_LINK = (old.NIX_CFLAGS_LINK or "") + " -fuse-ld=lld -Wl,-headerpad_max_install_names";
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.llvmPackages.lld ];
           }
@@ -90,7 +90,7 @@
       direnvCgoOverlay = uFinal: uPrev: {
         direnv = uPrev.direnv.overrideAttrs (
           old:
-          uPrev.lib.optionalAttrs uPrev.stdenv.isDarwin {
+          uPrev.lib.optionalAttrs uPrev.stdenv.hostPlatform.isDarwin {
             env = (old.env or { }) // {
               CGO_ENABLED = "1";
             };

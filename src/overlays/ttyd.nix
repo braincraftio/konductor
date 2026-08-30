@@ -14,7 +14,7 @@
 # When nerd-fonts updates, rebuilding ttyd picks up new version automatically.
 
 self: super:
-if !super.stdenv.isLinux then
+if !super.stdenv.hostPlatform.isLinux then
   { }
 else
   let

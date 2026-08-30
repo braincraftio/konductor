@@ -121,12 +121,25 @@
   };
 
   outputs =
-    { nixpkgs, flake-utils, ... }@inputs:
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      ...
+    }@inputs:
     let
       # Import overlays
       overlays = import ./src/overlays {
         inherit (nixpkgs) lib;
         inherit (inputs) nixpkgs-unstable k0s-nix;
+      };
+
+      # Flake source metadata — available at eval time, not runtime
+      sourceInfo = {
+        rev = self.rev or null;
+        shortRev = self.shortRev or "dirty";
+        lastModifiedDate = self.lastModifiedDate or "19700101000000";
+        narHash = self.narHash;
       };
 
     in
@@ -163,6 +176,7 @@
             inputs
             versions
             programs
+            sourceInfo
             ;
           inherit (nixpkgs) lib;
         };
@@ -213,7 +227,7 @@
 
         # Packages (build outputs, not shells)
         packages =
-          pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             # OCI is Linux-only (Docker/podman)
             oci = oci.image;
           }

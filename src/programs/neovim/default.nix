@@ -121,7 +121,7 @@ let
     };
 
     # Clipboard support (wl-copy for Linux/Wayland, macOS uses pbcopy automatically)
-    clipboard.providers.wl-copy.enable = pkgs.stdenv.isLinux;
+    clipboard.providers.wl-copy.enable = pkgs.stdenv.hostPlatform.isLinux;
 
     # Create vi/vim aliases
     viAlias = true;

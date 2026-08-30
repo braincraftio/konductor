@@ -19,7 +19,7 @@
 #   3. Update hash with the sha256 nix reports on mismatch (already SRI format)
 
 _final: prev:
-if !(prev.stdenv.isLinux && prev.stdenv.isx86_64) then
+if !(prev.stdenv.hostPlatform.isLinux && prev.stdenv.hostPlatform.isx86_64) then
   { }
 else
   let

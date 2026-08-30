@@ -18,12 +18,14 @@
 #   All shells work on Linux and macOS except konductor and ci which require
 #   Linux-specific virtualization packages (qemu_kvm, libvirt, OVMF, etc.)
 
-{ pkgs
-, lib
-, versions
-, programs
-, inputs
-, ...
+{
+  pkgs,
+  lib,
+  versions,
+  programs,
+  inputs,
+  sourceInfo,
+  ...
 }:
 
 let
@@ -33,7 +35,14 @@ let
 
   # Config provides wrapped linters/formatters with hermetic configuration
   # This is REQUIRED - unwrapped tools violate configuration standards
-  config = import ../config { inherit pkgs lib versions catppuccinSources; };
+  config = import ../config {
+    inherit
+      pkgs
+      lib
+      versions
+      catppuccinSources
+      ;
+  };
 
   # Single source of truth for package composition
   # Config is passed to ensure all linters/formatters are wrapped
@@ -76,6 +85,7 @@ let
       versions
       programs
       config
+      sourceInfo
       ;
   };
 

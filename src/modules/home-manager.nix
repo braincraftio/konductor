@@ -87,16 +87,16 @@ in
         common.mkFullEnv {
           config = konductorConfig;
           sslCertFile =
-            if pkgs.stdenv.isDarwin then "/etc/ssl/cert.pem" else "/etc/ssl/certs/ca-certificates.crt";
+            if pkgs.stdenv.hostPlatform.isDarwin then "/etc/ssl/cert.pem" else "/etc/ssl/certs/ca-certificates.crt";
         }
-        // lib.optionalAttrs pkgs.stdenv.isLinux (packages.konductor.env pkgs)
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (packages.konductor.env pkgs)
         // konductorConfig.shell.ssh.env
         // programs.tmux.env
         # LD_LIBRARY_PATH disabled in home.sessionVariables — on non-NixOS the
         # nix glibc 2.42 libpthread poisons system binaries (glibc 2.39),
         # crashing the compositor and display manager. Devshells set this
         # via shellHook where the entire environment is nix-controlled.
-        # // lib.optionalAttrs pkgs.stdenv.isLinux {
+        # // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
         #   LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
         #     pkgs.stdenv.cc.cc.lib
         #     pkgs.xz
@@ -114,7 +114,7 @@ in
           # Shell identity
           KONDUCTOR_SHELL = "konductor";
         }
-        // lib.optionalAttrs pkgs.stdenv.isLinux {
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           # Docker — mirrors konductor.nix:101 and packages/konductor.nix:55
           DOCKER_HOST = "unix:///var/run/docker.sock";
         };

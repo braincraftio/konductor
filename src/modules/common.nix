@@ -47,7 +47,7 @@ in
     in
     # fullPackages = base + IDE + all languages + container tooling (SSOT with full.nix)
     packages.fullPackages
-    ++ lib.optionals pkgs.stdenv.isLinux packages.konductor.packages
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux packages.konductor.packages
     ++ [ pkgs.nerd-fonts.jetbrains-mono ];
 
   # ===========================================================================

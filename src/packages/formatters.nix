@@ -21,7 +21,7 @@ in
       pkgs.gofumpt
       pkgs.nixpkgs-fmt
       pkgs.stylua
-    ] ++ lib.optionals (!stdenv.isDarwin) [
+    ] ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [
       # Darwin 25.x: black/isort pull setproctitle which fails tests in nix sandbox
       pkgs.black
       pkgs.isort
