@@ -21,6 +21,12 @@ jobs:
         include:
           - system: x86_64-linux
             runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - system: aarch64-darwin
+            runner: macos-15
+          - system: x86_64-darwin
+            runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -54,3 +60,7 @@ jobs:
       - name: Build konductor devshell
         if: matrix.system == 'x86_64-linux'
         run: nix build --no-link --accept-flake-config -L .#devShells.${{ matrix.system }}.konductor
+
+      - name: Build frontend devshell
+        if: matrix.system == 'x86_64-linux'
+        run: nix build --no-link --accept-flake-config -L .#devShells.${{ matrix.system }}.frontend
