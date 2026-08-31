@@ -20,6 +20,9 @@
   # devshell and home-manager consumers on different nixpkgs channels
   (import ./atuin.nix)
 
+  # terminal-browser — Chromium in terminal via kitty graphics protocol
+  (import ./terminal-browser.nix)
+
   # Vim plugin fixes (lualine sandbox test failures)
   (import ./vim-plugins.nix)
 

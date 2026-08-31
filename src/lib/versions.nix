@@ -68,6 +68,14 @@
     display = "18.20.1";
   };
 
+  # Terminal-embedded Chromium browser via kitty graphics protocol.
+  # Pinned via src/overlays/terminal-browser.nix; bumping = update
+  # version here + hashes in that overlay.
+  terminal-browser = {
+    version = "0.7.6";
+    display = "0.7.6";
+  };
+
   nix = {
     minimum = "2.24.0";
     recommended = "2.24.10";

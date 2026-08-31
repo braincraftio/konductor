@@ -7,13 +7,14 @@
 # OpenCode theme from: ../config/opencode/
 # Atuin shell history from: ../config/shell/atuin.nix
 
-{ baseShell
-, packages
-, versions
-, programs
-, config
-, pkgs
-, ...
+{
+  baseShell,
+  packages,
+  versions,
+  programs,
+  config,
+  pkgs,
+  ...
 }:
 
 let
@@ -45,11 +46,13 @@ baseShell.overrideAttrs (old: {
     ${config.shell.atuin.shellHook}
 
     # Runtime libraries (dynamic: appends to existing LD_LIBRARY_PATH)
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-      pkgs.stdenv.cc.cc.lib
-      pkgs.xz
-      pkgs.zstd
-    ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH="${
+      pkgs.lib.makeLibraryPath [
+        pkgs.stdenv.cc.cc.lib
+        pkgs.xz
+        pkgs.zstd
+      ]
+    }"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
     # Program hooks
     ${programs.neovim.shellHook}
@@ -102,6 +105,9 @@ baseShell.overrideAttrs (old: {
       NODE_ENV = "development";
       # Rust
       RUST_BACKTRACE = "1";
+      # Browser — enables neovim markdown-preview and Snacks.gitbrowse()
+      # in terminals supporting the kitty graphics protocol
+      BROWSER = "${pkgs.terminal-browser}/bin/terminal-browser open";
     }
     // config.shell.ssh.env
     // config.opencode.env

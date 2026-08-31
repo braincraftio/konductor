@@ -69,7 +69,24 @@ lib.makeExtensible (
     # Plugin derivations (immutable store copies, loaded via --plugin-dir).
     # Source dirs coerce to store paths.
     # =========================================================================
-    konductorPlugin = ./plugins/konductor;
+    # buildEnv (not symlinkJoin) for collision detection. If a skill name
+    # in terminal-browser collides with an existing konductor skill, the
+    # build fails instead of silently overwriting.
+    konductorPlugin = pkgs.buildEnv {
+      name = "konductor-plugin";
+      paths = [
+        ./plugins/konductor
+      ]
+      ++ lib.optionals (pkgs ? terminal-browser) [
+        # terminal-browser ships its own Claude skill at build time.
+        # Referenced from the package, not copied, so upstream skill
+        # updates arrive on rebuild without manual file maintenance.
+        (pkgs.linkFarm "terminal-browser-skill" {
+          "skills/terminal-browser/SKILL.md" =
+            "${pkgs.terminal-browser}/lib/terminal-browser/skills/default/terminal-browser/SKILL.md";
+        })
+      ];
+    };
     practitionerPlugin = ./plugins/konductor-practitioner;
 
     # =========================================================================
