@@ -38,10 +38,13 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
-        with:
-          use-flakehub: false
-          diagnostic-endpoint: ""
+      # GitHub Actions cache disabled: nix store closure exceeds
+      # GitHub's 10GB cache limit, causing ResourceExhausted rate limits.
+      # Cachix is the sole binary cache for this project.
+      # - uses: DeterminateSystems/magic-nix-cache-action@v14
+      #   with:
+      #     use-flakehub: false
+      #     diagnostic-endpoint: ""
 
       - uses: cachix/cachix-action@v15
         with:
