@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/braincraftio/konductor/compare/v1.2.0...v1.2.1) (2026-08-31)
+
+### Bug Fixes
+
+* **www:** CI=true for pnpm install, approve-builds, .npmrc confirm-modules-purge ([3e48c31](https://github.com/braincraftio/konductor/commit/3e48c314a1a7ac48854ee845575b7a35eb2d5e21))
+
 ## [1.2.0](https://github.com/braincraftio/konductor/compare/v1.1.1...v1.2.0) (2026-08-31)
 
 ### Features
