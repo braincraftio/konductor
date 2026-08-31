@@ -14,9 +14,9 @@ jobs:
     name: Semantic Release
     runs-on: ubuntu-latest
     outputs:
-      new_release: ${{ steps.semantic.outputs.new_release_published }}
-      version: ${{ steps.semantic.outputs.new_release_version }}
-      tag: ${{ steps.semantic.outputs.new_release_git_tag }}
+      new_release: ${{ steps.release.outputs.new_release }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v5
@@ -24,17 +24,34 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v6
-        id: semantic
+      - uses: actions/setup-node@v7
         with:
-          semantic_version: 25.0.9
-          extra_plugins: |
-            @semantic-release/changelog@7.0.0
-            @semantic-release/git@11.0.1
-            conventional-changelog-conventionalcommits@10.4.0
+          node-version: 22
+
+      - name: Install semantic-release
+        run: >
+          npm install -g
+          semantic-release@25.0.9
+          @semantic-release/changelog@7.0.0
+          @semantic-release/git@11.0.1
+          conventional-changelog-conventionalcommits@10.4.0
+
+      - name: Run semantic-release
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx semantic-release 2>&1 | tee release-output.txt
+          if grep -q "Published release" release-output.txt; then
+            VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' release-output.txt || true)
+            {
+              echo "new_release=true"
+              echo "version=${VERSION}"
+              echo "tag=v${VERSION}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "new_release=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # Build from post-release main HEAD and push to cachix.
   # Runs AFTER semantic-release commits CHANGELOG.md back to main.
