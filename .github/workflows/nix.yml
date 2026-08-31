@@ -25,8 +25,9 @@ jobs:
             runner: ubuntu-24.04-arm
           - system: aarch64-darwin
             runner: macos-15
-          - system: x86_64-darwin
-            runner: macos-15-intel
+          # x86_64-darwin removed: nixpkgs-unstable (26.11) dropped
+          # x86_64-darwin support. The unstable overlay import fails
+          # with "Nixpkgs 26.11 has dropped support for x86_64-darwin"
     runs-on: ${{ matrix.runner }}
 
     steps:

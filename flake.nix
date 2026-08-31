@@ -151,11 +151,17 @@
       # Single system list — one source of truth for all per-system outputs.
       # flake-utils and systems inputs are retained only for downstream
       # follows (nuschtosSearch, ixx, nixvim). Iteration uses lib.genAttrs.
+      # x86_64-darwin removed: nixpkgs-unstable (26.11) dropped x86_64-darwin.
+      # The unstable overlay imports nixpkgs-unstable at eval time, which
+      # throws on x86_64-darwin regardless of whether unstable packages are
+      # used. nixos-26.05 still supports x86_64-darwin through end of 2026
+      # but the unstable import makes it unreachable. Re-evaluate when
+      # nixpkgs-unstable re-adds x86_64-darwin or the unstable overlay
+      # gains a platform guard.
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
-        "x86_64-darwin"
       ];
 
       # Per-system bindings computed once via genAttrs, indexed everywhere.
