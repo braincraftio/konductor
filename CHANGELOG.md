@@ -1,3 +1,14 @@
+## [1.2.0](https://github.com/braincraftio/konductor/compare/v1.1.1...v1.2.0) (2026-08-31)
+
+### Features
+
+* add terminal-browser package, skill integration, BROWSER env var ([80f1c76](https://github.com/braincraftio/konductor/commit/80f1c7674674ac0a3811cf4f0ab333d04369bb50))
+* **www:** derive all version data from src/lib/versions.nix SSOT ([19ef488](https://github.com/braincraftio/konductor/commit/19ef488978b319f44d66f07f6de4680497638758)), closes [.#versions-json](https://github.com/braincraftio/./issues/versions-json) [.#versions-json](https://github.com/braincraftio/./issues/versions-json) [.#versions-json](https://github.com/braincraftio/./issues/versions-json)
+
+### Bug Fixes
+
+* **www:** eliminate dark mode flash with shared palette anti-flash CSS ([c9e5c43](https://github.com/braincraftio/konductor/commit/c9e5c43a2087e9a89fec3d7c3195357483257de9))
+
 ## [1.1.1](https://github.com/braincraftio/konductor/compare/v1.1.0...v1.1.1) (2026-08-31)
 
 ### Bug Fixes
