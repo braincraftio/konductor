@@ -1,0 +1,10 @@
+{
+  "name": "konductor-release",
+  "private": true,
+  "dependencies": {
+    "semantic-release": "^24.2.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "conventional-changelog-conventionalcommits": "^8.0.0"
+  }
+}
