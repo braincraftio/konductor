@@ -1,3 +1,14 @@
+## [1.1.0](https://github.com/braincraftio/konductor/compare/v1.0.0...v1.1.0) (2026-08-31)
+
+### Features
+
+* **ci:** add multi-platform CI matrix and frontend devshell build ([900faa3](https://github.com/braincraftio/konductor/commit/900faa3ab56d40138bfbf63a9d34a942d84282e0))
+* trigger v1.1.0 release to validate CI-gated release workflow ([0d737a6](https://github.com/braincraftio/konductor/commit/0d737a6d24ee975489e978f1a4054143f8ffbcfe))
+
+### Bug Fixes
+
+* **ci:** gate release on CI success, cachix push only after release ([cbb3301](https://github.com/braincraftio/konductor/commit/cbb3301d341fa2fdcd8264e189aaea117320ecfb))
+
 ## 1.0.0 (2026-08-31)
 
 ### Features
