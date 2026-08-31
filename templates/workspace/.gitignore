@@ -1,0 +1,58 @@
+# Child repositories (cloned as siblings, each has its own .git)
+# Add entries as repos are cloned into this workspace
+
+# Nix
+result
+result-*
+.direnv/
+
+# Secrets and environment
+.env
+.env.local
+.env.secrets
+.env.*.local
+*.pem
+*.key
+*.p12
+*.crt
+cosign.key
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Cache
+.cache/
+node_modules/
+__pycache__/
+target/
+
+# Claude Code local state
+.claude/
+
+# Mise local overrides
+.mise.local.toml
+
+# Pulumi state and credentials
+.config/pulumi/*
+!.config/pulumi/.gitkeep
+
+# Talos generated configurations (contain certificates)
+.config/talos/**/generated/
+
+# Large binary files
+*.iso
+*.img
+*.qcow2
+*.vmdk
+*.tar.gz
+*.tar.xz
+*.zip

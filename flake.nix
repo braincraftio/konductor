@@ -422,5 +422,35 @@
         konductor = import ./src/modules/darwin.nix;
         default = import ./src/modules/darwin.nix;
       };
+
+      # Project scaffolding: nix flake init -t github:braincraftio/konductor
+      templates = {
+        konductor = {
+          path = ./templates/konductor;
+          description = "Konductor standalone project with full devshell";
+          welcomeText = ''
+            # Konductor Project
+
+            Run `direnv allow` to activate the development environment.
+
+            First run will prompt to trust the cachix substituters.
+            Accept to enable binary cache downloads.
+          '';
+        };
+        workspace = {
+          path = ./templates/workspace;
+          description = "Konductor multi-repo workspace with child inheritance";
+          welcomeText = ''
+            # Konductor Workspace
+
+            Run `direnv allow` to activate the development environment.
+
+            Clone repos into this directory. Each repo with its own .envrc
+            inherits WORKSPACE_ROOT, vault injection, and nix auth from
+            this workspace via source_up_if_exists.
+          '';
+        };
+        default = self.templates.konductor;
+      };
     };
 }

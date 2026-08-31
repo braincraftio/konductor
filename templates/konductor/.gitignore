@@ -1,0 +1,74 @@
+# Nix
+result
+result-*
+.direnv/
+
+# Secrets and environment
+.env
+.env.local
+.env.secrets
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.stronghold
+**/vault.bin
+**/secrets/
+cosign.key
+
+# Rust
+/target/
+**/target/
+**/*.rs.bk
+*.pdb
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+
+# Node
+node_modules/
+.pnpm-store/
+.turbo/
+*.tsbuildinfo
+
+# Go
+go.work*
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# IDE
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-journal
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/keybindings.json
+
+# Mise local overrides
+.mise.local.toml
