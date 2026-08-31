@@ -37,8 +37,15 @@ jobs:
           name: braincraftio
           authToken: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
 
-      - name: Run flake checks
+      - name: Flake checks
         run: nix flake check --accept-flake-config -L
 
-      - name: Build installable package
-        run: nix build .#packages.${{ matrix.system }}.default --accept-flake-config -L
+      - name: Build outputs
+        run: |
+          nix build --no-link --accept-flake-config -L \
+            .#packages.${{ matrix.system }}.default \
+            .#devShells.${{ matrix.system }}.full
+
+      - name: Build konductor devshell
+        if: matrix.system == 'x86_64-linux'
+        run: nix build --no-link --accept-flake-config -L .#devShells.${{ matrix.system }}.konductor
