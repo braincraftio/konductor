@@ -51,7 +51,9 @@ SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
 print_header "Installing Website Dependencies"
 
 print_status info "Running pnpm install..."
-pnpm -C "${SITE_DIR}" install
+CI=true pnpm -C "${SITE_DIR}" install || true
+pnpm -C "${SITE_DIR}" approve-builds --all
+CI=true pnpm -C "${SITE_DIR}" install
 
 print_status success "Dependencies installed"
 '''
