@@ -1,0 +1,44 @@
+name: Nix Build & Cache
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build (defaults to triggering ref)
+        required: false
+        type: string
+        default: ''
+    secrets:
+      BCIO_CACHIX_PRIVATE_KEY:
+        required: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.system }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: braincraftio
+          authToken: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
+
+      - name: Run flake checks
+        run: nix flake check --accept-flake-config -L
+
+      - name: Build installable package
+        run: nix build .#packages.${{ matrix.system }}.default --accept-flake-config -L
