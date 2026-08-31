@@ -9,5 +9,3 @@ on:
 jobs:
   check:
     uses: ./.github/workflows/nix.yml
-    secrets:
-      BCIO_CACHIX_PRIVATE_KEY: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}

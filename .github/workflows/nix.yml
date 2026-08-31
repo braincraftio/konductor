@@ -10,7 +10,7 @@ on:
         default: ''
     secrets:
       BCIO_CACHIX_PRIVATE_KEY:
-        required: true
+        required: false
 
 jobs:
   build:

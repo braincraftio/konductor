@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -13,6 +15,9 @@ jobs:
   semantic-release:
     name: Semantic Release
     runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     outputs:
       new_release: ${{ steps.release.outputs.new_release }}
       version: ${{ steps.release.outputs.version }}
@@ -49,12 +54,6 @@ jobs:
             echo "new_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # Build from post-release main HEAD and push to cachix.
-  # Runs AFTER semantic-release commits CHANGELOG.md back to main.
-  # GITHUB_TOKEN pushes do not trigger on:push workflows, so ci.yml
-  # will not fire on the changelog commit. This job handles the
-  # cache-aligned build that matches what consumers fetch via
-  # github:braincraftio/konductor (resolves to main HEAD).
   nix-cache:
     name: Nix Cache
     needs: semantic-release
