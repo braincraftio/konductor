@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/braincraftio/konductor/compare/v1.1.0...v1.1.1) (2026-08-31)
+
+### Bug Fixes
+
+* **ci:** disable GitHub Actions nix cache, use cachix only ([af51370](https://github.com/braincraftio/konductor/commit/af5137060df5150593041bd5f979fa25a602dc97))
+* drop x86_64-darwin support, nixpkgs-unstable 26.11 removed it ([fe18582](https://github.com/braincraftio/konductor/commit/fe185827e58d3b8316cd49a93b5d3c4a7aee5527))
+
 ## [1.1.0](https://github.com/braincraftio/konductor/compare/v1.0.0...v1.1.0) (2026-08-31)
 
 ### Features
