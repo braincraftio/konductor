@@ -6,6 +6,9 @@ order: 1
 ---
 
 import RefCard from '../../../components/docs/RefCard.astro';
+import versions from '../../../data/versions.json';
+
+export const langs = versions.languages;
 
 Konductor provides 9 hermetic development shells. Enter any shell with one command — everything you need is on your `PATH`. Click any card below to copy its command.
 
@@ -15,10 +18,10 @@ Shells build on each other using Nix `overrideAttrs`. Each layer adds packages a
 
 <div className="my-6 overflow-x-auto rounded-xl border border-border-default bg-surface-paper">
   <pre className="p-5 font-mono text-sm leading-relaxed text-text-secondary m-0 bg-transparent border-none">{`default
-  ├── python               Python 3.13 + uv, ruff, mypy, bandit
-  ├── go                   Go 1.25 + gopls, delve, golangci-lint
-  ├── node                 Node.js 22 + pnpm, biome, prettier
-  ├── rust                 Rust 1.92.0 + cargo, clippy, rust-analyzer
+  ├── python               Python ${langs.python.display} + uv, ruff, mypy, bandit
+  ├── go                   Go ${langs.go.display} + gopls, delve, golangci-lint
+  ├── node                 Node.js ${langs.node.display} + pnpm, biome, prettier
+  ├── rust                 Rust ${langs.rust.display} + cargo, clippy, rust-analyzer
   ├── dev                  neovim, tmux, forgejo-cli
   └── full                 all languages + IDE + containers
        └── konductor       +qemu, libvirt, OVMF        (x86_64-linux)
@@ -39,28 +42,28 @@ Language shells (`python`, `go`, `node`, `rust`) and `dev` each extend `default`
   />
   <RefCard
     title="python"
-    description='Python 3.13 + uv, ruff, mypy, bandit. Auto-activates <code>.venv</code>.'
+    description={`Python ${langs.python.display} + uv, ruff, mypy, bandit. Auto-activates <code>.venv</code>.`}
     footer="nix develop .#python"
     copy="nix develop .#python"
     meta="x86_64 + aarch64 — linux, darwin"
   />
   <RefCard
     title="go"
-    description="Go 1.25 + gopls, delve, golangci-lint. Creates workspace dirs."
+    description={`Go ${langs.go.display} + gopls, delve, golangci-lint. Creates workspace dirs.`}
     footer="nix develop .#go"
     copy="nix develop .#go"
     meta="x86_64 + aarch64 — linux, darwin"
   />
   <RefCard
     title="node"
-    description="Node.js 22 + pnpm, biome, prettier, eslint. Adds pnpm global bin."
+    description={`Node.js ${langs.node.display} + pnpm, biome, prettier, eslint. Adds pnpm global bin.`}
     footer="nix develop .#node"
     copy="nix develop .#node"
     meta="x86_64 + aarch64 — linux, darwin"
   />
   <RefCard
     title="rust"
-    description="Rust 1.92.0 pinned via rust-overlay. Cargo, clippy, rust-analyzer."
+    description={`Rust ${langs.rust.display} pinned via rust-overlay. Cargo, clippy, rust-analyzer.`}
     footer="nix develop .#rust"
     copy="nix develop .#rust"
     meta="x86_64 + aarch64 — linux, darwin"

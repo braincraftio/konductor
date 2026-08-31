@@ -5,7 +5,7 @@ import Section from '../components/docs/Section.astro';
 import RefCard from '../components/docs/RefCard.astro';
 import { Code } from 'astro-expressive-code/components';
 import versions from '../data/versions.json';
-import versionsNixRaw from '../data/versions.nix?raw';
+import versionsNixRaw from '../../../../../src/lib/versions.nix?raw';
 import { href } from '../utils/paths';
 
 const { languages, nixos, nix, image } = versions;

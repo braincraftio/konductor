@@ -182,6 +182,12 @@
             };
           };
           versions = import ./src/lib/versions.nix;
+
+          # Website data derivation: versions.nix as JSON, cached and
+          # content-addressed. Replaces nix eval --json shell commands
+          # in CI and mise tasks with a single nix build .#versions-json.
+          versionsJson = pkgs.writeText "versions.json" (builtins.toJSON versions);
+
           catppuccinSources = inputs.catppuccin.packages.${system};
           konductorConfig = import ./src/config {
             inherit
@@ -333,6 +339,7 @@
           inherit
             pkgs
             versions
+            versionsJson
             packages
             programs
             devshells
@@ -375,6 +382,9 @@
         system: sb:
         {
           default = sb.konductorEnv;
+          # Website data: nix build .#versions-json
+          # Replaces nix eval --json shell commands in CI and mise tasks.
+          versions-json = sb.versionsJson;
         }
         // lib.optionalAttrs sb.pkgs.stdenv.hostPlatform.isLinux {
           oci = sb.oci.image;

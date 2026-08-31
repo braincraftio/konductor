@@ -46,8 +46,7 @@ jobs:
       - name: Generate versions data
         run: |
           mkdir -p www/sites/konductor.sh/src/data
-          nix eval --json -f src/lib/versions.nix > www/sites/konductor.sh/src/data/versions.json
-          cp src/lib/versions.nix www/sites/konductor.sh/src/data/versions.nix
+          cp "$(nix build .#versions-json --print-out-paths --no-link)" www/sites/konductor.sh/src/data/versions.json
 
       - name: Build
         run: pnpm -C www/sites/konductor.sh build

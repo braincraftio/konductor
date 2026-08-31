@@ -11,6 +11,14 @@ export default defineConfig({
   // fenced code blocks before MDX compilation.
   integrations: [expressiveCode(), mdx(), pagefind()],
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    server: {
+      fs: {
+        // Allow reading src/lib/versions.nix from the repo root for
+        // the specs page raw nix display. Eliminates the stale copy
+        // in src/data/versions.nix.
+        allow: ['../../../../../src/lib']
+      }
+    }
   }
 });

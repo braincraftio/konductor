@@ -8,6 +8,9 @@ order: 2
 import RefCard from '../../../components/docs/RefCard.astro';
 import Note from '../../../components/docs/Note.astro';
 import { href } from '../../../utils/paths';
+import versions from '../../../data/versions.json';
+
+export const langs = versions.languages;
 
 Every tool in Konductor — every linter, formatter, language runtime, and IDE plugin — is sealed into the Nix expression. The binary IS the config. When you enter a devshell, you get the exact same environment as every other developer, every CI runner, and every VM in the fleet. No setup instructions. No "works on my machine."
 
@@ -93,23 +96,7 @@ With [direnv](https://direnv.net) installed, entering the repo directory auto-ac
 
 When you enter a shell, Konductor prints what's available:
 
-```text frame="none"
-╔══════════════════════════════════════════════════════════════╗
-║                    Konductor DevShell                        ║
-╚══════════════════════════════════════════════════════════════╝
-
-Available shells:
-  nix develop              Default (current)
-  nix develop .#python     Python 3.13
-  nix develop .#go         Go 1.25
-  nix develop .#node       Node.js 22
-  nix develop .#rust       Rust 1.92.0
-  nix develop .#dev        IDE (neovim + tmux)
-  nix develop .#full       Everything
-  nix develop .#konductor  Self-hosting (full + docker/qemu/libvirt)
-
-Commands:  mise run help
-```
+<pre><code>konductor-base: py{langs.python.display} go{langs.go.display} node{langs.node.display} rust{langs.rust.display}</code></pre>
 
 Every tool in that shell is hermetically wrapped. The shellcheck binary has its config baked into the `/nix/store` path — you cannot use a different linter config even if you try. The formatter binary IS the formatting standard. This isn't policy, it's architecture.
 

@@ -71,10 +71,9 @@ DATA_DIR="${SITE_DIR}/src/data"
 
 print_header "Building Website"
 
-print_status info "Generating versions data from src/lib/versions.nix..."
+print_status info "Generating versions data from flake derivation..."
 mkdir -p "${DATA_DIR}"
-nix eval --json -f "${MISE_PROJECT_ROOT}/src/lib/versions.nix" > "${DATA_DIR}/versions.json"
-cp "${MISE_PROJECT_ROOT}/src/lib/versions.nix" "${DATA_DIR}/versions.nix"
+cp "$(nix build "${MISE_PROJECT_ROOT}#versions-json" --print-out-paths --no-link)" "${DATA_DIR}/versions.json"
 
 print_status info "Running astro build..."
 pnpm -C "${SITE_DIR}" build
@@ -93,8 +92,7 @@ SITE_DIR="${MISE_PROJECT_ROOT}/www/sites/konductor.sh"
 DATA_DIR="${SITE_DIR}/src/data"
 
 mkdir -p "${DATA_DIR}"
-nix eval --json -f "${MISE_PROJECT_ROOT}/src/lib/versions.nix" > "${DATA_DIR}/versions.json"
-cp "${MISE_PROJECT_ROOT}/src/lib/versions.nix" "${DATA_DIR}/versions.nix"
+cp "$(nix build "${MISE_PROJECT_ROOT}#versions-json" --print-out-paths --no-link)" "${DATA_DIR}/versions.json"
 
 pnpm -C "${SITE_DIR}" dev
 '''

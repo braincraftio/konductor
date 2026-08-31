@@ -6,7 +6,12 @@
 #
 # Package composition defined in: ../packages/
 
-{ pkgs, versions, packages, ... }:
+{
+  pkgs,
+  versions,
+  packages,
+  ...
+}:
 
 let
   # Read native bashrc for aliases and shell setup
@@ -50,23 +55,7 @@ pkgs.mkShell {
 
     # Welcome message (skipped if KONDUCTOR_SKIP_BANNER is set by derived shells)
     if [ -z "$KONDUCTOR_SKIP_BANNER" ]; then
-      echo ""
-      echo "╔══════════════════════════════════════════════════════════════╗"
-      echo "║                    Konductor DevShell                        ║"
-      echo "╚══════════════════════════════════════════════════════════════╝"
-      echo ""
-      echo "Available shells:"
-      echo "  nix develop              Default (current)"
-      echo "  nix develop .#python     Python ${versions.languages.python.display}"
-      echo "  nix develop .#go         Go ${versions.languages.go.display}"
-      echo "  nix develop .#node       Node.js ${versions.languages.node.display}"
-      echo "  nix develop .#rust       Rust ${versions.languages.rust.display}"
-      echo "  nix develop .#dev        IDE (neovim + tmux)"
-      echo "  nix develop .#full       Everything"
-      echo "  nix develop .#konductor  Self-hosting (full + docker/qemu/libvirt)"
-      echo ""
-      echo "Commands:  mise run help"
-      echo ""
+      echo "konductor-base: py${versions.languages.python.display} go${versions.languages.go.display} node${versions.languages.node.display} rust${versions.languages.rust.display}"
     fi
 
     # Clean up shellHook from env output
@@ -76,8 +65,11 @@ pkgs.mkShell {
   # Use centralized environment variables + shell identity + package env
   # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
   # SHELL must point to bashInteractive (not bash) for dirspell, complete, etc.
-  env = import ../lib/env.nix // packages.env // {
-    KONDUCTOR_SHELL = "default";
-    SHELL = "${pkgs.bashInteractive}/bin/bash";
-  };
+  env =
+    import ../lib/env.nix
+    // packages.env
+    // {
+      KONDUCTOR_SHELL = "default";
+      SHELL = "${pkgs.bashInteractive}/bin/bash";
+    };
 }
