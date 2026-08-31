@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { href } from '../utils/paths';
+import { themes } from '../styles/palette';
 
 interface Props {
 	title?: string;
@@ -11,10 +12,32 @@ const {
 	title = 'Konductor.sh',
 	description = 'Konductor: Hermetic polyglot development environments from one Nix flake.',
 } = Astro.props;
+
+// Generate anti-flash CSS from the shared palette at SSG build time.
+// Each theme gets a [data-theme] rule. The default (dark) also gets
+// a bare html rule for the initial paint before JS sets data-theme.
+// prefers-color-scheme media query provides the zero-JS fallback.
+const antiFlashRules = Object.entries(themes).map(([name, { background, foreground }]) =>
+	`html[data-theme="${name}"] { background-color: ${background}; color: ${foreground}; }`
+).join('\n');
+
+const darkTheme = themes.dark;
+const lightTheme = themes.light;
 ---
 
 <html lang="en" data-theme="dark" data-pf-theme="dark" style="color-scheme: dark">
 	<head>
+		<style set:html={`
+			/* Anti-flash: palette values from src/styles/palette.ts applied before
+			   external CSS loads. The browser paints the correct background on
+			   first frame. The full token chain in global.css takes over once parsed.
+			   Generated at SSG build time, not hardcoded. */
+			html { background-color: ${darkTheme.background}; color: ${darkTheme.foreground}; }
+			${antiFlashRules}
+			@media (prefers-color-scheme: light) {
+				html:not([data-theme="dark"]) { background-color: ${lightTheme.background}; color: ${lightTheme.foreground}; }
+			}
+		`} />
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
