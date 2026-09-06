@@ -78,7 +78,7 @@
     ++ packages.idePackages;
 
   # ===========================================================================
-  # Home Files (config files NOT managed by programs.bash)
+  # Home Files (config files not managed by programs.bash)
   # ===========================================================================
 
   mkHomeFiles =
@@ -92,24 +92,15 @@
     };
 
   # ===========================================================================
-  # programs.bash configuration (replaces home.file .bashrc/.bash_profile/.inputrc)
+  # programs.bash configuration
   # ===========================================================================
-  # home-manager's programs.bash generates .bashrc, .bash_profile, .profile.
+  # home-manager programs.bash generates .bashrc, .bash_profile, .profile.
   # targets.genericLinux sources hm-session-vars.sh in .bashrc for non-login shells.
-  # Starship/atuin/direnv hooks in initExtra — packages from fullPackages, not programs.*.
 
   mkBashConfig = {
     enable = true;
 
-    historyControl = [ "ignoreboth" ];
-    shellOptions = [
-      "histappend"
-      "checkwinsize"
-      "globstar"
-      "cdspell"
-    ];
-
-    # Non-interactive content (runs before the [[ $- == *i* ]] guard)
+    # Non-interactive content before the interactive guard
     bashrcExtra = ''
       # Source *.sh from ~/.bashrc.d/ for host-specific configuration
       if [ -d "$HOME/.bashrc.d" ] && [[ $- == *i* ]]; then
@@ -123,32 +114,12 @@
       unalias grep 2>/dev/null || true
     '';
 
-    # Interactive content (after history, options, aliases)
-    initExtra = ''
-      alias rm='rm -i'
-      alias cp='cp -i'
-      alias mv='mv -i'
-      alias gs='git status'
-      alias gd='git diff'
-      alias gl='git log --oneline -20'
+    # Interactive content shared with devshells via src/config/shell/.bashrc
+    initExtra = builtins.readFile ../config/shell/.bashrc;
 
-      # Starship prompt (skip dumb terminals)
-      [[ "''${TERM:-dumb}" != "dumb" ]] && [ -t 0 ] && eval "$(starship init bash)"
-
-      # Atuin shell history (requires bash-preexec)
-      if [[ "''${TERM:-dumb}" != "dumb" ]] && [ -t 0 ]; then
-        [ -n "$KONDUCTOR_PREEXEC_PATH" ] && [ -f "$KONDUCTOR_PREEXEC_PATH" ] && source "$KONDUCTOR_PREEXEC_PATH"
-        eval "$(atuin init bash)"
-      fi
-
-      # Direnv
-      export DIRENV_LOG_FORMAT="''${DIRENV_LOG_FORMAT:-}"
-      eval "$(direnv hook bash)"
-    '';
-
-    # Login shell content (.bash_profile / .profile)
+    # Login shell content for .profile
     profileExtra = ''
-      # Nix PATH guard — prevent nix-daemon.sh from re-prepending nix paths
+      # Nix PATH guard to prevent nix-daemon.sh from re-prepending nix paths
       if [[ ":$PATH:" == *"/.nix-profile/bin:"* ]]; then
         __ETC_PROFILE_NIX_SOURCED=1
       fi
@@ -169,7 +140,7 @@
   };
 
   # ===========================================================================
-  # programs.readline (replaces home.file .inputrc)
+  # programs.readline replaces home.file .inputrc
   # ===========================================================================
 
   mkReadlineConfig = {
@@ -194,16 +165,11 @@
   };
 
   # ===========================================================================
-  # Full Environment Variables (base + tool config paths)
+  # Full Environment Variables
   # ===========================================================================
-  # Merges env.nix (EDITOR, PAGER, etc.) with tool-specific config paths
-  # (KONDUCTOR_BASHRC, ATUIN_CONFIG_DIR, KONDUCTOR_PREEXEC_PATH, etc.)
-  #
-  # BASH_ENV is excluded: it points to the konductor bashrc which causes
-  # infinite recursion when tools like starship spawn non-interactive bash
-  # subprocesses (BASH_ENV → bashrc → starship init → bash → BASH_ENV → ...).
-  # QCOW2 sets BASH_ENV="/etc/set-environment" (NixOS-specific) instead.
-  # For home-manager, .bash_profile → .bashrc handles interactive shells.
+  # Merges env.nix with tool-specific config paths.
+  # BASH_ENV excluded to prevent infinite recursion when tools like starship
+  # spawn non-interactive bash subprocesses.
 
   mkFullEnv =
     {
@@ -215,20 +181,18 @@
     // config.shell.atuin.env
     // {
       KONDUCTOR = "true";
-      # Override NixOS-specific ca-bundle.crt path from env.nix
-      # Non-NixOS distros (Ubuntu, Pop!_OS, Debian) use ca-certificates.crt
       SSL_CERT_FILE = sslCertFile;
       NIX_SSL_CERT_FILE = sslCertFile;
     };
 
   # ===========================================================================
-  # Base Environment Variables (imported from SSOT)
+  # Base Environment Variables
   # ===========================================================================
 
   mkEnv = import ../lib/env.nix;
 
   # ===========================================================================
-  # Shell Aliases (imported from SSOT)
+  # Shell Aliases
   # ===========================================================================
 
   mkAliases = import ../lib/aliases.nix;
