@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/braincraftio/konductor/compare/v1.4.0...v1.4.1) (2026-09-06)
+
+### Bug Fixes
+
+* **home-manager:** wire opencode env vars into sessionVariables ([08dacd1](https://github.com/braincraftio/konductor/commit/08dacd1c78e47413de2cea6137d389a9188be2e5))
+
 ## [1.4.0](https://github.com/braincraftio/konductor/compare/v1.3.0...v1.4.0) (2026-09-06)
 
 ### Features
