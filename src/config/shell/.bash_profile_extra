@@ -1,0 +1,17 @@
+# Nix PATH guard to prevent nix-daemon.sh from re-prepending nix paths
+if [[ ":$PATH:" == *"/.nix-profile/bin:"* ]]; then
+  __ETC_PROFILE_NIX_SOURCED=1
+fi
+
+if [ -f /etc/profile ] && [ "$(uname)" != "Darwin" ]; then
+  source /etc/profile
+fi
+
+export __ETC_PROFILE_NIX_SOURCED=1
+
+# Deduplicate XDG_DATA_DIRS
+if [ -n "${XDG_DATA_DIRS:-}" ]; then
+  XDG_DATA_DIRS="$(printf '%s' "$XDG_DATA_DIRS" | awk -v RS=: -v ORS=: '!seen[$0]++')"
+  XDG_DATA_DIRS="${XDG_DATA_DIRS%:}"
+  export XDG_DATA_DIRS
+fi

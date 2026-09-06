@@ -99,44 +99,9 @@
 
   mkBashConfig = {
     enable = true;
-
-    # Non-interactive content before the interactive guard
-    bashrcExtra = ''
-      # Source *.sh from ~/.bashrc.d/ for host-specific configuration
-      if [ -d "$HOME/.bashrc.d" ] && [[ $- == *i* ]]; then
-        for f in "$HOME/.bashrc.d"/*.sh; do
-          [ -f "$f" ] && source "$f"
-        done
-      fi
-
-      # Clear aliases that conflict with wrapper scripts in PATH
-      unalias cat 2>/dev/null || true
-      unalias grep 2>/dev/null || true
-    '';
-
-    # Interactive content shared with devshells via src/config/shell/.bashrc
+    bashrcExtra = builtins.readFile ../config/shell/.bashrc_extra;
     initExtra = builtins.readFile ../config/shell/.bashrc;
-
-    # Login shell content for .profile
-    profileExtra = ''
-      # Nix PATH guard to prevent nix-daemon.sh from re-prepending nix paths
-      if [[ ":$PATH:" == *"/.nix-profile/bin:"* ]]; then
-        __ETC_PROFILE_NIX_SOURCED=1
-      fi
-
-      if [ -f /etc/profile ] && [ "$(uname)" != "Darwin" ]; then
-        source /etc/profile
-      fi
-
-      export __ETC_PROFILE_NIX_SOURCED=1
-
-      # Deduplicate XDG_DATA_DIRS
-      if [ -n "''${XDG_DATA_DIRS:-}" ]; then
-        XDG_DATA_DIRS="$(printf '%s' "$XDG_DATA_DIRS" | awk -v RS=: -v ORS=: '!seen[$0]++')"
-        XDG_DATA_DIRS="''${XDG_DATA_DIRS%:}"
-        export XDG_DATA_DIRS
-      fi
-    '';
+    profileExtra = builtins.readFile ../config/shell/.bash_profile_extra;
   };
 
   # ===========================================================================

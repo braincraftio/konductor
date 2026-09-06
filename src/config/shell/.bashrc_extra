@@ -1,0 +1,10 @@
+# Source *.sh from ~/.bashrc.d/ for host-specific configuration
+if [ -d "$HOME/.bashrc.d" ] && [[ $- == *i* ]]; then
+  for f in "$HOME/.bashrc.d"/*.sh; do
+    [ -f "$f" ] && source "$f"
+  done
+fi
+
+# Clear aliases that conflict with wrapper scripts in PATH
+unalias cat 2>/dev/null || true
+unalias grep 2>/dev/null || true
