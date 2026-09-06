@@ -87,7 +87,10 @@ in
         common.mkFullEnv {
           config = konductorConfig;
           sslCertFile =
-            if pkgs.stdenv.hostPlatform.isDarwin then "/etc/ssl/cert.pem" else "/etc/ssl/certs/ca-certificates.crt";
+            if pkgs.stdenv.hostPlatform.isDarwin then
+              "/etc/ssl/cert.pem"
+            else
+              "/etc/ssl/certs/ca-certificates.crt";
         }
         // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (packages.konductor.env pkgs)
         // konductorConfig.shell.ssh.env
@@ -103,6 +106,7 @@ in
         #     pkgs.zstd
         #   ]}";
         # }
+        // konductorConfig.opencode.env
         // {
           # Language env vars — mirrors konductor.nix:144-153
           UV_SYSTEM_PYTHON = "1";
