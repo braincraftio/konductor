@@ -1,3 +1,14 @@
+## [1.4.2](https://github.com/braincraftio/konductor/compare/v1.4.1...v1.4.2) (2026-09-06)
+
+### Bug Fixes
+
+* **opencode:** OPENCODE_CONFIG file path replaces inline JSON, native shell files ([d16880a](https://github.com/braincraftio/konductor/commit/d16880ad9f152cc5d9e895be2ea2a11fa405206a))
+
+### Refactoring
+
+* **home-manager:** migrate shell config to programs.bash ([dcf38e4](https://github.com/braincraftio/konductor/commit/dcf38e4e6a818c6461d0e36c0b5841258eb3f929))
+* **home-manager:** migrate shell config to programs.bash ([b2d43c6](https://github.com/braincraftio/konductor/commit/b2d43c67e7512ab13a99ec4b87241c3e49bfe6a0))
+
 ## [1.4.1](https://github.com/braincraftio/konductor/compare/v1.4.0...v1.4.1) (2026-09-06)
 
 ### Bug Fixes
