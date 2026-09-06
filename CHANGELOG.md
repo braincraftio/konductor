@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/braincraftio/konductor/compare/v1.2.1...v1.3.0) (2026-09-06)
+
+### Features
+
+* **claude-code:** add deepwiki RAG query engineering skill to konductor-practitioner ([acfa58e](https://github.com/braincraftio/konductor/commit/acfa58e2aca572f4543491f5e20a55c0eb49f1f6))
+
 ## [1.2.1](https://github.com/braincraftio/konductor/compare/v1.2.0...v1.2.1) (2026-08-31)
 
 ### Bug Fixes
