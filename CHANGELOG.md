@@ -1,3 +1,13 @@
+## [1.4.0](https://github.com/braincraftio/konductor/compare/v1.3.0...v1.4.0) (2026-09-06)
+
+### Features
+
+* **opencode:** hermetic OpenCode harness via env var injection ([be4ddfb](https://github.com/braincraftio/konductor/commit/be4ddfb58fcc1a7498511ce0233e8df803199b31))
+
+### Bug Fixes
+
+* **opencode:** v1 permission schema, nixd LSP key, inline commit command ([16b6bbd](https://github.com/braincraftio/konductor/commit/16b6bbdccd88678679cc4c2bcbdad323de1615c1))
+
 ## [1.3.0](https://github.com/braincraftio/konductor/compare/v1.2.1...v1.3.0) (2026-09-06)
 
 ### Features
