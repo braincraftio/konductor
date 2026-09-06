@@ -79,7 +79,7 @@ in
         # Atuin shell history (mirrors konductor.nix:47)
         ++ konductorConfig.shell.atuin.packages;
 
-      # Config files: bashrc, starship, atuin, inputrc, bash_profile
+      # Config files: starship, atuin (bash/readline/inputrc via programs.bash)
       file = common.mkHomeFiles { config = konductorConfig; };
 
       # Full environment — mirrors konductor.nix env (lines 138-161) + shellHook exports (lines 60-110)
@@ -125,5 +125,8 @@ in
 
       shellAliases = common.mkAliases;
     };
+
+    programs.bash = common.mkBashConfig;
+    programs.readline = common.mkReadlineConfig;
   };
 }
