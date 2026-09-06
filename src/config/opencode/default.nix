@@ -1,23 +1,50 @@
 # src/config/opencode/default.nix
-# OpenCode configuration values
+# Konductor OpenCode harness — env vars only, no file writes.
 #
-# Project-level config lives in opencode.json at repo root.
-# OpenCode automatically merges project config with global (~/.config/opencode/).
+# OPENCODE_CONFIG_CONTENT  builtins.toJSON inline JSON (store paths propagated via string context)
+# OPENCODE_TUI_CONFIG      store path to tui.json (Catppuccin Frappe)
+# OPENCODE_DISABLE_*       nix-managed binary and LSP servers
 #
-# This file exports values for reference by other Nix expressions.
+# Skills discovered via .claude/skills/ compatibility path (plugin store paths).
 
-_:
+{ pkgs, lib }:
 
-{
-  # Catppuccin theme for visual consistency with Neovim
-  themeName = "catppuccin";
+lib.makeExtensible (
+  final:
+  let
+    jsonFmt = pkgs.formats.json { };
+    baseConfig = import ./config.nix { inherit pkgs lib; };
+    baseTui = import ./tui.nix { };
+  in
+  {
+    config = baseConfig;
+    tui = baseTui;
+    instructionsFile = ./instructions.md;
+    commandsDir = ./commands;
 
-  # Free model from OpenCode Zen for title generation (no API key required)
-  smallModel = "opencode/gpt-5-nano";
+    tuiDrv = jsonFmt.generate "opencode-tui.json" final.tui;
 
-  # No shell hook needed - opencode.json in project root handles config
-  shellHook = "";
+    # Consumed by full.nix as ${config.opencode.shellHook}
+    shellHook = "";
 
-  # No environment variables needed
-  env = { };
-}
+    # Consumed by full.nix as config.opencode.env
+    # builtins.toJSON for env var serialization — store paths from lib.getExe
+    # propagate via string context (verified: nixpkgs unstructuredDerivationInputEnv test).
+    env = {
+      OPENCODE_CONFIG_CONTENT = builtins.toJSON (
+        final.config
+        // {
+          instructions = [ (builtins.toString final.instructionsFile) ];
+        }
+      );
+      OPENCODE_TUI_CONFIG = "${final.tuiDrv}";
+      OPENCODE_DISABLE_AUTOUPDATE = "1";
+      OPENCODE_DISABLE_LSP_DOWNLOAD = "1";
+    };
+
+    meta = {
+      description = "Konductor OpenCode harness";
+      configurable = true;
+    };
+  }
+)

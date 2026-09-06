@@ -34,7 +34,7 @@ in
   # ===========================================================================
   # AI Tools Configuration
   # ===========================================================================
-  opencode = import ./opencode { inherit pkgs; };
+  opencode = import ./opencode { inherit pkgs lib; };
 
   # Claude Code harness — wrapped CLI + user-tier config + two plugins.
   # Exposes .package (the wrapped `claude`), .configDirDrv, .devshellHook,
