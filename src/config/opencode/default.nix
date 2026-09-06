@@ -20,7 +20,6 @@ lib.makeExtensible (
     config = baseConfig;
     tui = baseTui;
     instructionsFile = ./instructions.md;
-    commandsDir = ./commands;
 
     tuiDrv = jsonFmt.generate "opencode-tui.json" final.tui;
 

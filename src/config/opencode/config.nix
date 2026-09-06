@@ -16,6 +16,16 @@
   autoupdate = false;
 
   # =========================================================================
+  # Commands — slash commands injected via OPENCODE_CONFIG_CONTENT
+  # =========================================================================
+  command = {
+    commit = {
+      description = "Stage and commit changes using conventional commits ceremony";
+      template = "Load the git-commit skill and execute all steps of the commit ceremony. NEVER truncate output: no | head, no | tail, no > file, no --stat alone, no --oneline. $ARGUMENTS";
+    };
+  };
+
+  # =========================================================================
   # MCP servers — hermetic store-path commands
   # =========================================================================
   mcp = {
@@ -54,161 +64,48 @@
   };
 
   # =========================================================================
-  # Permissions — ported from src/config/claude-code/permissions.nix
-  # OpenCode uses action/resource/effect triples evaluated last-match-wins.
+  # Permissions — v1 object keyed by tool name, last matching rule wins.
+  # Bare string applies to all patterns. Object maps pattern to action.
   # =========================================================================
-  permissions = [
+  permission = {
     # Read-only inspection — auto-approved
-    {
-      action = "read";
-      resource = "*";
-      effect = "allow";
-    }
-    {
-      action = "glob";
-      resource = "*";
-      effect = "allow";
-    }
-    {
-      action = "grep";
-      resource = "*";
-      effect = "allow";
-    }
+    read = {
+      "*" = "allow";
+      ".env" = "deny";
+      ".env.*" = "deny";
+      "secrets/**" = "deny";
+      "**/vault.bin" = "deny";
+      "**/id_ed25519" = "deny";
+      "**/id_rsa" = "deny";
+    };
+    glob = "allow";
+    grep = "allow";
+    skill = "allow";
 
-    # Safe git queries
-    {
-      action = "bash";
-      resource = "git status*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "git log*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "git diff*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "git show*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "git branch*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "git remote*";
-      effect = "allow";
-    }
+    # Bash — broad ask, narrow allows for safe queries, denies for destructive
+    bash = {
+      "git status*" = "allow";
+      "git log*" = "allow";
+      "git diff*" = "allow";
+      "git show*" = "allow";
+      "git branch*" = "allow";
+      "git remote*" = "allow";
+      "tree*" = "allow";
+      "wc*" = "allow";
+      "find*" = "allow";
+      "gh run list*" = "allow";
+      "gh run view*" = "allow";
+      "git push*" = "deny";
+      "git reset --hard*" = "deny";
+      "rm -rf*" = "deny";
+      "*" = "ask";
+    };
 
-    # Safe filesystem inspection
-    {
-      action = "bash";
-      resource = "tree*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "wc*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "find*";
-      effect = "allow";
-    }
-
-    # Safe CI inspection
-    {
-      action = "bash";
-      resource = "gh run list*";
-      effect = "allow";
-    }
-    {
-      action = "bash";
-      resource = "gh run view*";
-      effect = "allow";
-    }
-
-    # MCP tools — read-only queries
-    {
-      action = "skill";
-      resource = "*";
-      effect = "allow";
-    }
-
-    # Destructive operations — blocked
-    {
-      action = "bash";
-      resource = "git push*";
-      effect = "deny";
-    }
-    {
-      action = "bash";
-      resource = "git reset --hard*";
-      effect = "deny";
-    }
-    {
-      action = "bash";
-      resource = "rm -rf*";
-      effect = "deny";
-    }
-
-    # Secret material — blocked
-    {
-      action = "read";
-      resource = ".env";
-      effect = "deny";
-    }
-    {
-      action = "read";
-      resource = ".env.*";
-      effect = "deny";
-    }
-    {
-      action = "read";
-      resource = "secrets/**";
-      effect = "deny";
-    }
-    {
-      action = "read";
-      resource = "**/vault.bin";
-      effect = "deny";
-    }
-    {
-      action = "read";
-      resource = "**/id_ed25519";
-      effect = "deny";
-    }
-    {
-      action = "read";
-      resource = "**/id_rsa";
-      effect = "deny";
-    }
-
-    # Everything else — prompt for approval
-    {
-      action = "edit";
-      resource = "*";
-      effect = "ask";
-    }
-    {
-      action = "write";
-      resource = "*";
-      effect = "ask";
-    }
-    {
-      action = "bash";
-      resource = "*";
-      effect = "ask";
-    }
-  ];
+    edit = "ask";
+    write = "ask";
+    task = "ask";
+    webfetch = "ask";
+  };
 
   # =========================================================================
   # Formatter overrides — hermetic store paths
@@ -233,7 +130,7 @@
   # LSP overrides — hermetic store paths
   # =========================================================================
   lsp = {
-    nix = {
+    nixd = {
       command = [ (lib.getExe pkgs.nil) ];
     };
   };
