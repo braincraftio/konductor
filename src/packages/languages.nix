@@ -9,7 +9,12 @@
 # collisions when these package sets are consumed by home-manager, nixos, or
 # nix-darwin modules (which use buildEnv, not mkShell PATH shadowing).
 
-{ pkgs, versions, ... }:
+{
+  pkgs,
+  versions,
+  extraPythonPackages ? _ps: [ ],
+  ...
+}:
 
 let
   langs = versions.languages;
@@ -31,13 +36,21 @@ rec {
   # withPackages) can shadow the -env wrapper. To fix this, pythonEnv is exported
   # separately and prepended to PATH via shellHook in devshells that include
   # Python (same pattern as GOBIN/PNPM_HOME/CARGO_HOME).
-  pythonEnv = pkgs."python${langs.python.version}".withPackages (ps: [
-    ps.pip
-    ps.ipython
-    ps.pytest
-    ps.cryptography
-    ps.pylatexenc  # latex-to-unicode (utftex) — in withPackages to avoid python3.12 contamination
-  ] ++ pulumiDeps.pythonDeps ps);
+  #
+  # Downstream flakes extend via extraPythonPackages:
+  #   packages = import ../packages { extraPythonPackages = ps: [ ps.playwright ]; ... };
+  pythonEnv = pkgs."python${langs.python.version}".withPackages (
+    ps:
+    [
+      ps.pip
+      ps.ipython
+      ps.pytest
+      ps.cryptography
+      ps.pylatexenc # latex-to-unicode (utftex) — in withPackages to avoid python3.12 contamination
+    ]
+    ++ pulumiDeps.pythonDeps ps
+    ++ extraPythonPackages ps
+  );
 
   # Re-import pulumi.nix with pythonEnv so wrapper and env use same derivation
   pulumiPkg = import ./pulumi.nix { inherit pkgs pythonEnv; };

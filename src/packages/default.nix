@@ -19,6 +19,7 @@
   lib,
   config ? null,
   versions,
+  extraPythonPackages ? _ps: [ ],
 }:
 
 let
@@ -26,7 +27,14 @@ let
   core = import ./core.nix { inherit pkgs; };
   network = import ./network.nix { inherit pkgs; };
   system = import ./system.nix { inherit pkgs lib; };
-  languages = import ./languages.nix { inherit pkgs lib versions; };
+  languages = import ./languages.nix {
+    inherit
+      pkgs
+      lib
+      versions
+      extraPythonPackages
+      ;
+  };
   cli = import ./cli.nix {
     inherit pkgs config;
     inherit (languages) pulumiPkg;

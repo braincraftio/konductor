@@ -25,6 +25,7 @@
   programs,
   inputs,
   sourceInfo,
+  extraPythonPackages ? _ps: [ ],
   ...
 }:
 
@@ -46,12 +47,14 @@ let
 
   # Single source of truth for package composition
   # Config is passed to ensure all linters/formatters are wrapped
+  # extraPythonPackages flows through to languages.nix pythonEnv
   packages = import ../packages {
     inherit
       pkgs
       lib
       versions
       config
+      extraPythonPackages
       ;
   };
 
@@ -89,6 +92,32 @@ let
       ;
   };
 
+  # Rebuild the entire shell chain with extra Python packages.
+  # Used by passthru.withExtraPython on each Python-bearing shell.
+  # Pattern matches konductor's wrappedClaude.passthru.extend and
+  # nixpkgs' python3.withPackages (a passthru function on the interpreter).
+  rebuildWith =
+    newExtraPython:
+    import ./default.nix {
+      inherit
+        pkgs
+        lib
+        versions
+        programs
+        inputs
+        sourceInfo
+        ;
+      extraPythonPackages = newExtraPython;
+    };
+
+  addPassthru =
+    shell: shellName:
+    shell.overrideAttrs (old: {
+      passthru = (old.passthru or { }) // {
+        withExtraPython = extraPkgs: (rebuildWith extraPkgs).${shellName};
+      };
+    });
+
 in
 {
   # Default: Unopinionated foundation
@@ -96,14 +125,14 @@ in
   default = baseShell;
 
   # Language-specific shells (add their language to default)
-  python = import ./python.nix {
+  python = addPassthru (import ./python.nix {
     inherit
       baseShell
       pkgs
       packages
       versions
       ;
-  };
+  }) "python";
   go = import ./go.nix {
     inherit
       baseShell
@@ -141,15 +170,15 @@ in
   };
 
   # Full: Everything — all languages + IDE + container tooling
-  full = fullShell;
+  full = addPassthru fullShell "full";
 
   # Konductor: Self-hosting + CI — full + build tools + forgejo runner [Linux only]
   # Accumulative: base → full → konductor
-  konductor = konductorShell;
+  konductor = addPassthru konductorShell "konductor";
 
   # Frontend: Konductor + Playwright + Tauri [Linux only]
   # Accumulative: base → full → konductor → frontend
-  frontend = import ./frontend.nix {
+  frontend = addPassthru (import ./frontend.nix {
     inherit
       konductorShell
       pkgs
@@ -158,5 +187,5 @@ in
       programs
       config
       ;
-  };
+  }) "frontend";
 }
