@@ -20,8 +20,8 @@
       display = "3.13";
     };
     go = {
-      version = "1_25";
-      display = "1.25";
+      version = "1_26";
+      display = "1.26";
     };
     node = {
       version = "22";
