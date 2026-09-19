@@ -16,9 +16,8 @@
   #   - home-manager.url branch below (must match nixpkgs)
   # ===========================================================================
   inputs = {
-    # NixOS 26.05 - sync with src/lib/versions.nix nixos.channel
-    # gssproxy: fork until PR merges, then switch to upstream
-    #nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    # usrbinkat fork: gssproxy, freeipa, lesscpy, llvm patches ahead of upstream
+    # Based on nixpkgs master; home-manager and nixvim track master to match
     nixpkgs.url = "github:usrbinkat/nixpkgs/gssproxy-package-and-module";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
@@ -63,16 +62,16 @@
     # nixvim uses its own pinned nixpkgs for building; no
     # nixpkgs.follows to avoid nixos-render-docs rebuild conflicts
     nixvim = {
-      url = "github:nix-community/nixvim/nixos-26.05";
+      url = "github:nix-community/nixvim";
       inputs = {
         systems.follows = "systems";
         flake-parts.follows = "flake-parts";
       };
     };
 
-    # Must match nixpkgs branch - sync with src/lib/versions.nix nixos.channel
+    # Tracks master to match nixpkgs fork base
     home-manager = {
-      url = "github:nix-community/home-manager/release-26.05";
+      url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
