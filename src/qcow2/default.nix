@@ -382,7 +382,7 @@ let
     targetPkgs =
       pkgs: with pkgs; [
         # Core runtime
-        nodejs_20
+        nodejs_22
         stdenv.cc.libc # glibc (libc.so, ld-linux)
         stdenv.cc.cc.lib # libstdc++, libgcc_s
 
@@ -395,7 +395,7 @@ let
         libx11 # X11 (for clipboard, etc.)
         libxcb # XCB
       ];
-    runScript = "${pkgs.nodejs_20}/bin/node";
+    runScript = "${pkgs.nodejs_22}/bin/node";
   };
 
   # Script to patch VS Code server node binary by symlinking to FHS wrapper
