@@ -12,13 +12,15 @@
 
 let
   # Lua 5.1 with required packages for neovim plugins
-  luaEnv = pkgs.lua5_1.withPackages (ps: with ps; [
-    luarocks
-    # Required by rest.nvim
-    lua-curl
-    mimetypes
-    xml2lua
-  ]);
+  luaEnv = pkgs.lua5_1.withPackages (
+    ps: with ps; [
+      luarocks
+      # Required by rest.nvim
+      lua-curl
+      mimetypes
+      xml2lua
+    ]
+  );
 in
 {
   packages = with pkgs; [
@@ -32,9 +34,8 @@ in
     dust # Disk usage analyzer
     # tree → wrapped in src/config/ (in packages.default via cli.nix)
 
-    # AI coding agents (from unstable - fast-moving packages)
-    # opencode: 1.0.184 (unstable) vs 1.0.105 (25.11)
-    unstable.opencode
+    # OpenCode v2 AI coding agent (usrbinkat/opencode overlay)
+    opencode
 
     # Neovim dependencies (required for plugins)
     tree-sitter # Parser generator for nvim-treesitter (:TSInstallFromGrammar)
