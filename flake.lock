@@ -853,11 +853,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1789857261,
-        "narHash": "sha256-mAs1kjFv74fwwJkwd6rgwdBRu0w2uUBIbsckRyQzRVA=",
+        "lastModified": 1789859305,
+        "narHash": "sha256-maEKni17mV0xnG1v5eyBFrs4U79I4RX5YDkSk3aF3Z0=",
         "owner": "usrbinkat",
         "repo": "nixpkgs",
-        "rev": "42b80b5819f7cf092dc7c8545c013db9a4c639c6",
+        "rev": "dcb71679b129ed9602a89f4e54bcf5da40a91bf8",
         "type": "github"
       },
       "original": {
