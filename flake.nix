@@ -59,14 +59,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Tracks master to match nixpkgs fork base
+    # nixvim uses its own pinned nixpkgs for building doc tooling
+    # (nixos-render-docs); no nixpkgs follows. Plugin packages (opencode-nvim,
+    # etc.) resolve from the host pkgs via konductor overlays at consumption
+    # time, not from nixvim's internal nixpkgs.
     nixvim = {
       url = "github:nix-community/nixvim";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        systems.follows = "systems";
-        flake-parts.follows = "flake-parts";
-      };
+      inputs.systems.follows = "systems";
     };
 
     # Tracks master to match nixpkgs fork base
