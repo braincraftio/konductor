@@ -19,7 +19,7 @@
     # usrbinkat fork: gssproxy, freeipa, lesscpy, llvm patches ahead of upstream
     # Based on nixpkgs master; home-manager and nixvim track master to match
     nixpkgs.url = "github:usrbinkat/nixpkgs/gssproxy-package-and-module";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs-unstable.follows = "nixpkgs";
 
     # flake-utils and systems are retained for nuschtosSearch, ixx, and
     # nixvim follows declarations. Per-system iteration uses
@@ -59,11 +59,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # nixvim uses its own pinned nixpkgs for building; no
-    # nixpkgs.follows to avoid nixos-render-docs rebuild conflicts
+    # Tracks master to match nixpkgs fork base
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs = {
+        nixpkgs.follows = "nixpkgs";
         systems.follows = "systems";
         flake-parts.follows = "flake-parts";
       };
