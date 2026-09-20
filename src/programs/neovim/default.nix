@@ -34,6 +34,10 @@ let
     # Allow unfree packages (claude-code)
     nixpkgs.config.allowUnfree = true;
 
+    # Acknowledge that nixvim resolves nixpkgs from our fork via follows,
+    # not from nixvim's own pin. Suppresses the nixpkgs.source warning.
+    nixpkgs.source = pkgs.path;
+
     # Colorscheme
     colorschemes.catppuccin = {
       enable = true;
