@@ -309,12 +309,6 @@ _:
       action = "<cmd>lua Konductor.codex_cli_toggle()<CR>";
       options.desc = "Codex CLI";
     }
-    {
-      mode = "n";
-      key = "<leader>ai";
-      action = "<cmd>Copilot toggle<CR>";
-      options.desc = "Copilot inline";
-    }
 
     # Level 3: Claude Code actions (<leader>ac*)
     {
@@ -334,26 +328,6 @@ _:
       key = "<leader>acv";
       action.__raw = "function() require('claude-code').toggle('verbose') end";
       options.desc = "Verbose";
-    }
-
-    # Level 3: Copilot inline actions (<leader>ai*)
-    {
-      mode = "n";
-      key = "<leader>aie";
-      action = "<cmd>Copilot enable<CR>";
-      options.desc = "Enable";
-    }
-    {
-      mode = "n";
-      key = "<leader>aix";
-      action = "<cmd>Copilot disable<CR>";
-      options.desc = "Disable";
-    }
-    {
-      mode = "n";
-      key = "<leader>ais";
-      action = "<cmd>Copilot status<CR>";
-      options.desc = "Status";
     }
 
     # =========================================================================

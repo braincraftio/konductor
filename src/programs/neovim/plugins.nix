@@ -430,11 +430,6 @@ in
             icon = "󰚩";
           }
           {
-            __unkeyed-1 = "<leader>ai";
-            group = "Copilot";
-            icon = "";
-          }
-          {
             __unkeyed-1 = "<leader>l";
             group = "LSP";
             icon = "";
@@ -706,10 +701,6 @@ in
       settings = {
         sources = [
           {
-            name = "copilot";
-            priority = 1100;
-          }
-          {
             name = "nvim_lsp";
             priority = 1000;
           }
@@ -902,21 +893,6 @@ in
       };
     };
 
-    copilot-lua = {
-      enable = true;
-      settings = {
-        # Disable suggestion/panel - using copilot-cmp for nvim-cmp integration instead
-        # This provides unified completion UX through the cmp popup
-        suggestion.enabled = false;
-        panel.enabled = false;
-        filetypes = {
-          yaml = true;
-          markdown = true;
-          gitcommit = true;
-        };
-      };
-    };
-
     # =========================================================================
     # TOOLS LAYER
     # =========================================================================
@@ -950,8 +926,6 @@ in
       };
     };
 
-    # Copilot completion source
-    copilot-cmp.enable = true;
   };
 
   # =========================================================================
