@@ -874,11 +874,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1789877257,
-        "narHash": "sha256-JOvYdc8WLgRdc2MSt6DwwDb7i+muzjEHKZHFkDwbWNk=",
+        "lastModified": 1789878695,
+        "narHash": "sha256-XfXLWkUvp7+ZUn8Uv/6M8O1yy0z9N2n8W56KjmamPIc=",
         "owner": "usrbinkat",
         "repo": "nixpkgs",
-        "rev": "5d5919d0f60c3b93ecd22b06e2f1b3c38c5b1c71",
+        "rev": "e7584fefddbd0bf139049473b1ee8262c07b9fe7",
         "type": "github"
       },
       "original": {
@@ -1237,11 +1237,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789875915,
-        "narHash": "sha256-EH4ldM84Aw7La4kFQbcaFF8roDBnaKwvXEm2bn6VXhE=",
+        "lastModified": 1789878487,
+        "narHash": "sha256-HCqrs2nruTfcKSMy0hHPu6mvKWWVSlO9QFqfiSotpTE=",
         "owner": "usrbinkat",
         "repo": "opencode",
-        "rev": "3298cf6c870b167be5be917b4bf388bde84abb83",
+        "rev": "0c96c47800354c2b11311238cafd71e57d3b5dcc",
         "type": "github"
       },
       "original": {
