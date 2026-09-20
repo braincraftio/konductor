@@ -4,13 +4,11 @@
 # Layout Philosophy (Apple-simple, Material-elegant):
 #   LEFT   - Explorer (<leader>e)     - File navigation
 #   CENTER - Editor                   - Your code
-#   RIGHT  - AI Panel                 - Claude (<leader>vv) / OpenCode (<leader>oo)
+#   RIGHT  - AI Panel                 - Claude (<leader>vv)
 #   BOTTOM - Terminal (<leader>tt)    - Shell access
 #
 # AI Integration:
 #   <leader>v* - Vibe group (Claude Code, Copilot)
-#   <leader>o* - OpenCode (multi-provider AI agent with deep integration)
-#   go{motion} - OpenCode operator (review with motion, e.g., goap = review paragraph)
 #
 # Navigation:
 #   Ctrl+hjkl  - Move between splits AND tmux panes (vim-tmux-navigator;
@@ -116,7 +114,7 @@ _:
     # Tmux ⇄ Neovim navigation — all modes explicit.
     # g:tmux_navigator_no_mappings = 1 (options.nix) disables the plugin's
     # own maps because its t-mode maps use \<C-w>: which leaks command text
-    # into terminal programs (claude-code, opencode). We set both n-mode
+    # into terminal programs (claude-code). We set both n-mode
     # and t-mode maps here using <cmd> which bypasses terminal input.
     {
       mode = "n";
@@ -218,8 +216,6 @@ _:
           local ft = vim.bo.filetype
           if ft == "claude-code" then
             require("claude-code").toggle()
-          elseif ft == "opencode" then
-            require("opencode").toggle()
           else
             vim.cmd("stopinsert")
           end
@@ -303,12 +299,6 @@ _:
     }
     {
       mode = "n";
-      key = "<leader>ao";
-      action.__raw = "function() require('opencode').toggle() end";
-      options.desc = "OpenCode";
-    }
-    {
-      mode = "n";
       key = "<leader>ap";
       action = "<cmd>lua Konductor.copilot_cli_toggle()<CR>";
       options.desc = "Copilot CLI";
@@ -346,150 +336,6 @@ _:
       options.desc = "Verbose";
     }
 
-    # Level 3: OpenCode actions (<leader>ao*)
-    {
-      mode = "n";
-      key = "<leader>aoa";
-      action.__raw = "function() require('opencode').ask() end";
-      options.desc = "Ask";
-    }
-    {
-      mode = "n";
-      key = "<leader>aos";
-      action.__raw = "function() require('opencode').select() end";
-      options.desc = "Select prompt";
-    }
-    {
-      mode = "n";
-      key = "<leader>aog";
-      action.__raw = "function() require('opencode').command('agent.cycle') end";
-      options.desc = "Cycle agent";
-    }
-
-    # Level 4: OpenCode prompts (<leader>aop*)
-    {
-      mode = "n";
-      key = "<leader>aopr";
-      action.__raw = "function() require('opencode').prompt('review') end";
-      options.desc = "Review";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopr";
-      action.__raw = "function() require('opencode').prompt('review') end";
-      options.desc = "Review";
-    }
-    {
-      mode = "n";
-      key = "<leader>aope";
-      action.__raw = "function() require('opencode').prompt('explain') end";
-      options.desc = "Explain";
-    }
-    {
-      mode = "v";
-      key = "<leader>aope";
-      action.__raw = "function() require('opencode').prompt('explain') end";
-      options.desc = "Explain";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopd";
-      action.__raw = "function() require('opencode').prompt('document') end";
-      options.desc = "Document";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopd";
-      action.__raw = "function() require('opencode').prompt('document') end";
-      options.desc = "Document";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopf";
-      action.__raw = "function() require('opencode').prompt('fix') end";
-      options.desc = "Fix";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopt";
-      action.__raw = "function() require('opencode').prompt('test') end";
-      options.desc = "Test";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopt";
-      action.__raw = "function() require('opencode').prompt('test') end";
-      options.desc = "Test";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopo";
-      action.__raw = "function() require('opencode').prompt('optimize') end";
-      options.desc = "Optimize";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopo";
-      action.__raw = "function() require('opencode').prompt('optimize') end";
-      options.desc = "Optimize";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopi";
-      action.__raw = "function() require('opencode').prompt('implement') end";
-      options.desc = "Implement";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopi";
-      action.__raw = "function() require('opencode').prompt('implement') end";
-      options.desc = "Implement";
-    }
-    {
-      mode = "n";
-      key = "<leader>aopR";
-      action.__raw = "function() require('opencode').prompt('refactor') end";
-      options.desc = "Refactor";
-    }
-    {
-      mode = "v";
-      key = "<leader>aopR";
-      action.__raw = "function() require('opencode').prompt('refactor') end";
-      options.desc = "Refactor";
-    }
-
-    # Level 4: OpenCode session (<leader>aoss*)
-    {
-      mode = "n";
-      key = "<leader>aossn";
-      action.__raw = "function() require('opencode').command('session.new') end";
-      options.desc = "New session";
-    }
-    {
-      mode = "n";
-      key = "<leader>aossl";
-      action.__raw = "function() require('opencode').command('session.list') end";
-      options.desc = "List sessions";
-    }
-    {
-      mode = "n";
-      key = "<leader>aosss";
-      action.__raw = "function() require('opencode').command('session.share') end";
-      options.desc = "Share";
-    }
-    {
-      mode = "n";
-      key = "<leader>aossu";
-      action.__raw = "function() require('opencode').command('session.undo') end";
-      options.desc = "Undo";
-    }
-    {
-      mode = "n";
-      key = "<leader>aossr";
-      action.__raw = "function() require('opencode').command('session.redo') end";
-      options.desc = "Redo";
-    }
-
     # Level 3: Copilot inline actions (<leader>ai*)
     {
       mode = "n";
@@ -508,22 +354,6 @@ _:
       key = "<leader>ais";
       action = "<cmd>Copilot status<CR>";
       options.desc = "Status";
-    }
-
-    # Operator motion - 'go' prefix for opencode (vim-native, dot-repeatable)
-    # Example: goap (review paragraph), goiw (review word)
-    {
-      mode = "n";
-      key = "go";
-      action.__raw = "function() return require('opencode').operator() end";
-      options.desc = "OpenCode operator";
-      options.expr = true;
-    }
-    {
-      mode = "v";
-      key = "go";
-      action.__raw = "function() require('opencode').prompt('review') end";
-      options.desc = "OpenCode review";
     }
 
     # =========================================================================

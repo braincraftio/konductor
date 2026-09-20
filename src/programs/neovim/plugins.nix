@@ -329,12 +329,6 @@ in
               text = "";
               separator = true;
             }
-            {
-              filetype = "opencode";
-              text = " OpenCode";
-              highlight = "Directory";
-              separator = true;
-            }
           ];
           # Show working directory for terminals, clean names for others
           name_formatter.__raw = ''
@@ -402,9 +396,6 @@ in
                   -- Claude Code: show context
                   elseif ft == "claude-code" then
                     return "󰚩 Claude"
-                  -- OpenCode: show context
-                  elseif ft == "opencode" then
-                    return " OpenCode"
                   else
                     -- Files: relative path for location context
                     return vim.fn.expand("%:~:.")
@@ -437,21 +428,6 @@ in
             __unkeyed-1 = "<leader>ac";
             group = "Claude";
             icon = "󰚩";
-          }
-          {
-            __unkeyed-1 = "<leader>ao";
-            group = "OpenCode";
-            icon = "";
-          }
-          {
-            __unkeyed-1 = "<leader>aop";
-            group = "Prompts";
-            icon = "";
-          }
-          {
-            __unkeyed-1 = "<leader>aoss";
-            group = "Session";
-            icon = "";
           }
           {
             __unkeyed-1 = "<leader>ai";
@@ -656,13 +632,13 @@ in
     # g:tmux_navigator_no_mappings = 1 (options.nix) disables the plugin's
     # own key maps. All n-mode and t-mode C-hjkl maps are in keymaps.nix
     # using <cmd> instead of the plugin's \<C-w>: which leaks command text
-    # into terminal programs (claude-code, opencode).
+    # into terminal programs (claude-code).
     tmux-navigator = {
       enable = true;
       settings = {
         # Disable the plugin's own key maps. Its t-mode maps use \<C-w>:
         # which leaks command text into terminal programs (claude-code,
-        # opencode). All n-mode and t-mode C-hjkl maps are in keymaps.nix
+        # All n-mode and t-mode C-hjkl maps are in keymaps.nix
         # using <cmd> which bypasses terminal input entirely.
         no_mappings = 1;
       };
@@ -875,10 +851,6 @@ in
     # AI LAYER
     # =========================================================================
 
-    # OpenCode - Multi-provider AI agent with deep Neovim integration
-    # Configured via extraPlugins below (not native nixvim plugin)
-    # Keymaps: <leader>o* group, toggle with <leader>vo
-
     # Claude Code - Official Anthropic Claude integration
     claude-code = {
       enable = true;
@@ -991,22 +963,6 @@ in
     in
     [
       # -----------------------------------------------------------------------
-      # OpenCode.nvim - Deep integration with OpenCode AI agent
-      # -----------------------------------------------------------------------
-      # Features:
-      #   - Direct HTTP connection to OpenCode server (port 3232)
-      #   - SSE real-time events -> OpencodeEvent autocmds
-      #   - Context injection: @buffer, @this, @diagnostics, @diff, @visible
-      #   - Built-in prompts: review, explain, document, fix, test, optimize
-      #   - Session control: new, list, share, undo, redo, page navigation
-      #   - Vim-native operators with dot-repeat support
-      # -----------------------------------------------------------------------
-      # OpenCode.nvim - configured via vim.g.opencode_opts (no setup() function)
-      # Configuration is set in extraConfigLuaPre in extraConfig.nix
-      # Using unstable: 2025-12-18 vs stable 2025-11-20 (about 1 month newer)
-      pkgs.unstable.vimPlugins.opencode-nvim
-
-      # -----------------------------------------------------------------------
       # render-markdown.nvim - live in-editor markdown rendering (normal mode)
       # -----------------------------------------------------------------------
       (
@@ -1019,28 +975,28 @@ in
             sha256 = "sha256-0DwPuzqR+7R4lJFQ9f2xN26YhdQKg85Hw6+bPvloZoc=";
           };
         }).overrideAttrs
-        (old: {
-          doCheck = false;
-          postInstall = (old.postInstall or "") + ''
-                          mkdir -p $out/plugin
-                          cat > $out/plugin/render-markdown-setup.lua << 'EOF'
-            -- Auto-initialize render-markdown on plugin load
-            local ok, render_markdown = pcall(require, "render-markdown")
-            if ok then
-              render_markdown.setup({
-                enabled = true,
-                preset = "obsidian",
-                render_modes = { "n", "c", "t" },
-                anti_conceal = { enabled = true },
-                heading = { enabled = true },
-                code = { enabled = true, style = "full" },
-                -- Disable latex rendering (requires latex treesitter parser)
-                latex = { enabled = false },
-              })
-            end
-            EOF
-          '';
-        })
+          (old: {
+            doCheck = false;
+            postInstall = (old.postInstall or "") + ''
+                            mkdir -p $out/plugin
+                            cat > $out/plugin/render-markdown-setup.lua << 'EOF'
+              -- Auto-initialize render-markdown on plugin load
+              local ok, render_markdown = pcall(require, "render-markdown")
+              if ok then
+                render_markdown.setup({
+                  enabled = true,
+                  preset = "obsidian",
+                  render_modes = { "n", "c", "t" },
+                  anti_conceal = { enabled = true },
+                  heading = { enabled = true },
+                  code = { enabled = true, style = "full" },
+                  -- Disable latex rendering (requires latex treesitter parser)
+                  latex = { enabled = false },
+                })
+              end
+              EOF
+            '';
+          })
       )
     ];
 
