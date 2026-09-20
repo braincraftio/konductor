@@ -1,3 +1,21 @@
+## [1.5.0](https://github.com/braincraftio/konductor/compare/v1.4.2...v1.5.0) (2026-09-20)
+
+### Features
+
+* **deps:** opencode v2 via usrbinkat/opencode overlay ([d6da03e](https://github.com/braincraftio/konductor/commit/d6da03e0498a89a1cf555a4ff7ce89f92e76cac3))
+* **devshells:** add passthru.withExtraPython for downstream Python extension ([760acab](https://github.com/braincraftio/konductor/commit/760acab8d6102f79fcfc982f917b58cdcdc7df02))
+
+### Bug Fixes
+
+* **deps:** home-manager and nixvim track master to match nixpkgs fork ([fa0e16d](https://github.com/braincraftio/konductor/commit/fa0e16d03579d05d9b4c3da5ba18bee45c2f1c2b))
+* **deps:** nixvim and nixpkgs-unstable follow nixpkgs fork ([8e5aed2](https://github.com/braincraftio/konductor/commit/8e5aed2eacf5b66da443bce33ae1894cd77a4771))
+* **neovim:** remove copilot-lua, restore nixvim nixpkgs follows ([dd483ca](https://github.com/braincraftio/konductor/commit/dd483ca7481c5207bc038229891409ee785c0edc))
+* **neovim:** remove opencode-nvim v1 plugin and all references ([528ac31](https://github.com/braincraftio/konductor/commit/528ac31f4be5e91cb63d1966c7fa60515cf2df0a))
+* **nixvim:** drop flake-parts follows to suppress nixpkgs.source warning ([9e40ed0](https://github.com/braincraftio/konductor/commit/9e40ed09123c84c82681b73fcbe1766e5bf986d5))
+* **nixvim:** set nixpkgs.source, update flake.lock for follows ([14b0023](https://github.com/braincraftio/konductor/commit/14b0023ee67b5f704a826dbeb7caa714fbbad029))
+* **qcow2:** nodejs_20 -> nodejs_22, Node 20 EOL removed from nixpkgs ([ce7c80f](https://github.com/braincraftio/konductor/commit/ce7c80fed8c842eef29e0dd30ba98e48476823c9))
+* **versions:** go 1.25 -> 1.26, 1.25 removed from nixpkgs ([31bf936](https://github.com/braincraftio/konductor/commit/31bf9367b7cd9a6e9919ce4226e1cb728693c684))
+
 ## [1.4.2](https://github.com/braincraftio/konductor/compare/v1.4.1...v1.4.2) (2026-09-06)
 
 ### Bug Fixes
