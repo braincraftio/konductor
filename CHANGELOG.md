@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/braincraftio/konductor/compare/v1.5.0...v1.6.0) (2026-09-23)
+
+### Features
+
+* **claude-code:** add Opus 5.5 to available models roster ([48d88b7](https://github.com/braincraftio/konductor/commit/48d88b77b60e7ccfdd8680a2e962bb93180dfd9e))
+
 ## [1.5.0](https://github.com/braincraftio/konductor/compare/v1.4.2...v1.5.0) (2026-09-20)
 
 ### Features
