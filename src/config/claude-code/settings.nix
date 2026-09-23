@@ -34,6 +34,7 @@
   # resolves to so `opus`/`sonnet`/`haiku`/`fable` land on these exact IDs.
   #
   # 1M context: applied where the model supports it AND is not already always-1M.
+  #   - claude-opus-5-5      → always 1M; no suffix needed
   #   - claude-opus-4-6[1m]  → 1M forced via suffix
   #   - claude-sonnet-5      → always 1M on the API; suffix is neither needed nor accepted
   #   - claude-fable-5       → always 1M; no suffix
@@ -41,6 +42,7 @@
   availableModels = [
     "claude-fable-5"
     "claude-sonnet-5"
+    "claude-opus-5-5"
     "claude-opus-4-6"
     "claude-haiku-4-5"
   ];
