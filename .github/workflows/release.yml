@@ -54,6 +54,9 @@ jobs:
             echo "Skipping superseded CI run" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - uses: ./.github/actions/setup-nix
+        if: steps.revision.outputs.current == 'true'
+
       # node and npm come from .#ci; node major follows src/lib/versions.nix.
       - uses: ./.github/actions/setup-devshell
         if: steps.revision.outputs.current == 'true'

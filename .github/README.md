@@ -47,16 +47,16 @@ long-lived FlakeHub secret is used.
 
 ### Shared actions
 
-| Action                  | Responsibility                                            |
-| ----------------------- | --------------------------------------------------------- |
-| `setup-nix`             | Determinate installation, Cachix, optional FlakeHub Cache |
-| `setup-devshell`        | `setup-nix`, then `nix profile install .#ci` onto `PATH`  |
-| `upload-artifact`       | Single pinned `actions/upload-artifact`                   |
-| `upload-pages-artifact` | Single pinned `actions/upload-pages-artifact`             |
-| `deploy-pages`          | Single pinned `actions/deploy-pages`                      |
-| `fix-nix-hashes`        | Hash repair and platform patch artifact                   |
-| `semantic-release`      | Locked tool installation and structured release outputs   |
-| `publish-flake`         | Verify release checkout and publish its tag to FlakeHub   |
+| Action                  | Responsibility                                             |
+| ----------------------- | ---------------------------------------------------------- |
+| `setup-nix`             | Determinate installation, Cachix, optional FlakeHub Cache  |
+| `setup-devshell`        | `nix profile install .#ci` onto `PATH` (after `setup-nix`) |
+| `upload-artifact`       | Single pinned `actions/upload-artifact`                    |
+| `upload-pages-artifact` | Single pinned `actions/upload-pages-artifact`              |
+| `deploy-pages`          | Single pinned `actions/deploy-pages`                       |
+| `fix-nix-hashes`        | Hash repair and platform patch artifact                    |
+| `semantic-release`      | Locked tool installation and structured release outputs    |
+| `publish-flake`         | Verify release checkout and publish its tag to FlakeHub    |
 
 Workflows own event triggers, permissions, platform matrices, and job ordering. Composite actions
 own shared setup and publishing mechanics, and each third-party action is pinned by commit SHA in

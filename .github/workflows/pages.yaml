@@ -52,6 +52,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup-nix
+
       # node and pnpm come from .#ci; node major follows src/lib/versions.nix.
       - uses: ./.github/actions/setup-devshell
 

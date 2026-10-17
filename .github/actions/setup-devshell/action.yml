@@ -1,39 +1,16 @@
 name: Setup devshell
 description: >
-  Install Nix with caches, then install the flake's CI toolchain
-  (.#ci: node from src/lib/versions.nix, pnpm, git, jq, cachix, actionlint)
-  into a job-local profile on PATH. Runner tools come from the flake lock,
-  not from setup-* marketplace actions.
-
-inputs:
-  use-flakehub:
-    description: Enable FlakeHub Cache (caller requires id-token write)
-    required: false
-    default: "false"
-  cachix-name:
-    description: Cachix cache name (override for forks)
-    required: false
-    default: braincraftio
-  cachix-auth-token:
-    description: Cachix API token (empty disables push)
-    required: false
-    default: ""
-  cachix-skip-push:
-    description: Pull only, even when credentials are present
-    required: false
-    default: "false"
+  Install the flake's CI toolchain (.#ci: node from src/lib/versions.nix,
+  pnpm, git, jq, cachix, actionlint) into a job-local profile on PATH.
+  Requires ./.github/actions/setup-nix as an earlier step of the same job;
+  it is not nested here because the runner does not evaluate a nested
+  composite's inputs for its post steps (cachix-action post then fails on
+  an empty useDaemon). Runner tools come from the flake lock, not from
+  setup-* marketplace actions.
 
 runs:
   using: composite
   steps:
-    - name: Setup Nix
-      uses: ./.github/actions/setup-nix
-      with:
-        use-flakehub: ${{ inputs.use-flakehub }}
-        cachix-name: ${{ inputs.cachix-name }}
-        cachix-auth-token: ${{ inputs.cachix-auth-token }}
-        cachix-skip-push: ${{ inputs.cachix-skip-push }}
-
     - name: Install CI toolchain
       shell: bash
       run: |
