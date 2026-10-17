@@ -15,7 +15,10 @@ import sys
 from pathlib import Path
 
 from cryptography import x509
-from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    EllipticCurvePrivateKey,
+    EllipticCurvePublicKey,
+)
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.serialization import Encoding
 
@@ -32,7 +35,7 @@ from pki.crypto.keys import (
 from pki.crypto.leaf import build_leaf_certificate
 from pki.fingerprint import Fingerprint, FingerprintError, OSRelease
 from pki.identity import CertificateIdentity, TrustTier
-from pki.utils import action, atomic_write, ensure_dir, err, info, ok
+from pki.utils import action, atomic_write, ensure_dir, err, info, ok, warn
 
 
 def _load_identity(
@@ -102,9 +105,7 @@ def cmd_generate(args: list[str]) -> int:
     org = _extract_flag(args, "--org")
     ou = _extract_flag(args, "--ou")
     ca_days = int(_extract_flag(args, "--ca-days") or config.DEFAULT_CA_VALIDITY_DAYS)
-    cert_days = int(
-        _extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS
-    )
+    cert_days = int(_extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS)
 
     if config.VM_CA_CERT.exists() and not force:
         ok(f"CA already exists: {config.VM_CA_CERT}")
@@ -119,8 +120,7 @@ def cmd_generate(args: list[str]) -> int:
 
     # Detect hypervisor CA availability for cross-signing
     hypervisor_ca_available = (
-        config.HYPERVISOR_MOUNT_CA.exists() and
-        config.HYPERVISOR_MOUNT_KEY.exists()
+        config.HYPERVISOR_MOUNT_CA.exists() and config.HYPERVISOR_MOUNT_KEY.exists()
     )
     hypervisor_ca_cert = None
     hypervisor_ca_key = None
@@ -153,14 +153,10 @@ def cmd_generate(args: list[str]) -> int:
             "Generating SELF-SIGNED certificates (Envoy Gateway will NOT trust these)",
         )
 
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     if identity.fingerprint.is_ephemeral:
         print("  ⚠ Konductor PKI -- ORPHANED Certificate Generation")
-        print(
-            "═══════════════════════════════════════════════════════════════"
-        )
+        print("═══════════════════════════════════════════════════════════════")
         print()
         err("/.konductor not found -- generating ORPHANED certificates")
         err("Certs will be marked git:orphaned | nix:orphaned")
@@ -169,23 +165,20 @@ def cmd_generate(args: list[str]) -> int:
         print()
     elif trust_tier == TrustTier.HYPERVISOR:
         print("  Konductor PKI -- Hypervisor Cross-Signed Certificate Generation")
-        print(
-            "═══════════════════════════════════════════════════════════════"
-        )
+        print("═══════════════════════════════════════════════════════════════")
     else:
         print("  ⚠ Konductor PKI -- Self-Signed Certificate Generation (DEGRADED)")
-        print(
-            "═══════════════════════════════════════════════════════════════"
-        )
+        print("═══════════════════════════════════════════════════════════════")
     info(f"Domain: {identity.domain}")
     info(f"Organization: {identity.organization}")
     info(f"OU: {identity.organizational_unit}")
     info(f"Serial: {identity.serial_hex}")
     info(f"Trust tier: {trust_tier.display}")
     if not identity.fingerprint.is_ephemeral:
-        info(f"Git: {identity.fingerprint.git_commit}")
-        info(f"Nix: {identity.fingerprint.nix_drv}")
-        info(f"Built: {identity.fingerprint.build_date} by {identity.fingerprint.build_user}@{identity.fingerprint.build_host}")
+        fp = identity.fingerprint
+        info(f"Git: {fp.git_commit}")
+        info(f"Nix: {fp.nix_drv}")
+        info(f"Built: {fp.build_date} by {fp.build_user}@{fp.build_host}")
     print()
 
     # Ensure directories
@@ -218,8 +211,12 @@ def cmd_generate(args: list[str]) -> int:
         # 2. Build VM CA cert signed by hypervisor CA (intermediate CA)
         action("Building VM CA certificate (signed by hypervisor)")
         ca_cert = _build_cross_signed_ca(
-            ca_key, hypervisor_ca_key, hypervisor_ca_cert,
-            identity, trust_tier, validity_days=ca_days
+            ca_key,
+            hypervisor_ca_key,
+            hypervisor_ca_cert,
+            identity,
+            trust_tier,
+            validity_days=ca_days,
         )
         atomic_write(
             config.VM_CA_CERT,
@@ -239,9 +236,7 @@ def cmd_generate(args: list[str]) -> int:
         ok(f"CA key: {config.VM_CA_KEY}")
 
         action("Building CA certificate (self-signed)")
-        ca_cert = build_ca_certificate(
-            ca_key, identity, trust_tier, validity_days=ca_days
-        )
+        ca_cert = build_ca_certificate(ca_key, identity, trust_tier, validity_days=ca_days)
         atomic_write(
             config.VM_CA_CERT,
             ca_cert.public_bytes(Encoding.PEM),
@@ -314,8 +309,8 @@ def _warn_degraded_pki(reason: str, consequence: str) -> None:
 
 
 def _build_cross_signed_ca(
-    ca_key,
-    issuer_key,
+    ca_key: EllipticCurvePrivateKey,
+    issuer_key: EllipticCurvePrivateKey,
     issuer_cert: x509.Certificate,
     identity: CertificateIdentity,
     trust_tier: TrustTier,
@@ -330,18 +325,21 @@ def _build_cross_signed_ca(
     - Has pathLenConstraint=0 (can only sign end-entity certs)
     """
     import datetime
+
     from cryptography.hazmat.primitives import hashes
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    subject = x509.Name([
-        x509.NameAttribute(x509.oid.NameOID.ORGANIZATION_NAME, identity.organization),
-        x509.NameAttribute(
-            x509.oid.NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit
-        ),
-        x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, identity.ca_common_name),
-        x509.NameAttribute(x509.oid.NameOID.SERIAL_NUMBER, identity.serial_hex),
-    ])
+    subject = x509.Name(
+        [
+            x509.NameAttribute(x509.oid.NameOID.ORGANIZATION_NAME, identity.organization),
+            x509.NameAttribute(
+                x509.oid.NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit
+            ),
+            x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, identity.ca_common_name),
+            x509.NameAttribute(x509.oid.NameOID.SERIAL_NUMBER, identity.serial_hex),
+        ]
+    )
 
     # Issuer is the hypervisor CA's subject
     issuer = issuer_cert.subject
@@ -385,9 +383,7 @@ def _build_cross_signed_ca(
         # SHA-1, which may differ from how cert-manager computed the SKI.
         .add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-                issuer_cert.extensions.get_extension_for_class(
-                    x509.SubjectKeyIdentifier
-                ).value
+                issuer_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
             ),
             critical=False,
         )
@@ -395,6 +391,7 @@ def _build_cross_signed_ca(
 
     # nsComment
     from pki.crypto.extensions import build_provenance_extensions, der_ia5string
+
     ns_comment = identity.ns_comment("Intermediate CA", trust_tier)
     builder = builder.add_extension(
         x509.UnrecognizedExtension(
@@ -429,22 +426,16 @@ def cmd_hypervisor(args: list[str]) -> int:
     domain = _extract_flag(args, "--domain")
     org = _extract_flag(args, "--org")
     ou = _extract_flag(args, "--ou")
-    cert_days = int(
-        _extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS
-    )
+    cert_days = int(_extract_flag(args, "--cert-days") or config.DEFAULT_CERT_VALIDITY_DAYS)
 
     if not ca_path.exists():
         info(f"Hypervisor CA not found: {ca_path}")
         info("Nothing to import")
         return 0
 
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     print("  Konductor PKI -- Hypervisor Certificate Import")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
 
     identity = _load_identity(domain, org, ou)
     trust_tier = TrustTier.HYPERVISOR
@@ -471,15 +462,11 @@ def cmd_hypervisor(args: list[str]) -> int:
 
             # Also place hypervisor CA as the VM CA for consistent paths
             atomic_write(config.VM_CA_CERT, ca_pem, config.MODE_CERTIFICATE)
-            atomic_write(
-                config.VM_CA_KEY, key_pem, config.MODE_PRIVATE_KEY
-            )
+            atomic_write(config.VM_CA_KEY, key_pem, config.MODE_PRIVATE_KEY)
 
             action("Generating wildcard key (P-256)")
             leaf_key = generate_leaf_key()
-            write_private_key(
-                config.VM_WILDCARD_KEY, leaf_key, config.MODE_SERVICE_KEY
-            )
+            write_private_key(config.VM_WILDCARD_KEY, leaf_key, config.MODE_SERVICE_KEY)
 
             action("Signing wildcard cert with hypervisor CA")
             leaf_cert = build_leaf_certificate(
@@ -491,7 +478,9 @@ def cmd_hypervisor(args: list[str]) -> int:
                 validity_days=cert_days,
             )
             # Write full chain: leaf + hypervisor CA intermediate
-            chain_pem = leaf_cert.public_bytes(Encoding.PEM) + hyp_ca_cert.public_bytes(Encoding.PEM)
+            chain_pem = leaf_cert.public_bytes(Encoding.PEM) + hyp_ca_cert.public_bytes(
+                Encoding.PEM
+            )
             atomic_write(
                 config.VM_WILDCARD_CERT,
                 chain_pem,
@@ -514,13 +503,9 @@ def cmd_hypervisor(args: list[str]) -> int:
 
 def cmd_bundle(args: list[str]) -> int:
     """Build combined CA trust bundle from all available sources."""
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     print("  Konductor PKI -- CA Bundle Generation")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
 
     count = build_bundle()
 
@@ -544,13 +529,9 @@ def cmd_trust(args: list[str]) -> int:
         pki trust --remove                     Remove CA from system trust
         pki trust --status                     Check trust status
     """
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     print("  Konductor PKI -- System Trust Management")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
 
     # Parse arguments
     ca_path = Path(_extract_flag(args, "--ca") or str(config.HYPERVISOR_CA_CERT))
@@ -659,7 +640,9 @@ def _trust_status(docker_registries: list[str] | None = None) -> int:
                     if target == bundle_path:
                         ok(f"  {registry}: {registry_ca_path} → {target}")
                     else:
-                        warn(f"  {registry}: {registry_ca_path} → {target} (expected: {bundle_path})")
+                        warn(
+                            f"  {registry}: {registry_ca_path} → {target} (expected: {bundle_path})"
+                        )
                 else:
                     info(f"  {registry}: {registry_ca_path} (not a symlink)")
             else:
@@ -738,6 +721,7 @@ def _trust_install(ca_path: Path, docker_registries: list[str] | None = None) ->
 
         # Restart Docker daemon (if running)
         import subprocess
+
         result = subprocess.run(
             ["systemctl", "is-active", "docker.service"],
             capture_output=True,
@@ -774,6 +758,7 @@ def _trust_remove() -> int:
     certs_d = Path("/etc/docker/certs.d")
     if certs_d.exists():
         import shutil
+
         for registry_dir in certs_d.iterdir():
             if registry_dir.is_dir():
                 shutil.rmtree(registry_dir)
@@ -852,13 +837,9 @@ def cmd_inspect(args: list[str]) -> int:
 
     cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
 
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     print(f"  Certificate: {cert_path}")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     _print_cert_summary("", cert)
 
     # Extract custom OID extensions
@@ -894,16 +875,12 @@ def cmd_inspect(args: list[str]) -> int:
 
     # Show SANs
     try:
-        san_ext = cert.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        )
+        san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         print()
         print("  Subject Alternative Names:")
         for dns in san_ext.value.get_values_for_type(x509.DNSName):
             info(f"DNS: {dns}")
-        for uri in san_ext.value.get_values_for_type(
-            x509.UniformResourceIdentifier
-        ):
+        for uri in san_ext.value.get_values_for_type(x509.UniformResourceIdentifier):
             info(f"URI: {uri}")
     except x509.ExtensionNotFound:
         pass
@@ -922,34 +899,30 @@ def cmd_status(args: list[str]) -> int:
     One command, run anywhere (build host, inside VM, CI), gives full
     picture of PKI state. Same output everywhere = easy to compare.
     """
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
     print("  Konductor PKI Status")
-    print(
-        "═══════════════════════════════════════════════════════════════"
-    )
+    print("═══════════════════════════════════════════════════════════════")
 
     # All files we ever create, grouped by tier
     files = [
-        ("VM CA cert",       config.VM_CA_CERT,        True),
-        ("VM CA key",        config.VM_CA_KEY,          False),
-        ("VM wildcard cert", config.VM_WILDCARD_CERT,   True),
-        ("VM wildcard key",  config.VM_WILDCARD_KEY,    False),
-        ("Hypervisor CA",    config.HYPERVISOR_CA_CERT, True),
-        ("Hypervisor key",   config.HYPERVISOR_CA_KEY,  False),
-        ("CA bundle",        config.CA_BUNDLE,          False),
+        ("VM CA cert", config.VM_CA_CERT, True),
+        ("VM CA key", config.VM_CA_KEY, False),
+        ("VM wildcard cert", config.VM_WILDCARD_CERT, True),
+        ("VM wildcard key", config.VM_WILDCARD_KEY, False),
+        ("Hypervisor CA", config.HYPERVISOR_CA_CERT, True),
+        ("Hypervisor key", config.HYPERVISOR_CA_KEY, False),
+        ("CA bundle", config.CA_BUNDLE, False),
     ]
 
     # Also check mount points (deploy-time only)
     mount_points = [
-        ("Hypervisor mount CA",  config.HYPERVISOR_MOUNT_CA),
+        ("Hypervisor mount CA", config.HYPERVISOR_MOUNT_CA),
         ("Hypervisor mount key", config.HYPERVISOR_MOUNT_KEY),
     ]
 
     print()
     print("  Files:")
-    for label, path, is_cert in files:
+    for label, path, _is_cert in files:
         if path.exists():
             ok(f"{label}: {path}")
         else:
@@ -1076,15 +1049,11 @@ def _dump_cert(path: Path) -> None:
 
     # SANs
     try:
-        san = cert.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        )
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         dns_names = san.value.get_values_for_type(x509.DNSName)
         if dns_names:
             info(f"DNS:     {', '.join(dns_names)}")
-        uri_names = san.value.get_values_for_type(
-            x509.UniformResourceIdentifier
-        )
+        uri_names = san.value.get_values_for_type(x509.UniformResourceIdentifier)
         for uri in uri_names:
             info(f"URI:     {uri}")
     except x509.ExtensionNotFound:

@@ -2,7 +2,7 @@
 # Prettier configuration
 # https://prettier.io/docs/en/options.html
 
-# Line length (matches Python black default)
+# Line length (matches ruff line-length and nixfmt width)
 printWidth: 100
 
 # Tab width
@@ -53,16 +53,10 @@ singleAttributePerLine: false
 # Vue files script and style tags indentation
 vueIndentScriptAndStyle: false
 
-# Language-specific overrides
+# Language-specific overrides. JSON/JSONC are formatted by biome
+# (src/config/formatters/treefmt.nix), not prettier.
 overrides:
-  # DISABLED: Slidev plugin causes 120+ minute build regression (buildNpmPackage dep tree)
-  # See src/config/formatters/prettier/default.nix TODO for paths forward
-  # Re-enable when plugin is restored:
-  # - files: ["**/slides.md", "**/pages/*.md", "**/decks/**/*.md", "**/shared/fragments/**/*.md"]
-  #   options:
-  #     parser: slidev
-
-  # Markdown files (non-Slidev)
+  # Markdown files
   - files: ["*.md"]
     options:
       proseWrap: always
@@ -73,17 +67,6 @@ overrides:
     options:
       singleQuote: false
       printWidth: 120
-
-  # JSON files (handled by Biome, but Prettier for other aspects)
-  - files: ["*.json", "*.jsonc"]
-    options:
-      singleQuote: false
-      trailingComma: none
-
-  # Package.json special handling
-  - files: [package.json]
-    options:
-      printWidth: 1000 # Prevent unnecessary line breaks
 
   # GitHub Actions
   - files: [.github/workflows/*.yml, .github/workflows/*.yaml]

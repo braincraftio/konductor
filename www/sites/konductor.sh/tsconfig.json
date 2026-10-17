@@ -6,7 +6,5 @@
     "strict": true,
     "types": ["astro/client"]
   },
-  "include": [
-    "src/**/*"
-  ]
+  "include": ["src/**/*"]
 }

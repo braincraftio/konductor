@@ -33,10 +33,13 @@ rec {
   # Binary Portability Tools (for creating distributable binaries)
   # ===========================================================================
   # These tools help create portable binaries that work outside Nix
-  portabilityTools = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-    patchelf # Modify ELF binaries (interpreter, RPATH)
-    file # Identify file types
-  ]);
+  portabilityTools = lib.optionals stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      patchelf # Modify ELF binaries (interpreter, RPATH)
+      file # Identify file types
+    ]
+  );
 
   # ===========================================================================
   # Core Libraries (buildInputs)
@@ -56,32 +59,44 @@ rec {
   # Linux GUI Libraries (buildInputs) - Only on Linux
   # ===========================================================================
   # GTK and related libraries for Tauri's webview
-  gtkLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-    gtk3
-    glib
-    cairo
-    pango
-    gdk-pixbuf
-    librsvg
-    atk
-  ]);
+  gtkLibs = lib.optionals stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      gtk3
+      glib
+      cairo
+      pango
+      gdk-pixbuf
+      librsvg
+      atk
+    ]
+  );
 
   # WebKitGTK 4.1 - Tauri 2.x webview (Linux only)
-  webkitLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-    webkitgtk_4_1 # WebKit2GTK 4.1 for Tauri 2.x
-    libsoup_3 # HTTP library used by WebKitGTK
-  ]);
+  webkitLibs = lib.optionals stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      webkitgtk_4_1 # WebKit2GTK 4.1 for Tauri 2.x
+      libsoup_3 # HTTP library used by WebKitGTK
+    ]
+  );
 
   # System tray support (Linux only)
-  trayLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-    libayatana-appindicator # System tray icons
-  ]);
+  trayLibs = lib.optionals stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      libayatana-appindicator # System tray icons
+    ]
+  );
 
   # Additional Linux system libraries
-  systemLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-    dbus # D-Bus IPC
-    libxkbcommon # Keyboard handling
-  ]);
+  systemLibs = lib.optionals stdenv.hostPlatform.isLinux (
+    with pkgs;
+    [
+      dbus # D-Bus IPC
+      libxkbcommon # Keyboard handling
+    ]
+  );
 
   # ===========================================================================
   # Aggregated Package Lists
@@ -117,9 +132,9 @@ rec {
   shellHook = ''
     # Runtime libraries for Rust crates compiled within devshell
     # This ensures cargo-installed binaries can find their dependencies
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (
-      sslLibs ++ compressionLibs ++ gtkLibs ++ webkitLibs
-    )}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH="${
+      pkgs.lib.makeLibraryPath (sslLibs ++ compressionLibs ++ gtkLibs ++ webkitLibs)
+    }"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
     # Ensure Nix-provided binaries take precedence over ~/.cargo/bin
     # This prevents stale cargo-installed binaries from being used

@@ -56,7 +56,7 @@ spec:
             propagationMethod:
               qemuGuestAgent:
                 users:
-                  - usrbinkat   # Deploy-time user (UID 1000)
+                  - usrbinkat # Deploy-time user (UID 1000)
                   - kc2
                   - kc2admin
                   - runner
@@ -103,7 +103,7 @@ spec:
               masquerade: {}
             - name: macvtap
               model: virtio
-              macAddress: "52:54:00:c0:9d:01"  # Unique MAC for this instance
+              macAddress: "52:54:00:c0:9d:01" # Unique MAC for this instance
               binding:
                 name: macvtap
             - name: br0

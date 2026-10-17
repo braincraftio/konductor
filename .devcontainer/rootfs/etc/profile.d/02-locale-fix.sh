@@ -4,7 +4,7 @@
 # LC_ALL overrides all locale settings and can cause issues with Nix
 
 # Unset LC_ALL - it's too restrictive
-unset LC_ALL 2>/dev/null || true
+unset LC_ALL 2> /dev/null || true
 
 # Ensure LANG is set (C.UTF-8 is always available in containers)
 [ -z "${LANG}" ] && export LANG=C.UTF-8

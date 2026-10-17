@@ -174,26 +174,49 @@ run = "mise run doctor true"
 # TOP-LEVEL ORCHESTRATION
 # =============================================================================
 
+# Lint and format delegate to the runme tasks in docs/developer_guide/LINT.md
+# and the flake formatter, the same entrypoints lefthook and CI use.
 ["lint"]
 description = "🔍 Run all linters • l"
 alias = ["l"]
-depends = ["lint:nix", "lint:bash", "lint:yaml", "lint:toml", "lint:markdown"]
+run = "runme run lint"
 
 ["format"]
-description = "✨ Format all files • f"
-alias = ["f", "fmt"]
-depends = [
+description = "✨ Format all files (nix fmt) • f"
+alias = [
+  "f",
+  "fmt",
+  "format:all",
+  "fa",
   "format:nix",
+  "fn",
   "format:bash",
-  "format:yaml",
+  "fb",
   "format:toml",
+  "ft",
+  "format:yaml",
+  "fy",
   "format:markdown",
+  "fm",
+  "format:json",
+  "fj",
 ]
+dir = "{{ config_root }}"
+run = "nix fmt"
 
 ["format:check"]
-description = "🔍 Check formatting without changes • fc"
-alias = ["fc"]
-depends = ["format:nix:check", "format:bash:check", "format:toml:check"]
+description = "🔍 Check formatting without changes (checks.treefmt) • fc"
+alias = [
+  "fc",
+  "fmt:check",
+  "format:nix:check",
+  "fnc",
+  "format:bash:check",
+  "fbc",
+  "format:toml:check",
+  "ftc",
+]
+run = "runme run fmt:check"
 
 [clean]
 description = "🧹 Clean build artifacts and caches • c"

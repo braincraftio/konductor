@@ -4,8 +4,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "node scripts/generate-versions.mjs && astro dev",
+    "build": "node scripts/generate-versions.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

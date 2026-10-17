@@ -27,18 +27,21 @@
   nix-update-script,
 }:
 
+let
+  versions = import ../lib/versions.nix;
+in
 buildGoModule (finalAttrs: {
   pname = "trzsz-go";
-  version = "1.2.0";
+  inherit (versions.trzsz) version;
 
   src = fetchFromGitHub {
     owner = "trzsz";
     repo = "trzsz-go";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-CokZAXT61UKSsKnzE5mPMdAZecGX/8mgDkG4yDSat5M=";
+    inherit (versions.trzsz) hash;
   };
 
-  vendorHash = "sha256-eqQ5PpHNLp2QebC6fZcVYT9hHAeXfM6GLiji4WzGSRQ=";
+  inherit (versions.trzsz) vendorHash;
 
   subPackages = [
     "cmd/trz"

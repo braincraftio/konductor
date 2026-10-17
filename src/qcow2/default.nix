@@ -381,8 +381,10 @@ let
     name = "vscode-server-fhs";
     targetPkgs =
       pkgs: with pkgs; [
-        # Core runtime
-        nodejs_22
+        # Core runtime — Node major pinned by src/lib/versions.nix languages.node.
+        # Explicit pkgs.: the outer let binds `konductor` (devshellPackages
+        # self-hosting set), which shadows `with pkgs;` attribute lookup.
+        pkgs.konductor.nodejs
         stdenv.cc.libc # glibc (libc.so, ld-linux)
         stdenv.cc.cc.lib # libstdc++, libgcc_s
 
@@ -395,7 +397,7 @@ let
         libx11 # X11 (for clipboard, etc.)
         libxcb # XCB
       ];
-    runScript = "${pkgs.nodejs_22}/bin/node";
+    runScript = lib.getExe pkgs.konductor.nodejs;
   };
 
   # Script to patch VS Code server node binary by symlinking to FHS wrapper

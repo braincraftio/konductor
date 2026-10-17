@@ -25,46 +25,46 @@ Verify prerequisites and configure your development environment.
 
 ## Output
 
-| State | Exit | Description |
-|-------|------|-------------|
-| Ready | 0 | All prerequisites met, devshell loads correctly |
-| Warning | 0 | Functional with optional components missing (KVM, etc.) |
-| Failed | 1 | Critical prerequisite missing, cannot proceed |
+| State   | Exit | Description                                             |
+| ------- | ---- | ------------------------------------------------------- |
+| Ready   | 0    | All prerequisites met, devshell loads correctly         |
+| Warning | 0    | Functional with optional components missing (KVM, etc.) |
+| Failed  | 1    | Critical prerequisite missing, cannot proceed           |
 
 After successful setup:
 
-| Command | Description |
-|---------|-------------|
-| `nix develop .#full` | Enter devshell with all tools |
-| `direnv allow` | Auto-load environment on cd |
-| `ssh localhost` | Connect to build VM (after devshell) |
-| `runme run build:qcow2:image` | Build VM image |
+| Command                       | Description                          |
+| ----------------------------- | ------------------------------------ |
+| `nix develop .#full`          | Enter devshell with all tools        |
+| `direnv allow`                | Auto-load environment on cd          |
+| `ssh localhost`               | Connect to build VM (after devshell) |
+| `runme run build:qcow2:image` | Build VM image                       |
 
 ---
 
 ## Prerequisites
 
-| Tool | Purpose | Check | Fix |
-|------|---------|-------|-----|
-| Nix/Lix | Package manager | `nix --version` | `setup:nix` |
-| Flakes | Modern Nix CLI | `nix show-config` | `setup:flakes` |
-| KVM | VM builds (Linux) | `/dev/kvm` writable | `setup:kvm` |
-| Git user | Commits | `git config user.name` | `setup:git` |
+| Tool     | Purpose           | Check                  | Fix            |
+| -------- | ----------------- | ---------------------- | -------------- |
+| Nix/Lix  | Package manager   | `nix --version`        | `setup:nix`    |
+| Flakes   | Modern Nix CLI    | `nix show-config`      | `setup:flakes` |
+| KVM      | VM builds (Linux) | `/dev/kvm` writable    | `setup:kvm`    |
+| Git user | Commits           | `git config user.name` | `setup:git`    |
 
 ---
 
 ## Quick Start
 
-| Task | Description |
-|------|-------------|
-| `setup` | Show this help |
-| `setup:verify` | Check all prerequisites (CI: exits 1 on failure) |
-| `setup:nix` | Install Lix package manager |
-| `setup:flakes` | Enable flakes in nix.conf |
-| `setup:git` | Configure git user |
-| `setup:kvm` | Configure KVM access (Linux) |
-| `setup:registry` | Add konductor to flake registry |
-| `setup:test` | Test devshell loads correctly |
+| Task             | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| `setup`          | Show this help                                   |
+| `setup:verify`   | Check all prerequisites (CI: exits 1 on failure) |
+| `setup:nix`      | Install Lix package manager                      |
+| `setup:flakes`   | Enable flakes in nix.conf                        |
+| `setup:git`      | Configure git user                               |
+| `setup:kvm`      | Configure KVM access (Linux)                     |
+| `setup:registry` | Add konductor to flake registry                  |
+| `setup:test`     | Test devshell loads correctly                    |
 
 ### setup
 
@@ -173,35 +173,35 @@ echo "All devshells OK"
 
 **Entry Points:**
 
-| Task | Description |
-|------|-------------|
-| `setup` | Show help |
-| `setup:verify` | Check all prerequisites (runs --all on check tasks) |
-| `setup:test` | Test devshell loads |
-| `setup:nix` | Install Lix (interactive) |
-| `setup:flakes` | Enable flakes |
-| `setup:git` | Configure git user (interactive) |
-| `setup:kvm` | Configure KVM access (Linux) |
-| `setup:registry` | Add flake to registry |
+| Task             | Description                                         |
+| ---------------- | --------------------------------------------------- |
+| `setup`          | Show help                                           |
+| `setup:verify`   | Check all prerequisites (runs --all on check tasks) |
+| `setup:test`     | Test devshell loads                                 |
+| `setup:nix`      | Install Lix (interactive)                           |
+| `setup:flakes`   | Enable flakes                                       |
+| `setup:git`      | Configure git user (interactive)                    |
+| `setup:kvm`      | Configure KVM access (Linux)                        |
+| `setup:registry` | Add flake to registry                               |
 
 **Check Tasks** (internal, run via `setup:verify`):
 
-| Task | Description |
-|------|-------------|
-| `_setup:check:nix` | Nix installed |
-| `_setup:check:flakes` | Flakes enabled |
-| `_setup:check:daemon` | Nix daemon running (Linux) |
-| `_setup:check:kvm` | KVM accessible (Linux) |
-| `_setup:check:git` | Git user configured |
-| `_setup:check:project` | In project root |
-| `_setup:summary` | Print result and exit code |
+| Task                   | Description                |
+| ---------------------- | -------------------------- |
+| `_setup:check:nix`     | Nix installed              |
+| `_setup:check:flakes`  | Flakes enabled             |
+| `_setup:check:daemon`  | Nix daemon running (Linux) |
+| `_setup:check:kvm`     | KVM accessible (Linux)     |
+| `_setup:check:git`     | Git user configured        |
+| `_setup:check:project` | In project root            |
+| `_setup:summary`       | Print result and exit code |
 
 **Debug Tools:**
 
-| Task | Description |
-|------|-------------|
-| `_setup:debug:config` | Show Nix configuration |
-| `_setup:debug:env` | Show environment variables |
+| Task                  | Description                |
+| --------------------- | -------------------------- |
+| `_setup:debug:config` | Show Nix configuration     |
+| `_setup:debug:env`    | Show environment variables |
 
 **Exit Codes:** `0` = Ready, `1` = Critical prerequisite missing
 

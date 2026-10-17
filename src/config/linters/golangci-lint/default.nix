@@ -18,8 +18,22 @@ in
   package = pkgs.writeShellApplication {
     name = "golangci-lint";
     runtimeInputs = [ pkgs.golangci-lint ];
+    # --config is injected after the subcommands that read configuration;
+    # every other subcommand (fmt, linters, version, help) passes through.
     text = ''
-      exec golangci-lint run --config "${configFile}/.golangci.yml" "$@"
+      if [ "$#" -eq 0 ]; then
+        exec golangci-lint
+      fi
+      subcommand="$1"
+      shift
+      case "$subcommand" in
+        run | fmt | linters | config)
+          exec golangci-lint "$subcommand" --config "${configFile}/.golangci.yml" "$@"
+          ;;
+        *)
+          exec golangci-lint "$subcommand" "$@"
+          ;;
+      esac
     '';
   };
 

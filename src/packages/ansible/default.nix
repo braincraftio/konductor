@@ -2,7 +2,7 @@
 # Ansible toolchain — engine + mitogen acceleration + linter.
 #
 # ansible-core gains mitogen + httpx via its extraPackages parameter.
-# mitogen 0.3.50 is built from source (nixos-25.11 ships 0.3.33, too
+# mitogen is built from the versions.nix pin (nixos-25.11 ships 0.3.33, too
 # old for Ansible 14). The serverscom.mitogen Galaxy collection exposes
 # mitogen_linear as an FQCN strategy name.
 #
@@ -13,26 +13,25 @@
 
 {
   pkgs,
-  lib,
   versions,
 }:
 
 let
-  python3 = pkgs.python313;
-  python3Packages = pkgs.python313Packages;
+  python3 = pkgs."python${versions.languages.python.version}";
+  python3Packages = python3.pkgs;
 
-  # mitogen 0.3.50 — persistent remote Python interpreter + RPC.
+  # mitogen — persistent remote Python interpreter + RPC.
   # Zero runtime deps beyond stdlib + setuptools.
   mitogen = python3Packages.buildPythonPackage {
     pname = "mitogen";
-    version = versions.ansible.mitogen;
+    inherit (versions.ansible.mitogen) version;
     pyproject = true;
 
     src = pkgs.fetchFromGitHub {
       owner = "mitogen-hq";
       repo = "mitogen";
-      tag = "v${versions.ansible.mitogen}";
-      hash = "sha256-f6N9eGwhxa/Ls9NqTSqMh+zbLNBeFEUJXd9Km5aBGI8=";
+      tag = "v${versions.ansible.mitogen.version}";
+      inherit (versions.ansible.mitogen) hash;
     };
 
     build-system = [ python3Packages.setuptools ];
@@ -57,13 +56,13 @@ let
   # serverscom.mitogen Galaxy collection v1.4.1.
   serverscomMitogenCollection = pkgs.stdenvNoCC.mkDerivation {
     pname = "serverscom-mitogen-collection";
-    version = versions.ansible.serverscomCollection;
+    inherit (versions.ansible.serverscomCollection) version;
 
     src = pkgs.fetchFromGitHub {
       owner = "serverscom";
       repo = "ansible-collection-mitogen";
-      rev = versions.ansible.serverscomCollection;
-      hash = "sha256-5wumT5QPI42/JCcNlQN8fiZf80QBGu1h6/uWYTiKgf4=";
+      rev = versions.ansible.serverscomCollection.version;
+      inherit (versions.ansible.serverscomCollection) hash;
     };
 
     dontBuild = true;
@@ -116,6 +115,6 @@ in
   env = { };
 
   meta = {
-    description = "ansible-core (with mitogen ${versions.ansible.mitogen} + httpx) plus the hermetic ansible-lint wrapper";
+    description = "ansible-core (with mitogen ${versions.ansible.mitogen.version} + httpx) plus the hermetic ansible-lint wrapper";
   };
 }

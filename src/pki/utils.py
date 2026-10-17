@@ -59,6 +59,7 @@ def emit(symbol: str, message: str, *, file: object = None) -> None:
 
     Symbols:
         checkmark  = success
+        warning    = degraded state, operation continues
         cross      = error
         arrow      = action in progress
         dot        = informational
@@ -73,6 +74,10 @@ def info(message: str) -> None:
 
 def ok(message: str) -> None:
     emit("\u2713", message)
+
+
+def warn(message: str) -> None:
+    emit("\u26a0", message, file=sys.stderr)
 
 
 def err(message: str) -> None:

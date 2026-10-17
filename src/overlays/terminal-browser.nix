@@ -16,7 +16,7 @@
 #
 # Version bump procedure:
 #   1. src/lib/versions.nix terminal-browser.version
-#   2. Update hashes below (nix reports correct hash on mismatch)
+#   2. Update terminal-browser.hashes in the same release record.
 
 let
   versions = import ../lib/versions.nix;
@@ -29,19 +29,19 @@ let
   srcs = {
     x86_64-linux = {
       url = "https://github.com/zenbu-labs/terminal-browser/releases/download/v${version}/terminal-browser-linux-x64.tar.gz";
-      hash = "sha256-vjZ+fZQsW2/jmjJxBejcPkQS2SR0riukKrBWRS7E4sQ=";
+      hash = versions.terminal-browser.hashes.x86_64-linux;
     };
     aarch64-linux = {
       url = "https://github.com/zenbu-labs/terminal-browser/releases/download/v${version}/terminal-browser-linux-arm64.tar.gz";
-      hash = "sha256-cVD6l0YNmDS/1r8eSnH25TitvH/S7Wh50EV/zMoyPUY=";
+      hash = versions.terminal-browser.hashes.aarch64-linux;
     };
     aarch64-darwin = {
       url = "https://github.com/zenbu-labs/terminal-browser/releases/download/v${version}/terminal-browser-darwin-arm64.tar.gz";
-      hash = "sha256-hnWPfDegDzBDC1lHneAga6/DhdMZa0DXx8ZbVABk08A=";
+      hash = versions.terminal-browser.hashes.aarch64-darwin;
     };
     x86_64-darwin = {
       url = "https://github.com/zenbu-labs/terminal-browser/releases/download/v${version}/terminal-browser-darwin-x64.tar.gz";
-      hash = "sha256-3xhxbLa6jHhG4E092/YpGkUNFSmtBp3jM6wXsksfAcs=";
+      hash = versions.terminal-browser.hashes.x86_64-darwin;
     };
   };
 

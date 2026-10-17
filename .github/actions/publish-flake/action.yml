@@ -1,0 +1,20 @@
+name: Publish flake
+description: Publish the checked-out semantic release to FlakeHub (requires Nix and OIDC)
+inputs:
+  tag:
+    description: Existing v-prefixed semantic release tag
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify release checkout
+      shell: bash
+      env:
+        RELEASE_TAG: ${{ inputs.tag }}
+      run: test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+    - name: Publish to FlakeHub
+      uses: DeterminateSystems/flakehub-push@99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567
+      with:
+        tag: ${{ inputs.tag }}
+        visibility: public
+        include-output-paths: true

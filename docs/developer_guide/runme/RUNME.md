@@ -9,7 +9,8 @@ runme:
 
 # Runme: Executable Markdown Documentation
 
-Runme transforms Markdown files into interactive, executable documents. Instead of copy-pasting commands from documentation, developers can run code blocks directly from their editor or CLI.
+Runme transforms Markdown files into interactive, executable documents. Instead of copy-pasting
+commands from documentation, developers can run code blocks directly from their editor or CLI.
 
 ## Installation
 
@@ -75,18 +76,18 @@ echo "Hello, Runme!"
 
 ## Code Block Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | string | auto | Unique identifier for the block |
-| `interactive` | bool | `true` | Show output in real-time terminal |
-| `background` | bool | `false` | Run command in background |
-| `cwd` | string | doc dir | Working directory for execution |
-| `excludeFromRunAll` | bool | `false` | Skip when running `--all` |
-| `promptEnv` | bool | `true` | Prompt for environment variables |
-| `interpreter` | string | auto | Custom interpreter (e.g., `dagger shell`) |
-| `tag` | string | none | Categorize blocks (e.g., `setup,build`) |
-| `terminalRows` | int | auto | Terminal row allocation |
-| `skipPrompts` | bool | `false` | Skip all prompts for this block |
+| Attribute           | Type   | Default | Description                               |
+| ------------------- | ------ | ------- | ----------------------------------------- |
+| `name`              | string | auto    | Unique identifier for the block           |
+| `interactive`       | bool   | `true`  | Show output in real-time terminal         |
+| `background`        | bool   | `false` | Run command in background                 |
+| `cwd`               | string | doc dir | Working directory for execution           |
+| `excludeFromRunAll` | bool   | `false` | Skip when running `--all`                 |
+| `promptEnv`         | bool   | `true`  | Prompt for environment variables          |
+| `interpreter`       | string | auto    | Custom interpreter (e.g., `dagger shell`) |
+| `tag`               | string | none    | Categorize blocks (e.g., `setup,build`)   |
+| `terminalRows`      | int    | auto    | Terminal row allocation                   |
+| `skipPrompts`       | bool   | `false` | Skip all prompts for this block           |
 
 ### Attribute Examples
 
@@ -108,7 +109,8 @@ nix --version
 ```
 ````
 
-Output is captured and displayed after completion. Useful for commands that produce structured output.
+Output is captured and displayed after completion. Useful for commands that produce structured
+output.
 
 #### Background Process
 
@@ -166,29 +168,30 @@ container | from "alpine" | withExec ["echo", "hello"]
 
 ## Document Frontmatter
 
-Frontmatter provides document-level configuration. Runme supports YAML, JSON, and TOML formats, auto-detecting based on delimiters.
+Frontmatter provides document-level configuration. Runme supports YAML, JSON, and TOML formats,
+auto-detecting based on delimiters.
 
 ### Frontmatter Schema
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `cwd` | string | Default working directory for all blocks |
-| `shell` | string | Default shell interpreter |
-| `skipPrompts` | bool | Skip all prompts document-wide |
-| `terminalRows` | string | Default terminal row allocation |
-| `tag` | string | Document-level tags (comma-separated) |
-| `category` | string | **Deprecated** - use `tag` instead |
-| `runme` | object | Runme-specific metadata (nested) |
+| Field          | Type   | Description                              |
+| -------------- | ------ | ---------------------------------------- |
+| `cwd`          | string | Default working directory for all blocks |
+| `shell`        | string | Default shell interpreter                |
+| `skipPrompts`  | bool   | Skip all prompts document-wide           |
+| `terminalRows` | string | Default terminal row allocation          |
+| `tag`          | string | Document-level tags (comma-separated)    |
+| `category`     | string | **Deprecated** - use `tag` instead       |
+| `runme`        | object | Runme-specific metadata (nested)         |
 
 #### Nested `runme` Object
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `runme.id` | string | Unique document identifier (ULID, auto-generated) |
-| `runme.version` | string | Runme version (e.g., `v3`) |
-| `runme.session.id` | string | Session identifier |
-| `runme.session.updated` | string | Last session update timestamp |
-| `runme.document.relativePath` | string | Relative path of the document |
+| Field                         | Type   | Description                                       |
+| ----------------------------- | ------ | ------------------------------------------------- |
+| `runme.id`                    | string | Unique document identifier (ULID, auto-generated) |
+| `runme.version`               | string | Runme version (e.g., `v3`)                        |
+| `runme.session.id`            | string | Session identifier                                |
+| `runme.session.updated`       | string | Last session update timestamp                     |
+| `runme.document.relativePath` | string | Relative path of the document                     |
 
 ### YAML Format (Recommended)
 
@@ -199,14 +202,14 @@ Delimited by `---`:
 cwd: ../..
 shell: bash
 skipPrompts: false
-terminalRows: "24"
+terminalRows: '24'
 tag: build,deploy
 runme:
   id: 01HFVTDYA775K2HREH9ZGQJ75B
   version: v3
   session:
     id: 01HJS35FZ2K0JBWPVAXPMMVTGN
-    updated: "2024-01-15 10:30:00-05:00"
+    updated: '2024-01-15 10:30:00-05:00'
   document:
     relativePath: docs/BUILD.md
 ---
@@ -269,11 +272,13 @@ relativePath = "docs/BUILD.md"
 **Parsing**: Runme auto-detects format by delimiters and attempts YAML → JSON → TOML parsing.
 
 **Serialization**: When saving, Runme preserves the original format and updates metadata:
+
 - `runme.id` is auto-generated as a ULID if missing
 - `runme.session.updated` is refreshed on save
 - `runme.version` is set to current Runme version
 
-**Identity Resolution**: The `runme.id` ensures document tracking across renames and moves. Generated using ULID (Universally Unique Lexicographically Sortable Identifier).
+**Identity Resolution**: The `runme.id` ensures document tracking across renames and moves.
+Generated using ULID (Universally Unique Lexicographically Sortable Identifier).
 
 ### Minimal Frontmatter
 
@@ -292,37 +297,39 @@ Runme auto-populates `runme.id` and `runme.version` on first save.
 
 Runme auto-detects interpreters based on language identifiers:
 
-| Language ID | Interpreter | Execution Mode |
-|-------------|-------------|----------------|
-| `sh`, `bash`, `shell` | `bash` | Inline shell |
-| `zsh` | `zsh` | Inline shell |
-| `fish` | `fish` | Inline shell |
-| `powershell`, `pwsh` | `powershell` | Inline shell |
-| `python`, `py` | `python3` | Temp file |
-| `javascript`, `js` | `node` | Temp file |
-| `typescript`, `ts` | `ts-node` / `deno` / `bun` | Temp file |
-| `ruby`, `rb` | `ruby` | Temp file |
-| `go` | `go run` | Temp file |
-| `rust`, `rs` | `rust-script` | Temp file |
-| `lua` | `lua` | Temp file |
-| `perl` | `perl` | Temp file |
-| `php` | `php` | Temp file |
+| Language ID           | Interpreter                | Execution Mode |
+| --------------------- | -------------------------- | -------------- |
+| `sh`, `bash`, `shell` | `bash`                     | Inline shell   |
+| `zsh`                 | `zsh`                      | Inline shell   |
+| `fish`                | `fish`                     | Inline shell   |
+| `powershell`, `pwsh`  | `powershell`               | Inline shell   |
+| `python`, `py`        | `python3`                  | Temp file      |
+| `javascript`, `js`    | `node`                     | Temp file      |
+| `typescript`, `ts`    | `ts-node` / `deno` / `bun` | Temp file      |
+| `ruby`, `rb`          | `ruby`                     | Temp file      |
+| `go`                  | `go run`                   | Temp file      |
+| `rust`, `rs`          | `rust-script`              | Temp file      |
+| `lua`                 | `lua`                      | Temp file      |
+| `perl`                | `perl`                     | Temp file      |
+| `php`                 | `php`                      | Temp file      |
 
 ### Shell vs Temp File Execution
 
 **Inline Shell** (`sh`, `bash`, `zsh`): Commands passed via `-c` flag:
+
 ```sh
 bash -c 'echo "inline execution"'
 ```
 
 **Temp File** (`python`, `node`, etc.): Script written to temp file:
+
 ```sh
 python3 /tmp/runme-abc123.py
 ```
 
 ## Project Configuration
 
-### runme.yaml
+### `runme.yaml`
 
 The `runme.yaml` file configures project-level settings, primarily used by beta commands:
 
@@ -374,7 +381,8 @@ Runme respects ignore patterns when discovering files:
 
 ### Environment Loading Order
 
-Runme loads environment variables from multiple sources in this order (later sources override earlier):
+Runme loads environment variables from multiple sources in this order (later sources override
+earlier):
 
 1. **System environment** - Inherited from parent shell
 2. **Project `.env` files** - In order specified by `--env-order`
@@ -387,12 +395,14 @@ Runme loads environment variables from multiple sources in this order (later sou
 Runme automatically loads `.env` files from the project root.
 
 **Default behavior** (enabled by default):
+
 ```sh
 # Controlled by --load-env flag (default: true)
 runme run --load-env block-name
 ```
 
 **Load order** (controlled by `--env-order`):
+
 ```sh
 # Default order: .env.local, then .env
 runme run --env-order=".env.local,.env" block-name
@@ -402,6 +412,7 @@ runme run --env-order=".env.production,.env" block-name
 ```
 
 **Example `.env` file**:
+
 ```sh
 # .env
 OUTPUT_DIR=/tmp/build
@@ -415,6 +426,7 @@ LOG_LEVEL=info
 Runme integrates with direnv to load `.envrc` files automatically.
 
 **Default behavior** (enabled by default):
+
 ```sh
 # Controlled by --direnv flag (default: true)
 runme run --direnv block-name
@@ -423,9 +435,11 @@ runme run --direnv block-name
 runme run --direnv=false block-name
 ```
 
-**How it works**: Runme executes `eval $(direnv export $SHELL)` in the project root before running commands.
+**How it works**: Runme executes `eval $(direnv export $SHELL)` in the project root before running
+commands.
 
 **Example `.envrc`**:
+
 ```sh
 # .envrc
 use flake
@@ -437,14 +451,15 @@ export BUILD_DATE=$(date +%Y%m%d)
 
 Runme supports environment specification files for validation and documentation:
 
-| File | Purpose |
-|------|---------|
-| `.env.example` | Template showing required variables |
-| `.env.sample` | Alternative template name |
-| `.env.spec` | Formal specification with validation |
+| File              | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `.env.example`    | Template showing required variables    |
+| `.env.sample`     | Alternative template name              |
+| `.env.spec`       | Formal specification with validation   |
 | `.runme/owl.yaml` | Advanced env management with Owl Store |
 
 **Example `.env.example`**:
+
 ```sh
 # .env.example - Copy to .env and fill in values
 DATABASE_URL=postgres://user:pass@host/db
@@ -461,18 +476,19 @@ The Owl Store provides advanced environment variable management:
 - **Graph-based dependency resolution**
 
 **Configuration** (`.runme/owl.yaml`):
+
 ```yaml
 # .runme/owl.yaml
 variables:
   DATABASE_URL:
     required: true
-    pattern: "^postgres://"
+    pattern: '^postgres://'
   API_KEY:
     required: true
     secret: true
 ```
 
-Owl Store is enabled when a project is configured and owl.yaml exists.
+Owl Store is enabled when a project is configured and `owl.yaml` exists.
 
 ### Session Persistence
 
@@ -480,14 +496,15 @@ Environment variables persist across code blocks **within the same session**.
 
 **Important**: Session behavior differs between CLI modes:
 
-| Mode | Session Persistence | Use Case |
-|------|---------------------|----------|
-| `runme run task1` then `runme run task2` | No | Separate invocations = separate sessions |
-| `runme run --all` | **Yes** | All tasks run in single session |
-| `runme beta run task1 task2` | Yes | Multiple tasks in single session |
-| VS Code Extension | Yes | Interactive notebook experience |
+| Mode                                     | Session Persistence | Use Case                                 |
+| ---------------------------------------- | ------------------- | ---------------------------------------- |
+| `runme run task1` then `runme run task2` | No                  | Separate invocations = separate sessions |
+| `runme run --all`                        | **Yes**             | All tasks run in single session          |
+| `runme beta run task1 task2`             | Yes                 | Multiple tasks in single session         |
+| VS Code Extension                        | Yes                 | Interactive notebook experience          |
 
-**Key insight**: With `runme run --all`, tasks execute in markdown order within ONE session. Variables exported in early tasks are available to later tasks.
+**Key insight**: With `runme run --all`, tasks execute in markdown order within ONE session.
+Variables exported in early tasks are available to later tasks.
 
 **DRY Pattern - Setup Task First**:
 
@@ -551,7 +568,8 @@ tar -czf "$OUTPUT_FILE" ./dist
 
 **Standalone entry points** (run outside `--all`):
 
-Entry point tasks that users run directly need fallback defaults since they may not have the setup task's exports:
+Entry point tasks that users run directly need fallback defaults since they may not have the setup
+task's exports:
 
 ````markdown
 ```sh {"name":"build:package","excludeFromRunAll":"true"}
@@ -607,20 +625,22 @@ Or use a shared `.env` file that all blocks can load.
 
 Runme has two command modes with different capabilities:
 
-| Feature | `runme run` | `runme beta run` |
-|---------|-------------|------------------|
-| Runner | V1 (LocalRunner) | V2 (SessionRunner) |
-| Session persistence | No | Yes |
-| direnv integration | Yes | No |
-| Glob patterns | No | Yes |
-| Configuration | CLI flags | runme.yaml |
+| Feature             | `runme run`      | `runme beta run`   |
+| ------------------- | ---------------- | ------------------ |
+| Runner              | V1 (LocalRunner) | V2 (SessionRunner) |
+| Session persistence | No               | Yes                |
+| direnv integration  | Yes              | No                 |
+| Glob patterns       | No               | Yes                |
+| Configuration       | CLI flags        | `runme.yaml`       |
 
 **Use `runme run`** when:
+
 - You need direnv/nix shell integration
 - Blocks are self-contained or use .env files
 - Running individual blocks
 
 **Use `runme beta run`** when:
+
 - You need environment variables to persist between blocks
 - Running complex multi-block workflows
 - Using glob patterns to select blocks
@@ -725,6 +745,7 @@ Runme provides a VS Code extension for in-editor execution:
 ### Notebook Mode
 
 VS Code renders Markdown as interactive notebooks:
+
 - Each code block becomes an executable cell
 - Output displays below each cell
 - Environment persists across cells
@@ -733,17 +754,19 @@ VS Code renders Markdown as interactive notebooks:
 
 ### 1. Name All Important Blocks
 
-```markdown
+````markdown
 # Good - named and discoverable
+
 ```sh {"name":"build-image"}
 docker build -t myapp .
 ```
 
 # Avoid - anonymous blocks are hard to reference
+
 ```sh
 docker build -t myapp .
 ```
-```
+````
 
 ### 2. Use Tags for Workflows
 
@@ -818,14 +841,14 @@ Run all: `runme run --all --tag=db`
 
 ## Comparison with Alternatives
 
-| Feature | Runme | Makefile | Just | Task |
-|---------|-------|----------|------|------|
-| Markdown native | Yes | No | No | No |
-| Documentation | Built-in | Separate | Separate | Separate |
-| VS Code integration | Native | Limited | Limited | Limited |
-| Language support | Multi | Shell | Shell | Shell |
-| Session persistence | Yes | No | No | No |
-| Interactive prompts | Yes | No | No | No |
+| Feature             | Runme    | Makefile | Just     | Task     |
+| ------------------- | -------- | -------- | -------- | -------- |
+| Markdown native     | Yes      | No       | No       | No       |
+| Documentation       | Built-in | Separate | Separate | Separate |
+| VS Code integration | Native   | Limited  | Limited  | Limited  |
+| Language support    | Multi    | Shell    | Shell    | Shell    |
+| Session persistence | Yes      | No       | No       | No       |
+| Interactive prompts | Yes      | No       | No       | No       |
 
 ## Resources
 

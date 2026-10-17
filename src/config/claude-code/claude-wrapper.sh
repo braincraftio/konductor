@@ -71,8 +71,8 @@ claude_bin="@claude@/bin/claude"
 
 # Konductor plugins, loaded immutably from the store every session.
 plugin_args=(
-  --plugin-dir "@konductorPlugin@"
-  --plugin-dir "@practitionerPlugin@"
+    --plugin-dir "@konductorPlugin@"
+    --plugin-dir "@practitionerPlugin@"
 )
 
 # ─── Detect user-supplied system-prompt flags in "$@" ────────────────────────
@@ -83,77 +83,77 @@ plugin_args=(
 user_has_base_flag=false
 user_has_append_flag=false
 for arg in "$@"; do
-  case "${arg}" in
-    --)
-      break
-      ;;
-    --system-prompt | --system-prompt=* | --system-prompt-file | --system-prompt-file=*)
-      user_has_base_flag=true
-      ;;
-    --append-system-prompt | --append-system-prompt=* | --append-system-prompt-file | --append-system-prompt-file=*)
-      user_has_append_flag=true
-      ;;
-    *) ;;
-  esac
+    case "${arg}" in
+        --)
+            break
+            ;;
+        --system-prompt | --system-prompt=* | --system-prompt-file | --system-prompt-file=*)
+            user_has_base_flag=true
+            ;;
+        --append-system-prompt | --append-system-prompt=* | --append-system-prompt-file | --append-system-prompt-file=*)
+            user_has_append_flag=true
+            ;;
+        *) ;;
+    esac
 done
 
 # ─── System prompt dispatch ──────────────────────────────────────────────────
 system_prompt_args=()
 
 if [[ "${user_has_base_flag}" = true ]]; then
-  # Step 1: user's own base flag is authoritative. Inject nothing for the base
-  # slot regardless of env vars — the env-var layer never overrides an
-  # explicit flag. An --append-system-prompt* the user also passed rides
-  # through in "$@" unmodified; the wrapper adds nothing there either, since
-  # the user already fully owns the system-prompt surface for this invocation.
-  :
+    # Step 1: user's own base flag is authoritative. Inject nothing for the base
+    # slot regardless of env vars — the env-var layer never overrides an
+    # explicit flag. An --append-system-prompt* the user also passed rides
+    # through in "$@" unmodified; the wrapper adds nothing there either, since
+    # the user already fully owns the system-prompt surface for this invocation.
+    :
 else
-  sp_enabled="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED:-true}"
-  sp_file="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE:-}"
-  sp_file_mode="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE:-append}"
+    sp_enabled="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED:-true}"
+    sp_file="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE:-}"
+    sp_file_mode="${KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE:-append}"
 
-  case "${sp_enabled}" in
-    true | false) ;;
-    *)
-      printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED must be "true" or "false", got: %s\n' "${sp_enabled}" >&2
-      exit 1
-      ;;
-  esac
+    case "${sp_enabled}" in
+        true | false) ;;
+        *)
+            printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED must be "true" or "false", got: %s\n' "${sp_enabled}" >&2
+            exit 1
+            ;;
+    esac
 
-  case "${sp_file_mode}" in
-    append | replace) ;;
-    *)
-      printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE must be "append" or "replace", got: %s\n' "${sp_file_mode}" >&2
-      exit 1
-      ;;
-  esac
+    case "${sp_file_mode}" in
+        append | replace) ;;
+        *)
+            printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE must be "append" or "replace", got: %s\n' "${sp_file_mode}" >&2
+            exit 1
+            ;;
+    esac
 
-  if [[ -n "${sp_file}" ]] && [[ ! -r "${sp_file}" ]]; then
-    printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE is set but not readable: %s\n' "${sp_file}" >&2
-    exit 1
-  fi
-
-  if [[ "${sp_enabled}" = "true" ]] && [[ -n "${sp_file}" ]] && [[ "${sp_file_mode}" = "replace" ]]; then
-    printf 'konductor-claude: contradictory system-prompt config: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED=true (keep hermetic default) with KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE=replace (drop it for %s). Set ENABLED=false to replace, or FILE_MODE=append to layer.\n' "${sp_file}" >&2
-    exit 1
-  fi
-
-  if [[ "${sp_enabled}" = "true" ]]; then
-    system_prompt_args+=(--system-prompt-file "@systemPromptFile@")
-    if [[ -n "${sp_file}" ]]; then
-      # FILE_MODE is append here by construction (replace + ENABLED=true errored above).
-      system_prompt_args+=(--append-system-prompt-file "${sp_file}")
+    if [[ -n "${sp_file}" ]] && [[ ! -r "${sp_file}" ]]; then
+        printf 'konductor-claude: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE is set but not readable: %s\n' "${sp_file}" >&2
+        exit 1
     fi
-  else
-    if [[ -n "${sp_file}" ]]; then
-      # ENABLED=false: FILE is the sole base regardless of FILE_MODE — there is
-      # no hermetic default to append to or replace, so both modes collapse to
-      # the same flag. This collapse is intentional, not a silently dropped mode.
-      system_prompt_args+=(--system-prompt-file "${sp_file}")
+
+    if [[ "${sp_enabled}" = "true" ]] && [[ -n "${sp_file}" ]] && [[ "${sp_file_mode}" = "replace" ]]; then
+        printf 'konductor-claude: contradictory system-prompt config: KONDUCTOR_CLAUDE_SYSTEM_PROMPT_ENABLED=true (keep hermetic default) with KONDUCTOR_CLAUDE_SYSTEM_PROMPT_FILE_MODE=replace (drop it for %s). Set ENABLED=false to replace, or FILE_MODE=append to layer.\n' "${sp_file}" >&2
+        exit 1
     fi
-    # ENABLED=false, FILE unset: system_prompt_args stays empty — pure
-    # claude-code default system prompt, the explicit escape hatch.
-  fi
+
+    if [[ "${sp_enabled}" = "true" ]]; then
+        system_prompt_args+=(--system-prompt-file "@systemPromptFile@")
+        if [[ -n "${sp_file}" ]]; then
+            # FILE_MODE is append here by construction (replace + ENABLED=true errored above).
+            system_prompt_args+=(--append-system-prompt-file "${sp_file}")
+        fi
+    else
+        if [[ -n "${sp_file}" ]]; then
+            # ENABLED=false: FILE is the sole base regardless of FILE_MODE — there is
+            # no hermetic default to append to or replace, so both modes collapse to
+            # the same flag. This collapse is intentional, not a silently dropped mode.
+            system_prompt_args+=(--system-prompt-file "${sp_file}")
+        fi
+        # ENABLED=false, FILE unset: system_prompt_args stays empty — pure
+        # claude-code default system prompt, the explicit escape hatch.
+    fi
 fi
 
 # Step 1 continued: if the user passed only --append-system-prompt* (no base
@@ -169,7 +169,7 @@ fi
 # their own ~/.claude). --set-default semantics. Plugins and system-prompt
 # dispatch still apply; they are orthogonal to the config dir.
 if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
-  exec "${claude_bin}" "${plugin_args[@]}" "${system_prompt_args[@]}" "$@"
+    exec "${claude_bin}" "${plugin_args[@]}" "${system_prompt_args[@]}" "$@"
 fi
 
 cfg="${XDG_CONFIG_HOME:-${HOME}/.config}/konductor-claude"
@@ -179,14 +179,14 @@ mkdir -p "${cfg}"
 # existing real dir/file is replaced, not nested into. ${cfg:?} guards against an
 # empty expansion ever targeting /.
 for item in settings.json CLAUDE.md rules output-styles statusline-command.sh; do
-  rm -rf "${cfg:?}/${item}"
-  ln -s "@configDir@/${item}" "${cfg}/${item}"
+    rm -rf "${cfg:?}/${item}"
+    ln -s "@configDir@/${item}" "${cfg}/${item}"
 done
 
 # Share auth with the user's personal claude without sharing config. Dangling
 # symlink is intentional: claude materializes ~/.claude.json on first login.
 if [[ ! -e "${cfg}/.claude.json" ]]; then
-  ln -s "${HOME}/.claude.json" "${cfg}/.claude.json"
+    ln -s "${HOME}/.claude.json" "${cfg}/.claude.json"
 fi
 
 export CLAUDE_CONFIG_DIR="${cfg}"

@@ -12,7 +12,7 @@
 # - Session persistence for 12+ hour development sessions
 # - Catppuccin Frappe theme with mauve accent
 
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 
 let
   # ===========================================================================

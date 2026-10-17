@@ -20,6 +20,8 @@
 { pkgs, inputs, ... }:
 
 let
+  versions = import ../../lib/versions.nix;
+
   # Forgejo packages from nixpkgs
   forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
@@ -29,16 +31,15 @@ let
   # overrideAttrs doesn't reliably propagate src changes for buildGoModule
   forgejoRunner = pkgs.buildGoModule {
     pname = "forgejo-runner";
-    version = "12.5.3-braincraft";
+    inherit (versions.forgejo-runner) version vendorHash;
     src = inputs.forgejo-runner-src;
-    vendorHash = "sha256-zowZvsjg9k5XO12pip1SbOz3KXXqxFfnLF+y4cf8WOQ=";
     proxyVendor = true; # Fetch deps via Go proxy, ignore stale vendor/
     subPackages = [ "." ];
     ldflags = [
       "-s"
       "-w"
       "-X"
-      "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v12.5.3-braincraft"
+      "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v${versions.forgejo-runner.version}"
     ];
     nativeBuildInputs = [ pkgs.git ];
     doCheck = false;

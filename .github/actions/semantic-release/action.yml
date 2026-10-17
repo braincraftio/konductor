@@ -1,0 +1,29 @@
+name: Semantic release
+description: Install the locked release toolchain and expose structured release outputs
+inputs:
+  github-token:
+    description: Token with release publishing permissions
+    required: true
+outputs:
+  new_release:
+    description: Whether a release was published
+    value: ${{ steps.release.outputs.new_release }}
+  version:
+    description: Published semantic version
+    value: ${{ steps.release.outputs.version }}
+  tag:
+    description: Published Git tag
+    value: ${{ steps.release.outputs.tag }}
+runs:
+  using: composite
+  steps:
+    - name: Install semantic-release
+      shell: bash
+      working-directory: .github/semantic-release
+      run: npm ci
+    - name: Publish release
+      id: release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: node "$GITHUB_ACTION_PATH/release.mjs"

@@ -17,14 +17,13 @@
 
 {
   # ── Model / behavior — konductor defaults ──
-  # Default: Opus 4.6 with the 1M-token context window. Opus 4.6 is the one
-  # family where this harness's thinking policy (never-adaptive + low effort) is
-  # FULLY enforceable — Fable 5 and Sonnet 5 are always-adaptive at the model
-  # level and cannot honor CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING. So the default
-  # stays on the model that actually respects the policy. The [1m] suffix forces
-  # the 1M window on the Anthropic API / pinned providers. `model` is read once at
-  # session start; use /model to switch mid-session.
-  model = "claude-opus-4-6[1m]";
+  # Default: Opus 5.5 (always 1M context, no suffix needed). Opus 5.5 is
+  # always-adaptive at the model level — CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING
+  # is a no-op on it, same as Fable 5 and Sonnet 5. The harness ships the
+  # preference where it can hold (Opus 4.6 via the `opus` alias below) but
+  # defaults to the strongest available model. `model` is read once at session
+  # start; use /model to switch mid-session.
+  model = "claude-opus-5-5";
 
   # ── Explicit model roster — one pinned ID per family, no implicit aliases. ──
   # availableModels restricts the /model picker to exactly these. It is user-tier
@@ -69,6 +68,23 @@
   # per-server per-machine approval prompts defeat the hermetic harness. ──
   enableAllProjectMcpServers = true;
 
+  # ── Compaction — manual only. Idle compaction rewrites the conversation while
+  # the terminal is unfocused, invalidating the prompt cache on return. Disable
+  # it so the cache stays warm across focus switches. /compact remains available. ──
+  idleCompaction = false;
+
+  # ── Checkpointing — disabled. /rewind snapshots add write overhead on every
+  # file edit. The git history is the checkpoint mechanism for konductor work. ──
+  fileCheckpointingEnabled = false;
+
+  # ── Spell checking — aspell (with the en dictionary) ships beside the wrapped
+  # claude in src/packages/ai.nix, so every surface that has claude has the
+  # checker. Pinned by name: Claude Code does not fall back from a named checker. ──
+  spellcheck = {
+    enabled = true;
+    checker = "aspell";
+  };
+
   # NOTE: outputStyle is intentionally UNSET (opt-in via /output-style).
 
   env = {
@@ -82,11 +98,11 @@
     ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-6[1m]";
     ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-haiku-4-5";
 
-    # ── Never adaptive thinking. ──
+    # ── Never adaptive thinking (where enforceable). ──
     # Reverts Opus 4.6 / Sonnet 4.6 to the fixed thinking budget instead of
-    # adaptive reasoning. No-op on Fable 5 / Sonnet 5, which are always-adaptive
-    # at the model level — the harness ships the preference where it can hold and
-    # defaults to Opus 4.6 (see `model` above) where it fully holds.
+    # adaptive reasoning. No-op on Opus 5.5 / Fable 5 / Sonnet 5, which are
+    # always-adaptive at the model level. The harness ships the preference for
+    # sessions that select Opus 4.6 via the `opus` alias.
     CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING = "1";
   };
 

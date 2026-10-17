@@ -20,7 +20,8 @@ in
     name = "shellcheck";
     runtimeInputs = [ pkgs.shellcheck ];
     text = ''
-      exec shellcheck --rcfile="${configFile}/.shellcheckrc" "$@"
+      # -x: follow `source` across files, identically for hooks, runme, CI.
+      exec shellcheck --rcfile="${configFile}/.shellcheckrc" --external-sources "$@"
     '';
   };
 

@@ -1,7 +1,7 @@
 # Flake Input Management & Airgap Build Lifecycle
 
-How Konductor ships fully offline-reproducible QCOW2 images without committing
-1GB of vendored sources to git.
+How Konductor ships fully offline-reproducible QCOW2 images without committing 1GB of vendored
+sources to git.
 
 ## Contents
 
@@ -18,11 +18,11 @@ How Konductor ships fully offline-reproducible QCOW2 images without committing
 
 ## Problem
 
-Nix flakes in git repos only evaluate git-tracked files. When `flake.nix` uses
-`path:./_sources/foo` as an input and `_sources/` is in `.gitignore`, nix copies
-the repo to `/nix/store` *without* `_sources/`, and the path resolution fails:
+Nix flakes in git repos only evaluate git-tracked files. When `flake.nix` uses `path:./_sources/foo`
+as an input and `_sources/` is in `.gitignore`, nix copies the repo to `/nix/store` _without_
+`_sources/`, and the path resolution fails:
 
-```
+```text
 error: getting status of '/nix/store/...-source/_sources/catppuccin': No such file or directory
 ```
 
@@ -39,7 +39,7 @@ We need ~1GB of vendored flake inputs for offline builds, but:
 
 The solution uses three complementary mechanisms:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │  flake.nix                                                         │
 │  ┌───────────────────────────────────────────────────────────────┐  │
@@ -71,14 +71,14 @@ The solution uses three complementary mechanisms:
 
 ### Why three mechanisms?
 
-| Mechanism | Speed | Survives GC | Survives store wipe | Needs git tracking |
-|---|---|---|---|---|
-| Nix store (archive) | Fast | With GC roots | No | No |
-| Vendored directory | Medium | Yes | Yes | No |
-| `--override-input` | Medium | N/A | N/A | No |
+| Mechanism           | Speed  | Survives GC   | Survives store wipe | Needs git tracking |
+| ------------------- | ------ | ------------- | ------------------- | ------------------ |
+| Nix store (archive) | Fast   | With GC roots | No                  | No                 |
+| Vendored directory  | Medium | Yes           | Yes                 | No                 |
+| `--override-input`  | Medium | N/A           | N/A                 | No                 |
 
-The nix store is the fast path. The vendored directory is the durable fallback.
-`--override-input` is the recovery mechanism when the store cache is lost.
+The nix store is the fast path. The vendored directory is the durable fallback. `--override-input`
+is the recovery mechanism when the store cache is lost.
 
 ---
 
@@ -114,7 +114,7 @@ No network access required. Everything resolves from local cache.
 
 ### Phase 1: Vendor on Build Host (online)
 
-```
+```text
 Build Host (internet access)
 │
 ├─ nix flake archive .
@@ -135,6 +135,7 @@ Build Host (internet access)
 ```
 
 The `oci:vendor:inputs` task:
+
 1. Reads `flake.lock` to extract locked input references
 2. Uses `nix flake prefetch` to download each input to the store
 3. Copies store paths to `_sources/` via rsync (for VM transfer)
@@ -143,7 +144,7 @@ The `oci:vendor:inputs` task:
 
 ### Phase 2: Transfer to VM (build pipeline)
 
-```
+```text
 Build Host                          Build VM
 │                                   │
 ├─ git bundle → scp →──────────────→ /opt/konductor/src/
@@ -172,13 +173,13 @@ Build Host                          Build VM
 
 The QCOW2 is sealed with:
 
-| Location | Contents | Purpose |
-|---|---|---|
-| `/opt/konductor/src/` | Flake source + flake.lock | Build instructions |
-| `/opt/konductor/vendored/sources/` | Input source trees (~1GB) | Durable fallback |
-| `/nix/store/` | Archived input store paths | Fast offline builds |
-| `/var/nix/gcroots/konductor/` | GC root symlinks | Prevent store cleanup |
-| `/.konductor` | Provenance attestation | Supply chain audit |
+| Location                           | Contents                   | Purpose               |
+| ---------------------------------- | -------------------------- | --------------------- |
+| `/opt/konductor/src/`              | Flake source + flake.lock  | Build instructions    |
+| `/opt/konductor/vendored/sources/` | Input source trees (~1GB)  | Durable fallback      |
+| `/nix/store/`                      | Archived input store paths | Fast offline builds   |
+| `/var/nix/gcroots/konductor/`      | GC root symlinks           | Prevent store cleanup |
+| `/.konductor`                      | Provenance attestation     | Supply chain audit    |
 
 ---
 
@@ -186,7 +187,7 @@ The QCOW2 is sealed with:
 
 A deployed QCOW2 VM can rebuild itself into a new QCOW2:
 
-```
+```text
 Deployed VM (offline)
 │
 ├─ /opt/konductor/src/flake.nix     (github: URLs, doesn't matter offline)
@@ -257,7 +258,7 @@ echo "✓ Built from vendored sources"
 
 When the VM has temporary network access:
 
-```
+```text
 VM connects to network
 │
 ├─ cd /opt/konductor/src
@@ -340,8 +341,8 @@ echo "✓ Update complete. Offline builds ready."
 
 **Symptom**: `nix build --offline` fails with "path not found in store"
 
-**Recovery**: `konductor-rebuild` automatically falls back to `--override-input`
-from `/opt/konductor/vendored/sources/`. To restore store cache:
+**Recovery**: `konductor-rebuild` automatically falls back to `--override-input` from
+`/opt/konductor/vendored/sources/`. To restore store cache:
 
 ```bash
 # Re-archive from vendored sources (no network needed)
@@ -381,8 +382,8 @@ konductor-rebuild   # automatic fallback
 
 **Symptom**: 403 errors during `nix flake archive`
 
-**Recovery**: Set `GITHUB_TOKEN` or use the `oci:vendor:inputs` runme task
-which uses `nix flake prefetch` with retries:
+**Recovery**: Set `GITHUB_TOKEN` or use the `oci:vendor:inputs` runme task which uses
+`nix flake prefetch` with retries:
 
 ```bash
 export GITHUB_TOKEN="ghp_..."
@@ -409,39 +410,39 @@ nix flake prefetch github:owner/repo/rev
 
 ### Files involved
 
-| File | Role |
-|---|---|
-| `flake.nix` | Canonical `github:` input URLs |
-| `flake.lock` | Pinned `rev` + `narHash` for reproducibility |
-| `.gitignore` | Excludes `_sources/` from git |
-| `docs/developer_guide/qcow2/OCI.md` | `oci:vendor:inputs` task |
-| `docs/developer_guide/qcow2/OCI.md` | `_oci:vm:sync` task |
+| File                                | Role                                         |
+| ----------------------------------- | -------------------------------------------- |
+| `flake.nix`                         | Canonical `github:` input URLs               |
+| `flake.lock`                        | Pinned `rev` + `narHash` for reproducibility |
+| `.gitignore`                        | Excludes `_sources/` from git                |
+| `docs/developer_guide/qcow2/OCI.md` | `oci:vendor:inputs` task                     |
+| `docs/developer_guide/qcow2/OCI.md` | `_oci:vm:sync` task                          |
 
 ### Nix commands reference
 
-| Command | Purpose | Network |
-|---|---|---|
-| `nix flake archive .` | Copy all input source trees to local store | Required |
-| `nix flake archive --to ssh://vm .` | Copy archived inputs to remote store | Local only |
-| `nix flake archive --offline .` | Re-archive from local cache | No |
-| `nix build --offline .#qcow2` | Build using only local store | No |
-| `nix build --override-input X path:/dir .#qcow2` | Build with local path override | No |
-| `nix flake prefetch github:owner/repo/rev` | Fetch single input to store | Required |
-| `nix-store --add-root /path -r /nix/store/...` | Create GC root | No |
-| `nix flake update` | Refresh flake.lock from upstream | Required |
+| Command                                          | Purpose                                    | Network    |
+| ------------------------------------------------ | ------------------------------------------ | ---------- |
+| `nix flake archive .`                            | Copy all input source trees to local store | Required   |
+| `nix flake archive --to ssh://vm .`              | Copy archived inputs to remote store       | Local only |
+| `nix flake archive --offline .`                  | Re-archive from local cache                | No         |
+| `nix build --offline .#qcow2`                    | Build using only local store               | No         |
+| `nix build --override-input X path:/dir .#qcow2` | Build with local path override             | No         |
+| `nix flake prefetch github:owner/repo/rev`       | Fetch single input to store                | Required   |
+| `nix-store --add-root /path -r /nix/store/...`   | Create GC root                             | No         |
+| `nix flake update`                               | Refresh flake.lock from upstream           | Required   |
 
 ### Key nix flags
 
-| Flag | Effect |
-|---|---|
-| `--offline` | Disable network; resolve from local store only |
-| `--no-update-lock-file` | Don't try to update flake.lock |
-| `--no-write-lock-file` | Don't write changes to flake.lock |
+| Flag                        | Effect                                                         |
+| --------------------------- | -------------------------------------------------------------- |
+| `--offline`                 | Disable network; resolve from local store only                 |
+| `--no-update-lock-file`     | Don't try to update flake.lock                                 |
+| `--no-write-lock-file`      | Don't write changes to flake.lock                              |
 | `--override-input name url` | Replace input with local path (implies `--no-write-lock-file`) |
 
 ### QCOW2 filesystem layout
 
-```
+```text
 /
 ├── .konductor                              # Provenance attestation
 ├── opt/konductor/

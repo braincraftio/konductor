@@ -62,10 +62,12 @@ rec {
     selectionForeground = palette.text;
     # ANSI Normal (0-7)
     black = palette.surface1;
-    red = palette.red;
-    green = palette.green;
-    yellow = palette.yellow;
-    blue = palette.blue;
+    inherit (palette)
+      red
+      green
+      yellow
+      blue
+      ;
     magenta = palette.mauve;
     cyan = palette.teal;
     white = palette.subtext1;

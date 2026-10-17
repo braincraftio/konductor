@@ -14,20 +14,21 @@
 #   https://github.com/coder/code-server/releases
 #
 # To update:
-#   1. Change version
+#   1. Change code-server.version in src/lib/versions.nix
 #   2. Run: nix-prefetch-url <new-url>  (NOT --unpack; fetchurl hashes the raw tarball)
-#   3. Update hash with the sha256 nix reports on mismatch (already SRI format)
+#   3. Update code-server.hash in src/lib/versions.nix (raw archive hash).
 
 _final: prev:
 if !(prev.stdenv.hostPlatform.isLinux && prev.stdenv.hostPlatform.isx86_64) then
   { }
 else
   let
-    version = "4.109.5";
+    versions = import ../lib/versions.nix;
+    inherit (versions.code-server) version;
 
     src = prev.fetchurl {
       url = "https://github.com/coder/code-server/releases/download/v${version}/code-server-${version}-linux-amd64.tar.gz";
-      hash = "sha256-Fcp0cuRSLyFOARQ2c1WZOFNlcdcVLF/KPLQpZueaaIs=";
+      inherit (versions.code-server) hash;
     };
   in
   {

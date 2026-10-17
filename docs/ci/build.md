@@ -12,9 +12,9 @@ runme:
 
 Complete build pipeline: source → nix → VM configure → seal → compress → OCI containerDisk.
 
-Phases run sequentially in document order via `runme run --all --tag=k9:ci:pipeline:all`.
-Each phase is a named code block tagged for pipeline membership. Background daemons
-use `background:true` for proper process lifecycle in runme's single-session mode.
+Phases run sequentially in document order via `runme run --all --tag=k9:ci:pipeline:all`. Each phase
+is a named code block tagged for pipeline membership. Background daemons use `background:true` for
+proper process lifecycle in runme's single-session mode.
 
 ## Contents
 

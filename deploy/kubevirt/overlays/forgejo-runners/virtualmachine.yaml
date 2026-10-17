@@ -99,7 +99,7 @@ spec:
               masquerade: {}
             - name: macvtap
               model: virtio
-              macAddress: "02:00:00:f0:9e:01"  # Unique MAC for runner
+              macAddress: "02:00:00:f0:9e:01" # Unique MAC for runner
               binding:
                 name: macvtap
             - name: br0

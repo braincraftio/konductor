@@ -1,32 +1,36 @@
 # Konductor Boot Sequence Architecture
 
-**Version:** 1.0
-**Last Updated:** 2026-02-04
-**Status:** Design Specification
+**Version:** 1.0 **Last Updated:** 2026-02-04 **Status:** Design Specification
 
 ---
 
 ## Overview
 
-This document defines the systemd service ordering, dependency chain, and validation gate architecture for Konductor QCOW2 VMs. The design ensures deterministic boot behavior with conditional strictness for production vs development workflows.
+This document defines the systemd service ordering, dependency chain, and validation gate
+architecture for Konductor QCOW2 VMs. The design ensures deterministic boot behavior with
+conditional strictness for production vs development workflows.
 
 ---
 
 ## Design Principles
 
-1. **Serial Console is the Trusted Pathway** - All boot validation output goes to `/dev/ttyS0`, captured by KubeVirt pod log collector and shipped to upstream log analysis.
+1. **Serial Console is the Trusted Pathway** - All boot validation output goes to `/dev/ttyS0`,
+   captured by KubeVirt pod log collector and shipped to upstream log analysis.
 
-2. **Exit Code IS the Gate** - `konductor.service` exit code determines whether dependent services start. Strictness logic is inside the service, not in systemd unit configuration.
+2. **Exit Code IS the Gate** - `konductor.service` exit code determines whether dependent services
+   start. Strictness logic is inside the service, not in systemd unit configuration.
 
-3. **Conditional Strictness** - `strict=true` blocks on validation failure; `strict=false` warns loudly but allows degraded operation.
+3. **Conditional Strictness** - `strict=true` blocks on validation failure; `strict=false` warns
+   loudly but allows degraded operation.
 
-4. **Static Dependencies, Dynamic Behavior** - Systemd unit files are static; runtime behavior is controlled by the `strict` flag in `/.konductor`.
+4. **Static Dependencies, Dynamic Behavior** - Systemd unit files are static; runtime behavior is
+   controlled by the `strict` flag in `/.konductor`.
 
 ---
 
 ## Boot Phase Timeline
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ PHASE 1: PRE-NETWORK (local-fs.target)                                      │
 │ Time: 0-2s                                                                  │
@@ -219,16 +223,16 @@ The `konductor.service` exit code is the sole mechanism for controlling downstre
 
 ### Exit Code Matrix
 
-| Validation | strict | Exit Code | systemd Status | forgejo-runner | Console Output |
-|------------|--------|-----------|----------------|----------------|----------------|
-| PASS | true | 0 | active | STARTS | `=== VERIFIED (strict=true) ===` |
-| PASS | false | 0 | active | STARTS | `=== VERIFIED (strict=false) ===` |
-| FAIL | true | 1 | failed | BLOCKED | `=== FAILED (strict=true) ===` |
-| FAIL | false | 0 | active | STARTS | `=== DEGRADED (strict=false) ===` |
+| Validation | strict | Exit Code | systemd Status | forgejo-runner | Console Output                    |
+| ---------- | ------ | --------- | -------------- | -------------- | --------------------------------- |
+| PASS       | true   | 0         | active         | STARTS         | `=== VERIFIED (strict=true) ===`  |
+| PASS       | false  | 0         | active         | STARTS         | `=== VERIFIED (strict=false) ===` |
+| FAIL       | true   | 1         | failed         | BLOCKED        | `=== FAILED (strict=true) ===`    |
+| FAIL       | false  | 0         | active         | STARTS         | `=== DEGRADED (strict=false) ===` |
 
 ### Exit Code Flow Diagram
 
-```
+```text
                     ┌─────────────────────┐
                     │  Run Validations    │
                     └──────────┬──────────┘
@@ -260,7 +264,7 @@ The `konductor.service` exit code is the sole mechanism for controlling downstre
 
 ### Check Categories
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ PROVENANCE CHECKS (Software Supply Chain)                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -343,7 +347,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
 
 ### VERIFIED Output (strict=true, all checks pass)
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════════════════
                          KONDUCTOR VALIDATION
 ═══════════════════════════════════════════════════════════════════════════════
@@ -373,7 +377,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
 
 ### FAILED Output (strict=true, validation failed)
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════════════════
                          KONDUCTOR VALIDATION
 ═══════════════════════════════════════════════════════════════════════════════
@@ -414,7 +418,7 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
 
 ### DEGRADED Output (strict=false, validation failed)
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════════════════
                          KONDUCTOR VALIDATION
 ═══════════════════════════════════════════════════════════════════════════════
@@ -456,12 +460,12 @@ All output goes to `/dev/ttyS0` (serial console) for KubeVirt pod log collection
 
 ## Environment Mapping
 
-| Environment | Git Branch | strict | On Validation Fail |
-|-------------|------------|--------|-------------------|
-| Production CI | main | `true` | BLOCK - exit 1, no CI |
-| Staging CI | staging | `true` | BLOCK - exit 1, no CI |
-| PR CI | feature/*, fix/* | `false` | WARN - exit 0, CI runs |
-| Local Development | any | `false` | WARN - exit 0, full workflow |
+| Environment       | Git Branch       | strict  | On Validation Fail           |
+| ----------------- | ---------------- | ------- | ---------------------------- |
+| Production CI     | main             | `true`  | BLOCK - exit 1, no CI        |
+| Staging CI        | staging          | `true`  | BLOCK - exit 1, no CI        |
+| PR CI             | feature/_, fix/_ | `false` | WARN - exit 0, CI runs       |
+| Local Development | any              | `false` | WARN - exit 0, full workflow |
 
 ### Setting strict Mode
 
@@ -473,7 +477,9 @@ strict = true   # Production: block on validation failure
 # strict = false  # Development: warn but continue
 ```
 
-This file is baked into the QCOW2 image at build time. Different images are built for different environments:
+This file is baked into the QCOW2 image at build time. Different images are built for different
+environments:
+
 - `konductor-prod.qcow2` - strict=true
 - `konductor-dev.qcow2` - strict=false
 

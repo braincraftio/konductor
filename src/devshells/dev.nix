@@ -6,7 +6,13 @@
 # SSH config from: ../config/shell/ssh.nix
 # OpenCode theme from: ../config/opencode/
 
-{ baseShell, packages, programs, config, ... }:
+{
+  baseShell,
+  packages,
+  programs,
+  config,
+  ...
+}:
 
 baseShell.overrideAttrs (old: {
   name = "dev";
@@ -14,7 +20,8 @@ baseShell.overrideAttrs (old: {
   # packages.idePackages from ./packages.nix (single source of truth)
   # plus neovim, tmux, and forgejo-cli from programs
   # Using nativeBuildInputs (where mkShell's `packages` attribute is merged)
-  nativeBuildInputs = old.nativeBuildInputs
+  nativeBuildInputs =
+    old.nativeBuildInputs
     ++ programs.neovim.packages
     ++ programs.tmux.packages
     ++ programs.forgejo.cliPackages
@@ -38,7 +45,12 @@ baseShell.overrideAttrs (old: {
   '';
 
   # Note: `name` cannot be in env (conflicts with mkShell's name attribute)
-  env = old.env // {
-    KONDUCTOR_SHELL = "dev";
-  } // config.shell.ssh.env // config.opencode.env // programs.tmux.env;
+  env =
+    old.env
+    // {
+      KONDUCTOR_SHELL = "dev";
+    }
+    // config.shell.ssh.env
+    // config.opencode.env
+    // programs.tmux.env;
 })

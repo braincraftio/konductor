@@ -22,8 +22,8 @@
 profile: production
 
 skip_list:
-  - 'args[module]'    # arguments supplied via module_defaults group, not per-task
-  - 'fqcn[canonical]' # collection module aliases are the public interface
+  - "args[module]" # arguments supplied via module_defaults group, not per-task
+  - "fqcn[canonical]" # collection module aliases are the public interface
 
 exclude_paths:
   - .direnv/

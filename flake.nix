@@ -141,7 +141,7 @@
       ...
     }@inputs:
     let
-      lib = nixpkgs.lib;
+      inherit (nixpkgs) lib;
 
       # Import overlays
       overlays = import ./src/overlays {
@@ -154,7 +154,7 @@
         rev = self.rev or null;
         shortRev = self.shortRev or "dirty";
         lastModifiedDate = self.lastModifiedDate or "19700101000000";
-        narHash = self.narHash;
+        inherit (self) narHash;
       };
 
       # Single system list — one source of truth for all per-system outputs.
@@ -252,6 +252,21 @@
             meta.description = "Konductor polyglot development environment";
           };
 
+          # CI runner toolchain: nix profile install .#ci
+          # Consumed by .github/actions/setup-devshell. Node is the versions.nix pin.
+          ciEnv = pkgs.buildEnv {
+            name = "konductor-ci";
+            paths = [
+              pkgs.konductor.nodejs
+              pkgs.pnpm
+              pkgs.git
+              pkgs.jq
+              pkgs.cachix
+              pkgs.actionlint
+            ];
+            meta.description = "Konductor CI runner toolchain";
+          };
+
           # Per-tool version checks: each depends only on its own package
           # closure, so bumping one tool does not invalidate other checks.
           # Follows nixpkgs testers.testVersion pattern.
@@ -343,6 +358,40 @@
               ''
                 test -d ${konductorEnv}/bin && touch $out
               '';
+
+          # Source quality gates: the same wrapped tools lefthook and runme
+          # invoke. The flake source is git-tracked content only, so gitignored
+          # trees (_sources/) are absent by construction. Filesets narrow each
+          # check's input hash to the files it reads.
+          nixSources = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.fileFilter (file: file.hasExt "nix") ./.;
+          };
+          lintChecks = {
+            # treefmt --ci formats in place and fails on change, so it runs on a
+            # writable copy. The sandbox has no .git: walk the filesystem. The
+            # root is resolved by the config's tree-root-file (flake.nix) from
+            # --working-dir; passing --tree-root as well is rejected by treefmt.
+            treefmt = pkgs.runCommand "check-treefmt" { } ''
+              cp -r --no-preserve=mode ${./.} source
+              export HOME="$TMPDIR"
+              ${lib.getExe konductorConfig.formatters.treefmt.package} \
+                --ci --walk filesystem --working-dir source
+              touch $out
+            '';
+            statix =
+              pkgs.runCommand "check-statix" { nativeBuildInputs = [ konductorConfig.linters.statix.package ]; }
+                ''
+                  statix check ${nixSources}
+                  touch $out
+                '';
+            deadnix =
+              pkgs.runCommand "check-deadnix" { nativeBuildInputs = [ konductorConfig.linters.deadnix.package ]; }
+                ''
+                  deadnix --fail -- ${nixSources}
+                  touch $out
+                '';
+          };
         in
         {
           inherit
@@ -356,8 +405,10 @@
             oci
             konductorConfig
             konductorEnv
+            ciEnv
             toolChecks
             bundleCheck
+            lintChecks
             ;
         }
       );
@@ -391,22 +442,65 @@
         system: sb:
         {
           default = sb.konductorEnv;
+          ci = sb.ciEnv;
           # Website data: nix build .#versions-json
           # Replaces nix eval --json shell commands in CI and mise tasks.
           versions-json = sb.versionsJson;
+
+          # Maintenance targets reuse the exact devshell package set. Dependency
+          # hashes can be refreshed with .#atuin.cargoDeps / .#k0sctl.goModules.
+          inherit (sb.pkgs)
+            atuin
+            k0sctl
+            terminal-browser
+            opencode
+            ;
+          mitogen = sb.packages.ansible.mitogen;
+          ansible = sb.packages.ansible.package;
+          python-env = sb.packages.pythonEnv;
+          pulumi = sb.packages.languages.pulumiPkg.package;
+          pulumi-cli = sb.packages.languages.pulumiPkg.cli;
+          trzsz = sb.pkgs.callPackage ./src/packages/trzsz.nix { };
+          forgejo-runner = sb.programs.forgejo.runner;
+          prettier-plugin-astro = sb.konductorConfig.formatters.prettier.astroPlugin;
+          treefmt = sb.konductorConfig.formatters.treefmt.package;
         }
         // lib.optionalAttrs sb.pkgs.stdenv.hostPlatform.isLinux {
           oci = sb.oci.image;
+          k0s = sb.pkgs.${sb.versions.kubernetes.k0s.attr};
         }
         // lib.optionalAttrs (system == "x86_64-linux") {
           qcow2 = sb.qcow2.image;
+          code-server = sb.pkgs.code-server;
         }
       );
 
       # Functional checks: nix flake check
       # Per-tool checks depend only on their own closure (per-tool cache invalidation).
       # Bundle check verifies buildEnv composition (catches collisions).
-      checks = forAllSystems (_system: sb: sb.toolChecks // { inherit (sb) bundleCheck; });
+      # Lint checks gate formatting (treefmt), Nix lints (statix), and dead
+      # code (deadnix).
+      checks = forAllSystems (
+        _system: sb: sb.toolChecks // sb.lintChecks // { inherit (sb) bundleCheck; }
+      );
+
+      # nix fmt [paths] / nix fmt -- --ci: treefmt bound to every konductor
+      # formatter, the same binary checks.treefmt and lefthook run.
+      formatter = forAllSystems (_system: sb: sb.konductorConfig.formatters.treefmt.package);
+
+      apps = forAllSystems (
+        _system: sb: {
+          update-prettier-astro-lock =
+            let
+              app = import ./src/apps/update-prettier-astro-lock.nix { inherit (sb) pkgs versions; };
+            in
+            {
+              type = "app";
+              program = lib.getExe app;
+              meta.description = app.meta.description;
+            };
+        }
+      );
     }
 
     # Cross-system outputs (modules, overlays, nixosConfigurations)
@@ -434,17 +528,15 @@
         k0s = inputs.k0s-nix.nixosModules.default;
       };
 
-      # Home Manager module - convention from nix-community/home-manager
-      # Not a standard flake output - `nix flake check` warns "unknown flake output"
-      # This is expected and harmless; home-manager recognizes this output
-      homeManagerModules = {
+      # Home Manager module. `homeModules` is the output name `nix flake check`
+      # recognizes (Nix 2.34 known-output list), so it is type-checked as a
+      # module set instead of warning "unknown flake output".
+      homeModules = {
         konductor = import ./src/modules/home-manager.nix;
         default = import ./src/modules/home-manager.nix;
       };
 
-      # nix-darwin module - convention from LnL7/nix-darwin
-      # Not a standard flake output - `nix flake check` warns "unknown flake output"
-      # This is expected and harmless; nix-darwin recognizes this output
+      # nix-darwin module; `darwinModules` is a known flake output name.
       darwinModules = {
         konductor = import ./src/modules/darwin.nix;
         default = import ./src/modules/darwin.nix;

@@ -9,8 +9,8 @@
 // When base is '/', href('/manual') returns '/manual'.
 // When base is '/konductor', href('/manual') returns '/konductor/manual'.
 
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export function href(path: string): string {
-  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }

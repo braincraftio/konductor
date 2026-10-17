@@ -19,7 +19,8 @@ in
     name = "yamllint";
     runtimeInputs = [ pkgs.yamllint ];
     text = ''
-      exec yamllint -c "${configFile}/.yamllint.yaml" "$@"
+      # --strict: warnings fail the gate.
+      exec yamllint -c "${configFile}/.yamllint.yaml" --strict "$@"
     '';
   };
 

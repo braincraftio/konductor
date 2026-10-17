@@ -1,0 +1,44 @@
+name: Setup devshell
+description: >
+  Install Nix with caches, then install the flake's CI toolchain
+  (.#ci: node from src/lib/versions.nix, pnpm, git, jq, cachix, actionlint)
+  into a job-local profile on PATH. Runner tools come from the flake lock,
+  not from setup-* marketplace actions.
+
+inputs:
+  use-flakehub:
+    description: Enable FlakeHub Cache (caller requires id-token write)
+    required: false
+    default: "false"
+  cachix-name:
+    description: Cachix cache name (override for forks)
+    required: false
+    default: braincraftio
+  cachix-auth-token:
+    description: Cachix API token (empty disables push)
+    required: false
+    default: ""
+  cachix-skip-push:
+    description: Pull only, even when credentials are present
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Nix
+      uses: ./.github/actions/setup-nix
+      with:
+        use-flakehub: ${{ inputs.use-flakehub }}
+        cachix-name: ${{ inputs.cachix-name }}
+        cachix-auth-token: ${{ inputs.cachix-auth-token }}
+        cachix-skip-push: ${{ inputs.cachix-skip-push }}
+
+    - name: Install CI toolchain
+      shell: bash
+      run: |
+        nix profile install .#ci --no-update-lock-file --accept-flake-config --profile "$RUNNER_TEMP/ci-env" -L
+        echo "$RUNNER_TEMP/ci-env/bin" >> "$GITHUB_PATH"
+        for tool in node npm pnpm git jq cachix actionlint; do
+          test -x "$RUNNER_TEMP/ci-env/bin/$tool" || { echo "::error::$tool missing from .#ci profile"; exit 1; }
+        done

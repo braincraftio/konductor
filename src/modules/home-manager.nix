@@ -10,7 +10,7 @@
 #
 #   homeConfigurations."user" = home-manager.lib.homeManagerConfiguration {
 #     modules = [
-#       konductor.homeManagerModules.default
+#       konductor.homeModules.default
 #       { konductor.enable = true; }
 #     ];
 #     extraSpecialArgs = { inherit (inputs) konductor; };

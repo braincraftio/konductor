@@ -18,37 +18,83 @@
 # All native extensions (grpc, protobuf, bcrypt, etc.) are correctly linked
 # against Nix store library paths -- no LD_LIBRARY_PATH workarounds needed.
 #
-# Pulumi CLI + Python language host: pkgs.unstable.pulumi-bin (3.244.0, a single
-# Go binary bundle). The Python SDK and provider SDKs are built from PyPI wheels
-# pinned to the versions in infrastructure/pulumi/pyproject.toml, against the
-# stable python313Packages set. nixpkgs python313Packages.pulumi (3.192) is too
-# old for the provider SDKs (>=3.231), and stable pulumi-bin (3.207) is too old
-# to match the wheeled SDK; both come from unstable/wheels to reach 3.244.
+# Pulumi CLI, language hosts, provider binaries, and Python wheels are pinned
+# together in src/lib/versions.nix. Reuse nixpkgs' binary packaging with locally
+# maintained source metadata. Python wheels use the shared Python package set.
 #
 let
   inherit (pkgs) lib;
+  versions = import ../lib/versions.nix;
+  pythonPackages = pkgs."python${versions.languages.python.version}Packages";
+
+  # Reuse nixpkgs' unpack/install/fixup/completion phases. Replace the SDK
+  # archive and our six provider archives; additional nixpkgs providers retain
+  # the source attestation supplied by the locked nixpkgs input.
+  pulumiCli = pkgs.unstable.pulumi-bin.overrideAttrs (old: {
+    inherit (versions.pulumi) version;
+    srcs =
+      let
+        system = pkgs.stdenv.hostPlatform.system;
+        platform =
+          {
+            x86_64-linux = {
+              os = "linux";
+              cliArch = "x64";
+              pluginArch = "amd64";
+            };
+            aarch64-linux = {
+              os = "linux";
+              cliArch = "arm64";
+              pluginArch = "arm64";
+            };
+            aarch64-darwin = {
+              os = "darwin";
+              cliArch = "arm64";
+              pluginArch = "arm64";
+            };
+          }
+          .${system};
+        providers = versions.pulumi.providers;
+        replaced =
+          src:
+          lib.hasInfix "/releases/sdk/pulumi-v" src.url
+          || lib.any (name: lib.hasInfix "/pulumi-resource-${name}-v" src.url) (builtins.attrNames providers);
+      in
+      [
+        (pkgs.fetchurl {
+          url = "https://github.com/pulumi/pulumi/releases/download/v${versions.pulumi.version}/pulumi-v${versions.pulumi.version}-${platform.os}-${platform.cliArch}.tar.gz";
+          hash = versions.pulumi.cliHashes.${system};
+        })
+      ]
+      ++ lib.mapAttrsToList (
+        name: release:
+        pkgs.fetchurl {
+          url = "https://github.com/pulumi/pulumi-${name}/releases/download/v${release.version}/pulumi-resource-${name}-v${release.version}-${platform.os}-${platform.pluginArch}.tar.gz";
+          hash = release.pluginHashes.${system};
+        }
+      ) providers
+      ++ builtins.filter (src: !(replaced src)) old.srcs;
+  });
 
   # =========================================================================
-  # Pulumi Python SDK -- PyPI wheel (nixpkgs python313Packages.pulumi is too old
+  # Pulumi Python SDK -- PyPI wheel (nixpkgs' Pulumi SDK can lag
   # for the provider SDKs, which require a newer pulumi core).
   # =========================================================================
   # fetchPypi format="wheel" constructs incorrect URLs (py2.py3 prefix path).
   # Use fetchurl with exact PyPI content-addressed URLs instead.
-  pulumiCore = pkgs.python313Packages.buildPythonPackage {
+  # Wheel URLs and hashes live alongside their versions in versions.nix.
+  pulumiCore = pythonPackages.buildPythonPackage {
     pname = "pulumi";
-    version = "3.244.0";
+    inherit (versions.pulumi) version;
     format = "wheel";
 
     src = pkgs.fetchurl {
-      url = "https://files.pythonhosted.org/packages/37/54/f6b4ab6ffba2cfbb70f7e1188c81f5805ce740ee34d2ce3d325a0d043ab3/pulumi-3.244.0-py3-none-any.whl";
-      hash = "sha256-ujZcEzkUBDt4SJBtt6xGsfuStjLHfwnIOOyiclAfnww=";
+      inherit (versions.pulumi) url hash;
     };
 
-    # Runtime deps per the wheel's Requires-Dist (pulumi 3.244.0). Sourced from
-    # the same python313Packages set as the shared withPackages env so the
-    # single-interpreter invariant holds (languages.nix builds the env from
-    # the stable python313).
-    propagatedBuildInputs = with pkgs.python313Packages; [
+    # Runtime deps per the pinned wheel's Requires-Dist. Sourced from
+    # same pinned Python package set as the shared withPackages environment.
+    propagatedBuildInputs = with pythonPackages; [
       debugpy
       dill
       grpcio
@@ -56,15 +102,16 @@ let
       protobuf
       pyyaml
       semver
-      pkgs.python313Packages."opentelemetry-api"
-      pkgs.python313Packages."opentelemetry-sdk"
-      pkgs.python313Packages."opentelemetry-exporter-otlp-proto-grpc"
-      pkgs.python313Packages."opentelemetry-instrumentation-grpc"
+      typing-extensions
+      pythonPackages."opentelemetry-api"
+      pythonPackages."opentelemetry-sdk"
+      pythonPackages."opentelemetry-exporter-otlp-proto-grpc"
+      pythonPackages."opentelemetry-instrumentation-grpc"
     ];
 
     doCheck = false;
     pythonRelaxDeps = [ "protobuf" ];
-    nativeBuildInputs = [ pkgs.python313Packages.pythonRelaxDepsHook ];
+    nativeBuildInputs = [ pythonPackages.pythonRelaxDepsHook ];
     pythonImportsCheck = [ "pulumi" ];
 
     meta = with lib; {
@@ -86,7 +133,7 @@ let
       hash,
       meta ? { },
     }:
-    pkgs.python313Packages.buildPythonPackage {
+    pythonPackages.buildPythonPackage {
       inherit pname version;
       format = "wheel";
 
@@ -95,13 +142,14 @@ let
       };
 
       pythonRelaxDeps = true;
-      nativeBuildInputs = [ pkgs.python313Packages.pythonRelaxDepsHook ];
+      nativeBuildInputs = [ pythonPackages.pythonRelaxDepsHook ];
 
       propagatedBuildInputs = [
         pulumiCore
-        pkgs.python313Packages.parver
-        pkgs.python313Packages.requests
-        pkgs.python313Packages.semver
+        pythonPackages.parver
+        pythonPackages.packaging
+        pythonPackages.requests
+        pythonPackages.semver
       ];
 
       # No tests in provider SDK wheels
@@ -119,49 +167,37 @@ let
 
   pulumiKubernetes = mkPulumiPypiPackage {
     pname = "pulumi_kubernetes";
-    version = "4.32.0";
-    url = "https://files.pythonhosted.org/packages/3a/12/8e2cb7dd2f6dbd24c4bb3225e161c7a04675a81a9a335b66f3a3430850a8/pulumi_kubernetes-4.32.0-py3-none-any.whl";
-    hash = "sha256-duL5aBlLrRdnR8PKn539P8hWOVKJsBTaJo1V2AXvhm0=";
+    inherit (versions.pulumi.providers.kubernetes) version url hash;
     meta.description = "Pulumi Kubernetes provider SDK";
   };
 
   pulumiTls = mkPulumiPypiPackage {
     pname = "pulumi_tls";
-    version = "5.5.0";
-    url = "https://files.pythonhosted.org/packages/b9/4f/e3ec5f28ea46733ba58fa244e5e7d011038e57c27ac02bf6b93efebe17f4/pulumi_tls-5.5.0-py3-none-any.whl";
-    hash = "sha256-p78na09SWw61eM3KfBnobWqNHZRIEixKmj5LUZF0YKE=";
+    inherit (versions.pulumi.providers.tls) version url hash;
     meta.description = "Pulumi TLS provider SDK";
   };
 
   pulumiDockerBuild = mkPulumiPypiPackage {
     pname = "pulumi_docker_build";
-    version = "0.0.19";
-    url = "https://files.pythonhosted.org/packages/eb/dd/b065b43d67a6c0134ea4dae90828eb5b595f704a3fe2e5bb4b4efd0d4450/pulumi_docker_build-0.0.19-py3-none-any.whl";
-    hash = "sha256-lfFBTYBRjyUxa44rSZI0FsETEJ9RRHqEflhXwh7+YhE=";
+    inherit (versions.pulumi.providers.docker-build) version url hash;
     meta.description = "Pulumi Docker Build provider SDK";
   };
 
   pulumiCloudflare = mkPulumiPypiPackage {
     pname = "pulumi_cloudflare";
-    version = "6.17.0";
-    url = "https://files.pythonhosted.org/packages/b6/11/d82a291b33486227e58f2b01f2908001609757f1abb29a7c1335ecd4a2bc/pulumi_cloudflare-6.17.0-py3-none-any.whl";
-    hash = "sha256-64JWLWl+Bu4JQFqdd2dae/hlLDnmb2qb3pm3OyFZZpA=";
+    inherit (versions.pulumi.providers.cloudflare) version url hash;
     meta.description = "Pulumi Cloudflare provider SDK";
   };
 
   pulumiRandom = mkPulumiPypiPackage {
     pname = "pulumi_random";
-    version = "4.21.0";
-    url = "https://files.pythonhosted.org/packages/d0/bc/168881eeb54804c1506a5349c3aaf0933bc09f54081c50343ed485fa4c16/pulumi_random-4.21.0-py3-none-any.whl";
-    hash = "sha256-0masuKUIUfBXa86lqlgsroltNPc/vmPVNt+uDNEkWYE=";
+    inherit (versions.pulumi.providers.random) version url hash;
     meta.description = "Pulumi Random provider SDK";
   };
 
   pulumiAws = mkPulumiPypiPackage {
     pname = "pulumi_aws";
-    version = "7.34.0";
-    url = "https://files.pythonhosted.org/packages/3b/1c/198d10e93ab2cc597a5628be5dc82a81014d3b81f17e1e4d3d3bf7041624/pulumi_aws-7.34.0-py3-none-any.whl";
-    hash = "sha256-ae385aMbqMULENtR8Ip6t8MT0q9xKcdLIQW9+vxTaP4=";
+    inherit (versions.pulumi.providers.aws) version url hash;
     meta.description = "Pulumi AWS provider SDK";
   };
 
@@ -172,17 +208,16 @@ let
   # 2. The hermetic CLI wrapper (config/linters/pyright/) provides
   #    --pythonpath injection for direct terminal/CI invocations
   # =========================================================================
-  pyrightPkg = pkgs.python313Packages.buildPythonPackage {
+  pyrightPkg = pythonPackages.buildPythonPackage {
     pname = "pyright";
-    version = "1.1.410";
+    inherit (versions.pyright) version;
     format = "wheel";
 
     src = pkgs.fetchurl {
-      url = "https://files.pythonhosted.org/packages/d7/33/288b5868fa00846dacf249633719d747893e54aebd196b9968ac1878a5d3/pyright-1.1.410-py3-none-any.whl";
-      hash = "sha256-XpYb7TfKz5az9817HaObNQqSOaouaRONDoj3KM+vKWw=";
+      inherit (versions.pyright) url hash;
     };
 
-    propagatedBuildInputs = with pkgs.python313Packages; [
+    propagatedBuildInputs = with pythonPackages; [
       nodeenv
       typing-extensions
     ];
@@ -204,15 +239,15 @@ let
   # Defined in `let` so `package` and `env` can reference it without self-import.
   pythonDeps = ps: [
     # Pulumi core SDK -- PyPI wheel
-    pulumiCore # 3.244.0
+    pulumiCore
 
     # Pulumi provider SDKs -- PyPI wheels
-    pulumiKubernetes # 4.32.0
-    pulumiTls # 5.5.0
-    pulumiDockerBuild # 0.0.19
-    pulumiCloudflare # 6.17.0
-    pulumiRandom # 4.21.0
-    pulumiAws # 7.34.0
+    pulumiKubernetes
+    pulumiTls
+    pulumiDockerBuild
+    pulumiCloudflare
+    pulumiRandom
+    pulumiAws
 
     # Dependencies with native extensions (ensure proper linking)
     ps.grpcio # C++ extension -- the original motivation for this approach
@@ -250,14 +285,15 @@ in
 {
   # Re-export pythonDeps for languages.nix to merge into python.withPackages
   inherit pythonDeps;
+  cli = pulumiCli;
 
   # =========================================================================
   # Pulumi CLI package (for cli.nix)
   # =========================================================================
   # The symlinkJoin containing pulumi CLI, wrapper, and language host.
-  # pulumi-bin (from unstable: 3.244.0) bundles the CLI and
+  # The locally pinned pulumi-bin bundles the CLI and
   # pulumi-language-python(-exec). Its version must match the wheeled Python SDK
-  # (pythonDeps, 3.244.0): the language host and SDK resolve pulumi.Output via
+  # (versions.pulumi.version): the language host and SDK resolve pulumi.Output via
   # is-identity, so a version split breaks Input[T] serialization. pulumi-bin is
   # a standalone Go binary, so sourcing it from unstable does not affect the
   # stable-python withPackages env.
@@ -269,13 +305,13 @@ in
         pythonEnv;
       pulumiWrapper = pkgs.writeShellScriptBin "pulumi" ''
         export PULUMI_PYTHON_CMD="${resolvedPythonEnv}/bin/python"
-        exec ${pkgs.unstable.pulumi-bin}/bin/pulumi "$@"
+        exec ${pulumiCli}/bin/pulumi "$@"
       '';
     in
     pkgs.symlinkJoin {
       name = "pulumi-with-python";
       paths = [
-        pkgs.unstable.pulumi-bin # CLI + bundled language hosts (3.244.0)
+        pulumiCli # CLI + bundled language hosts and providers
         pkgs.pulumictl # Pulumi utilities
         pulumiWrapper # Last: wrapper wins symlinkJoin conflict (sets PULUMI_PYTHON_CMD)
       ];

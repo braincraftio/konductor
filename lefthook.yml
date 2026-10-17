@@ -1,5 +1,18 @@
 ---
-# lefthook.yml - BrainCraft.io flake configuration
+# lefthook.yml - Konductor git hooks
+#
+# lefthook owns .git/hooks in this repository (pre-commit and prek ship in the
+# devshell for consuming projects and are never installed here).
+#
+# Every job calls the konductor-wrapped, store-pinned tool that runme tasks and
+# `nix flake check` use. Formatting has one owner: treefmt (nix fmt). Lint jobs
+# never rewrite files; the fmt job fails when treefmt changes a staged file.
+#
+#   lefthook install                               install hooks
+#   lefthook check-install                         verify hooks are installed
+#   lefthook validate                              validate this file
+#   lefthook run pre-commit --no-auto-install --tag nix
+#   LEFTHOOK=0 git commit ...                      bypass hooks for one commit
 min_version: 1.12.0
 assert_lefthook_installed: true
 colors: true
@@ -11,221 +24,144 @@ output:
   - failure
   - summary
 
-# Pre-commit hook - All checks before committing
 pre-commit:
   parallel: true
-  commands:
-    # Python checks
-    python-style:
+  jobs:
+    # ------------------------------------------------------------------------
+    # Formatting (single owner: treefmt, same config as nix fmt / checks.treefmt)
+    # ------------------------------------------------------------------------
+    - name: fmt
+      run: treefmt --fail-on-change --no-cache {staged_files}
+      tags: [format]
+      fail_text: |
+        treefmt reformatted staged files. Review and stage the result.
+        How to fix: nix fmt
+
+    # ------------------------------------------------------------------------
+    # Nix
+    # ------------------------------------------------------------------------
+    - name: nix-lint
+      glob: "*.nix"
+      # statix check takes a single target; it walks the tree honouring
+      # .gitignore and the wrapped statix.toml ignore list.
+      run: statix check
+      tags: [nix, lint]
+
+    - name: nix-deadcode
+      glob: "*.nix"
+      run: deadnix --fail -- {staged_files}
+      tags: [nix, lint]
+
+    # ------------------------------------------------------------------------
+    # Python
+    # ------------------------------------------------------------------------
+    - name: python-lint
       glob: "*.py"
-      exclude:
-        - "**/venv/**"
-        - "**/.venv/**"
-        - "**/site-packages/**"
       run: ruff check {staged_files}
       tags: [python, lint]
-      fail_text: |
-        Python style check failed.
-        How to test: ruff check [files]
 
-    python-types:
+    - name: python-types
       glob: "*.py"
-      exclude:
-        - "**/venv/**"
-        - "**/.venv/**"
       run: mypy {staged_files}
       tags: [python, types]
-      fail_text: |
-        Python type check failed.
-        How to test: mypy [files]
 
-    python-security:
+    - name: python-security
       glob: "*.py"
       run: bandit {staged_files}
       tags: [python, security]
-      fail_text: |
-        Python security check failed.
-        How to test: bandit [files]
 
-    # JavaScript/TypeScript checks
-    js-quality:
-      glob: "*.{js,jsx,ts,tsx,mjs,cjs}"
-      exclude:
-        - "**/node_modules/**"
-        - "**/dist/**"
-        - "**/build/**"
-      run: eslint {staged_files}
+    # ------------------------------------------------------------------------
+    # JavaScript / TypeScript / JSON (single owner: biome)
+    # ------------------------------------------------------------------------
+    - name: js-lint
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc}"
+      run: biome lint --no-errors-on-unmatched {staged_files}
       tags: [javascript, lint]
-      fail_text: |
-        JavaScript quality check failed.
-        How to test: eslint [files]
 
-    js-style:
-      glob: "*.{js,jsx,ts,tsx,mjs,cjs}"
-      exclude:
-        - "**/node_modules/**"
-      run: biome check {staged_files}
-      tags: [javascript, style]
-      fail_text: |
-        JavaScript style check failed.
-        How to test: biome check [files]
-
-    # Prettier formatting check
-    prettier-check:
-      glob: "*.{js,jsx,ts,tsx,json,css,scss,sass,html,md,markdown,yml,yaml}"
-      exclude:
-        - "**/node_modules/**"
-        - "**/dist/**"
-        - "**/build/**"
-      run: prettier --check {staged_files}
-      tags: [format, style]
-      fail_text: |
-        Code formatting check failed.
-        How to test: prettier --check [files]
-        To fix: prettier --write [files]
-
-    # Shell script checks
-    shell-syntax:
+    # ------------------------------------------------------------------------
+    # Shell
+    # ------------------------------------------------------------------------
+    - name: shell-lint
       glob: "*.{sh,bash}"
       run: shellcheck {staged_files}
-      tags: [bash, lint]
-      fail_text: |
-        Shell syntax check failed.
-        How to test: shellcheck [files]
+      tags: [shell, lint]
 
-    # Config file validation
-    yaml-lint:
+    # ------------------------------------------------------------------------
+    # Config files
+    # ------------------------------------------------------------------------
+    - name: yaml-lint
       glob: "*.{yml,yaml}"
-      exclude:
-        - "**/node_modules/**"
-        - "**/.pnpm-store/**"
       run: yamllint {staged_files}
-      tags: [config, yaml]
-      fail_text: |
-        YAML validation failed.
-        How to test: yamllint [files]
+      tags: [config, lint]
 
-    toml-lint:
+    - name: toml-lint
       glob: "*.toml"
-      run: taplo check {staged_files}
-      tags: [config, toml]
-      fail_text: |
-        TOML validation failed.
-        How to test: taplo check [files]
+      run: taplo lint {staged_files}
+      tags: [config, lint]
 
-    # Nix checks
-    nix-format:
-      glob: "*.nix"
-      run: nixpkgs-fmt --check {staged_files}
-      tags: [nix, format]
-      fail_text: |
-        Nix format check failed.
-        How to test: nixpkgs-fmt --check [files]
-
-    nix-lint:
-      glob: "*.nix"
-      run: statix check {staged_files}
-      tags: [nix, lint]
-      fail_text: |
-        Nix lint check failed.
-        How to test: statix check [files]
-
-    nix-deadcode:
-      glob: "*.nix"
-      run: deadnix --fail {staged_files}
-      tags: [nix, deadcode]
-      fail_text: |
-        Dead Nix code detected.
-        How to test: deadnix --fail [files]
-
-    # Documentation checks
-    markdown-style:
-      glob: "*.{md,markdown}"
-      exclude:
-        - "**/venv/**"
-        - "**/.venv/**"
-        - "**/site-packages/**"
-        - "**/node_modules/**"
-      run: markdownlint-cli2 {staged_files}
-      tags: [docs, markdown]
-      fail_text: |
-        Markdown style check failed.
-        How to test: markdownlint-cli2 [files]
-
-    # Spell checking
-    spell-check:
-      glob: "*.{md,markdown,txt,js,jsx,ts,tsx,py,go,rs}"
-      run: cspell {staged_files}
-      tags: [docs, spelling]
-      fail_text: |
-        Spelling errors detected.
-        How to test: cspell [files]
-
-    markdown-links:
-      glob: "*.{md,markdown}"
-      run: lychee --offline {staged_files}
-      tags: [docs, validation]
-      skip:
-        - merge
-        - rebase
-      fail_text: |
-        Broken links detected.
-        How to test: lychee --offline [files]
-
-    # GitHub Actions
-    actions-lint:
+    - name: actions-lint
       glob: ".github/workflows/*.{yml,yaml}"
-      run: actionlint
-      tags: [ci, github]
-      fail_text: |
-        GitHub Actions validation failed.
-        How to test: actionlint
+      run: actionlint {staged_files}
+      tags: [ci, lint]
 
-    # Docker
-    docker-lint:
+    - name: docker-lint
       glob: "**/Dockerfile*"
       run: hadolint {staged_files}
       tags: [docker, lint]
-      fail_text: |
-        Dockerfile validation failed.
-        How to test: hadolint [files]
 
-    # Go
-    go-lint:
+    # ------------------------------------------------------------------------
+    # Go / Web
+    # ------------------------------------------------------------------------
+    - name: go-lint
       glob: "*.go"
       run: golangci-lint run
       tags: [go, lint]
-      fail_text: |
-        Go lint check failed.
-        How to test: golangci-lint run
 
-    # Web
-    html-lint:
+    - name: html-lint
       glob: "*.html"
       run: htmlhint {staged_files}
-      tags: [web, html]
-      fail_text: |
-        HTML validation failed.
-        How to test: htmlhint [files]
+      tags: [web, lint]
 
-    css-lint:
+    - name: css-lint
       glob: "*.{css,scss,sass}"
       run: stylelint {staged_files}
-      tags: [web, css]
-      fail_text: |
-        CSS validation failed.
-        How to test: stylelint [files]
+      tags: [web, lint]
 
-    # Security checks (always run)
-    secrets-scan:
-      run: detect-secrets scan --baseline .secrets.baseline
-      tags: [security, critical]
-      fail_text: |
-        Secrets detected in staged files!
-        How to test: detect-secrets scan --baseline .secrets.baseline
+    # ------------------------------------------------------------------------
+    # Documentation
+    # ------------------------------------------------------------------------
+    - name: markdown-lint
+      glob: "*.{md,markdown}"
+      run: markdownlint-cli2 {staged_files}
+      tags: [docs, lint]
 
-# Commit message validation for semantic-release (https://semver.org/)
+    - name: spell-check
+      glob: "*.{md,markdown,txt,js,jsx,ts,tsx,py,go,rs,nix}"
+      run: cspell lint --no-progress --no-must-find-files {staged_files}
+      tags: [docs, spelling]
+
+    - name: markdown-links
+      glob: "*.{md,markdown}"
+      run: lychee --offline --no-progress {staged_files}
+      tags: [docs, links]
+      skip:
+        - merge
+        - rebase
+
+    # ------------------------------------------------------------------------
+    # Secrets (gate: detect-secrets-hook; baseline maintenance: runme)
+    # ------------------------------------------------------------------------
+    - name: secrets
+      exclude:
+        - ".secrets.baseline"
+      run: detect-secrets-hook --baseline .secrets.baseline {staged_files}
+      tags: [security]
+      fail_text: |
+        Potential secret in staged files.
+        Real secret: remove it. False positive: runme run secrets:baseline:update, then audit.
+
 commit-msg:
-  commands:
-    conventional-commits:
+  jobs:
+    - name: conventional-commits
       run: commitlint --edit {1}
+      tags: [commits]

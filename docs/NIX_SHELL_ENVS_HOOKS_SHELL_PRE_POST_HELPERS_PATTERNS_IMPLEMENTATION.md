@@ -2,7 +2,9 @@
 
 ## Document Purpose
 
-This document captures comprehensive research on Nix `mkShell` environment variable management, hooks, string escaping, and best practices. Created to preserve institutional knowledge for the Konductor devshell implementation.
+This document captures comprehensive research on Nix `mkShell` environment variable management,
+hooks, string escaping, and best practices. Created to preserve institutional knowledge for the
+Konductor devshell implementation.
 
 ---
 
@@ -30,7 +32,7 @@ This document captures comprehensive research on Nix `mkShell` environment varia
 
 When running `env | grep export` in our devshell, we saw:
 
-```
+```text
 shellHook=export KONDUCTOR_SHELL="default"
 export UV_SYSTEM_PYTHON="1"
 export GOPATH="${GOPATH:-$HOME/go}"
@@ -39,13 +41,17 @@ export GOPATH="${GOPATH:-$HOME/go}"
 
 ### Issues Identified
 
-1. **shellHook content visible in env output** - The entire shellHook string is stored as an environment variable
-2. **Duplicate variables** - `UV_SYSTEM_PYTHON` appeared twice: once as a real env var (from `env` attribute), once as text inside shellHook
-3. **Malformed env entries** - Lines with `export ` prefix appearing in env output confused tools parsing the environment
+1. **shellHook content visible in env output** - The entire shellHook string is stored as an
+   environment variable
+2. **Duplicate variables** - `UV_SYSTEM_PYTHON` appeared twice: once as a real env var (from `env`
+   attribute), once as text inside shellHook
+3. **Malformed env entries** - Lines prefixed with `export` appearing in env output confused tools
+   parsing the environment
 
 ### Root Cause
 
-We were setting the same variables in BOTH the `env` attribute AND in `shellHook` with `export` statements, causing duplication and pollution.
+We were setting the same variables in BOTH the `env` attribute AND in `shellHook` with `export`
+statements, causing duplication and pollution.
 
 ---
 
@@ -53,7 +59,7 @@ We were setting the same variables in BOTH the `env` attribute AND in `shellHook
 
 ### Architecture
 
-```
+```text
 mkShell (pkgs/build-support/mkshell/default.nix)
     │
     └── stdenv.mkDerivation (specialized wrapper)
@@ -67,7 +73,8 @@ mkShell (pkgs/build-support/mkshell/default.nix)
 ### Key Facts
 
 - `mkShell` is a specialized `stdenv.mkDerivation` for development shells
-- The `shellHook` variable is stored as an environment variable - this is **expected and fundamental** to how nix-shell/nix develop works
+- The `shellHook` variable is stored as an environment variable - this is **expected and
+  fundamental** to how nix-shell/nix develop works
 - Variables from `env` attribute are exported by Nix BEFORE shellHook executes
 - shellHook commands run AFTER env is set up
 
@@ -80,17 +87,20 @@ mkShell (pkgs/build-support/mkshell/default.nix)
 **Purpose**: Set static environment variables that don't need shell expansion
 
 **Behavior**:
+
 - Values are set as literal strings
 - Nix expressions ARE evaluated (e.g., `${pkgs.hello}/bin` becomes `/nix/store/...`)
 - Shell variables are NOT expanded (e.g., `$HOME` stays literal `$HOME`)
 - Variables are exported automatically
 
 **Use for**:
+
 - Static values: `UV_SYSTEM_PYTHON = "1";`
 - Nix store paths: `MY_TOOL = "${pkgs.sometool}/bin/tool";`
 - Configuration flags: `NODE_ENV = "development";`
 
 **Example**:
+
 ```nix
 env = {
   UV_SYSTEM_PYTHON = "1";
@@ -105,18 +115,21 @@ env = {
 **Purpose**: Execute shell commands that need runtime evaluation
 
 **Behavior**:
+
 - Commands executed when shell starts
 - Shell variable expansion works
 - Conditional logic works
 - The shellHook STRING is stored as an env var (visible in `env` output)
 
 **Use for**:
+
 - Dynamic values needing `$HOME`: `export GOPATH="''${GOPATH:-$HOME/go}"`
 - Conditional setup: `if [ -d .venv ]; then source .venv/bin/activate; fi`
 - PATH manipulation depending on other vars: `export PATH="$GOBIN:$PATH"`
 - Sourcing scripts: `source some-script.sh`
 
 **Example**:
+
 ```nix
 shellHook = ''
   # Dynamic with shell expansion
@@ -137,11 +150,11 @@ shellHook = ''
 
 ### Critical Distinction
 
-| Syntax | Interpretation | When Evaluated | Example Result |
-|--------|---------------|----------------|----------------|
-| `${var}` | Nix interpolation | Nix eval time | Nix variable value |
-| `''${var}` | Escaped, passed to shell | Shell runtime | Shell expands `${var}` |
-| `$var` | Shell variable | Shell runtime | Shell expands `$var` |
+| Syntax     | Interpretation           | When Evaluated | Example Result         |
+| ---------- | ------------------------ | -------------- | ---------------------- |
+| `${var}`   | Nix interpolation        | Nix eval time  | Nix variable value     |
+| `''${var}` | Escaped, passed to shell | Shell runtime  | Shell expands `${var}` |
+| `$var`     | Shell variable           | Shell runtime  | Shell expands `$var`   |
 
 ### Examples
 
@@ -226,6 +239,7 @@ mkShell {
 ### Location in Nixpkgs
 
 Setup hooks are in `pkgs/build-support/setup-hooks/`:
+
 - `add-bin-to-path.sh` - adds `$out/bin` to PATH
 - `patch-shebangs.sh` - fixes script interpreters
 - `make-wrapper.sh` - wrapper script utilities
@@ -244,6 +258,7 @@ mySetupHook = pkgs.makeSetupHook {
 ```
 
 Where `my-setup-hook.sh`:
+
 ```bash
 # This script is sourced by downstream dependencies
 export MY_CUSTOM_VAR="@myVar@"
@@ -251,7 +266,8 @@ export MY_CUSTOM_VAR="@myVar@"
 
 ### Important Note
 
-Setup hooks are sourced as shell scripts, so any `export` statements WILL appear in `env` output. They don't provide a way to "hide" environment variables.
+Setup hooks are sourced as shell scripts, so any `export` statements WILL appear in `env` output.
+They don't provide a way to "hide" environment variables.
 
 ---
 
@@ -259,28 +275,29 @@ Setup hooks are sourced as shell scripts, so any `export` statements WILL appear
 
 ### In mkShell
 
-| Hook | When Executed | Use Case |
-|------|---------------|----------|
+| Hook        | When Executed  | Use Case      |
+| ----------- | -------------- | ------------- |
 | `shellHook` | On shell entry | Primary setup |
 
 ### In stdenv (Build Phases)
 
 These are for package building, not interactive shells:
 
-| Hook | Phase |
-|------|-------|
-| `preHook` | Before anything |
-| `postHook` | After setup |
-| `preBuild` | Before build |
-| `postBuild` | After build |
-| `preInstall` | Before install |
-| `postInstall` | After install |
-| `preFixup` | Before fixup |
-| `postFixup` | After fixup |
+| Hook          | Phase           |
+| ------------- | --------------- |
+| `preHook`     | Before anything |
+| `postHook`    | After setup     |
+| `preBuild`    | Before build    |
+| `postBuild`   | After build     |
+| `preInstall`  | Before install  |
+| `postInstall` | After install   |
+| `preFixup`    | Before fixup    |
+| `postFixup`   | After fixup     |
 
 ### Python-Specific
 
 Python packages have additional hooks:
+
 - `preShellHook` - Before main shellHook
 - `postShellHook` - After main shellHook
 
@@ -290,16 +307,17 @@ Python packages have additional hooks:
 
 ### Available Functions
 
-| Function | Purpose | Example |
-|----------|---------|---------|
-| `lib.makeBinPath` | Construct PATH from packages | `lib.makeBinPath [ pkgs.git pkgs.curl ]` |
-| `lib.makeLibraryPath` | Construct LD_LIBRARY_PATH | `lib.makeLibraryPath [ pkgs.openssl ]` |
-| `lib.makeSearchPath` | Generic search path | `lib.makeSearchPath "lib" [ pkgs.foo ]` |
-| `lib.makeSearchPathOutput` | Search path with output | `lib.makeSearchPathOutput "lib" "lib" [ pkgs.foo ]` |
+| Function                   | Purpose                      | Example                                             |
+| -------------------------- | ---------------------------- | --------------------------------------------------- |
+| `lib.makeBinPath`          | Construct PATH from packages | `lib.makeBinPath [ pkgs.git pkgs.curl ]`            |
+| `lib.makeLibraryPath`      | Construct LD_LIBRARY_PATH    | `lib.makeLibraryPath [ pkgs.openssl ]`              |
+| `lib.makeSearchPath`       | Generic search path          | `lib.makeSearchPath "lib" [ pkgs.foo ]`             |
+| `lib.makeSearchPathOutput` | Search path with output      | `lib.makeSearchPathOutput "lib" "lib" [ pkgs.foo ]` |
 
 ### Usage in env vs shellHook
 
 **In env attribute** (static, Nix-evaluated):
+
 ```nix
 env = {
   # Good - fully determined at Nix eval time
@@ -308,6 +326,7 @@ env = {
 ```
 
 **In shellHook** (dynamic, needs runtime append):
+
 ```nix
 shellHook = ''
   # Append to existing LD_LIBRARY_PATH at runtime
@@ -576,38 +595,53 @@ baseShell.overrideAttrs (old: {
 
 ### Config Files
 
-- [ ] `k9/src/config/shell/ssh.nix` - Line 48: duplicate `export KONDUCTOR_SSH_CONFIG` (already in env line 74)
-- [ ] `k9/src/config/shell/atuin.nix` - Line 51: duplicate `export ATUIN_CONFIG_DIR` (already in env line 79); Line 52: move `BASH_PREEXEC_PATH` to env
-- [ ] `k9/src/programs/tmux/default.nix` - Line 342: move `export KONDUCTOR_TMUX_CONF` to env attribute
+- [ ] `k9/src/config/shell/ssh.nix` - Line 48: duplicate `export KONDUCTOR_SSH_CONFIG` (already in
+      env line 74)
+- [ ] `k9/src/config/shell/atuin.nix` - Line 51: duplicate `export ATUIN_CONFIG_DIR` (already in env
+      line 79); Line 52: move `BASH_PREEXEC_PATH` to env
+- [ ] `k9/src/programs/tmux/default.nix` - Line 342: move `export KONDUCTOR_TMUX_CONF` to env
+      attribute
 
 ### Devshell Files
 
-- [ ] `k9/src/devshells/base.nix` - Lines 25-26: move `KONDUCTOR_SHELL` and `name` to env (in env.nix)
-- [ ] `k9/src/devshells/python.nix` - Lines 24-25: remove duplicate UV_SYSTEM_PYTHON/PYTHONDONTWRITEBYTECODE exports; Lines 20-21: move KONDUCTOR_SHELL/name to env; add `unset shellHook`
-- [ ] `k9/src/devshells/go.nix` - Lines 20-21: move KONDUCTOR_SHELL/name to env; add `unset shellHook`
-- [ ] `k9/src/devshells/node.nix` - Lines 20-21: move KONDUCTOR_SHELL/name to env; add `unset shellHook`
-- [ ] `k9/src/devshells/rust.nix` - Lines 20-21: move KONDUCTOR_SHELL/name to env; add `unset shellHook`
-- [ ] `k9/src/devshells/dev.nix` - Lines 24-25: move KONDUCTOR_SHELL/name to env; add `unset shellHook`
-- [ ] `k9/src/devshells/full.nix` - Lines 44-45: move KONDUCTOR_SHELL/name to env; Lines 69-70: remove duplicate UV_SYSTEM_PYTHON/PYTHONDONTWRITEBYTECODE; add `unset shellHook`
-- [ ] `k9/src/devshells/konductor.nix` - Lines 71-72: move KONDUCTOR_SHELL/name to env; Lines 87-88: remove duplicate UV_SYSTEM_PYTHON/PYTHONDONTWRITEBYTECODE; Line 108: move DOCKER_BUILDKIT to env; add `unset shellHook`
-- [ ] `k9/src/devshells/ci.nix` - Lines 56-58: move KONDUCTOR_SHELL/name/CI to env; Lines 64-65: remove duplicate UV_SYSTEM_PYTHON/PYTHONDONTWRITEBYTECODE; Line 85: move DOCKER_BUILDKIT to env; add `unset shellHook`
+- [ ] `k9/src/devshells/base.nix` - Lines 25-26: move `KONDUCTOR_SHELL` and `name` to env (in
+      `env.nix`)
+- [ ] `k9/src/devshells/python.nix` - Lines 24-25: remove duplicate
+      `UV_SYSTEM_PYTHON`/`PYTHONDONTWRITEBYTECODE` exports; Lines 20-21: move
+      `KONDUCTOR_SHELL`/`name` to env; add `unset shellHook`
+- [ ] `k9/src/devshells/go.nix` - Lines 20-21: move `KONDUCTOR_SHELL`/`name` to env; add
+      `unset shellHook`
+- [ ] `k9/src/devshells/node.nix` - Lines 20-21: move `KONDUCTOR_SHELL`/`name` to env; add
+      `unset shellHook`
+- [ ] `k9/src/devshells/rust.nix` - Lines 20-21: move `KONDUCTOR_SHELL`/`name` to env; add
+      `unset shellHook`
+- [ ] `k9/src/devshells/dev.nix` - Lines 24-25: move `KONDUCTOR_SHELL`/`name` to env; add
+      `unset shellHook`
+- [ ] `k9/src/devshells/full.nix` - Lines 44-45: move `KONDUCTOR_SHELL`/`name` to env; Lines 69-70:
+      remove duplicate `UV_SYSTEM_PYTHON`/`PYTHONDONTWRITEBYTECODE`; add `unset shellHook`
+- [ ] `k9/src/devshells/konductor.nix` - Lines 71-72: move `KONDUCTOR_SHELL`/`name` to env; Lines
+      87-88: remove duplicate `UV_SYSTEM_PYTHON`/`PYTHONDONTWRITEBYTECODE`; Line 108: move
+      `DOCKER_BUILDKIT` to env; add `unset shellHook`
+- [ ] `k9/src/devshells/ci.nix` - Lines 56-58: move `KONDUCTOR_SHELL`/`name`/`CI` to env; Lines
+      64-65: remove duplicate `UV_SYSTEM_PYTHON`/`PYTHONDONTWRITEBYTECODE`; Line 85: move
+      `DOCKER_BUILDKIT` to env; add `unset shellHook`
 
 ### Summary of Changes Per File
 
-| File | Remove from shellHook | Add to env | Add unset |
-|------|----------------------|------------|-----------|
-| ssh.nix | `export KONDUCTOR_SSH_CONFIG=...` | (already there) | no |
-| atuin.nix | `export ATUIN_CONFIG_DIR=...` | `BASH_PREEXEC_PATH` | no |
-| tmux/default.nix | `export KONDUCTOR_TMUX_CONF=...` | `KONDUCTOR_TMUX_CONF` | no |
-| base.nix | `export KONDUCTOR_SHELL/name` | add to env.nix | yes |
-| python.nix | UV_SYSTEM_PYTHON, PYTHONDONTWRITEBYTECODE, KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| go.nix | KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| node.nix | KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| rust.nix | KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| dev.nix | KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| full.nix | UV_SYSTEM_PYTHON, PYTHONDONTWRITEBYTECODE, KONDUCTOR_SHELL, name | KONDUCTOR_SHELL, name | yes |
-| konductor.nix | UV_SYSTEM_PYTHON, PYTHONDONTWRITEBYTECODE, KONDUCTOR_SHELL, name, DOCKER_BUILDKIT | KONDUCTOR_SHELL, name, DOCKER_BUILDKIT | yes |
-| ci.nix | UV_SYSTEM_PYTHON, PYTHONDONTWRITEBYTECODE, KONDUCTOR_SHELL, name, CI, DOCKER_BUILDKIT | KONDUCTOR_SHELL, name, DOCKER_BUILDKIT (CI already there) | yes |
+| File               | Remove from shellHook                                                                             | Add to env                                                        | Add unset |
+| ------------------ | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------- |
+| `ssh.nix`          | `export KONDUCTOR_SSH_CONFIG=...`                                                                 | (already there)                                                   | no        |
+| `atuin.nix`        | `export ATUIN_CONFIG_DIR=...`                                                                     | `BASH_PREEXEC_PATH`                                               | no        |
+| `tmux/default.nix` | `export KONDUCTOR_TMUX_CONF=...`                                                                  | `KONDUCTOR_TMUX_CONF`                                             | no        |
+| `base.nix`         | `export KONDUCTOR_SHELL/name`                                                                     | add to `env.nix`                                                  | yes       |
+| `python.nix`       | `UV_SYSTEM_PYTHON`, `PYTHONDONTWRITEBYTECODE`, `KONDUCTOR_SHELL`, `name`                          | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `go.nix`           | `KONDUCTOR_SHELL`, `name`                                                                         | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `node.nix`         | `KONDUCTOR_SHELL`, `name`                                                                         | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `rust.nix`         | `KONDUCTOR_SHELL`, `name`                                                                         | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `dev.nix`          | `KONDUCTOR_SHELL`, `name`                                                                         | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `full.nix`         | `UV_SYSTEM_PYTHON`, `PYTHONDONTWRITEBYTECODE`, `KONDUCTOR_SHELL`, `name`                          | `KONDUCTOR_SHELL`, `name`                                         | yes       |
+| `konductor.nix`    | `UV_SYSTEM_PYTHON`, `PYTHONDONTWRITEBYTECODE`, `KONDUCTOR_SHELL`, `name`, `DOCKER_BUILDKIT`       | `KONDUCTOR_SHELL`, `name`, `DOCKER_BUILDKIT`                      | yes       |
+| `ci.nix`           | `UV_SYSTEM_PYTHON`, `PYTHONDONTWRITEBYTECODE`, `KONDUCTOR_SHELL`, `name`, `CI`, `DOCKER_BUILDKIT` | `KONDUCTOR_SHELL`, `name`, `DOCKER_BUILDKIT` (`CI` already there) | yes       |
 
 ---
 
@@ -677,8 +711,10 @@ baseShell.overrideAttrs (old: {
 
 ### Summary of Changes
 
-1. **Move static values to env attribute**: `KONDUCTOR_SHELL`, `UV_SYSTEM_PYTHON`, `PYTHONDONTWRITEBYTECODE`, etc.
-2. **Keep only dynamic values in shellHook**: Anything needing `$HOME`, `${VAR:-default}`, or conditional logic
+1. **Move static values to env attribute**: `KONDUCTOR_SHELL`, `UV_SYSTEM_PYTHON`,
+   `PYTHONDONTWRITEBYTECODE`, etc.
+2. **Keep only dynamic values in shellHook**: Anything needing `$HOME`, `${VAR:-default}`, or
+   conditional logic
 3. **Add `unset shellHook`** at the end to clean env output
 4. **Remove all redundant exports** from shellHook for vars already in env
 

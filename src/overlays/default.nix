@@ -90,7 +90,7 @@
   (
     _final: prev:
     let
-      direnvCgoOverlay = uFinal: uPrev: {
+      direnvCgoOverlay = _uFinal: uPrev: {
         direnv = uPrev.direnv.overrideAttrs (
           old:
           uPrev.lib.optionalAttrs uPrev.stdenv.hostPlatform.isDarwin {

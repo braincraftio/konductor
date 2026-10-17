@@ -54,7 +54,5 @@ def load_private_key(path: Path) -> EllipticCurvePrivateKey:
     pem_data = path.read_bytes()
     key = serialization.load_pem_private_key(pem_data, password=None)
     if not isinstance(key, EllipticCurvePrivateKey):
-        raise TypeError(
-            f"Expected EC private key, got {type(key).__name__} from {path}"
-        )
+        raise TypeError(f"Expected EC private key, got {type(key).__name__} from {path}")
     return key

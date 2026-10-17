@@ -38,7 +38,10 @@ let
   #
   wrappedK9s = pkgs.writeShellApplication {
     name = "k9s";
-    runtimeInputs = [ pkgs.unstable.k9s pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.unstable.k9s
+      pkgs.coreutils
+    ];
     text = ''
       # Ensure skins directory exists
       SKINS_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/k9s/skins"

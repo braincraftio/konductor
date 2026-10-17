@@ -27,23 +27,23 @@ Manage Nix flake inputs, builds, store maintenance, and binary cache.
 
 ## Output
 
-| Command | Result |
-|---------|--------|
-| `nix:update` | Updated `flake.lock` with latest input versions |
-| `nix:build` | Build output in `./result` symlink |
-| `nix:check` | Flake validation (CI exit 0/1) |
-| `nix:gc` | Freed disk space in `/nix/store` |
-| `nix:cache:push` | Build outputs uploaded to Cachix |
+| Command          | Result                                          |
+| ---------------- | ----------------------------------------------- |
+| `nix:update`     | Updated `flake.lock` with latest input versions |
+| `nix:build`      | Build output in `./result` symlink              |
+| `nix:check`      | Flake validation (CI exit 0/1)                  |
+| `nix:gc`         | Freed disk space in `/nix/store`                |
+| `nix:cache:push` | Build outputs uploaded to Cachix                |
 
 ---
 
 ## Prerequisites
 
-| Tool | Purpose | Check |
-|------|---------|-------|
-| Nix/Lix | Package manager | `nix --version` |
-| Flakes | Experimental feature | `nix show-config \| grep flakes` |
-| Cachix | Binary cache (optional) | `cachix --version` |
+| Tool    | Purpose                 | Check                            |
+| ------- | ----------------------- | -------------------------------- |
+| Nix/Lix | Package manager         | `nix --version`                  |
+| Flakes  | Experimental feature    | `nix show-config \| grep flakes` |
+| Cachix  | Binary cache (optional) | `cachix --version`               |
 
 All tools provided by `nix develop .#full`.
 
@@ -51,22 +51,22 @@ All tools provided by `nix develop .#full`.
 
 ## Quick Start
 
-| Task | Description |
-|------|-------------|
-| `nix` | Show this help |
-| `nix:update` | Update all flake inputs |
-| `nix:update:input` | Update specific input |
-| `nix:build` | Build flake output |
-| `nix:check` | Validate flake (CI-friendly) |
-| `nix:show` | Show flake outputs and metadata |
-| `nix:gc` | Garbage collect store |
+| Task                | Description                     |
+| ------------------- | ------------------------------- |
+| `nix`               | Show this help                  |
+| `nix:update`        | Update all flake inputs         |
+| `nix:update:input`  | Update specific input           |
+| `nix:build`         | Build flake output              |
+| `nix:check`         | Validate flake (CI-friendly)    |
+| `nix:show`          | Show flake outputs and metadata |
+| `nix:gc`            | Garbage collect store           |
 | `nix:gc:aggressive` | Aggressive GC (all generations) |
-| `nix:optimise` | Deduplicate store |
-| `nix:info` | Show Nix installation info |
-| `nix:doctor` | Run health diagnostics |
-| `nix:cache:push` | Push to Cachix |
-| `nix:registry:add` | Add to flake registry |
-| `nix:registry:list` | List registries |
+| `nix:optimise`      | Deduplicate store               |
+| `nix:info`          | Show Nix installation info      |
+| `nix:doctor`        | Run health diagnostics          |
+| `nix:cache:push`    | Push to Cachix                  |
+| `nix:registry:add`  | Add to flake registry           |
+| `nix:registry:list` | List registries                 |
 
 ### nix
 
@@ -121,22 +121,22 @@ EOF
 
 ## Task Reference
 
-| Category | Task | Description |
-|----------|------|-------------|
-| **Flake** | `nix:update` | Update all inputs |
-| | `nix:update:input` | Update specific input |
-| | `nix:build` | Build output |
-| | `nix:check` | Validate (CI) |
-| | `nix:show` | Show metadata |
-| **Store** | `nix:gc` | Garbage collect |
-| | `nix:gc:aggressive` | Aggressive GC |
-| | `nix:optimise` | Deduplicate |
-| **Cache** | `nix:cache:push` | Push to Cachix |
-| **Registry** | `nix:registry:add` | Add entry |
-| | `nix:registry:list` | List registries |
-| | `nix:registry:remove` | Remove entry |
-| **Diag** | `nix:info` | Installation info |
-| | `nix:doctor` | Health check |
+| Category     | Task                  | Description           |
+| ------------ | --------------------- | --------------------- |
+| **Flake**    | `nix:update`          | Update all inputs     |
+|              | `nix:update:input`    | Update specific input |
+|              | `nix:build`           | Build output          |
+|              | `nix:check`           | Validate (CI)         |
+|              | `nix:show`            | Show metadata         |
+| **Store**    | `nix:gc`              | Garbage collect       |
+|              | `nix:gc:aggressive`   | Aggressive GC         |
+|              | `nix:optimise`        | Deduplicate           |
+| **Cache**    | `nix:cache:push`      | Push to Cachix        |
+| **Registry** | `nix:registry:add`    | Add entry             |
+|              | `nix:registry:list`   | List registries       |
+|              | `nix:registry:remove` | Remove entry          |
+| **Diag**     | `nix:info`            | Installation info     |
+|              | `nix:doctor`          | Health check          |
 
 ---
 

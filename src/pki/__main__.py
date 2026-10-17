@@ -28,6 +28,7 @@ def main() -> int:
         return 1
 
     from pki.cli import run
+
     return run()
 
 

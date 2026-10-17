@@ -2,12 +2,26 @@
 # BrainCraft.io YAML Lint Configuration
 extends: default
 
+# Generated lockfiles (same exclusions as treefmt, cspell, biome)
+ignore: |
+  pnpm-lock.yaml
+  package-lock.json
+  *.package-lock.json
+
 rules:
+  # Layout is owned by prettier (treefmt), which neither adds nor requires a
+  # document start marker.
+  document-start: disable
   line-length:
     max: 120
     allow-non-breakable-words: true
+    # `key: <one token>` (digest-pinned image URLs) has no break point; YAML
+    # cannot split a scalar without whitespace.
+    allow-non-breakable-inline-mappings: true
   truthy:
     allowed-values: ["true", "false", "yes", "no"]
+    # `on:` is the trigger key GitHub/Forgejo Actions requires, not a value.
+    check-keys: false
   comments:
     min-spaces-from-content: 1
   indentation:

@@ -29,7 +29,11 @@
     home = "/home/kc2admin";
     shell = "/bin/bash";
     gecos = "Konductor Admin";
-    groups = [ "kc2admin" "kc2" "wheel" ];
+    groups = [
+      "kc2admin"
+      "kc2"
+      "wheel"
+    ];
   };
 
   # CI/CD runner user (for forgejo-runner agents)
@@ -43,7 +47,14 @@
     home = "/home/runner";
     shell = "/bin/bash";
     gecos = "Forgejo Runner";
-    groups = [ "runner" "kc2" "wheel" "docker" "libvirtd" "kvm" ];
+    groups = [
+      "runner"
+      "kc2"
+      "wheel"
+      "docker"
+      "libvirtd"
+      "kvm"
+    ];
   };
 
   # Forgejo server user
@@ -55,16 +66,42 @@
     home = "/home/forgejo";
     shell = "/bin/bash";
     gecos = "Forgejo Server";
-    groups = [ "forgejo" "kc2" "docker" ];
+    groups = [
+      "forgejo"
+      "kc2"
+      "docker"
+    ];
   };
 
   # Group definitions
   # kc2 is the shared group - all users are members for shared directory access
   groups = {
-    kc2 = { gid = 1001; members = [ "kc2admin" "runner" "forgejo" ]; };
-    kc2admin = { gid = 1002; members = [ ]; };
-    runner = { gid = 1003; members = [ ]; };
-    forgejo = { gid = 1004; members = [ ]; };
-    wheel = { gid = 10; members = [ "kc2admin" "runner" ]; };
+    kc2 = {
+      gid = 1001;
+      members = [
+        "kc2admin"
+        "runner"
+        "forgejo"
+      ];
+    };
+    kc2admin = {
+      gid = 1002;
+      members = [ ];
+    };
+    runner = {
+      gid = 1003;
+      members = [ ];
+    };
+    forgejo = {
+      gid = 1004;
+      members = [ ];
+    };
+    wheel = {
+      gid = 10;
+      members = [
+        "kc2admin"
+        "runner"
+      ];
+    };
   };
 }

@@ -11,8 +11,8 @@ runme:
 
 Verify this Konductor VM can reproduce its own build from `/.konductor` provenance.
 
-**Execution context:** This file runs INSIDE a built Konductor VM (`cwd: /opt/konductor`),
-not on the build host.
+**Execution context:** This file runs INSIDE a built Konductor VM (`cwd: /opt/konductor`), not on
+the build host.
 
 ## Contents
 
@@ -295,12 +295,12 @@ fi
 
 ## Provenance Fields
 
-| Field | Purpose | Verification |
-|-------|---------|--------------|
-| `git_commit` | Source code version | `git rev-parse HEAD` |
-| `git_dirty` | Trust gate (0 = clean) | Must be 0 for reproducibility |
-| `nix_version` | Nix toolchain version | `nix --version` |
-| `nix_hash` | Flake inputs hash | `nix flake metadata --json` |
-| `nix_drv` | Derivation hash | `nix path-info --derivation .#qcow2` |
-| `flake_lock_sha256` | Lock file integrity | `sha256sum flake.lock` |
-| `image_sha256` | Final artifact | `sha256sum konductor.qcow2` |
+| Field               | Purpose                | Verification                         |
+| ------------------- | ---------------------- | ------------------------------------ |
+| `git_commit`        | Source code version    | `git rev-parse HEAD`                 |
+| `git_dirty`         | Trust gate (0 = clean) | Must be 0 for reproducibility        |
+| `nix_version`       | Nix toolchain version  | `nix --version`                      |
+| `nix_hash`          | Flake inputs hash      | `nix flake metadata --json`          |
+| `nix_drv`           | Derivation hash        | `nix path-info --derivation .#qcow2` |
+| `flake_lock_sha256` | Lock file integrity    | `sha256sum flake.lock`               |
+| `image_sha256`      | Final artifact         | `sha256sum konductor.qcow2`          |

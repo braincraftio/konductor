@@ -184,8 +184,8 @@ spec:
           volumeMode: Block
           resources:
             requests:
-              storage: 120Gi                    # Default, patchable
-          storageClassName: ceph-nvme-vm-block  # Default, patchable
+              storage: 120Gi # Default, patchable
+          storageClassName: ceph-nvme-vm-block # Default, patchable
         source:
           snapshot:
             name: konductor-local-snapshot
@@ -207,7 +207,7 @@ spec:
         - sshPublicKey:
             source:
               secret:
-                secretName: konductor-ssh-key   # Created by overlay deploy.sh
+                secretName: konductor-ssh-key # Created by overlay deploy.sh
             propagationMethod:
               qemuGuestAgent:
                 users:
@@ -223,8 +223,8 @@ spec:
           cores: 4
           sockets: 1
           threads: 2
-          maxSockets: 4                         # CPU hotplug up to 16 vCPUs
-          model: host-passthrough               # Required for nested virt
+          maxSockets: 4 # CPU hotplug up to 16 vCPUs
+          model: host-passthrough # Required for nested virt
 
         # =====================================================================
         # Memory Configuration (with hotplug support)
@@ -233,7 +233,7 @@ spec:
           hugepages:
             pageSize: "1Gi"
           guest: 16Gi
-          maxGuest: 64Gi                        # Memory hotplug up to 64Gi
+          maxGuest: 64Gi # Memory hotplug up to 64Gi
         resources:
           requests:
             memory: 16Gi
@@ -250,7 +250,7 @@ spec:
         firmware:
           bootloader:
             efi:
-              secureBoot: false                 # NixOS manages integrity
+              secureBoot: false # NixOS manages integrity
 
         # =====================================================================
         # Devices
@@ -274,7 +274,7 @@ spec:
               disk:
                 bus: virtio
             - name: kubeconfig
-              serial: iso-root-755-m.kube       # konductor-mount@.service
+              serial: iso-root-755-m.kube # konductor-mount@.service
               disk:
                 bus: virtio
 

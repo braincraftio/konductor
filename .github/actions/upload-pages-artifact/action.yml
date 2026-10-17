@@ -1,0 +1,20 @@
+name: Upload Pages artifact
+description: Package a static site directory as the GitHub Pages artifact with a single pinned version.
+
+inputs:
+  path:
+    description: Directory containing the built site
+    required: true
+  retention-days:
+    description: Days until the artifact expires
+    required: false
+    default: "1"
+
+runs:
+  using: composite
+  steps:
+    - id: upload
+      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      with:
+        path: ${{ inputs.path }}
+        retention-days: ${{ inputs.retention-days }}

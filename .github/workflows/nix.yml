@@ -7,10 +7,18 @@ on:
         description: Git ref to build (defaults to triggering ref)
         required: false
         type: string
-        default: ''
+        default: ""
     secrets:
       BCIO_CACHIX_PRIVATE_KEY:
         required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
@@ -18,6 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # x86_64-darwin is not in flake supportedSystems; see flake.nix.
         include:
           - system: x86_64-linux
             runner: ubuntu-24.04
@@ -25,46 +34,70 @@ jobs:
             runner: ubuntu-24.04-arm
           - system: aarch64-darwin
             runner: macos-15
-          # x86_64-darwin removed: nixpkgs-unstable (26.11) dropped
-          # x86_64-darwin support. The unstable overlay import fails
-          # with "Nixpkgs 26.11 has dropped support for x86_64-darwin"
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
 
-      - uses: cachix/install-nix-action@v31
+      # PR builds pull only; push and release builds push to both caches.
+      - uses: ./.github/actions/setup-nix
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          use-flakehub: ${{ github.event_name != 'pull_request' }}
+          cachix-name: ${{ vars.CACHIX_NAME || 'braincraftio' }}
+          cachix-auth-token: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
+          cachix-skip-push: ${{ github.event_name == 'pull_request' }}
 
-      # GitHub Actions cache disabled: nix store closure exceeds
-      # GitHub's 10GB cache limit, causing ResourceExhausted rate limits.
-      # Cachix is the sole binary cache for this project.
-      # - uses: DeterminateSystems/magic-nix-cache-action@v14
-      #   with:
-      #     use-flakehub: false
-      #     diagnostic-endpoint: ""
-
-      - uses: cachix/cachix-action@v15
-        with:
-          name: braincraftio
-          authToken: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
+      - name: Flake structure
+        run: nix flake show --no-update-lock-file --accept-flake-config
 
       - name: Flake checks
-        run: nix flake check --accept-flake-config -L
+        run: nix flake check --no-update-lock-file --accept-flake-config -L
 
-      - name: Build outputs
+      - name: Build maintained packages
+        env:
+          SYSTEM: ${{ matrix.system }}
         run: |
-          nix build --no-link --accept-flake-config -L \
-            .#packages.${{ matrix.system }}.default \
-            .#devShells.${{ matrix.system }}.full
+          packages=(
+            ci atuin k0sctl terminal-browser opencode mitogen ansible python-env
+            pulumi pulumi-cli trzsz forgejo-runner
+          )
+          targets=()
+          for package in "${packages[@]}"; do
+            targets+=(".#packages.$SYSTEM.$package")
+          done
+          if [[ "$SYSTEM" == *-linux ]]; then
+            targets+=(".#packages.$SYSTEM.k0s")
+          fi
+          if [[ "$SYSTEM" == x86_64-linux ]]; then
+            targets+=(".#packages.$SYSTEM.code-server")
+          fi
+          nix build --no-link --no-update-lock-file --keep-going --accept-flake-config -L "${targets[@]}"
+          nix build --no-link --no-update-lock-file --accept-flake-config -L ".#packages.$SYSTEM.k0sctl.tests.version"
 
-      - name: Build konductor devshell
-        if: matrix.system == 'x86_64-linux'
-        run: nix build --no-link --accept-flake-config -L .#devShells.${{ matrix.system }}.konductor
+      # Exercises the documented consumer path: nix profile install.
+      - name: Install default package
+        run: |
+          nix profile install ".#packages.${{ matrix.system }}.default" \
+            --no-update-lock-file --accept-flake-config --profile "$RUNNER_TEMP/konductor" -L
+          "$RUNNER_TEMP/konductor/bin/nvim" --version
 
-      - name: Build frontend devshell
-        if: matrix.system == 'x86_64-linux'
-        run: nix build --no-link --accept-flake-config -L .#devShells.${{ matrix.system }}.frontend
+      - name: Build devshells
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          targets=(".#devShells.$SYSTEM.default" ".#devShells.$SYSTEM.full")
+          if [[ "$SYSTEM" == x86_64-linux ]]; then
+            targets+=(".#devShells.$SYSTEM.konductor" ".#devShells.$SYSTEM.frontend")
+          fi
+          nix build --no-link --no-update-lock-file --keep-going --accept-flake-config -L "${targets[@]}"
+
+      # Keep the failed build red. Each platform emits its own reviewable patch.
+      - name: Repair hash mismatches
+        if: failure() && github.event_name == 'pull_request'
+        uses: ./.github/actions/fix-nix-hashes
+        with:
+          system: ${{ matrix.system }}

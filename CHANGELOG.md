@@ -387,7 +387,7 @@
 * **env:** set projv-engprod/konductor as default image in flake env ([30bc9d3](https://github.com/braincraftio/konductor/commit/30bc9d3373bea9b8e5322955397383ad7ef2aae2))
 * **flake:** drop nixpkgs follows on open-sesame input for cachix hits ([7f2ed83](https://github.com/braincraftio/konductor/commit/7f2ed8370bfbd1fbb3bc9bde6e721c9dc0dce712))
 * **flake:** point nixvim to nixpkgs-unstable ([fb5ccf4](https://github.com/braincraftio/konductor/commit/fb5ccf484cdbc91afd5cb851dfe34a4458f9da57))
-* **flake:** remove duplicate open-sesame input and revert katmorg merge artifacts ([60bbc0e](https://github.com/braincraftio/konductor/commit/60bbc0e0ea923fbe4a0efbd994a162bb99f8d79e))
+* **flake:** remove duplicate open-sesame input and revert usrbinkat merge artifacts ([60bbc0e](https://github.com/braincraftio/konductor/commit/60bbc0e0ea923fbe4a0efbd994a162bb99f8d79e))
 * **flake:** restore github inputs for remote flake compatibility ([ce37ac9](https://github.com/braincraftio/konductor/commit/ce37ac9b596a699db10b49091dd42e84fc14144d))
 * **flake:** restrict konductor/ci devshells and qcow2 to x86_64-linux ([31e0ea4](https://github.com/braincraftio/konductor/commit/31e0ea4a02a091f1afb401d1bc624c215011da39))
 * **flake:** switch to claude-code-bin, add COLORTERM, fix vendor auto-run ([2e335c3](https://github.com/braincraftio/konductor/commit/2e335c39c6d954f5e1edca43dccee731eb19bb91))

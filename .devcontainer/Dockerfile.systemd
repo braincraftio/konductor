@@ -3,6 +3,10 @@
 # Minimal base for `nix develop .#full` workflow
 FROM docker.io/library/debian:13
 
+# pipefail: a failing download in `curl ... | sh` fails the build instead of
+# piping an empty or truncated script into the shell.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Essential packages only - everything else comes from Nix
@@ -42,7 +46,7 @@ ENV LANGUAGE=C:en
 # System-wide PATH including Nix (for docker exec without shell)
 ENV PATH="/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Clean up systemd for container operation
+# Clean up systemd for container operation, then mask unnecessary services
 RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
     /etc/systemd/system/*.wants/* \
     /lib/systemd/system/local-fs.target.wants/* \
@@ -50,10 +54,8 @@ RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
     /lib/systemd/system/sockets.target.wants/*initctl* \
     /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
     /lib/systemd/system/systemd-update-utmp* \
-    /lib/systemd/system/getty.target
-
-# Disable unnecessary systemd services
-RUN systemctl mask \
+    /lib/systemd/system/getty.target \
+    && systemctl mask \
     systemd-logind.service \
     getty.target \
     console-getty.service \
@@ -83,29 +85,23 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/
     --no-start-daemon \
     --no-confirm
 
-# Enable Nix daemon systemd services
-RUN systemctl enable nix-daemon.socket nix-daemon.service
-
-# Add konductor flake to registry for `nix develop konductor` UX
-RUN /nix/var/nix/profiles/default/bin/nix registry add konductor github:braincraftio/konductor
+# Enable Nix daemon systemd services; add konductor flake to registry for
+# `nix develop konductor` UX
+RUN systemctl enable nix-daemon.socket nix-daemon.service \
+    && /nix/var/nix/profiles/default/bin/nix registry add konductor github:braincraftio/konductor
 
 # Copy konductor repo to well-known location (secrets filtered by .dockerignore)
 COPY . /etc/skel/.konductor
 RUN chmod -R a+rX /etc/skel/.konductor
 
 # Pre-build default devshell to populate nix cache
-RUN cd /etc/skel/.konductor && \
-    /nix/var/nix/profiles/default/bin/nix develop --profile /nix/var/nix/profiles/konductor-default -c true
+WORKDIR /etc/skel/.konductor
+RUN /nix/var/nix/profiles/default/bin/nix develop --profile /nix/var/nix/profiles/konductor-default -c true
+WORKDIR /
 
 # Configure Nix daemon systemd override
 # IMPORTANT: Do NOT set NIX_REMOTE for the daemon itself
-RUN mkdir -p /etc/systemd/system/nix-daemon.service.d && \
-    cat > /etc/systemd/system/nix-daemon.service.d/override.conf << 'EOF'
-[Service]
-Environment="PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Restart=always
-RestartSec=5
-EOF
+COPY .devcontainer/rootfs/etc/systemd/system/nix-daemon.service.d/override.conf /etc/systemd/system/nix-daemon.service.d/override.conf
 
 # Copy sudoers configuration BEFORE creating user
 COPY .devcontainer/rootfs/etc/sudoers.d/debian /etc/sudoers.d/debian
@@ -120,7 +116,7 @@ COPY .devcontainer/rootfs/etc/gitconfig /etc/gitconfig
 
 # Docker socket link service (for non-privileged mode with docker-host.sock mount)
 # Uncomment if using isolated mode with /var/run/docker.sock:/var/run/docker-host.sock
-# COPY rootfs/etc/systemd/system/docker-socket-link.service /etc/systemd/system/
+# COPY .devcontainer/rootfs/etc/systemd/system/docker-socket-link.service /etc/systemd/system/
 # RUN systemctl enable docker-socket-link.service
 
 # Create docker group
@@ -149,7 +145,10 @@ RUN mkdir -p /home/debian/.local/share/bash-completion/completions && \
 RUN mkdir -p /home/debian/.local/state/mise && \
     chmod 755 /home/debian/.local/state /home/debian/.local/state/mise
 
-# Switch back to root for final configuration
+# Switch back to root: ENTRYPOINT runs systemd as PID 1, which must be root
+# to act as the system manager; the debian user's processes run under
+# systemd user sessions (/run/user/1000), not as the container's root process.
+# hadolint ignore=DL3002
 USER root
 WORKDIR /
 
@@ -162,20 +161,14 @@ RUN mkdir -p /run/user/1000 && \
     chmod 700 /run/user/1000
 
 # Create systemd tmpfiles config
-RUN cat > /etc/tmpfiles.d/konductor.conf << 'EOF'
-d /run/user/1000 0700 debian debian -
-d /run/user/1000/systemd 0755 debian debian -
-EOF
+COPY .devcontainer/rootfs/etc/tmpfiles.d/konductor.conf /etc/tmpfiles.d/konductor.conf
 
 # Prevent apt from starting services during package installation
 RUN echo 'exit 0' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d
 
 # Health check script
-RUN cat > /usr/local/bin/healthcheck << 'EOF'
-#!/bin/bash
-systemctl is-active --quiet nix-daemon.socket
-EOF
-RUN chmod +x /usr/local/bin/healthcheck
+COPY .devcontainer/rootfs/usr/local/bin/healthcheck /usr/local/bin/healthcheck
+RUN chmod 0755 /usr/local/bin/healthcheck
 
 # Verify installations
 RUN /home/debian/.local/bin/mise --version && \

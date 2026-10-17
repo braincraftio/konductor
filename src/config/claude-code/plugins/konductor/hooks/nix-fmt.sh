@@ -12,24 +12,25 @@
 # Kill switch (konductor-namespaced, NOT a Claude Code var):
 #   KONDUCTOR_CLAUDE_HOOKS_DISABLE=1
 
-[ "${KONDUCTOR_CLAUDE_HOOKS_DISABLE:-0}" = "1" ] && exit 0
+[[ "${KONDUCTOR_CLAUDE_HOOKS_DISABLE:-0}" = "1" ]] && exit 0
 
-input=$(cat 2>/dev/null || true)
+input=$(cat 2> /dev/null || true)
 
-if command -v jq >/dev/null 2>&1; then
-  file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // ""' 2>/dev/null || true)
+if command -v jq > /dev/null 2>&1; then
+    file=$(printf '%s' "${input}" | jq -r '.tool_input.file_path // .tool_input.path // ""' 2> /dev/null || true)
 else
-  exit 0
+    exit 0
 fi
-[ -z "$file" ] && exit 0
-[ -f "$file" ] || exit 0
+[[ -z "${file}" ]] && exit 0
+[[ -f "${file}" ]] || exit 0
 
-case "$file" in
-  *.nix)
-    if command -v nixfmt >/dev/null 2>&1; then
-      nixfmt "$file" >/dev/null 2>&1 || true
-    fi
-    ;;
+case "${file}" in
+    *.nix)
+        if command -v nixfmt > /dev/null 2>&1; then
+            nixfmt "${file}" > /dev/null 2>&1 || true
+        fi
+        ;;
+    *) ;; # non-Nix file: nothing to format
 esac
 
 exit 0

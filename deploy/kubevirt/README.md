@@ -40,14 +40,15 @@ virtctl vnc konductor -n konductor
 
 ### Users
 
-| User | Description | Sudo |
-|------|-------------|------|
-| `kc2` | Unprivileged user (uid 1000) | Power commands only |
-| `kc2admin` | Admin user | Full NOPASSWD |
+| User       | Description                  | Sudo                |
+| ---------- | ---------------------------- | ------------------- |
+| `kc2`      | Unprivileged user (uid 1000) | Power commands only |
+| `kc2admin` | Admin user                   | Full NOPASSWD       |
 
 ## Advanced Deployment
 
 The advanced overlay adds:
+
 - **Persistent storage** via DataVolumeTemplate (imported from registry)
 - **macvtap networking** for direct L2 access to physical network
 - **OVS bridge** for nested virtualization
@@ -114,7 +115,7 @@ kubectl create secret generic konductor-ssh-key -n konductor \
 
 ## Directory Structure
 
-```
+```text
 deploy/kubevirt/
 ├── README.md
 ├── base/
@@ -156,17 +157,19 @@ patches:
 ### Change Storage Class (Advanced)
 
 Edit `overlays/advanced/virtualmachine.yaml`:
+
 ```yaml
 spec:
   dataVolumeTemplates:
     - spec:
         pvc:
-          storageClassName: your-storage-class  # Change this
+          storageClassName: your-storage-class # Change this
 ```
 
 ### Change Physical NIC for macvtap (Advanced)
 
 Edit `overlays/advanced/network-attachment-definitions.yaml`:
+
 ```yaml
 metadata:
   annotations:

@@ -44,14 +44,14 @@ def build_ca_certificate(
     """
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, identity.organization),
-        x509.NameAttribute(
-            NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit
-        ),
-        x509.NameAttribute(NameOID.COMMON_NAME, identity.ca_common_name),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, identity.serial_hex),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, identity.organization),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit),
+            x509.NameAttribute(NameOID.COMMON_NAME, identity.ca_common_name),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, identity.serial_hex),
+        ]
+    )
 
     builder = (
         x509.CertificateBuilder()

@@ -11,7 +11,13 @@
 # The konductor flake input is passed via specialArgs to provide
 # access to catppuccin theme sources (same pattern as devshells + qcow2).
 
-{ config, pkgs, lib, konductor, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  konductor,
+  ...
+}:
 
 let
   common = import ./common.nix { inherit lib; };
@@ -27,7 +33,12 @@ in
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = common.mkPackages {
-      inherit pkgs lib versions catppuccinSources;
+      inherit
+        pkgs
+        lib
+        versions
+        catppuccinSources
+        ;
     };
     environment.variables = common.mkEnv // {
       SSL_CERT_FILE = "/etc/ssl/cert.pem";

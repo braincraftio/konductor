@@ -9,7 +9,6 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-
 # =====================================================================
 # Filesystem Paths (Immutable Contract)
 # =====================================================================
@@ -122,12 +121,12 @@ OID_NAMES: dict[str, str] = {
 DEFAULT_DOMAIN = "konductor.arpa"
 DEFAULT_ORGANIZATION = "Konductor"
 DEFAULT_OU = "Infrastructure"
-DEFAULT_CA_VALIDITY_DAYS = 3650   # 10 years
+DEFAULT_CA_VALIDITY_DAYS = 3650  # 10 years
 DEFAULT_CERT_VALIDITY_DAYS = 365  # 1 year
 
 # File permission modes
-MODE_PRIVATE_KEY = 0o600    # CA private key -- root only
-MODE_SERVICE_KEY = 0o640    # Wildcard key -- konductor-pki group read
-MODE_CERTIFICATE = 0o644    # Certificates -- world-readable
-MODE_DIRECTORY = 0o755       # PKI directories
-MODE_PRIVATE_DIR = 0o700     # Hypervisor dir -- root only
+MODE_PRIVATE_KEY = 0o600  # CA private key -- root only
+MODE_SERVICE_KEY = 0o640  # Wildcard key -- konductor-pki group read
+MODE_CERTIFICATE = 0o644  # Certificates -- world-readable
+MODE_DIRECTORY = 0o755  # PKI directories
+MODE_PRIVATE_DIR = 0o700  # Hypervisor dir -- root only

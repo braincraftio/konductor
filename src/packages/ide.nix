@@ -80,7 +80,7 @@ in
     # Nix flake development tools
     flake-checker # Health checks for Nix flakes
     nvd # Nix package version diff tool
-    nixfmt # Official Nix code formatter
+    # nixfmt → src/config/formatters/nixfmt.nix (in packages.default)
   ];
 
   shellHook = "";

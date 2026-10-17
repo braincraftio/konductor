@@ -76,7 +76,8 @@ stringData:
       # Allow kc2 to poweroff/reboot without sudo password
       - path: /etc/sudoers.d/kc2-power
         content: |
-          kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
+          kc2 ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/poweroff, \
+            /run/current-system/sw/bin/reboot, /run/current-system/sw/bin/shutdown
         permissions: '0440'
       # Containers policy for skopeo/podman
       - path: /etc/containers/policy.json
@@ -188,8 +189,12 @@ stringData:
 
       # Force ARP/MAC learning by pinging gateway and sending gratuitous ARP on macvtap interface
       # enp2s0 is the macvtap interface with DHCP IP (default route)
-      - [sh, -c, "sleep 5 && /run/current-system/sw/bin/ping -c 5 $(ip route | awk '/default/ {print $3}' | head -1) || true"]
-      - [sh, -c, "/run/current-system/sw/bin/arping -c 3 -U -I enp2s0 $(ip -4 addr show enp2s0 | awk '/inet / {print $2}' | cut -d/ -f1) 2>/dev/null || true"]
+      - |
+        sleep 5 && /run/current-system/sw/bin/ping -c 5 \
+          $(ip route | awk '/default/ {print $3}' | head -1) || true
+      - |
+        /run/current-system/sw/bin/arping -c 3 -U -I enp2s0 \
+          $(ip -4 addr show enp2s0 | awk '/inet / {print $2}' | cut -d/ -f1) 2>/dev/null || true
 
       # Copy kubeconfig to user directories
       # Mount point is /mnt/kube (serial iso-root-755-m.kube: m.kube → mnt/kube → /mnt/kube)

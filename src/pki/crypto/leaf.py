@@ -22,8 +22,8 @@ import datetime
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.ec import (
-    EllipticCurvePrivateKey,
     SECP384R1,
+    EllipticCurvePrivateKey,
 )
 from cryptography.x509.oid import NameOID
 
@@ -64,14 +64,14 @@ def build_leaf_certificate(
     """
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    subject = x509.Name([
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, identity.organization),
-        x509.NameAttribute(
-            NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit
-        ),
-        x509.NameAttribute(NameOID.COMMON_NAME, identity.wildcard_common_name),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, identity.serial_hex),
-    ])
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, identity.organization),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, identity.organizational_unit),
+            x509.NameAttribute(NameOID.COMMON_NAME, identity.wildcard_common_name),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, identity.serial_hex),
+        ]
+    )
 
     # Build SAN list
     san_names: list[x509.GeneralName] = []
@@ -109,10 +109,12 @@ def build_leaf_certificate(
             critical=True,
         )
         .add_extension(
-            x509.ExtendedKeyUsage([
-                x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
-                x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
-            ]),
+            x509.ExtendedKeyUsage(
+                [
+                    x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+                    x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+                ]
+            ),
             critical=False,
         )
         # Subject Alternative Names
@@ -130,9 +132,7 @@ def build_leaf_certificate(
         # which may differ if the cert was issued by cert-manager.
         .add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-                signing_cert.extensions.get_extension_for_class(
-                    x509.SubjectKeyIdentifier
-                ).value
+                signing_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
             ),
             critical=False,
         )

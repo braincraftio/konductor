@@ -62,6 +62,9 @@ config:
   ol-prefix: false
   strong-style: false
   ul-indent: false
+  # Prettier pads every table to aligned columns
+  MD060:
+    style: aligned
 
   # ---------------------------------------------------------------------------
   # Project-specific rules

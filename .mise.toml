@@ -18,25 +18,24 @@
 [settings]
 # Core settings
 jobs = 4
-yes = true
 color = true
 verbose = false
 experimental = true
 
 # Task output
-task_output = "prefix"
+task.output = "prefix"
 status.show_env = true
 
 # Disable tool auto-install - Nix handles all tools
 auto_install = false
-task_run_auto_install = false
+task.run_auto_install = false
 not_found_auto_install = false
 activate_aggressive = false
 legacy_version_file = false
 always_keep_download = false
 
-# Trust configuration
-trusted_config_paths = [ "{{ config_root }}", "{{ config_root }}/.config" ]
+# `yes` and `trusted_config_paths` are honoured only in the global mise
+# config (~/.config/mise/config.toml); mise ignores them here.
 
 # Task configuration variables
 [vars]
@@ -79,10 +78,7 @@ min_disk_space_gb = "10"
 # Environment configuration
 [env]
 _.file = ".env"
-_.path = [
-  "./.config/bin",
-  "/nix/var/nix/profiles/default/bin",
-]
+_.path = ["./.config/bin", "/nix/var/nix/profiles/default/bin"]
 
 # Core paths
 PROJECT_ROOT = "{{ config_root }}"
@@ -117,7 +113,6 @@ includes = [
   ".config/mise/toml/main.toml",
   ".config/mise/toml/nix.toml",
   ".config/mise/toml/lint.toml",
-  ".config/mise/toml/format.toml",
   ".config/mise/toml/docker.toml",
   ".config/mise/toml/setup.toml",
   ".config/mise/toml/www.toml",

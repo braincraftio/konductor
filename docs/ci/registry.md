@@ -30,7 +30,8 @@ Install cluster CA certificate for Docker daemon and Skopeo.
 2. Installs to `/etc/docker/certs.d/registry.docker.arpa/ca.crt` (Docker daemon)
 3. Installs to `${WORKSPACE_ROOT}/.certs/registry.docker.arpa/ca.crt` (Skopeo)
 
-**Why needed:** `registry.docker.arpa` uses a self-signed CA from cert-manager. Docker and Skopeo need this CA to trust the registry's TLS certificate.
+**Why needed:** `registry.docker.arpa` uses a self-signed CA from cert-manager. Docker and Skopeo
+need this CA to trust the registry's TLS certificate.
 
 **Prerequisites:** Cluster running, kubectl configured
 

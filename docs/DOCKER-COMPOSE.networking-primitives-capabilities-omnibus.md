@@ -1,7 +1,7 @@
 # Docker Compose Networking: Primitives and Capabilities Omnibus
 
-> Comprehensive guide for Docker Compose networking capabilities, limitations,
-> and integration with host-level networking (NixOS) for the Konductor platform.
+> Comprehensive guide for Docker Compose networking capabilities, limitations, and integration with
+> host-level networking (NixOS) for the Konductor platform.
 
 ## Table of Contents
 
@@ -31,13 +31,12 @@
 
 ### Scenario
 
-Konductor is a NixOS VM running Docker Compose with a Talos Kubernetes cluster
-inside containers. External users need to access Kubernetes services via the VM's
-external IP.
+Konductor is a NixOS VM running Docker Compose with a Talos Kubernetes cluster inside containers.
+External users need to access Kubernetes services via the VM's external IP.
 
 ### Network Topology
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ External Network (192.168.1.0/24)                                           │
 │                                                                             │
@@ -69,9 +68,9 @@ external IP.
 
 ### The Challenge
 
-The LoadBalancer VIPs (10.5.0.240-255) are **virtual IPs** managed by Cilium L2
-inside the Kubernetes cluster. They are NOT container IPs - they're announced
-via ARP on the Docker bridge network by Cilium.
+The LoadBalancer VIPs (10.5.0.240-255) are **virtual IPs** managed by Cilium L2 inside the
+Kubernetes cluster. They are NOT container IPs - they're announced via ARP on the Docker bridge
+network by Cilium.
 
 **Goal**: External users connect to `192.168.1.83:80` → traffic forwards to `10.5.0.241:80`
 
@@ -79,7 +78,7 @@ via ARP on the Docker bridge network by Cilium.
 
 ## Architecture Overview
 
-### Current compose.yaml
+### Current `compose.yaml`
 
 ```yaml
 networks:
@@ -102,10 +101,10 @@ services:
       talos-network:
         ipv4_address: 10.5.0.11
     ports:
-      - "127.0.0.1:6443:6443"   # Kubernetes API
-      - "127.0.0.1:50000:50000" # Talos API
-      - "127.0.0.1:80:80"       # HTTP (localhost only)
-      - "127.0.0.1:443:443"     # HTTPS (localhost only)
+      - '127.0.0.1:6443:6443' # Kubernetes API
+      - '127.0.0.1:50000:50000' # Talos API
+      - '127.0.0.1:80:80' # HTTP (localhost only)
+      - '127.0.0.1:443:443' # HTTPS (localhost only)
     volumes:
       - talos-cp1-var:/var
       - talos-cp1-etc:/etc/kubernetes
@@ -127,26 +126,26 @@ networks:
     driver: bridge
     driver_opts:
       # Bridge name on host (default: br-<network-id>)
-      com.docker.network.bridge.name: "my-bridge"
+      com.docker.network.bridge.name: 'my-bridge'
 
       # Enable IP masquerading (SNAT for outbound traffic)
-      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_ip_masquerade: 'true'
 
       # Inter-container communication on this bridge
-      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_icc: 'true'
 
       # Host IP to bind published ports (default: 0.0.0.0)
-      com.docker.network.bridge.host_binding_ipv4: "192.168.1.83"
+      com.docker.network.bridge.host_binding_ipv4: '192.168.1.83'
 
       # Maximum Transmission Unit
-      com.docker.network.driver.mtu: "1500"
+      com.docker.network.driver.mtu: '1500'
 
     ipam:
       driver: default
       config:
         - subnet: 10.5.0.0/24
           gateway: 10.5.0.1
-          ip_range: 10.5.0.0/28  # Allocatable range for containers
+          ip_range: 10.5.0.0/28 # Allocatable range for containers
           aux_addresses:
             # Reserve IPs for LoadBalancer VIPs (won't be auto-assigned)
             lb_envoy: 10.5.0.241
@@ -156,13 +155,13 @@ networks:
 
 #### Key driver_opts Explained
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `enable_ip_masquerade` | true | SNAT for container outbound traffic |
-| `enable_icc` | true | Containers can communicate on same bridge |
-| `host_binding_ipv4` | 0.0.0.0 | Host IP for published ports |
-| `name` | br-<id> | Custom bridge interface name |
-| `mtu` | 1500 | Maximum packet size |
+| Option                 | Default | Description                               |
+| ---------------------- | ------- | ----------------------------------------- |
+| `enable_ip_masquerade` | true    | SNAT for container outbound traffic       |
+| `enable_icc`           | true    | Containers can communicate on same bridge |
+| `host_binding_ipv4`    | 0.0.0.0 | Host IP for published ports               |
+| `name`                 | br-<id> | Custom bridge interface name              |
+| `mtu`                  | 1500    | Maximum packet size                       |
 
 #### Relevance to Our Use Case
 
@@ -183,12 +182,12 @@ networks:
   external-macvlan:
     driver: macvlan
     driver_opts:
-      parent: enp2s0  # Host's physical interface
+      parent: enp2s0 # Host's physical interface
     ipam:
       config:
         - subnet: 192.168.1.0/24
           gateway: 192.168.1.1
-          ip_range: 192.168.1.200/28  # Range for containers
+          ip_range: 192.168.1.200/28 # Range for containers
 
 services:
   talos-cp1:
@@ -212,12 +211,12 @@ services:
 
 #### Limitations
 
-| Limitation | Impact | Workaround |
-|------------|--------|------------|
-| Host cannot reach container | VM can't talk to talos-cp1 | Create macvlan interface on host |
-| Promiscuous mode may be required | Some hypervisors block this | Check virtualization settings |
-| IP conflicts possible | Must coordinate with DHCP | Use static IPs outside DHCP range |
-| Complex for Kubernetes | Pod networking complexity | Requires careful CNI configuration |
+| Limitation                       | Impact                      | Workaround                         |
+| -------------------------------- | --------------------------- | ---------------------------------- |
+| Host cannot reach container      | VM can't talk to talos-cp1  | Create macvlan interface on host   |
+| Promiscuous mode may be required | Some hypervisors block this | Check virtualization settings      |
+| IP conflicts possible            | Must coordinate with DHCP   | Use static IPs outside DHCP range  |
+| Complex for Kubernetes           | Pod networking complexity   | Requires careful CNI configuration |
 
 #### Host-to-Container Communication Fix
 
@@ -236,10 +235,10 @@ Similar to macvlan but containers share host's MAC address.
 
 #### L2 vs L3 Modes
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| L2 | Containers on same broadcast domain as host | Direct LAN access |
-| L3 | Host routes traffic to containers | Network isolation with routing |
+| Mode | Description                                 | Use Case                       |
+| ---- | ------------------------------------------- | ------------------------------ |
+| L2   | Containers on same broadcast domain as host | Direct LAN access              |
+| L3   | Host routes traffic to containers           | Network isolation with routing |
 
 #### L2 Mode Configuration
 
@@ -272,7 +271,7 @@ networks:
       ipvlan_mode: l3
     ipam:
       config:
-        - subnet: 10.10.0.0/24  # Different subnet, host routes
+        - subnet: 10.10.0.0/24 # Different subnet, host routes
 ```
 
 #### When to Use
@@ -305,23 +304,23 @@ services:
 
 #### Implications for Talos/Kubernetes
 
-| Aspect | With Host Network | Impact |
-|--------|-------------------|--------|
-| Cilium L2 VIPs | Advertised on host's 192.168.1.x | VIPs would be on physical network |
-| Pod Network | Uses host's network namespace | More complex CNI setup required |
-| Port Conflicts | Container ports conflict with host | Must manage port allocation |
-| Network Isolation | None | Security considerations |
+| Aspect            | With Host Network                  | Impact                            |
+| ----------------- | ---------------------------------- | --------------------------------- |
+| Cilium L2 VIPs    | Advertised on host's 192.168.1.x   | VIPs would be on physical network |
+| Pod Network       | Uses host's network namespace      | More complex CNI setup required   |
+| Port Conflicts    | Container ports conflict with host | Must manage port allocation       |
+| Network Isolation | None                               | Security considerations           |
 
 #### Mixing Host Mode with Other Networks
 
 ```yaml
 services:
   talos-cp1:
-    network_mode: host  # Uses host network
+    network_mode: host # Uses host network
 
   helper:
     networks:
-      - internal-bridge  # Uses Docker bridge
+      - internal-bridge # Uses Docker bridge
 ```
 
 **Note**: A single container cannot use both `network_mode: host` AND Docker-managed networks.
@@ -335,33 +334,33 @@ services:
 ```yaml
 ports:
   # Bind to all interfaces
-  - "80:80"
+  - '80:80'
 
   # Bind to specific host IP
-  - "192.168.1.83:80:80"
+  - '192.168.1.83:80:80'
 
   # Bind to localhost only
-  - "127.0.0.1:80:80"
+  - '127.0.0.1:80:80'
 
   # Random host port
-  - "80"
+  - '80'
 
   # Port range
-  - "8080-8090:8080-8090"
+  - '8080-8090:8080-8090'
 
   # UDP protocol
-  - "53:53/udp"
+  - '53:53/udp'
 ```
 
 ### Long Syntax
 
 ```yaml
 ports:
-  - target: 80        # Container port
-    published: 80     # Host port
-    protocol: tcp     # tcp or udp
-    mode: host        # host or ingress (Swarm)
-    host_ip: 192.168.1.83  # Specific host IP
+  - target: 80 # Container port
+    published: 80 # Host port
+    protocol: tcp # tcp or udp
+    mode: host # host or ingress (Swarm)
+    host_ip: 192.168.1.83 # Specific host IP
 ```
 
 ### Critical Limitation
@@ -371,14 +370,14 @@ ports:
 ```yaml
 # This works: forwards host:80 → container:80
 ports:
-  - "80:80"
+  - '80:80'
 
 # This is IMPOSSIBLE in pure Docker:
 # host:80 → 10.5.0.241:80 (LoadBalancer VIP)
 ```
 
-Docker's port publishing mechanism uses the container's IP address as the DNAT target.
-It cannot forward to arbitrary IPs on the Docker network.
+Docker's port publishing mechanism uses the container's IP address as the DNAT target. It cannot
+forward to arbitrary IPs on the Docker network.
 
 ---
 
@@ -411,15 +410,16 @@ services:
     networks:
       internal:
         ipv4_address: 10.5.0.11
-        priority: 100  # Lower = less preferred for default route
+        priority: 100 # Lower = less preferred for default route
       external:
         ipv4_address: 192.168.1.100
-        priority: 1000  # Higher = preferred for default route
+        priority: 1000 # Higher = preferred for default route
 ```
 
 #### Network Priority
 
 The `priority` field determines:
+
 - Which network's gateway becomes the default route
 - Higher priority = used for default gateway
 
@@ -428,9 +428,9 @@ services:
   myservice:
     networks:
       primary:
-        priority: 1000  # Default gateway from this network
+        priority: 1000 # Default gateway from this network
       secondary:
-        priority: 100   # Connected but not default route
+        priority: 100 # Connected but not default route
 ```
 
 #### Routing Behavior
@@ -453,7 +453,7 @@ services:
   main-app:
     image: nginx
     ports:
-      - "80:80"
+      - '80:80'
 
   sidecar:
     image: log-collector
@@ -488,7 +488,7 @@ Connect to networks not managed by this Compose project.
 networks:
   existing-network:
     external: true
-    name: my-preexisting-network  # Actual Docker network name
+    name: my-preexisting-network # Actual Docker network name
 
 services:
   app:
@@ -519,7 +519,7 @@ networks:
       config:
         - subnet: 10.5.0.0/24
           gateway: 10.5.0.1
-          ip_range: 10.5.0.0/28  # Only .1-.15 auto-assigned
+          ip_range: 10.5.0.0/28 # Only .1-.15 auto-assigned
           aux_addresses:
             # Reserved addresses (never auto-assigned)
             reserved1: 10.5.0.240
@@ -527,7 +527,7 @@ networks:
             reserved3: 10.5.0.242
             reserved4: 10.5.0.243
       options:
-        foo: bar  # Driver-specific options
+        foo: bar # Driver-specific options
 ```
 
 #### Static IP Assignment
@@ -538,7 +538,7 @@ services:
     networks:
       talos-network:
         ipv4_address: 10.5.0.11
-        ipv6_address: "2001:db8::11"
+        ipv6_address: '2001:db8::11'
 ```
 
 #### Reserving LoadBalancer VIP Range
@@ -549,7 +549,7 @@ networks:
     ipam:
       config:
         - subnet: 10.5.0.0/24
-          ip_range: 10.5.0.0/28  # Auto-assign only .0-.15
+          ip_range: 10.5.0.0/28 # Auto-assign only .0-.15
           aux_addresses:
             # Reserve .240-.255 for Cilium L2 LoadBalancer
             lb1: 10.5.0.240
@@ -569,9 +569,9 @@ networks:
 services:
   talos-cp1:
     cap_add:
-      - NET_ADMIN   # Network interface configuration, iptables
-      - NET_RAW     # Raw sockets (ping, etc.)
-      - NET_BIND_SERVICE  # Bind to ports < 1024 as non-root
+      - NET_ADMIN # Network interface configuration, iptables
+      - NET_RAW # Raw sockets (ping, etc.)
+      - NET_BIND_SERVICE # Bind to ports < 1024 as non-root
 ```
 
 #### What NET_ADMIN Enables
@@ -583,11 +583,11 @@ services:
 
 #### Critical Note on iptables
 
-| Container Mode | iptables Scope |
-|----------------|----------------|
-| Bridge network + NET_ADMIN | Container's namespace only |
-| Host network + NET_ADMIN | Host's iptables (dangerous!) |
-| Privileged | Full host access |
+| Container Mode             | iptables Scope               |
+| -------------------------- | ---------------------------- |
+| Bridge network + NET_ADMIN | Container's namespace only   |
+| Host network + NET_ADMIN   | Host's iptables (dangerous!) |
+| Privileged                 | Full host access             |
 
 ### Sysctls
 
@@ -596,17 +596,17 @@ services:
   talos-cp1:
     sysctls:
       # Enable IP forwarding in container
-      net.ipv4.ip_forward: "1"
+      net.ipv4.ip_forward: '1'
 
       # Allow binding to non-local IPs (for VIPs)
-      net.ipv4.ip_nonlocal_bind: "1"
+      net.ipv4.ip_nonlocal_bind: '1'
 
       # Enable local routing (for hairpin NAT)
-      net.ipv4.conf.all.route_localnet: "1"
+      net.ipv4.conf.all.route_localnet: '1'
 
       # ARP settings for Cilium L2
-      net.ipv4.conf.all.arp_announce: "2"
-      net.ipv4.conf.all.arp_ignore: "1"
+      net.ipv4.conf.all.arp_announce: '2'
+      net.ipv4.conf.all.arp_ignore: '1'
 ```
 
 ### Privileged Mode
@@ -632,30 +632,28 @@ services:
   "ip-forward": true,
   "ip-masq": true,
   "userland-proxy": false,
-  "default-address-pools": [
-    {"base": "10.5.0.0/24", "size": 24}
-  ],
+  "default-address-pools": [{ "base": "10.5.0.0/24", "size": 24 }],
   "live-restore": true
 }
 ```
 
 #### Setting Explanations
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `iptables` | true | Docker manages iptables rules |
-| `ip-forward` | true | Enable IP forwarding on host |
-| `ip-masq` | true | SNAT for container outbound traffic |
-| `userland-proxy` | true | Use userspace proxy vs iptables for ports |
-| `default-address-pools` | 172.x.x.x | Default subnets for new networks |
-| `live-restore` | false | Keep containers running during daemon restart |
+| Setting                 | Default   | Description                                   |
+| ----------------------- | --------- | --------------------------------------------- |
+| `iptables`              | true      | Docker manages iptables rules                 |
+| `ip-forward`            | true      | Enable IP forwarding on host                  |
+| `ip-masq`               | true      | SNAT for container outbound traffic           |
+| `userland-proxy`        | true      | Use userspace proxy vs iptables for ports     |
+| `default-address-pools` | 172.x.x.x | Default subnets for new networks              |
+| `live-restore`          | false     | Keep containers running during daemon restart |
 
 #### userland-proxy Impact
 
-| Setting | Behavior |
-|---------|----------|
-| `true` | docker-proxy process handles port forwarding |
-| `false` | Pure iptables DNAT (better performance) |
+| Setting | Behavior                                     |
+| ------- | -------------------------------------------- |
+| `true`  | docker-proxy process handles port forwarding |
+| `false` | Pure iptables DNAT (better performance)      |
 
 #### default-address-pools vs Compose IPAM
 
@@ -668,27 +666,27 @@ services:
 
 ### What Docker Compose CANNOT Do
 
-| Requirement | Compose Capability | Solution |
-|-------------|-------------------|----------|
-| DNAT from host IP to internal VIP | ❌ NO | Host-level iptables (NixOS networking.nat) |
-| Configure host routing table | ❌ NO | Host-level configuration |
-| Forward to non-container IPs | ❌ NO | Host-level NAT |
-| Create host iptables rules | ❌ NO | NixOS networking.firewall |
-| macvlan host communication | ❌ NO | Host macvlan interface |
+| Requirement                       | Compose Capability | Solution                                   |
+| --------------------------------- | ------------------ | ------------------------------------------ |
+| DNAT from host IP to internal VIP | ❌ NO              | Host-level iptables (NixOS networking.nat) |
+| Configure host routing table      | ❌ NO              | Host-level configuration                   |
+| Forward to non-container IPs      | ❌ NO              | Host-level NAT                             |
+| Create host iptables rules        | ❌ NO              | NixOS networking.firewall                  |
+| macvlan host communication        | ❌ NO              | Host macvlan interface                     |
 
 ### What Docker Compose CAN Do
 
-| Capability | Compose Support |
-|------------|-----------------|
-| Create bridge/macvlan/ipvlan networks | ✅ YES |
-| Assign static container IPs | ✅ YES |
-| Reserve IPs (aux_addresses) | ✅ YES |
-| Multiple networks per container | ✅ YES |
-| Network namespace sharing | ✅ YES |
-| Port publishing (container ports only) | ✅ YES |
-| Container capabilities (NET_ADMIN) | ✅ YES |
-| Sysctls within container | ✅ YES |
-| Network priority for default route | ✅ YES |
+| Capability                             | Compose Support |
+| -------------------------------------- | --------------- |
+| Create bridge/macvlan/ipvlan networks  | ✅ YES          |
+| Assign static container IPs            | ✅ YES          |
+| Reserve IPs (aux_addresses)            | ✅ YES          |
+| Multiple networks per container        | ✅ YES          |
+| Network namespace sharing              | ✅ YES          |
+| Port publishing (container ports only) | ✅ YES          |
+| Container capabilities (NET_ADMIN)     | ✅ YES          |
+| Sysctls within container               | ✅ YES          |
+| Network priority for default route     | ✅ YES          |
 
 ---
 
@@ -696,11 +694,12 @@ services:
 
 ### Option 1: Pure Bridge + Host NAT (Recommended)
 
-```
+```text
 External → Host iptables DNAT → Docker Bridge → VIP
 ```
 
 **Compose**:
+
 ```yaml
 networks:
   talos-network:
@@ -713,6 +712,7 @@ networks:
 ```
 
 **NixOS** (required):
+
 ```nix
 networking.nat = {
   enable = true;
@@ -724,19 +724,19 @@ networking.nat = {
 };
 ```
 
-**Pros**: Simple, well-understood, Cilium L2 works naturally
-**Cons**: Requires host configuration
+**Pros**: Simple, well-understood, Cilium L2 works naturally **Cons**: Requires host configuration
 
 ---
 
 ### Option 2: macvlan Direct Access
 
-```
+```text
 External → macvlan → Container (192.168.1.100)
                    → Cilium L2 VIPs (192.168.1.x)
 ```
 
 **Compose**:
+
 ```yaml
 networks:
   external:
@@ -755,38 +755,39 @@ services:
         ipv4_address: 192.168.1.100
 ```
 
-**Pros**: No NAT, direct L2 access
-**Cons**: Host can't reach container, complex Cilium config
+**Pros**: No NAT, direct L2 access **Cons**: Host can't reach container, complex Cilium config
 
 ---
 
 ### Option 3: Host Network Mode
 
-```
+```text
 External → Host Network → Talos (shares host namespace)
                         → Cilium L2 VIPs on host interface
 ```
 
 **Compose**:
+
 ```yaml
 services:
   talos-cp1:
     network_mode: host
 ```
 
-**Pros**: Simplest network path
-**Cons**: No network isolation, port conflicts, complex Kubernetes networking
+**Pros**: Simplest network path **Cons**: No network isolation, port conflicts, complex Kubernetes
+networking
 
 ---
 
 ### Option 4: Dual Network (Bridge + macvlan)
 
-```
+```text
 External → macvlan (192.168.1.100) → Container
 Internal → bridge (10.5.0.11) → Container
 ```
 
 **Compose**:
+
 ```yaml
 services:
   talos-cp1:
@@ -799,8 +800,7 @@ services:
         priority: 1000
 ```
 
-**Pros**: Best of both worlds
-**Cons**: Complex routing, macvlan limitations still apply
+**Pros**: Best of both worlds **Cons**: Complex routing, macvlan limitations still apply
 
 ---
 
@@ -811,13 +811,14 @@ services:
 **Decision**: Option 1 (Bridge + Host NAT)
 
 **Rationale**:
+
 1. Cilium L2 works naturally on bridge network
 2. Clean separation between Docker and host networking
 3. NixOS networking.nat is declarative and persistent
 4. No macvlan host-communication issues
 5. Simplest mental model
 
-### compose.yaml Configuration
+### `compose.yaml` Configuration
 
 ```yaml
 networks:
@@ -825,12 +826,12 @@ networks:
     name: talos-network
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: "docker-dev"
+      com.docker.network.bridge.name: 'docker-dev'
     ipam:
       config:
         - subnet: 10.5.0.0/24
           gateway: 10.5.0.1
-          ip_range: 10.5.0.0/28  # .0-.15 for containers
+          ip_range: 10.5.0.0/28 # .0-.15 for containers
           aux_addresses:
             # Reserve Cilium L2 LoadBalancer pool
             lb_cilium_ingress: 10.5.0.240
@@ -848,13 +849,13 @@ services:
       talos-network:
         ipv4_address: 10.5.0.11
     sysctls:
-      net.ipv4.ip_forward: "1"
-      net.ipv4.conf.all.arp_announce: "2"
-      net.ipv4.conf.all.arp_ignore: "1"
+      net.ipv4.ip_forward: '1'
+      net.ipv4.conf.all.arp_announce: '2'
+      net.ipv4.conf.all.arp_ignore: '1'
     ports:
       # Local access only - external access via NixOS NAT
-      - "127.0.0.1:6443:6443"   # Kubernetes API
-      - "127.0.0.1:50000:50000" # Talos API
+      - '127.0.0.1:6443:6443' # Kubernetes API
+      - '127.0.0.1:50000:50000' # Talos API
     volumes:
       - talos-var:/var
       - talos-etc:/etc/kubernetes
@@ -909,12 +910,14 @@ networking.firewall = {
 
 ### Related Documentation
 
-- `KONDUCTOR.networking-firewall-nat-masquerade-nix-firewall-iptables-nftables-omnibus.md` - NixOS networking configuration
+- `KONDUCTOR.networking-firewall-nat-masquerade-nix-firewall-iptables-nftables-omnibus.md` - NixOS
+  networking configuration
 - `NIX_SHELL_ENVS_HOOKS_SHELL_PRE_POST_HELPERS_PATTERNS_IMPLEMENTATION.md` - Nix devshell patterns
 
 ### DeepWiki Queries
 
 This document was informed by comprehensive queries to the docker/compose DeepWiki:
+
 - Network drivers and driver_opts
 - Port publishing mechanisms and limitations
 - macvlan/ipvlan configuration and limitations
@@ -925,6 +928,6 @@ This document was informed by comprehensive queries to the docker/compose DeepWi
 
 ## Changelog
 
-| Date | Change |
-|------|--------|
+| Date       | Change                                          |
+| ---------- | ----------------------------------------------- |
 | 2026-01-21 | Initial document created from DeepWiki research |

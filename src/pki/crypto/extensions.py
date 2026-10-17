@@ -91,14 +91,10 @@ def build_provenance_extensions(
     ]
 
     if identity.fingerprint.image_sha256:
-        candidates.append(
-            (config.OID_IMAGE_SHA256, identity.fingerprint.image_sha256)
-        )
+        candidates.append((config.OID_IMAGE_SHA256, identity.fingerprint.image_sha256))
 
     if identity.fingerprint.git_remote:
-        candidates.append(
-            (config.OID_PROVENANCE_URI, identity.fingerprint.git_remote)
-        )
+        candidates.append((config.OID_PROVENANCE_URI, identity.fingerprint.git_remote))
 
     extensions: list[x509.Extension[x509.UnrecognizedExtension]] = []
     for oid_str, value in candidates:

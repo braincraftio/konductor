@@ -15,9 +15,9 @@ linters:
   default: standard
   enable:
     # Documentation quality
-    - godot        # Sentence format for doc comments
-    - revive       # Exported function documentation
-    - misspell     # Spelling in docs and code
+    - godot # Sentence format for doc comments
+    - revive # Exported function documentation
+    - misspell # Spelling in docs and code
 
     # Code quality (kept from v1)
     - gofmt

@@ -43,9 +43,8 @@ __pycache__/
 .cargo/
 target/
 
-# Node.js
+# Node.js (pnpm-lock.yaml is tracked: CI installs with --frozen-lockfile)
 node_modules/
-pnpm-lock.yaml
 
 # =============================================================================
 # Astro Websites
@@ -118,5 +117,4 @@ Desktop.ini
 tmp/
 .certs
 _sources
-.ansible
 .ansible

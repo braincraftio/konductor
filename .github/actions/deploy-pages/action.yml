@@ -1,0 +1,13 @@
+name: Deploy Pages
+description: Deploy the uploaded Pages artifact with a single pinned version (caller requires pages and id-token write).
+
+outputs:
+  page-url:
+    description: URL of the deployed site
+    value: ${{ steps.deployment.outputs.page_url }}
+
+runs:
+  using: composite
+  steps:
+    - id: deployment
+      uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

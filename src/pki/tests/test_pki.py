@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import textwrap
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -20,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     ECDSA,
     SECP256R1,
     SECP384R1,
+    EllipticCurvePrivateKey,
     EllipticCurvePublicKey,
 )
 from cryptography.hazmat.primitives.hashes import SHA256, SHA384
@@ -31,9 +33,9 @@ from pki.cli import cmd_status
 from pki.crypto.bundle import build_bundle
 from pki.crypto.ca import build_ca_certificate
 from pki.crypto.extensions import (
+    _der_utf8string,
     decode_provenance_value,
     der_ia5string,
-    _der_utf8string,
 )
 from pki.crypto.keys import (
     generate_ca_key,
@@ -44,7 +46,6 @@ from pki.crypto.keys import (
 from pki.crypto.leaf import build_leaf_certificate
 from pki.fingerprint import Fingerprint, FingerprintError, OSRelease
 from pki.identity import CertificateIdentity, TrustTier
-
 
 # =====================================================================
 # Fixtures
@@ -95,25 +96,28 @@ def empty_identity() -> CertificateIdentity:
 
 
 @pytest.fixture
-def ca_key():
+def ca_key() -> EllipticCurvePrivateKey:
     return generate_ca_key()
 
 
 @pytest.fixture
-def leaf_key():
+def leaf_key() -> EllipticCurvePrivateKey:
     return generate_leaf_key()
 
 
 @pytest.fixture
-def ca_cert(ca_key, identity):
+def ca_cert(ca_key: EllipticCurvePrivateKey, identity: CertificateIdentity) -> x509.Certificate:
     return build_ca_certificate(ca_key, identity, TrustTier.SELF_SIGNED)
 
 
 @pytest.fixture
-def leaf_cert(leaf_key, ca_key, ca_cert, identity):
-    return build_leaf_certificate(
-        leaf_key, ca_key, ca_cert, identity, TrustTier.SELF_SIGNED
-    )
+def leaf_cert(
+    leaf_key: EllipticCurvePrivateKey,
+    ca_key: EllipticCurvePrivateKey,
+    ca_cert: x509.Certificate,
+    identity: CertificateIdentity,
+) -> x509.Certificate:
+    return build_leaf_certificate(leaf_key, ca_key, ca_cert, identity, TrustTier.SELF_SIGNED)
 
 
 # =====================================================================
@@ -122,26 +126,25 @@ def leaf_cert(leaf_key, ca_key, ca_cert, identity):
 
 
 class TestKeyGeneration:
-    def test_ca_key_is_p384(self, ca_key):
+    def test_ca_key_is_p384(self, ca_key: EllipticCurvePrivateKey) -> None:
         assert isinstance(ca_key.curve, SECP384R1)
 
-    def test_leaf_key_is_p256(self, leaf_key):
+    def test_leaf_key_is_p256(self, leaf_key: EllipticCurvePrivateKey) -> None:
         assert isinstance(leaf_key.curve, SECP256R1)
 
-    def test_serialize_roundtrip(self, ca_key, tmp_path):
+    def test_serialize_roundtrip(self, ca_key: EllipticCurvePrivateKey, tmp_path: Path) -> None:
         key_path = tmp_path / "test.key"
         write_private_key(key_path, ca_key, 0o600)
         loaded = load_private_key(key_path)
         # Same key material -- public points match
-        assert (
-            ca_key.public_key().public_numbers()
-            == loaded.public_key().public_numbers()
-        )
+        assert ca_key.public_key().public_numbers() == loaded.public_key().public_numbers()
 
-    def test_key_file_permissions(self, ca_key, tmp_path):
+    def test_key_file_permissions(self, ca_key: EllipticCurvePrivateKey, tmp_path: Path) -> None:
         key_path = tmp_path / "test.key"
         write_private_key(key_path, ca_key, 0o600)
-        import os, stat
+        import os
+        import stat
+
         mode = stat.S_IMODE(os.stat(key_path).st_mode)
         assert mode == 0o600
 
@@ -152,16 +155,16 @@ class TestKeyGeneration:
 
 
 class TestCACertificate:
-    def test_is_self_signed(self, ca_cert):
+    def test_is_self_signed(self, ca_cert: x509.Certificate) -> None:
         assert ca_cert.subject == ca_cert.issuer
 
-    def test_is_ca(self, ca_cert):
+    def test_is_ca(self, ca_cert: x509.Certificate) -> None:
         bc = ca_cert.extensions.get_extension_for_class(x509.BasicConstraints)
         assert bc.critical is True
         assert bc.value.ca is True
         assert bc.value.path_length is None
 
-    def test_key_usage(self, ca_cert):
+    def test_key_usage(self, ca_cert: x509.Certificate) -> None:
         ku = ca_cert.extensions.get_extension_for_class(x509.KeyUsage)
         assert ku.critical is True
         assert ku.value.digital_signature is True
@@ -169,30 +172,36 @@ class TestCACertificate:
         assert ku.value.crl_sign is True
         assert ku.value.key_encipherment is False
 
-    def test_subject_dn(self, ca_cert, identity):
+    def test_subject_dn(self, ca_cert: x509.Certificate, identity: CertificateIdentity) -> None:
         cn = ca_cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         assert cn == f"{DOMAIN} Root CA"
         org = ca_cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
         assert org == "TestOrg"
 
-    def test_serial_number_in_dn(self, ca_cert, identity):
+    def test_serial_number_in_dn(
+        self, ca_cert: x509.Certificate, identity: CertificateIdentity
+    ) -> None:
         sn = ca_cert.subject.get_attributes_for_oid(NameOID.SERIAL_NUMBER)[0].value
         assert sn == identity.serial_hex
         assert len(sn) == 16
 
-    def test_validity(self, ca_cert):
+    def test_validity(self, ca_cert: x509.Certificate) -> None:
         now = datetime.datetime.now(datetime.timezone.utc)
         assert ca_cert.not_valid_before_utc <= now
         assert ca_cert.not_valid_after_utc > now
         delta = ca_cert.not_valid_after_utc - ca_cert.not_valid_before_utc
         assert delta.days >= 3649  # ~10 years
 
-    def test_custom_validity(self, ca_key, identity):
+    def test_custom_validity(
+        self, ca_key: EllipticCurvePrivateKey, identity: CertificateIdentity
+    ) -> None:
         cert = build_ca_certificate(ca_key, identity, TrustTier.SELF_SIGNED, validity_days=30)
         delta = cert.not_valid_after_utc - cert.not_valid_before_utc
         assert 29 <= delta.days <= 30
 
-    def test_signature_verifies(self, ca_key, ca_cert):
+    def test_signature_verifies(
+        self, ca_key: EllipticCurvePrivateKey, ca_cert: x509.Certificate
+    ) -> None:
         """CA cert signature is verifiable with its own public key."""
         pub = ca_key.public_key()
         assert isinstance(pub, EllipticCurvePublicKey)
@@ -203,14 +212,12 @@ class TestCACertificate:
             ECDSA(SHA384()),
         )
 
-    def test_has_ski(self, ca_cert):
-        ski = ca_cert.extensions.get_extension_for_class(
-            x509.SubjectKeyIdentifier
-        )
+    def test_has_ski(self, ca_cert: x509.Certificate) -> None:
+        ski = ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
         assert ski is not None
         assert len(ski.value.digest) == 20  # SHA-1 hash
 
-    def test_has_ns_comment(self, ca_cert):
+    def test_has_ns_comment(self, ca_cert: x509.Certificate) -> None:
         ns_ext = None
         for ext in ca_cert.extensions:
             if ext.oid.dotted_string == config.NS_COMMENT_OID:
@@ -218,7 +225,7 @@ class TestCACertificate:
                 break
         assert ns_ext is not None
 
-    def test_pem_roundtrip(self, ca_cert):
+    def test_pem_roundtrip(self, ca_cert: x509.Certificate) -> None:
         pem = ca_cert.public_bytes(Encoding.PEM)
         reloaded = x509.load_pem_x509_certificate(pem)
         assert reloaded.subject == ca_cert.subject
@@ -231,60 +238,56 @@ class TestCACertificate:
 
 
 class TestLeafCertificate:
-    def test_not_ca(self, leaf_cert):
+    def test_not_ca(self, leaf_cert: x509.Certificate) -> None:
         bc = leaf_cert.extensions.get_extension_for_class(x509.BasicConstraints)
         assert bc.critical is True
         assert bc.value.ca is False
 
-    def test_issuer_matches_ca_subject(self, leaf_cert, ca_cert):
+    def test_issuer_matches_ca_subject(
+        self, leaf_cert: x509.Certificate, ca_cert: x509.Certificate
+    ) -> None:
         assert leaf_cert.issuer == ca_cert.subject
 
-    def test_key_usage(self, leaf_cert):
+    def test_key_usage(self, leaf_cert: x509.Certificate) -> None:
         ku = leaf_cert.extensions.get_extension_for_class(x509.KeyUsage)
         assert ku.critical is True
         assert ku.value.digital_signature is True
         assert ku.value.key_encipherment is True
         assert ku.value.key_cert_sign is False
 
-    def test_extended_key_usage(self, leaf_cert):
+    def test_extended_key_usage(self, leaf_cert: x509.Certificate) -> None:
         eku = leaf_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
         oids = list(eku.value)
         assert ExtendedKeyUsageOID.SERVER_AUTH in oids
         assert ExtendedKeyUsageOID.CLIENT_AUTH in oids
 
-    def test_san_dns_names(self, leaf_cert):
-        san = leaf_cert.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        )
+    def test_san_dns_names(self, leaf_cert: x509.Certificate) -> None:
+        san = leaf_cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         dns_names = san.value.get_values_for_type(x509.DNSName)
         assert f"*.{DOMAIN}" in dns_names
         assert DOMAIN in dns_names
         assert f"*.docker.{DOMAIN}" in dns_names
         assert f"docker.{DOMAIN}" in dns_names
 
-    def test_san_uri_names(self, leaf_cert):
-        san = leaf_cert.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        )
+    def test_san_uri_names(self, leaf_cert: x509.Certificate) -> None:
+        san = leaf_cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         uris = san.value.get_values_for_type(x509.UniformResourceIdentifier)
         assert SAMPLE_FINGERPRINT.git_remote in uris
 
-    def test_has_aki(self, leaf_cert):
-        aki = leaf_cert.extensions.get_extension_for_class(
-            x509.AuthorityKeyIdentifier
-        )
+    def test_has_aki(self, leaf_cert: x509.Certificate) -> None:
+        aki = leaf_cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
         assert aki.value.key_identifier is not None
 
-    def test_aki_matches_ca_ski(self, leaf_cert, ca_cert):
-        aki = leaf_cert.extensions.get_extension_for_class(
-            x509.AuthorityKeyIdentifier
-        )
-        ski = ca_cert.extensions.get_extension_for_class(
-            x509.SubjectKeyIdentifier
-        )
+    def test_aki_matches_ca_ski(
+        self, leaf_cert: x509.Certificate, ca_cert: x509.Certificate
+    ) -> None:
+        aki = leaf_cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
+        ski = ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
         assert aki.value.key_identifier == ski.value.digest
 
-    def test_signature_verifies_with_ca_key(self, ca_key, leaf_cert):
+    def test_signature_verifies_with_ca_key(
+        self, ca_key: EllipticCurvePrivateKey, leaf_cert: x509.Certificate
+    ) -> None:
         """Leaf cert signature is verifiable with the CA public key."""
         ca_key.public_key().verify(
             leaf_cert.signature,
@@ -292,15 +295,27 @@ class TestLeafCertificate:
             ECDSA(SHA384()),  # P-384 CA signs with SHA-384
         )
 
-    def test_custom_validity(self, leaf_key, ca_key, ca_cert, identity):
+    def test_custom_validity(
+        self,
+        leaf_key: EllipticCurvePrivateKey,
+        ca_key: EllipticCurvePrivateKey,
+        ca_cert: x509.Certificate,
+        identity: CertificateIdentity,
+    ) -> None:
         cert = build_leaf_certificate(
-            leaf_key, ca_key, ca_cert, identity, TrustTier.SELF_SIGNED,
+            leaf_key,
+            ca_key,
+            ca_cert,
+            identity,
+            TrustTier.SELF_SIGNED,
             validity_days=7,
         )
         delta = cert.not_valid_after_utc - cert.not_valid_before_utc
         assert 6 <= delta.days <= 7
 
-    def test_different_serial_from_ca(self, leaf_cert, ca_cert):
+    def test_different_serial_from_ca(
+        self, leaf_cert: x509.Certificate, ca_cert: x509.Certificate
+    ) -> None:
         assert leaf_cert.serial_number != ca_cert.serial_number
 
 
@@ -312,15 +327,17 @@ class TestLeafCertificate:
 class TestHypervisorFlow:
     """Simulates the hypervisor trust tier: external CA signs the wildcard."""
 
-    def test_hypervisor_signs_leaf(self, identity):
+    def test_hypervisor_signs_leaf(self, identity: CertificateIdentity) -> None:
         hyp_ca_key = generate_ca_key()
-        hyp_ca_cert = build_ca_certificate(
-            hyp_ca_key, identity, TrustTier.HYPERVISOR
-        )
+        hyp_ca_cert = build_ca_certificate(hyp_ca_key, identity, TrustTier.HYPERVISOR)
 
         leaf_key = generate_leaf_key()
         leaf_cert = build_leaf_certificate(
-            leaf_key, hyp_ca_key, hyp_ca_cert, identity, TrustTier.HYPERVISOR,
+            leaf_key,
+            hyp_ca_key,
+            hyp_ca_cert,
+            identity,
+            TrustTier.HYPERVISOR,
         )
 
         # Verify chain: leaf signed by hypervisor CA
@@ -331,16 +348,22 @@ class TestHypervisorFlow:
             ECDSA(SHA384()),
         )
 
-    def test_p256_ca_signs_with_sha256(self, identity):
+    def test_p256_ca_signs_with_sha256(self, identity: CertificateIdentity) -> None:
         """If hypervisor provides a P-256 CA, leaf uses SHA-256."""
         p256_ca_key = generate_leaf_key()  # P-256
         p256_ca_cert = build_ca_certificate(
-            p256_ca_key, identity, TrustTier.HYPERVISOR,
+            p256_ca_key,
+            identity,
+            TrustTier.HYPERVISOR,
         )
 
         leaf_key = generate_leaf_key()
         leaf_cert = build_leaf_certificate(
-            leaf_key, p256_ca_key, p256_ca_cert, identity, TrustTier.HYPERVISOR,
+            leaf_key,
+            p256_ca_key,
+            p256_ca_cert,
+            identity,
+            TrustTier.HYPERVISOR,
         )
 
         # Should verify with SHA-256 (matching P-256 curve)
@@ -359,14 +382,16 @@ class TestHypervisorFlow:
 class TestNoFingerprint:
     """Certs must generate cleanly even without /.konductor (orphaned mode)."""
 
-    def test_generate_with_empty_fingerprint(self, empty_identity):
+    def test_generate_with_empty_fingerprint(self, empty_identity: CertificateIdentity) -> None:
         ca_key = generate_ca_key()
-        ca_cert = build_ca_certificate(
-            ca_key, empty_identity, TrustTier.SELF_SIGNED
-        )
+        ca_cert = build_ca_certificate(ca_key, empty_identity, TrustTier.SELF_SIGNED)
         leaf_key = generate_leaf_key()
         leaf_cert = build_leaf_certificate(
-            leaf_key, ca_key, ca_cert, empty_identity, TrustTier.SELF_SIGNED,
+            leaf_key,
+            ca_key,
+            ca_cert,
+            empty_identity,
+            TrustTier.SELF_SIGNED,
         )
 
         # Basic sanity
@@ -384,23 +409,23 @@ class TestNoFingerprint:
             ECDSA(SHA384()),
         )
 
-    def test_no_uri_sans_without_fingerprint(self, empty_identity):
+    def test_no_uri_sans_without_fingerprint(self, empty_identity: CertificateIdentity) -> None:
         ca_key = generate_ca_key()
-        ca_cert = build_ca_certificate(
-            ca_key, empty_identity, TrustTier.SELF_SIGNED
-        )
+        ca_cert = build_ca_certificate(ca_key, empty_identity, TrustTier.SELF_SIGNED)
         leaf_key = generate_leaf_key()
         leaf_cert = build_leaf_certificate(
-            leaf_key, ca_key, ca_cert, empty_identity, TrustTier.SELF_SIGNED,
+            leaf_key,
+            ca_key,
+            ca_cert,
+            empty_identity,
+            TrustTier.SELF_SIGNED,
         )
 
-        san = leaf_cert.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        )
+        san = leaf_cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         uris = san.value.get_values_for_type(x509.UniformResourceIdentifier)
         assert uris == []  # No git_remote => no URI SANs
 
-    def test_serial_hex_zeros_without_commit(self, empty_identity):
+    def test_serial_hex_zeros_without_commit(self, empty_identity: CertificateIdentity) -> None:
         assert empty_identity.serial_hex == "0" * 16
 
 
@@ -410,19 +435,19 @@ class TestNoFingerprint:
 
 
 class TestProvenance:
-    def test_der_utf8string_roundtrip(self):
+    def test_der_utf8string_roundtrip(self) -> None:
         for val in ["hello", "a" * 200, "git:abc1234"]:
             encoded = _der_utf8string(val)
             decoded = decode_provenance_value(encoded)
             assert decoded == val
 
-    def test_der_ia5string_encoding(self):
+    def test_der_ia5string_encoding(self) -> None:
         encoded = der_ia5string("test comment")
         assert encoded[0] == 0x16  # IA5String tag
         assert encoded[2:] == b"test comment"
 
-    def test_provenance_in_cert(self, ca_cert):
-        found_oids = set()
+    def test_provenance_in_cert(self, ca_cert: x509.Certificate) -> None:
+        found_oids: set[str] = set()
         for ext in ca_cert.extensions:
             if ext.oid.dotted_string in config.OID_NAMES:
                 found_oids.add(ext.oid.dotted_string)
@@ -432,7 +457,7 @@ class TestProvenance:
         # With sample fingerprint, git_commit should be present
         assert config.OID_GIT_COMMIT in found_oids
 
-    def test_provenance_values_decodable(self, ca_cert):
+    def test_provenance_values_decodable(self, ca_cert: x509.Certificate) -> None:
         for ext in ca_cert.extensions:
             name = config.OID_NAMES.get(ext.oid.dotted_string)
             if name:
@@ -440,7 +465,7 @@ class TestProvenance:
                 assert isinstance(val, str)
                 assert len(val) > 0
 
-    def test_trust_tier_value(self, ca_cert):
+    def test_trust_tier_value(self, ca_cert: x509.Certificate) -> None:
         for ext in ca_cert.extensions:
             if ext.oid.dotted_string == config.OID_TRUST_TIER:
                 val = decode_provenance_value(ext.value.value)
@@ -448,7 +473,7 @@ class TestProvenance:
                 return
         pytest.fail("trust tier OID not found")
 
-    def test_git_commit_value(self, ca_cert):
+    def test_git_commit_value(self, ca_cert: x509.Certificate) -> None:
         for ext in ca_cert.extensions:
             if ext.oid.dotted_string == config.OID_GIT_COMMIT:
                 val = decode_provenance_value(ext.value.value)
@@ -463,7 +488,9 @@ class TestProvenance:
 
 
 class TestBundle:
-    def test_bundle_aggregates_certs(self, ca_key, ca_cert, tmp_path):
+    def test_bundle_aggregates_certs(
+        self, ca_key: EllipticCurvePrivateKey, ca_cert: x509.Certificate, tmp_path: Path
+    ) -> None:
         # Write VM CA
         vm_ca = tmp_path / "vm" / "ca.crt"
         vm_ca.parent.mkdir(parents=True)
@@ -490,7 +517,7 @@ class TestBundle:
         assert count == 2  # system + vm
         assert content.count("BEGIN CERTIFICATE") == 2
 
-    def test_bundle_empty_sources(self, tmp_path):
+    def test_bundle_empty_sources(self, tmp_path: Path) -> None:
         bundle_path = tmp_path / "bundle" / "ca-bundle.crt"
         count = build_bundle(
             output=bundle_path,
@@ -501,7 +528,9 @@ class TestBundle:
         assert count == 0
         assert bundle_path.exists()
 
-    def test_bundle_all_three_sources(self, ca_key, ca_cert, tmp_path):
+    def test_bundle_all_three_sources(
+        self, ca_key: EllipticCurvePrivateKey, ca_cert: x509.Certificate, tmp_path: Path
+    ) -> None:
         pem = ca_cert.public_bytes(Encoding.PEM)
         for name in ["sys.crt", "vm.crt", "hyp.crt"]:
             (tmp_path / name).write_bytes(pem)
@@ -522,58 +551,64 @@ class TestBundle:
 
 
 class TestFingerprint:
-    def test_load_missing_file(self, tmp_path):
+    def test_load_missing_file(self, tmp_path: Path) -> None:
         """Missing /.konductor returns ephemeral fingerprint (pre-provenance)."""
         fp = Fingerprint.load(tmp_path / "nonexistent")
         assert fp.git_commit is None
         assert fp.build_date is None
         assert fp.is_ephemeral is True
 
-    def test_load_toml(self, tmp_path):
+    def test_load_toml(self, tmp_path: Path) -> None:
         toml_file = tmp_path / ".konductor"
-        toml_file.write_text(textwrap.dedent("""\
+        toml_file.write_text(
+            textwrap.dedent("""\
             [konductor]
             git_commit = "abc123"
             git_branch = "main"
             build_date = "2025-01-15"
-        """))
+        """)
+        )
         fp = Fingerprint.load(toml_file)
         assert fp.git_commit == "abc123"
         assert fp.git_branch == "main"
         assert fp.build_date == "2025-01-15"
         assert fp.is_ephemeral is False
 
-    def test_load_corrupt_toml_raises(self, tmp_path):
+    def test_load_corrupt_toml_raises(self, tmp_path: Path) -> None:
         """Malformed TOML must raise FingerprintError, never silently degrade."""
         bad_file = tmp_path / ".konductor"
-        bad_file.write_text(textwrap.dedent("""\
+        bad_file.write_text(
+            textwrap.dedent("""\
             [konductor]
             git_commit = "abc123"
             nix_version = "nix (Lix, like Nix) 2.93.0
             System type: x86_64-linux
             Features: gc, signed-caches"
             nix_drv = "abc123xyz456"
-        """))
+        """)
+        )
         with pytest.raises(FingerprintError, match="Failed to parse"):
             Fingerprint.load(bad_file)
 
-    def test_strict_parser(self, tmp_path):
+    def test_strict_parser(self, tmp_path: Path) -> None:
         flat_file = tmp_path / ".konductor"
-        flat_file.write_text(textwrap.dedent("""\
+        flat_file.write_text(
+            textwrap.dedent("""\
             git_commit = "deadbeef"
             build_host = "myhost"
-        """))
+        """)
+        )
         fp = Fingerprint._parse_strict(flat_file)
         assert fp.git_commit == "deadbeef"
         assert fp.build_host == "myhost"
 
-    def test_validate_matching(self):
+    def test_validate_matching(self) -> None:
         """Identical provenance passes validation."""
         baked = Fingerprint(git_commit="abc123", flake_lock_sha256="def456")
         discovered = Fingerprint(git_commit="abc123", flake_lock_sha256="def456")
         assert baked.validate_against(discovered) == []
 
-    def test_validate_mismatch(self):
+    def test_validate_mismatch(self) -> None:
         """Mismatched git_commit fails validation."""
         baked = Fingerprint(git_commit="abc123")
         discovered = Fingerprint(git_commit="xyz789")
@@ -581,7 +616,7 @@ class TestFingerprint:
         assert len(errors) == 1
         assert "git_commit mismatch" in errors[0]
 
-    def test_validate_flake_lock_mismatch(self):
+    def test_validate_flake_lock_mismatch(self) -> None:
         """Mismatched flake_lock_sha256 fails validation."""
         baked = Fingerprint(git_commit="abc123", flake_lock_sha256="aaa")
         discovered = Fingerprint(git_commit="abc123", flake_lock_sha256="bbb")
@@ -596,26 +631,26 @@ class TestFingerprint:
 
 
 class TestIdentity:
-    def test_deterministic_serial_stable(self, identity):
+    def test_deterministic_serial_stable(self, identity: CertificateIdentity) -> None:
         s1 = identity.deterministic_serial("ca")
         s2 = identity.deterministic_serial("ca")
         assert s1 == s2
 
-    def test_deterministic_serial_differs_by_context(self, identity):
+    def test_deterministic_serial_differs_by_context(self, identity: CertificateIdentity) -> None:
         s_ca = identity.deterministic_serial("ca")
         s_leaf = identity.deterministic_serial("leaf")
         assert s_ca != s_leaf
 
-    def test_serial_is_positive(self, identity):
+    def test_serial_is_positive(self, identity: CertificateIdentity) -> None:
         assert identity.deterministic_serial("ca") > 0
         assert identity.deterministic_serial("leaf") > 0
 
-    def test_dns_names(self, identity):
+    def test_dns_names(self, identity: CertificateIdentity) -> None:
         names = identity.dns_names
         assert len(names) == 4
         assert f"*.{DOMAIN}" in names
 
-    def test_ns_comment_contains_trust_tier(self, identity):
+    def test_ns_comment_contains_trust_tier(self, identity: CertificateIdentity) -> None:
         comment = identity.ns_comment("Root CA", TrustTier.SELF_SIGNED)
         assert "self-signed" in comment
         assert "Root CA" in comment
@@ -633,7 +668,14 @@ class TestPKIStatus:
     build log, the pipeline is lying about what it tested.
     """
 
-    def test_status_receipt(self, ca_key, leaf_key, identity, tmp_path, monkeypatch):
+    def test_status_receipt(
+        self,
+        ca_key: EllipticCurvePrivateKey,
+        leaf_key: EllipticCurvePrivateKey,
+        identity: CertificateIdentity,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Generate full chain into tmpdir, run cmd_status, print evidence."""
         import pki.config as cfg
 
@@ -675,3 +717,27 @@ class TestPKIStatus:
 
         rc = cmd_status([])
         assert rc == 0
+
+
+# =====================================================================
+# Output helpers
+# =====================================================================
+
+
+class TestOutputHelpers:
+    """cli.py reports degraded states (trust store, env vars, registries,
+    Docker restart) through `warn`; every helper it calls must resolve."""
+
+    def test_warn_writes_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from pki.utils import warn
+
+        warn("hypervisor CA missing")
+        captured = capsys.readouterr()
+        assert "hypervisor CA missing" in captured.err
+        assert captured.out == ""
+
+    def test_cli_resolves_warn(self) -> None:
+        import pki.cli
+        import pki.utils
+
+        assert pki.cli.warn is pki.utils.warn

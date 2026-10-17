@@ -47,11 +47,11 @@ nix-build-qcow2-vm-start  →  Start the VM (ATOMIC TASK)
 
 ### Execution Layers
 
-| Layer | Scope | Example | Audience |
-|-------|-------|---------|----------|
-| 0 | Entry point | `rr nix-build-qcow2` | Operators |
-| 1 | Subdomain | `runme beta run "nix-build-qcow2-vm-*"` | CI/CD |
-| 2 | Atomic | `rr nix-build-qcow2-vm-start` | Developers |
+| Layer | Scope       | Example                                 | Audience   |
+| ----- | ----------- | --------------------------------------- | ---------- |
+| 0     | Entry point | `rr nix-build-qcow2`                    | Operators  |
+| 1     | Subdomain   | `runme beta run "nix-build-qcow2-vm-*"` | CI/CD      |
+| 2     | Atomic      | `rr nix-build-qcow2-vm-start`           | Developers |
 
 ### Glob Patterns
 
@@ -107,23 +107,23 @@ Atomic Tasks (granular control):
 
 ### Character Rules
 
-| Allowed | Forbidden | Rationale |
-|---------|-----------|-----------|
-| `a-z` | `A-Z` | Lowercase only, no case confusion |
-| `0-9` | | Version suffixes allowed |
-| `-` | `_` `:` `.` `/` | Hyphen only, no shift key needed |
+| Allowed | Forbidden       | Rationale                         |
+| ------- | --------------- | --------------------------------- |
+| `a-z`   | `A-Z`           | Lowercase only, no case confusion |
+| `0-9`   |                 | Version suffixes allowed          |
+| `-`     | `_` `:` `.` `/` | Hyphen only, no shift key needed  |
 
 ### Domain Registry
 
-| Tool | Actions | Targets |
-|------|---------|---------|
-| `nix` | `build`, `develop`, `check` | `qcow2`, `container`, `devshell` |
-| `docker` | `build`, `push`, `pull` | `registry`, `image` |
-| `helm` | `deploy`, `upgrade`, `rollback` | `cluster`, `chart` |
-| `kubectl` | `apply`, `delete`, `get` | `namespace`, `deployment` |
-| `pulumi` | `up`, `down`, `preview` | `stack`, `infra` |
-| `test` | `unit`, `e2e`, `integration` | `api`, `ui`, `cli` |
-| `lint` | `check`, `fix` | `nix`, `shell`, `python`, `yaml` |
+| Tool      | Actions                         | Targets                          |
+| --------- | ------------------------------- | -------------------------------- |
+| `nix`     | `build`, `develop`, `check`     | `qcow2`, `container`, `devshell` |
+| `docker`  | `build`, `push`, `pull`         | `registry`, `image`              |
+| `helm`    | `deploy`, `upgrade`, `rollback` | `cluster`, `chart`               |
+| `kubectl` | `apply`, `delete`, `get`        | `namespace`, `deployment`        |
+| `pulumi`  | `up`, `down`, `preview`         | `stack`, `infra`                 |
+| `test`    | `unit`, `e2e`, `integration`    | `api`, `ui`, `cli`               |
+| `lint`    | `check`, `fix`                  | `nix`, `shell`, `python`, `yaml` |
 
 ---
 
@@ -144,37 +144,37 @@ runme run --all --tag=phase:verify
 
 ### Scope Tags
 
-| Tag | Purpose |
-|-----|---------|
-| `scope:dev` | Development environment |
-| `scope:ci` | CI/CD pipelines |
-| `scope:prod` | Production operations |
+| Tag          | Purpose                 |
+| ------------ | ----------------------- |
+| `scope:dev`  | Development environment |
+| `scope:ci`   | CI/CD pipelines         |
+| `scope:prod` | Production operations   |
 
 ### Type Tags
 
-| Tag | Purpose |
-|-----|---------|
-| `type:entry` | Entry point task (runs sub-tasks) |
+| Tag                | Purpose                             |
+| ------------------ | ----------------------------------- |
+| `type:entry`       | Entry point task (runs sub-tasks)   |
 | `type:destructive` | Deletes data, requires confirmation |
-| `type:readonly` | Safe, no mutations |
-| `type:debug` | Troubleshooting utilities |
-| `type:meta` | Documentation/help tasks |
+| `type:readonly`    | Safe, no mutations                  |
+| `type:debug`       | Troubleshooting utilities           |
+| `type:meta`        | Documentation/help tasks            |
 
 ### Requirement Tags
 
-| Tag | Purpose |
-|-----|---------|
-| `requires:nix` | Needs nix installed |
-| `requires:docker` | Needs docker daemon |
-| `requires:kvm` | Needs KVM acceleration |
+| Tag                | Purpose                |
+| ------------------ | ---------------------- |
+| `requires:nix`     | Needs nix installed    |
+| `requires:docker`  | Needs docker daemon    |
+| `requires:kvm`     | Needs KVM acceleration |
 | `requires:guestfs` | Needs libguestfs tools |
 
 ### Duration Tags
 
-| Tag | Purpose |
-|-----|---------|
-| `duration:fast` | < 10 seconds |
-| `duration:slow` | > 1 minute |
+| Tag                   | Purpose              |
+| --------------------- | -------------------- |
+| `duration:fast`       | < 10 seconds         |
+| `duration:slow`       | > 1 minute           |
 | `duration:background` | Long-running service |
 
 ---
@@ -270,7 +270,7 @@ project:
     - .direnv
     - vendor
     - result
-    - "*.qcow2"
+    - '*.qcow2'
     - .git
     - .claude
   disable_gitignore: false
@@ -281,7 +281,7 @@ project:
 
 filters:
   - type: block
-    condition: "isNamed == true"
+    condition: 'isNamed == true'
 
 log:
   enabled: false
@@ -296,29 +296,29 @@ Filter blocks by properties:
 # Only CI-safe tasks
 filters:
   - type: block
-    condition: "len(intersection(tags, extra.allowed)) > 0"
+    condition: 'len(intersection(tags, extra.allowed)) > 0'
     extra:
-      allowed: ["scope:ci"]
+      allowed: ['scope:ci']
 
 # Exclude destructive operations
 filters:
   - type: block
-    condition: "len(intersection(tags, extra.excluded)) == 0"
+    condition: 'len(intersection(tags, extra.excluded)) == 0'
     extra:
-      excluded: ["type:destructive"]
+      excluded: ['type:destructive']
 ```
 
 Available block properties:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `name` | string | Task name |
-| `tags` | []string | Task tags |
-| `language` | string | Code block language |
-| `isNamed` | bool | Has explicit name |
-| `background` | bool | Background execution |
-| `interactive` | bool | Interactive mode |
-| `excludeFromRunAll` | bool | Excluded from --all |
+| Property            | Type     | Description          |
+| ------------------- | -------- | -------------------- |
+| `name`              | string   | Task name            |
+| `tags`              | []string | Task tags            |
+| `language`          | string   | Code block language  |
+| `isNamed`           | bool     | Has explicit name    |
+| `background`        | bool     | Background execution |
+| `interactive`       | bool     | Interactive mode     |
+| `excludeFromRunAll` | bool     | Excluded from --all  |
 
 ---
 

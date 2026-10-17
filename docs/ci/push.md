@@ -9,7 +9,8 @@ runme:
 
 # Push to Registry
 
-Push built containerDisk to docker-dev local registry with multi-tag (git commit, nix derivation, latest).
+Push built containerDisk to docker-dev local registry with multi-tag (git commit, nix derivation,
+latest).
 
 ## Contents
 
@@ -27,7 +28,8 @@ Push container with multi-tag (git commit, nix derivation, latest).
 - `qcow2-<git-commit>` - Source traceability (only if tree is clean)
 - `qcow2-<nix-drv>` - Reproducible build ID
 
-**Prerequisites:** Container image built (`build:all`), docker-dev cluster running, registry trust configured
+**Prerequisites:** Container image built (`build:all`), docker-dev cluster running, registry trust
+configured
 
 ```bash {"name":"k9:ci:qcow2:push:image","excludeFromRunAll":"true","tag":"k9:ci:qcow2:push,k9:ci:pipeline:all,type:entry,requires:docker"}
 set -e

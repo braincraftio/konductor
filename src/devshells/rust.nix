@@ -3,7 +3,13 @@
 #
 # Package composition defined in: ../packages/
 
-{ baseShell, pkgs, packages, versions, ... }:
+{
+  baseShell,
+  pkgs,
+  packages,
+  versions,
+  ...
+}:
 
 let
   langs = versions.languages;
@@ -19,7 +25,12 @@ baseShell.overrideAttrs (old: {
   shellHook = old.shellHook + ''
     # Runtime libraries for Rust crates using compression (cargo install targets)
     # Dynamic: appends to existing LD_LIBRARY_PATH
-    export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.xz pkgs.zstd ]}"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH="${
+      pkgs.lib.makeLibraryPath [
+        pkgs.xz
+        pkgs.zstd
+      ]
+    }"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
     # Cargo home (dynamic, needs $HOME)
     CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"

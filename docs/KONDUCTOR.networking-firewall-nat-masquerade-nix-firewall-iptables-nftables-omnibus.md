@@ -1,7 +1,7 @@
 # Konductor Networking: Firewall, NAT, Masquerade, iptables, nftables Omnibus
 
-> Comprehensive guide for NixOS networking configuration in Konductor QCOW2 VMs
-> covering port forwarding from external interfaces to Docker/Kubernetes networks.
+> Comprehensive guide for NixOS networking configuration in Konductor QCOW2 VMs covering port
+> forwarding from external interfaces to Docker/Kubernetes networks.
 
 ## Table of Contents
 
@@ -27,11 +27,12 @@
 
 ### Scenario
 
-Konductor is a NixOS QCOW2 VM built via nixos-generators that serves as a development
-environment. The VM runs Docker with a Talos Kubernetes cluster inside containers.
+Konductor is a NixOS QCOW2 VM built via nixos-generators that serves as a development environment.
+The VM runs Docker with a Talos Kubernetes cluster inside containers.
 
 **Network Topology:**
-```
+
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Home Network (192.168.1.0/24)                                               │
 │                                                                             │
@@ -60,9 +61,9 @@ environment. The VM runs Docker with a Talos Kubernetes cluster inside container
 
 ### Goal
 
-Users on the home network (192.168.1.0/24) should access Kubernetes services by
-connecting to the VM's external IP (192.168.1.83:80/443), which forwards traffic
-to Envoy Gateway (10.5.0.241:80/443) inside the Docker network.
+Users on the home network (192.168.1.0/24) should access Kubernetes services by connecting to the
+VM's external IP (192.168.1.83:80/443), which forwards traffic to Envoy Gateway (10.5.0.241:80/443)
+inside the Docker network.
 
 ### Requirements
 
@@ -114,11 +115,11 @@ virtualisation.docker = {
 
 ### Network Interfaces
 
-| Interface | IP Address | Role |
-|-----------|------------|------|
-| `enp2s0` | 192.168.1.83 (DHCP) | External, home network |
-| `br-*` | 10.5.0.1/24 | Docker bridge |
-| `docker0` | 172.17.0.1/16 | Default Docker bridge (unused) |
+| Interface | IP Address          | Role                           |
+| --------- | ------------------- | ------------------------------ |
+| `enp2s0`  | 192.168.1.83 (DHCP) | External, home network         |
+| `br-*`    | 10.5.0.1/24         | Docker bridge                  |
+| `docker0` | 172.17.0.1/16       | Default Docker bridge (unused) |
 
 ---
 
@@ -275,12 +276,12 @@ networking.firewall = {
 
 #### Differences from networking.nat
 
-| Aspect | networking.nat | networking.firewall |
-|--------|---------------|---------------------|
-| Chain used | `nixos-nat-pre` | Direct `PREROUTING` |
-| Masquerade | Automatic | Manual |
-| IP forward | Automatic | Manual |
-| Integration | Own service or firewall hook | Part of firewall |
+| Aspect      | networking.nat               | networking.firewall |
+| ----------- | ---------------------------- | ------------------- |
+| Chain used  | `nixos-nat-pre`              | Direct `PREROUTING` |
+| Masquerade  | Automatic                    | Manual              |
+| IP forward  | Automatic                    | Manual              |
+| Integration | Own service or firewall hook | Part of firewall    |
 
 ---
 
@@ -318,7 +319,7 @@ networking.nftables = {
 
 **Docker ALWAYS loads iptables kernel modules**, even when NixOS uses nftables.
 
-```
+```text
 When networking.nftables.enable = true:
 - NixOS uses nftables for its firewall
 - Docker still uses iptables
@@ -327,6 +328,7 @@ When networking.nftables.enable = true:
 ```
 
 From nixpkgs source:
+
 > "The nftables module disables the ip_tables kernel module, but Docker automatically loads it."
 
 #### When to Use nftables
@@ -386,8 +388,8 @@ Docker provides its own port publishing mechanisms.
 services:
   envoy:
     ports:
-      - "192.168.1.83:80:80"   # Bind to specific IP
-      - "192.168.1.83:443:443"
+      - '192.168.1.83:80:80' # Bind to specific IP
+      - '192.168.1.83:443:443'
 ```
 
 Or via Docker daemon settings:
@@ -408,12 +410,14 @@ virtualisation.docker.daemon.settings = {
 3. **Docker port publishing operates on containers**, not network-level services
 
 Docker's `-p` flag works for:
-```
+
+```text
 Host:Port → Container:Port
 ```
 
 We need:
-```
+
+```text
 Host:Port → Docker-Network-IP:Port (LoadBalancer VIP)
 ```
 
@@ -425,7 +429,7 @@ This requires host-level NAT (networking.nat), not Docker port publishing.
 
 ### Service Ordering
 
-```
+```text
                     ┌──────────────────┐
                     │ sysinit.target   │
                     └────────┬─────────┘
@@ -451,14 +455,14 @@ This requires host-level NAT (networking.nat), not Docker port publishing.
 
 ### Key Ordering Facts
 
-| Service | Ordering | When Rules Applied |
-|---------|----------|-------------------|
-| `firewall.service` | `before = [ "network-pre.target" ]` | **FIRST** - Very early |
-| `nat.service` | `after = [ "network-pre.target" ]` | After basic network, before online |
-| `docker.service` | `after = [ "network-online.target" ]` | **LAST** - After network ready |
+| Service            | Ordering                              | When Rules Applied                 |
+| ------------------ | ------------------------------------- | ---------------------------------- |
+| `firewall.service` | `before = [ "network-pre.target" ]`   | **FIRST** - Very early             |
+| `nat.service`      | `after = [ "network-pre.target" ]`    | After basic network, before online |
+| `docker.service`   | `after = [ "network-online.target" ]` | **LAST** - After network ready     |
 
-**Implication**: NixOS firewall/NAT rules are applied BEFORE Docker starts.
-This is correct behavior - no race condition.
+**Implication**: NixOS firewall/NAT rules are applied BEFORE Docker starts. This is correct
+behavior - no race condition.
 
 ### Systemd Units
 
@@ -507,7 +511,7 @@ systemd.services.custom-nat = {
 
 ### Tables and Chains
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ PACKET FLOW                                                                 │
 │                                                                             │
@@ -527,23 +531,23 @@ systemd.services.custom-nat = {
 
 ### NixOS NAT Chains
 
-| Chain | Table | Purpose |
-|-------|-------|---------|
-| `nixos-nat-pre` | nat | DNAT rules (port forwarding) |
-| `nixos-nat-post` | nat | SNAT/MASQUERADE rules |
-| `nixos-nat-out` | nat | Loopback DNAT (hairpin NAT) |
-| `nixos-nat-forward` | filter | Forward filtering for NAT |
+| Chain               | Table  | Purpose                      |
+| ------------------- | ------ | ---------------------------- |
+| `nixos-nat-pre`     | nat    | DNAT rules (port forwarding) |
+| `nixos-nat-post`    | nat    | SNAT/MASQUERADE rules        |
+| `nixos-nat-out`     | nat    | Loopback DNAT (hairpin NAT)  |
+| `nixos-nat-forward` | filter | Forward filtering for NAT    |
 
 ### Docker Chains
 
 Docker creates its own chains:
 
-| Chain | Table | Purpose |
-|-------|-------|---------|
-| `DOCKER` | nat | Container port DNAT |
-| `DOCKER-USER` | filter | User-defined rules (check first) |
-| `DOCKER-ISOLATION-STAGE-1` | filter | Network isolation |
-| `DOCKER-ISOLATION-STAGE-2` | filter | Network isolation |
+| Chain                      | Table  | Purpose                          |
+| -------------------------- | ------ | -------------------------------- |
+| `DOCKER`                   | nat    | Container port DNAT              |
+| `DOCKER-USER`              | filter | User-defined rules (check first) |
+| `DOCKER-ISOLATION-STAGE-1` | filter | Network isolation                |
+| `DOCKER-ISOLATION-STAGE-2` | filter | Network isolation                |
 
 ### Rule Precedence
 
@@ -555,6 +559,7 @@ iptables -L FORWARD -n --line-numbers
 ```
 
 Typical order:
+
 1. NixOS chains (applied at boot)
 2. Docker chains (applied when Docker starts)
 3. Docker container rules (applied when containers start)
@@ -601,11 +606,11 @@ networking.firewall.trustedInterfaces = [ "docker0" ];
 
 ### Potential Conflicts
 
-| Scenario | Problem | Solution |
-|----------|---------|----------|
-| Both NixOS and Docker DNAT same port | First rule wins | Use different approaches for different ports |
-| Masquerade conflicts | Double NAT | Let Docker handle container masquerade, NixOS handles external |
-| Firewall blocks forwarded traffic | Packets dropped | Add FORWARD rules or use trustedInterfaces |
+| Scenario                             | Problem         | Solution                                                       |
+| ------------------------------------ | --------------- | -------------------------------------------------------------- |
+| Both NixOS and Docker DNAT same port | First rule wins | Use different approaches for different ports                   |
+| Masquerade conflicts                 | Double NAT      | Let Docker handle container masquerade, NixOS handles external |
+| Firewall blocks forwarded traffic    | Packets dropped | Add FORWARD rules or use trustedInterfaces                     |
 
 ---
 
@@ -733,12 +738,12 @@ sudo dmesg | grep TRACE
 
 ### Common Issues
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Connection refused | Firewall blocking | Add to `allowedTCPPorts` |
-| Connection timeout | No DNAT rule | Check `nixos-nat-pre` chain |
-| Works locally, not externally | Missing FORWARD rule | Add FORWARD ACCEPT rules |
-| Intermittent failures | Docker rule conflicts | Check rule ordering |
+| Symptom                       | Cause                 | Fix                         |
+| ----------------------------- | --------------------- | --------------------------- |
+| Connection refused            | Firewall blocking     | Add to `allowedTCPPorts`    |
+| Connection timeout            | No DNAT rule          | Check `nixos-nat-pre` chain |
+| Works locally, not externally | Missing FORWARD rule  | Add FORWARD ACCEPT rules    |
+| Intermittent failures         | Docker rule conflicts | Check rule ordering         |
 
 ---
 
@@ -761,6 +766,7 @@ sudo dmesg | grep TRACE
 ### DeepWiki Queries
 
 This document was informed by comprehensive queries to the NixOS/nixpkgs DeepWiki:
+
 - networking.nat module options and implementation
 - networking.firewall extraCommands vs extraForwardRules
 - Boot ordering between firewall, nat, and docker services
@@ -771,6 +777,6 @@ This document was informed by comprehensive queries to the NixOS/nixpkgs DeepWik
 
 ## Changelog
 
-| Date | Change |
-|------|--------|
+| Date       | Change                                          |
+| ---------- | ----------------------------------------------- |
 | 2026-01-21 | Initial document created from DeepWiki research |

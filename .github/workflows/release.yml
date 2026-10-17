@@ -7,14 +7,25 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   semantic-release:
     name: Semantic Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push'
@@ -24,42 +35,67 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: main
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
+      # semantic-release publishes from main and commits the changelog there.
+      # A newer push must pass its own CI before it can be released.
+      - name: Verify tested revision
+        id: revision
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [[ "$(git rev-parse HEAD)" == "$TESTED_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping superseded CI run" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Install semantic-release
-        run: npm ci
-        working-directory: .github/semantic-release
+      # node and npm come from .#ci; node major follows src/lib/versions.nix.
+      - uses: ./.github/actions/setup-devshell
+        if: steps.revision.outputs.current == 'true'
 
       - name: Run semantic-release
         id: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          .github/semantic-release/node_modules/.bin/semantic-release 2>&1 | tee release-output.txt
-          if grep -q "Published release" release-output.txt; then
-            VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' release-output.txt || true)
-            {
-              echo "new_release=true"
-              echo "version=${VERSION}"
-              echo "tag=v${VERSION}"
-            } >> "$GITHUB_OUTPUT"
-          else
-            echo "new_release=false" >> "$GITHUB_OUTPUT"
-          fi
+        if: steps.revision.outputs.current == 'true'
+        uses: ./.github/actions/semantic-release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   nix-cache:
     name: Nix Cache
+    permissions:
+      contents: read
+      id-token: write
     needs: semantic-release
     if: needs.semantic-release.outputs.new_release == 'true'
     uses: ./.github/workflows/nix.yml
     with:
-      ref: main
+      ref: ${{ needs.semantic-release.outputs.tag }}
     secrets:
       BCIO_CACHIX_PRIVATE_KEY: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
+
+  flakehub-publish:
+    name: Publish release to FlakeHub
+    needs: [semantic-release, nix-cache]
+    if: needs.semantic-release.outputs.new_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.semantic-release.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-nix
+
+      - uses: ./.github/actions/publish-flake
+        with:
+          tag: ${{ needs.semantic-release.outputs.tag }}

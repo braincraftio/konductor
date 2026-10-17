@@ -1,32 +1,32 @@
 # OpenCode Automation Guide
 
-This document covers the extensibility and automation systems in OpenCode, including
-skills, commands, custom tools, plugins, and agents.
+This document covers the extensibility and automation systems in OpenCode, including skills,
+commands, custom tools, plugins, and agents.
 
 ## Overview
 
 OpenCode provides multiple extension points for automation:
 
-| Concept | Purpose | Location | Trigger |
-|---------|---------|----------|---------|
-| **Skill** | Reusable instructions agents load on-demand | `SKILL.md` files | Agent calls `skill()` tool |
-| **Command** | Custom prompts for repetitive tasks | Markdown or JSON | User types `/name` in TUI |
-| **Tool** | Functions the LLM can call | TypeScript/JavaScript | LLM decides to invoke |
-| **Plugin** | Event hooks and lifecycle interception | TypeScript/JavaScript | Automatic on events |
-| **Agent** | Specialized AI assistants | Markdown or JSON | User switches or `@mentions` |
+| Concept     | Purpose                                     | Location              | Trigger                      |
+| ----------- | ------------------------------------------- | --------------------- | ---------------------------- |
+| **Skill**   | Reusable instructions agents load on-demand | `SKILL.md` files      | Agent calls `skill()` tool   |
+| **Command** | Custom prompts for repetitive tasks         | Markdown or JSON      | User types `/name` in TUI    |
+| **Tool**    | Functions the LLM can call                  | TypeScript/JavaScript | LLM decides to invoke        |
+| **Plugin**  | Event hooks and lifecycle interception      | TypeScript/JavaScript | Automatic on events          |
+| **Agent**   | Specialized AI assistants                   | Markdown or JSON      | User switches or `@mentions` |
 
 ---
 
 ## Skills
 
-Skills are reusable instruction sets that agents discover and load on-demand via the
-native `skill` tool. They provide specialized knowledge for specific tasks.
+Skills are reusable instruction sets that agents discover and load on-demand via the native `skill`
+tool. They provide specialized knowledge for specific tasks.
 
 ### Locations
 
 Skills are discovered from these paths (searched in order):
 
-```
+```text
 .opencode/skill/<name>/SKILL.md          # Project-level
 ~/.config/opencode/skill/<name>/SKILL.md # Global
 .claude/skills/<name>/SKILL.md           # Claude-compatible (project)
@@ -58,19 +58,19 @@ metadata:
 
 ## When to use me
 
-Use this when you are preparing a tagged release.
-Ask clarifying questions if the target versioning scheme is unclear.
+Use this when you are preparing a tagged release. Ask clarifying questions if the target versioning
+scheme is unclear.
 ```
 
 ### Frontmatter Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Skill identifier (must match directory name) |
-| `description` | Yes | Brief explanation (1-1024 chars) |
-| `license` | No | License identifier |
-| `compatibility` | No | Compatibility information |
-| `metadata` | No | String-to-string map for additional data |
+| Field           | Required | Description                                  |
+| --------------- | -------- | -------------------------------------------- |
+| `name`          | Yes      | Skill identifier (must match directory name) |
+| `description`   | Yes      | Brief explanation (1-1024 chars)             |
+| `license`       | No       | License identifier                           |
+| `compatibility` | No       | Compatibility information                    |
+| `metadata`      | No       | String-to-string map for additional data     |
 
 ### Name Validation
 
@@ -101,11 +101,11 @@ Control skill access in `opencode.json`:
 }
 ```
 
-| Permission | Behavior |
-|------------|----------|
-| `allow` | Skill loads immediately |
-| `deny` | Skill hidden from agent, access rejected |
-| `ask` | User prompted for approval |
+| Permission | Behavior                                 |
+| ---------- | ---------------------------------------- |
+| `allow`    | Skill loads immediately                  |
+| `deny`     | Skill hidden from agent, access rejected |
+| `ask`      | User prompted for approval               |
 
 Wildcards supported: `internal-*` matches `internal-docs`, `internal-tools`, etc.
 
@@ -117,7 +117,7 @@ In agent frontmatter:
 ---
 permission:
   skill:
-    "documents-*": "allow"
+    'documents-*': 'allow'
 ---
 ```
 
@@ -152,12 +152,12 @@ tools:
 
 ## Commands
 
-Commands are custom prompts triggered with `/name` in the TUI. They extend built-in
-commands like `/init`, `/undo`, `/redo`, `/share`, `/help`.
+Commands are custom prompts triggered with `/name` in the TUI. They extend built-in commands like
+`/init`, `/undo`, `/redo`, `/share`, `/help`.
 
 ### Locations
 
-```
+```text
 .opencode/command/<name>.md          # Project-level
 ~/.config/opencode/command/<name>.md # Global
 opencode.json → "command" field      # JSON config
@@ -175,8 +175,8 @@ model: anthropic/claude-3-5-sonnet-20241022
 subtask: false
 ---
 
-Run the full test suite with coverage report and show any failures.
-Focus on the failing tests and suggest fixes.
+Run the full test suite with coverage report and show any failures. Focus on the failing tests and
+suggest fixes.
 ```
 
 ### JSON Format
@@ -202,13 +202,13 @@ In `opencode.json`:
 
 ### Options
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `template` | Yes | Prompt sent to LLM |
-| `description` | No | Shown in TUI command list |
-| `agent` | No | Which agent executes (defaults to current) |
-| `model` | No | Override model for this command |
-| `subtask` | No | Force subagent invocation |
+| Option        | Required | Description                                |
+| ------------- | -------- | ------------------------------------------ |
+| `template`    | Yes      | Prompt sent to LLM                         |
+| `description` | No       | Shown in TUI command list                  |
+| `agent`       | No       | Which agent executes (defaults to current) |
+| `model`       | No       | Override model for this command            |
+| `subtask`     | No       | Force subagent invocation                  |
 
 ### Template Variables
 
@@ -237,8 +237,7 @@ Run: `/create-file config.json src "{ \"key\": \"value\" }"`
 Inject command output with `` !`command` ``:
 
 ```markdown
-Here are the current test results:
-!`npm test`
+Here are the current test results: !`npm test`
 
 Based on these results, suggest improvements.
 ```
@@ -248,20 +247,19 @@ Based on these results, suggest improvements.
 Include file content with `@path`:
 
 ```markdown
-Review the component in @src/components/Button.tsx.
-Check for performance issues.
+Review the component in @src/components/Button.tsx. Check for performance issues.
 ```
 
 ---
 
 ## Custom Tools
 
-Custom tools are functions the LLM can call during conversations, extending built-in
-tools like `read`, `write`, `bash`, `glob`, `grep`.
+Custom tools are functions the LLM can call during conversations, extending built-in tools like
+`read`, `write`, `bash`, `glob`, `grep`.
 
 ### Locations
 
-```
+```text
 .opencode/tool/<name>.ts          # Project-level
 ~/.config/opencode/tool/<name>.ts # Global
 ```
@@ -271,18 +269,18 @@ The filename becomes the tool name.
 ### Basic Structure
 
 ```typescript
-import { tool } from "@opencode-ai/plugin"
+import { tool } from '@opencode-ai/plugin';
 
 export default tool({
-  description: "Query the project database",
+  description: 'Query the project database',
   args: {
-    query: tool.schema.string().describe("SQL query to execute"),
+    query: tool.schema.string().describe('SQL query to execute'),
   },
   async execute(args) {
     // Your logic here
-    return `Executed query: ${args.query}`
+    return `Executed query: ${args.query}`;
   },
-})
+});
 ```
 
 ### Arguments with Zod
@@ -300,17 +298,17 @@ args: {
 Or import Zod directly:
 
 ```typescript
-import { z } from "zod"
+import { z } from 'zod';
 
 export default {
-  description: "Tool description",
+  description: 'Tool description',
   args: {
-    param: z.string().describe("Parameter"),
+    param: z.string().describe('Parameter'),
   },
   async execute(args, context) {
-    return "result"
+    return 'result';
   },
-}
+};
 ```
 
 ### Context Object
@@ -338,29 +336,29 @@ async execute(args, context) {
 Export multiple named tools:
 
 ```typescript
-import { tool } from "@opencode-ai/plugin"
+import { tool } from '@opencode-ai/plugin';
 
 export const add = tool({
-  description: "Add two numbers",
+  description: 'Add two numbers',
   args: {
     a: tool.schema.number(),
     b: tool.schema.number(),
   },
   async execute(args) {
-    return args.a + args.b
+    return args.a + args.b;
   },
-})
+});
 
 export const multiply = tool({
-  description: "Multiply two numbers",
+  description: 'Multiply two numbers',
   args: {
     a: tool.schema.number(),
     b: tool.schema.number(),
   },
   async execute(args) {
-    return args.a * args.b
+    return args.a * args.b;
   },
-})
+});
 ```
 
 Creates tools: `math_add` and `math_multiply` (from `math.ts`).
@@ -370,19 +368,19 @@ Creates tools: `math_add` and `math_multiply` (from `math.ts`).
 Use Bun's shell API for subprocess execution:
 
 ```typescript
-import { tool } from "@opencode-ai/plugin"
+import { tool } from '@opencode-ai/plugin';
 
 export default tool({
-  description: "Add two numbers using Python",
+  description: 'Add two numbers using Python',
   args: {
     a: tool.schema.number(),
     b: tool.schema.number(),
   },
   async execute(args) {
-    const result = await Bun.$`python3 .opencode/tool/add.py ${args.a} ${args.b}`.text()
-    return result.trim()
+    const result = await Bun.$`python3 .opencode/tool/add.py ${args.a} ${args.b}`.text();
+    return result.trim();
   },
-})
+});
 ```
 
 ### Tool Permissions
@@ -419,12 +417,12 @@ Granular patterns for specific inputs:
 
 ## Plugins
 
-Plugins hook into OpenCode events and lifecycle to customize behavior, add tools,
-or integrate with external services.
+Plugins hook into OpenCode events and lifecycle to customize behavior, add tools, or integrate with
+external services.
 
 ### Locations
 
-```
+```text
 .opencode/plugin/<name>.ts          # Project-level
 ~/.config/opencode/plugin/<name>.ts # Global
 opencode.json → "plugin" array      # npm packages
@@ -434,11 +432,7 @@ opencode.json → "plugin" array      # npm packages
 
 ```json
 {
-  "plugin": [
-    "opencode-helicone-session",
-    "opencode-wakatime",
-    "@my-org/custom-plugin"
-  ]
+  "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
@@ -454,26 +448,26 @@ Packages are auto-installed via Bun, cached in `~/.cache/opencode/node_modules/`
 ### Basic Structure
 
 ```typescript
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from '@opencode-ai/plugin';
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
-  console.log("Plugin initialized!")
+  console.log('Plugin initialized!');
 
   return {
     // Hook implementations
-  }
-}
+  };
+};
 ```
 
 #### Context Object
 
-| Property | Description |
-|----------|-------------|
-| `project` | Current project information |
-| `directory` | Current working directory |
-| `worktree` | Git worktree path |
-| `client` | OpenCode SDK client |
-| `$` | Bun shell API |
+| Property    | Description                 |
+| ----------- | --------------------------- |
+| `project`   | Current project information |
+| `directory` | Current working directory   |
+| `worktree`  | Git worktree path           |
+| `client`    | OpenCode SDK client         |
+| `$`         | Bun shell API               |
 
 ### Available Hooks
 
@@ -481,16 +475,16 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ```typescript
 return {
-  "tool.execute.before": async (input, output) => {
+  'tool.execute.before': async (input, output) => {
     // Modify args or prevent execution
-    if (input.tool === "read" && output.args.filePath.includes(".env")) {
-      throw new Error("Do not read .env files")
+    if (input.tool === 'read' && output.args.filePath.includes('.env')) {
+      throw new Error('Do not read .env files');
     }
   },
-  "tool.execute.after": async (input, output) => {
+  'tool.execute.after': async (input, output) => {
     // React to tool completion
   },
-}
+};
 ```
 
 #### Event Hook
@@ -500,16 +494,17 @@ Subscribe to system events:
 ```typescript
 return {
   event: async ({ event }) => {
-    if (event.type === "session.idle") {
-      await $`osascript -e 'display notification "Done!" with title "opencode"'`
+    if (event.type === 'session.idle') {
+      await $`osascript -e 'display notification "Done!" with title "opencode"'`;
     }
   },
-}
+};
 ```
 
 Available events:
 
-- **Session**: `session.created`, `session.idle`, `session.error`, `session.compacted`, `session.deleted`, `session.updated`, `session.status`, `session.diff`
+- **Session**: `session.created`, `session.idle`, `session.error`, `session.compacted`,
+  `session.deleted`, `session.updated`, `session.status`, `session.diff`
 - **Message**: `message.updated`, `message.removed`, `message.part.updated`, `message.part.removed`
 - **File**: `file.edited`, `file.watcher.updated`
 - **Tool**: `tool.execute.before`, `tool.execute.after`
@@ -522,13 +517,13 @@ Available events:
 
 ```typescript
 return {
-  "chat.message": async (input, output) => {
+  'chat.message': async (input, output) => {
     // Called on new message
   },
-  "chat.params": async (input, output) => {
+  'chat.params': async (input, output) => {
     // Modify LLM parameters (temperature, topP, etc.)
   },
-}
+};
 ```
 
 #### Compaction Hook
@@ -537,51 +532,51 @@ Customize session compaction:
 
 ```typescript
 return {
-  "experimental.session.compacting": async (input, output) => {
+  'experimental.session.compacting': async (input, output) => {
     // Inject additional context
     output.context.push(`
 ## Custom Context
 - Current task status
 - Important decisions made
 - Files being actively worked on
-`)
+`);
   },
-}
+};
 ```
 
 Or replace the entire prompt:
 
 ```typescript
 return {
-  "experimental.session.compacting": async (input, output) => {
+  'experimental.session.compacting': async (input, output) => {
     output.prompt = `
 You are generating a continuation prompt.
 Summarize the current task, files being modified, and next steps.
-`
+`;
   },
-}
+};
 ```
 
 #### Adding Tools via Plugin
 
 ```typescript
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from '@opencode-ai/plugin';
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
     tool: {
       mytool: tool({
-        description: "Custom tool from plugin",
+        description: 'Custom tool from plugin',
         args: {
           foo: tool.schema.string(),
         },
         async execute(args) {
-          return `Hello ${args.foo}!`
+          return `Hello ${args.foo}!`;
         },
       }),
     },
-  }
-}
+  };
+};
 ```
 
 ### Dependencies
@@ -604,11 +599,11 @@ Use structured logging instead of `console.log`:
 
 ```typescript
 await client.app.log({
-  service: "my-plugin",
-  level: "info",  // debug, info, warn, error
-  message: "Plugin initialized",
-  extra: { foo: "bar" },
-})
+  service: 'my-plugin',
+  level: 'info', // debug, info, warn, error
+  message: 'Plugin initialized',
+  extra: { foo: 'bar' },
+});
 ```
 
 ---
@@ -631,7 +626,7 @@ Built-in agents:
 
 ### Locations
 
-```
+```text
 .opencode/agent/<name>.md          # Project-level
 ~/.config/opencode/agent/<name>.md # Global
 opencode.json → "agent" field      # JSON config
@@ -651,10 +646,11 @@ tools:
   edit: false
 permission:
   skill:
-    "review-*": "allow"
+    'review-*': 'allow'
 ---
 
 You are a code review specialist. Focus on:
+
 - Code quality and best practices
 - Security vulnerabilities
 - Performance issues
@@ -692,16 +688,16 @@ In `opencode.json`:
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `description` | Brief explanation (required) |
-| `mode` | `primary`, `subagent`, or `all` (default) |
-| `model` | Override LLM model (`provider/model-id`) |
-| `prompt` | Path to system prompt file |
-| `temperature` | Creativity (0.0 focused → 1.0 creative) |
-| `maxSteps` | Max agentic iterations before text-only response |
-| `tools` | Enable/disable specific tools |
-| `permission` | Tool and skill permissions |
+| Option        | Description                                      |
+| ------------- | ------------------------------------------------ |
+| `description` | Brief explanation (required)                     |
+| `mode`        | `primary`, `subagent`, or `all` (default)        |
+| `model`       | Override LLM model (`provider/model-id`)         |
+| `prompt`      | Path to system prompt file                       |
+| `temperature` | Creativity (0.0 focused → 1.0 creative)          |
+| `maxSteps`    | Max agentic iterations before text-only response |
+| `tools`       | Enable/disable specific tools                    |
+| `permission`  | Tool and skill permissions                       |
 
 ### Creating Agents
 
@@ -712,6 +708,7 @@ opencode agent create
 ```
 
 This guides you through:
+
 1. Save location selection
 2. Description input
 3. System prompt generation
@@ -721,7 +718,7 @@ This guides you through:
 
 ## Directory Structure Example
 
-```
+```text
 .opencode/
 ├── agent/
 │   └── reviewer.md

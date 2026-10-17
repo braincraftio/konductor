@@ -1,7 +1,7 @@
 # src/config/opencode/config.nix
 # opencode.json content — hermetic MCP servers, permissions, formatters, LSP.
 #
-# Every external binary path uses lib.getExe for store-path hermicity.
+# Every external binary path uses lib.getExe for store-path hermeticity.
 # Consumed by default.nix via pkgs.formats.json.
 
 { pkgs, lib }:

@@ -12,10 +12,10 @@ The devshell provides all tooling. Do not install tools via pip, npm, cargo, or 
 
 ## Commit Convention
 
-Konductor uses [Conventional Commits](https://www.conventionalcommits.org/) enforced
-by commitlint via lefthook pre-commit hooks.
+Konductor uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint
+via lefthook pre-commit hooks.
 
-```
+```text
 type(scope): description
 
 [optional body]
@@ -25,57 +25,57 @@ type(scope): description
 
 Types and their release behavior:
 
-| Type | Release | Description |
-|---|---|---|
-| `feat` | minor | New feature |
-| `fix` | patch | Bug fix |
-| `perf` | patch | Performance improvement |
-| `revert` | patch | Revert previous commit |
-| `docs` | patch (README only) | Documentation |
-| `refactor` | none | Code restructuring without behavior change |
-| `style` | none | Formatting, whitespace |
-| `test` | none | Adding or updating tests |
-| `build` | none | Build system or dependencies |
-| `ci` | none | CI/CD configuration |
-| `chore` | none | Maintenance |
+| Type       | Release             | Description                                |
+| ---------- | ------------------- | ------------------------------------------ |
+| `feat`     | minor               | New feature                                |
+| `fix`      | patch               | Bug fix                                    |
+| `perf`     | patch               | Performance improvement                    |
+| `revert`   | patch               | Revert previous commit                     |
+| `docs`     | patch (README only) | Documentation                              |
+| `refactor` | none                | Code restructuring without behavior change |
+| `style`    | none                | Formatting, whitespace                     |
+| `test`     | none                | Adding or updating tests                   |
+| `build`    | none                | Build system or dependencies               |
+| `ci`       | none                | CI/CD configuration                        |
+| `chore`    | none                | Maintenance                                |
 
-Breaking changes use `!` after the type: `feat(api)!: remove legacy endpoint`.
-This triggers a major version bump.
+Breaking changes use `!` after the type: `feat(api)!: remove legacy endpoint`. This triggers a major
+version bump.
 
-Commit body is diff-derived, exhaustive, objective, present-tense. Enumerate every
-meaningful change at the mechanism level. The bar is "a reader could reconstruct
-what changed and why from the body alone."
+Commit body is diff-derived, exhaustive, objective, present-tense. Enumerate every meaningful change
+at the mechanism level. The bar is "a reader could reconstruct what changed and why from the body
+alone."
 
-No AI attribution. No PII. No `Co-Authored-By` with AI identity. No narrative or
-storytelling. No past or future framing.
+No AI attribution. No PII. No `Co-Authored-By` with AI identity. No narrative or storytelling. No
+past or future framing.
 
 ## Git Hooks
 
 Lefthook runs 20+ parallel pre-commit checks automatically on `git commit`:
 
-| Check | Files | Tool |
-|---|---|---|
-| Python style | `*.py` | ruff |
-| Python types | `*.py` | mypy |
-| Python security | `*.py` | bandit |
-| JavaScript quality | `*.{js,jsx,ts,tsx}` | eslint |
-| JavaScript style | `*.{js,jsx,ts,tsx}` | biome |
-| Formatting | `*.{js,ts,json,css,html,md,yml}` | prettier |
-| Shell syntax | `*.{sh,bash}` | shellcheck |
-| YAML validation | `*.{yml,yaml}` | yamllint |
-| TOML validation | `*.toml` | taplo |
-| Nix formatting | `*.nix` | nixpkgs-fmt |
-| Nix linting | `*.nix` | statix |
-| Nix dead code | `*.nix` | deadnix |
-| Markdown style | `*.{md,markdown}` | markdownlint-cli2 |
-| Spelling | `*.{md,txt,js,ts,py,go,rs}` | cspell |
-| Link validation | `*.{md,markdown}` | lychee (offline) |
-| GitHub Actions | `.github/workflows/*.yml` | actionlint |
-| Dockerfile | `Dockerfile*` | hadolint |
-| Go | `*.go` | golangci-lint |
-| HTML | `*.html` | htmlhint |
-| CSS | `*.{css,scss,sass}` | stylelint |
-| Secrets | all files | detect-secrets |
+| Check              | Files                            | Tool              |
+| ------------------ | -------------------------------- | ----------------- |
+| Python style       | `*.py`                           | ruff              |
+| Python types       | `*.py`                           | mypy              |
+| Python security    | `*.py`                           | bandit            |
+| JavaScript quality | `*.{js,jsx,ts,tsx}`              | eslint            |
+| JavaScript style   | `*.{js,jsx,ts,tsx}`              | biome             |
+| Formatting         | `*.{js,ts,json,css,html,md,yml}` | prettier          |
+| Shell syntax       | `*.{sh,bash}`                    | shellcheck        |
+| YAML validation    | `*.{yml,yaml}`                   | yamllint          |
+| TOML validation    | `*.toml`                         | taplo             |
+| Nix formatting     | `*.nix`                          | nixfmt            |
+| Nix linting        | `*.nix`                          | statix            |
+| Nix dead code      | `*.nix`                          | deadnix           |
+| Markdown style     | `*.{md,markdown}`                | markdownlint-cli2 |
+| Spelling           | `*.{md,txt,js,ts,py,go,rs}`      | cspell            |
+| Link validation    | `*.{md,markdown}`                | lychee (offline)  |
+| GitHub Actions     | `.github/workflows/*.yml`        | actionlint        |
+| Dockerfile         | `Dockerfile*`                    | hadolint          |
+| Go                 | `*.go`                           | golangci-lint     |
+| HTML               | `*.html`                         | htmlhint          |
+| CSS                | `*.{css,scss,sass}`              | stylelint         |
+| Secrets            | all files                        | detect-secrets    |
 
 Commit messages are validated by commitlint against the conventional commits spec.
 
@@ -112,7 +112,8 @@ git push origin feat/my-improvement
 
 Pull requests trigger the CI workflow:
 
-1. `nix flake check` runs all 9 checks (8 per-tool version checks + 1 buildEnv bundle integration check)
+1. `nix flake check` runs all 9 checks (8 per-tool version checks + 1 buildEnv bundle integration
+   check)
 2. `nix build packages.default` verifies the installable buildEnv compiles
 3. All built paths are pushed to `braincraftio.cachix.org` for binary cache warming
 
@@ -130,13 +131,12 @@ Releases are fully automated via semantic-release on push to main:
 6. The nix-cache job builds from post-release main HEAD and pushes to cachix
 
 The post-release cache build is critical for cache alignment. Consumers fetch
-`github:braincraftio/konductor` which resolves to main HEAD (the post-changelog
-commit). The nix-cache job builds from that same commit so derivation hashes match.
-Builds from the tag would produce different hashes because the changelog commit
-changes the flake's `self.narHash`.
+`github:braincraftio/konductor` which resolves to main HEAD (the post-changelog commit). The
+nix-cache job builds from that same commit so derivation hashes match. Builds from the tag would
+produce different hashes because the changelog commit changes the flake's `self.narHash`.
 
-No manual release steps. No version bumps in source. No changelog authoring.
-Conventional commits determine everything.
+No manual release steps. No version bumps in source. No changelog authoring. Conventional commits
+determine everything.
 
 ## PR Checklist
 
@@ -168,18 +168,23 @@ All pinned versions live in `src/lib/versions.nix`:
 
 Changing a version propagates to all devshells, containers, VMs, and modules.
 
-For overlay-pinned packages (atuin, k0sctl), update hashes in the overlay file
-alongside the version in `versions.nix`:
+Keep locally maintained versions and their source/dependency/platform hashes together in
+`src/lib/versions.nix`. Overlays and packages consume these records:
 
-- Atuin: `src/overlays/atuin.nix` (src hash + cargoHash)
-- k0sctl: `src/overlays/k0s.nix` (version + hashes)
-- NixOS channel: `flake.nix` nixpkgs.url, nixvim.url, home-manager.url branches
+- Atuin: `atuin.version`, `atuin.hash`, `atuin.cargoHash`
+- k0sctl: `kubernetes.k0sctl.version`, `hash`, `vendorHash`
+- Pulumi: CLI archive hashes, Python wheel URL/hash, and provider wheel/binary hashes alongside
+  their respective versions
+- Flake inputs: revisions and `narHash` remain together in `flake.lock`
+
+Build affected packages after updating. Keep NixOS `stateVersion` unchanged during routine
+dependency upgrades; it controls compatibility defaults.
 
 ## Workspace Setup with Open Sesame
 
-[Open Sesame](https://github.com/ScopeCreep-zip/open-sesame) provides workspace
-management with canonical directory paths, encrypted secret vaults, and SSH agent
-unlock. This is optional. Standard `git clone` works without it.
+[Open Sesame](https://github.com/ScopeCreep-zip/open-sesame) provides workspace management with
+canonical directory paths, encrypted secret vaults, and SSH agent unlock. This is optional. Standard
+`git clone` works without it.
 
 ```bash
 # Clone to canonical workspace path
@@ -201,19 +206,19 @@ sesame workspace status
 sesame workspace shell
 ```
 
-The canonical path is `/workspace/<user>/<server>/<org>/<repo>`. Workspace-level
-`.envrc` files set `WORKSPACE_ROOT` at the org namespace depth. Child repos inherit
-via `source_up_if_exists` with the `_DIRENV_CHILD_SOURCING` guard.
+The canonical path is `/workspace/<user>/<server>/<org>/<repo>`. Workspace-level `.envrc` files set
+`WORKSPACE_ROOT` at the org namespace depth. Child repos inherit via `source_up_if_exists` with the
+`_DIRENV_CHILD_SOURCING` guard.
 
-Vault secrets are injected as environment variables via `sesame export -p default`
-in the `.envrc`. This replaces plaintext tokens in `.env` files. The `.envrc`
-templates produced by `nix flake init -t github:braincraftio/konductor` include
-Open Sesame vault injection blocks that are no-ops when sesame is not installed.
+Vault secrets are injected as environment variables via `sesame export -p default` in the `.envrc`.
+This replaces plaintext tokens in `.env` files. The `.envrc` templates produced by
+`nix flake init -t github:braincraftio/konductor` include Open Sesame vault injection blocks that
+are no-ops when sesame is not installed.
 
 ## Architecture
 
-See [CLAUDE.md](CLAUDE.md) for the maintainer operating model, dependency chain,
-overlay composition order, and decision gates.
+See [CLAUDE.md](CLAUDE.md) for the maintainer operating model, dependency chain, overlay composition
+order, and decision gates.
 
-See [README.md](README.md) for the full flake output reference, shell specifications,
-and user-facing documentation.
+See [README.md](README.md) for the full flake output reference, shell specifications, and
+user-facing documentation.

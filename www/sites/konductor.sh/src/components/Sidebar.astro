@@ -21,48 +21,64 @@ const { sections, groupedDocs, currentSlug } = Astro.props;
 
 <!-- Toggle button — fixed, always visible on md+ -->
 <button
-  id="sidebar-toggle"
-  class="hidden md:flex fixed top-24 left-[15.5rem] z-40 w-6 h-6 items-center justify-center rounded-full bg-surface-paper border border-border-default shadow-sm text-text-tertiary hover:text-brand-primary hover:border-brand-primary/40 transition-all duration-200"
-  aria-label="Toggle sidebar"
+  id='sidebar-toggle'
+  class='hidden md:flex fixed top-24 left-[15.5rem] z-40 w-6 h-6 items-center justify-center rounded-full bg-surface-paper border border-border-default shadow-sm text-text-tertiary hover:text-brand-primary hover:border-brand-primary/40 transition-all duration-200'
+  aria-label='Toggle sidebar'
 >
-  <svg id="sidebar-icon-close" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+  <svg
+    id='sidebar-icon-close'
+    class='w-3.5 h-3.5'
+    fill='none'
+    viewBox='0 0 24 24'
+    stroke='currentColor'
+  >
+    <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 19l-7-7 7-7'
+    ></path>
   </svg>
-  <svg id="sidebar-icon-open" class="w-3.5 h-3.5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  <svg
+    id='sidebar-icon-open'
+    class='w-3.5 h-3.5 hidden'
+    fill='none'
+    viewBox='0 0 24 24'
+    stroke='currentColor'
+  >
+    <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 5l7 7-7 7'></path>
   </svg>
 </button>
 
-<aside id="sidebar" class="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 pt-24 pb-8 px-6 bg-surface-base z-30 transition-transform duration-300">
-  <div class="absolute top-24 bottom-0 right-0 w-px bg-border-subtle"></div>
-  <nav class="flex-1 overflow-y-auto space-y-8 no-scrollbar">
-    {sections.map(section => {
-      const docs = groupedDocs[section];
-      if (!docs || docs.length === 0) return null;
-      return (
-        <div class="space-y-3">
-          <h5 class="text-xs font-bold text-text-tertiary uppercase tracking-wider">
-            {section}
-          </h5>
-          <ul class="space-y-1">
-            {docs.map(doc => (
-              <li>
-                <a
-                  href={href(`/manual/${doc.id}`)}
-                  class={`block py-1.5 text-sm transition-colors duration-200 ${
-                    currentSlug === doc.id
-                      ? 'text-brand-primary'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {doc.data.title}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    })}
+<aside
+  id='sidebar'
+  class='hidden md:flex flex-col w-64 fixed inset-y-0 left-0 pt-24 pb-8 px-6 bg-surface-base z-30 transition-transform duration-300'
+>
+  <div class='absolute top-24 bottom-0 right-0 w-px bg-border-subtle'></div>
+  <nav class='flex-1 overflow-y-auto space-y-8 no-scrollbar'>
+    {
+      sections.map((section) => {
+        const docs = groupedDocs[section];
+        if (!docs || docs.length === 0) return null;
+        return (
+          <div class='space-y-3'>
+            <h5 class='text-xs font-bold text-text-tertiary uppercase tracking-wider'>{section}</h5>
+            <ul class='space-y-1'>
+              {docs.map((doc) => (
+                <li>
+                  <a
+                    href={href(`/manual/${doc.id}`)}
+                    class={`block py-1.5 text-sm transition-colors duration-200 ${
+                      currentSlug === doc.id
+                        ? 'text-brand-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {doc.data.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })
+    }
   </nav>
 </aside>
 

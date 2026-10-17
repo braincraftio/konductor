@@ -14,13 +14,15 @@
 { pkgs, pythonEnv }:
 
 {
-  package = pkgs.lib.hiPrio (pkgs.writeShellApplication {
-    name = "pyright";
-    runtimeInputs = [ pkgs.pyright ];
-    text = ''
-      exec pyright --pythonpath "${pythonEnv}/bin/python3" "$@"
-    '';
-  });
+  package = pkgs.lib.hiPrio (
+    pkgs.writeShellApplication {
+      name = "pyright";
+      runtimeInputs = [ pkgs.pyright ];
+      text = ''
+        exec pyright --pythonpath "${pythonEnv}/bin/python3" "$@"
+      '';
+    }
+  );
 
   unwrapped = pkgs.pyright;
 

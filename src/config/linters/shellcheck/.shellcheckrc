@@ -7,5 +7,5 @@ enable=all
 # Require bash explicitly
 shell=bash
 
-# Treat warnings as errors in CI
-# (handled by wrapper flag, not here)
+# Severity stays at the default (style): every finding of every level is
+# reported and makes shellcheck exit 1, so hooks, runme and CI fail on it.

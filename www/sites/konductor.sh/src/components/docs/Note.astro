@@ -22,11 +22,11 @@ const icons: Record<string, string> = {
 ---
 
 <div class={`my-8 p-4 rounded-lg border-l-4 ${styles[type]} not-prose`}>
-  <div class="flex gap-3">
-    <div class="flex-shrink-0 text-xl">{icons[type]}</div>
+  <div class='flex gap-3'>
+    <div class='flex-shrink-0 text-xl'>{icons[type]}</div>
     <div>
-      {title && <h5 class="font-bold text-text-primary mb-1">{title}</h5>}
-      <div class="text-sm leading-relaxed">
+      {title && <h5 class='font-bold text-text-primary mb-1'>{title}</h5>}
+      <div class='text-sm leading-relaxed'>
         <slot />
       </div>
     </div>

@@ -20,7 +20,6 @@
   packages,
   versions,
   programs,
-  config,
   sourceInfo,
   ...
 }:

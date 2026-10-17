@@ -3,7 +3,12 @@
 #
 # Package composition defined in: ../packages/
 
-{ baseShell, packages, versions, ... }:
+{
+  baseShell,
+  packages,
+  versions,
+  ...
+}:
 
 let
   langs = versions.languages;

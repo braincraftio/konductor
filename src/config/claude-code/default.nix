@@ -55,7 +55,7 @@ lib.makeExtensible (
     # settings.json content. statusline flows THROUGH final so a downstream
     # .extend on it recomputes settings → settingsDrv → configDirDrv.
     baseSettings = import ./settings.nix {
-      statusline = final.statusline;
+      inherit (final) statusline;
     };
   in
   {
@@ -63,7 +63,7 @@ lib.makeExtensible (
     # Overlay-able data (downstream .extend targets)
     # =========================================================================
     settings = baseSettings;
-    statusline = statusline;
+    inherit statusline;
 
     # =========================================================================
     # Plugin derivations (immutable store copies, loaded via --plugin-dir).
@@ -127,9 +127,7 @@ lib.makeExtensible (
       name = "konductor-claude-code-hook";
       substitutions = {
         configDir = final.configDirDrv;
-        konductorPlugin = final.konductorPlugin;
-        practitionerPlugin = final.practitionerPlugin;
-        systemPromptFile = final.systemPromptFile;
+        inherit (final) konductorPlugin practitionerPlugin systemPromptFile;
       };
     } ./setup-hook.sh;
 
@@ -158,20 +156,20 @@ lib.makeExtensible (
           nativeBuildInputs = [ pkgs.shellcheck ];
           # substituteAll replaces @name@ with these (paths coerce to store paths).
           configDir = final.configDirDrv;
-          konductorPlugin = final.konductorPlugin;
-          practitionerPlugin = final.practitionerPlugin;
-          systemPromptFile = final.systemPromptFile;
+          inherit (final) konductorPlugin practitionerPlugin systemPromptFile;
           claude = pkgs.unstable.claude-code;
 
           passthru = (pkgs.unstable.claude-code.passthru or { }) // {
             unwrapped = pkgs.unstable.claude-code;
             configDir = final.configDirDrv;
             settings = final.settingsDrv;
-            konductorPlugin = final.konductorPlugin;
-            practitionerPlugin = final.practitionerPlugin;
-            systemPromptFile = final.systemPromptFile;
-            devshellHook = final.devshellHook;
-            extend = final.extend;
+            inherit (final)
+              konductorPlugin
+              practitionerPlugin
+              systemPromptFile
+              devshellHook
+              extend
+              ;
           };
 
           meta = (pkgs.unstable.claude-code.meta or { }) // {

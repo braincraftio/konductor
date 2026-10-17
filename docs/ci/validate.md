@@ -53,7 +53,8 @@ Test web terminal services via port-forward (non-blocking).
 - `ttyd-rw` (port 7683) - xterm.js terminal (writable)
 - `ghostty-web-rw` (port 7684) - ghostty WASM terminal (writable)
 
-**Note:** This check is non-blocking. Failures generate warnings but don't fail the pipeline. Services may still be starting.
+**Note:** This check is non-blocking. Failures generate warnings but don't fail the pipeline.
+Services may still be starting.
 
 **Prerequisites:** VM deployed to KubeVirt (`validate:deploy`)
 
@@ -129,7 +130,8 @@ Test Forgejo runner by pushing to local git server and validating workflow execu
 **What it does:**
 
 1. Provisions Forgejo user and access token
-2. Creates repositories: `containercraft/k9` (main repo) and `containercraft/workspace` (shared tooling)
+2. Creates repositories: `containercraft/k9` (main repo) and `containercraft/workspace` (shared
+   tooling)
 3. Pushes workspace repository
 4. Pushes k9 repository
 5. Triggers workflow via API: `validate-environment.yaml`

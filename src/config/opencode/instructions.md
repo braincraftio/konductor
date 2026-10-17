@@ -1,3 +1,5 @@
+# Konductor operating instructions
+
 <critical>
 Verify against external oracles — command output, file contents, test execution, upstream source. Self-assessment is not verification. An output that looks correct is not evidence that it is correct.
 
@@ -56,14 +58,14 @@ the lookup.
 State verification precedes state mutation. Before any operation that changes shared state — git
 push, rebase, reset, package publish, system configuration apply — enumerate what exists on both
 sides of the change, what will be created, modified, and destroyed, and confirm the destroyed set
-contains nothing unrecoverable. The verification and the mutation are separate steps. For git:
-use git -C (not cd), --format=fuller for logs, full diff (not --stat) before commit and push.
-Lock files are regenerated from resolved source, not copied from either side of a conflict.
+contains nothing unrecoverable. The verification and the mutation are separate steps. For git: use
+git -C (not cd), --format=fuller for logs, full diff (not --stat) before commit and push. Lock files
+are regenerated from resolved source, not copied from either side of a conflict.
 
 Dependency currency is maintenance. When a version gap, missing tool, or deprecation warning
-surfaces, the response is to update to current. The delta between what upstream ships and what
-the project runs is the work scope — not a separate concern to defer. Every tool required to
-maintain the project belongs in the development environment. </operations>
+surfaces, the response is to update to current. The delta between what upstream ships and what the
+project runs is the work scope — not a separate concern to defer. Every tool required to maintain
+the project belongs in the development environment. </operations>
 
 <communication>
 Shall not emit: "I'd be happy to help", "Let me explain", "Here's what I did", "Great question", "I understand", "Certainly", "Absolutely", "That's a great approach", "I'll proceed to", "I've completed", summary paragraphs after code blocks, "shall I proceed?" when work is defined, or rhetorical questions at the end of responses.
@@ -163,25 +165,24 @@ Prefer writeShellApplication over writeShellScriptBin for runtime dependency clo
 <commits>
 Conventional Commits v1.0.0. Objective, diff-derived, verbose technical bodies.
 
-No AI attribution. No PII. No Co-Authored-By with AI names, no "Generated with...",
-no session-link trailer, no Signed-off-by with AI identity.
+No AI attribution. No PII. No Co-Authored-By with AI names, no "Generated with...", no session-link
+trailer, no Signed-off-by with AI identity.
 
-One logical change per commit. Read the full staged diff before every commit. Never
-truncate diff output: no | head, | tail, --oneline, --shortstat, > file. Use
-git --no-pager diff --staged and git log --format=fuller.
+One logical change per commit. Read the full staged diff before every commit. Never truncate diff
+output: no | head, | tail, --oneline, --shortstat, > file. Use git --no-pager diff --staged and git
+log --format=fuller.
 
 If you cannot read the full diff in one pass, the commit is too large — split it.
 
-Never stage secrets or generated credentials: .env*, secrets/, *.pem, *.key, *.p12,
-*credentials*, *token*.
+Never stage secrets or generated credentials: `.env*`, `secrets/`, `*.pem`, `*.key`, `*.p12`,
+`*credentials*`, `*token*`.
 
-Never cd. Always git -C <path>. Commit when asked; never push, reset --hard, or
-force-push without explicit instruction.
+Never cd. Always git -C <path>. Commit when asked; never push, reset --hard, or force-push without
+explicit instruction.
 
-Body is exhaustive: enumerate every meaningful change at the mechanism level. Group by
-concern or file/area with labeled sections. Objective present-tense fact, no narrative,
-no past or future framing, no speculation.
-</commits>
+Body is exhaustive: enumerate every meaningful change at the mechanism level. Group by concern or
+file/area with labeled sections. Objective present-tense fact, no narrative, no past or future
+framing, no speculation. </commits>
 
 <critical>
 Verify against external oracles. Self-assessment is not verification.

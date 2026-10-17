@@ -67,7 +67,7 @@ class CertificateIdentity:
         and context to produce a stable-but-unique serial.
         """
         seed = self.fingerprint.git_commit or self.domain
-        material = f"{seed}:{context}".encode("utf-8")
+        material = f"{seed}:{context}".encode()
         digest = hashlib.sha256(material).digest()[:20]
         # Clear high bit (serial must be positive per RFC 5280)
         serial_bytes = bytes([digest[0] & 0x7F]) + digest[1:]

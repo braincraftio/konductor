@@ -17,7 +17,10 @@
 
   systemd.services."konductor-mount@" = {
     description = "Mount virtio disk by serial ID: %i";
-    after = [ "sysinit.target" "cloud-init.service" ];
+    after = [
+      "sysinit.target"
+      "cloud-init.service"
+    ];
 
     serviceConfig =
       let

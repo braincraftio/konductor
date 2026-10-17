@@ -9,7 +9,8 @@ runme:
 
 # Konductor CI Pipeline
 
-Complete build, validation, and promotion pipeline for airgap-ready NixOS VM images with supply chain attestation.
+Complete build, validation, and promotion pipeline for airgap-ready NixOS VM images with supply
+chain attestation.
 
 ## Contents
 
@@ -31,7 +32,9 @@ Complete build, validation, and promotion pipeline for airgap-ready NixOS VM ima
 
 ## Overview
 
-This pipeline builds production-ready QCOW2 VM images with comprehensive supply chain attestation, packages them as KubeVirt containerDisks, validates in a live cluster, and promotes to public registries.
+This pipeline builds production-ready QCOW2 VM images with comprehensive supply chain attestation,
+packages them as KubeVirt containerDisks, validates in a live cluster, and promotes to public
+registries.
 
 **What this pipeline does:**
 
@@ -131,17 +134,17 @@ This pipeline builds production-ready QCOW2 VM images with comprehensive supply 
 
 **File responsibilities:**
 
-| File | Role | Tasks |
-|------|------|-------|
-| `README.md` | Sole orchestrator + pipeline docs | `k9:ci:qcow2:pipeline` |
-| `build.md` | Source → sealed QCOW2 → OCI containerDisk | `--tag=k9:ci:pipeline:all`, `--tag=k9:ci:pipeline:image` |
-| `platform.md` | Cluster lifecycle (Talos + Pulumi) | `k9:ci:platform:up`, `k9:ci:platform:down`, `k9:ci:platform:status` |
-| `registry.md` | Registry trust, auth, inspection | `k9:ci:registry:trust`, `k9:ci:registry:login`, `k9:ci:registry:list`, `k9:ci:registry:tags` |
-| `push.md` | Push to local registry | `k9:ci:qcow2:push:image` |
+| File          | Role                                           | Tasks                                                                                         |
+| ------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `README.md`   | Sole orchestrator + pipeline docs              | `k9:ci:qcow2:pipeline`                                                                        |
+| `build.md`    | Source → sealed QCOW2 → OCI containerDisk      | `--tag=k9:ci:pipeline:all`, `--tag=k9:ci:pipeline:image`                                      |
+| `platform.md` | Cluster lifecycle (Talos + Pulumi)             | `k9:ci:platform:up`, `k9:ci:platform:down`, `k9:ci:platform:status`                           |
+| `registry.md` | Registry trust, auth, inspection               | `k9:ci:registry:trust`, `k9:ci:registry:login`, `k9:ci:registry:list`, `k9:ci:registry:tags`  |
+| `push.md`     | Push to local registry                         | `k9:ci:qcow2:push:image`                                                                      |
 | `validate.md` | KubeVirt deploy + service checks + runner test | `k9:ci:qcow2:validate:deploy`, `k9:ci:qcow2:validate:services`, `k9:ci:qcow2:validate:runner` |
-| `promote.md` | Manual gate → public registry copy | `k9:ci:qcow2:promote` |
-| `verify.md` | Build verification (runs inside VM) | `k9:ci:qcow2:verify:*` |
-| `dev.md` | Developer workflow tools | `k9:ci:dev:*` |
+| `promote.md`  | Manual gate → public registry copy             | `k9:ci:qcow2:promote`                                                                         |
+| `verify.md`   | Build verification (runs inside VM)            | `k9:ci:qcow2:verify:*`                                                                        |
+| `dev.md`      | Developer workflow tools                       | `k9:ci:dev:*`                                                                                 |
 
 No file ever calls another file. Only `k9:ci:qcow2:pipeline` orchestrates cross-file execution.
 Exception: `dev.md` calls `build.md` internal tasks for VM lifecycle (dev-only, never CI).
@@ -192,78 +195,78 @@ runme run k9:ci:qcow2:promote
 
 ### Build Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `--tag=k9:ci:pipeline:all` | build.md | Full pipeline: clean → nix → VM → seal → container | 30-60 min |
-| `--tag=k9:ci:pipeline:image` | build.md | Build QCOW2 only (no container packaging) | 30-60 min |
+| Task                         | File     | Description                                        | Duration  |
+| ---------------------------- | -------- | -------------------------------------------------- | --------- |
+| `--tag=k9:ci:pipeline:all`   | build.md | Full pipeline: clean → nix → VM → seal → container | 30-60 min |
+| `--tag=k9:ci:pipeline:image` | build.md | Build QCOW2 only (no container packaging)          | 30-60 min |
 
 ### Platform Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:platform:up` | platform.md | Start Talos + deploy platform | 5-10 min |
-| `k9:ci:platform:down` | platform.md | Destroy cluster | 1-2 min |
-| `k9:ci:platform:status` | platform.md | Check cluster health | <1 min |
+| Task                    | File        | Description                   | Duration |
+| ----------------------- | ----------- | ----------------------------- | -------- |
+| `k9:ci:platform:up`     | platform.md | Start Talos + deploy platform | 5-10 min |
+| `k9:ci:platform:down`   | platform.md | Destroy cluster               | 1-2 min  |
+| `k9:ci:platform:status` | platform.md | Check cluster health          | <1 min   |
 
 ### Registry Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:registry:trust` | registry.md | Install cluster CA | <1 min |
-| `k9:ci:registry:login` | registry.md | Authenticate to registry | <1 min |
-| `k9:ci:registry:list` | registry.md | List images in registry | <1 min |
-| `k9:ci:registry:tags` | registry.md | List tags for konductor image | <1 min |
+| Task                   | File        | Description                   | Duration |
+| ---------------------- | ----------- | ----------------------------- | -------- |
+| `k9:ci:registry:trust` | registry.md | Install cluster CA            | <1 min   |
+| `k9:ci:registry:login` | registry.md | Authenticate to registry      | <1 min   |
+| `k9:ci:registry:list`  | registry.md | List images in registry       | <1 min   |
+| `k9:ci:registry:tags`  | registry.md | List tags for konductor image | <1 min   |
 
 ### Push Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:qcow2:push:image` | push.md | Multi-tag push to local registry | 1-2 min |
+| Task                     | File    | Description                      | Duration |
+| ------------------------ | ------- | -------------------------------- | -------- |
+| `k9:ci:qcow2:push:image` | push.md | Multi-tag push to local registry | 1-2 min  |
 
 ### Validation Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:qcow2:validate:deploy` | validate.md | Deploy to KubeVirt + SSH test | 3-5 min |
-| `k9:ci:qcow2:validate:services` | validate.md | Test web terminals (non-blocking) | 1-2 min |
-| `k9:ci:qcow2:validate:runner` | validate.md | Forgejo runner workflow test | 5-10 min |
+| Task                            | File        | Description                       | Duration |
+| ------------------------------- | ----------- | --------------------------------- | -------- |
+| `k9:ci:qcow2:validate:deploy`   | validate.md | Deploy to KubeVirt + SSH test     | 3-5 min  |
+| `k9:ci:qcow2:validate:services` | validate.md | Test web terminals (non-blocking) | 1-2 min  |
+| `k9:ci:qcow2:validate:runner`   | validate.md | Forgejo runner workflow test      | 5-10 min |
 
 ### Promotion Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:qcow2:promote` | promote.md | Copy to public registry | 2-5 min |
+| Task                  | File       | Description             | Duration |
+| --------------------- | ---------- | ----------------------- | -------- |
+| `k9:ci:qcow2:promote` | promote.md | Copy to public registry | 2-5 min  |
 
 ### Development Tasks
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:dev:clean` | dev.md | Reset build state | <1 min |
-| `k9:ci:dev:start` | dev.md | Boot VM for development | 2-3 min |
-| `k9:ci:dev:ssh` | dev.md | SSH into running VM | instant |
-| `k9:ci:dev:stop` | dev.md | Shutdown VM | <1 min |
-| `k9:ci:dev:rebase` | dev.md | Rebuild NixOS host from flake | 5-10 min |
-| `k9:ci:dev:vendor` | dev.md | Vendor flake inputs offline | 2-5 min |
-| `k9:ci:dev:vendor-online` | dev.md | Online refresh + vendor | 2-5 min |
-| `k9:ci:dev:log` | dev.md | View serial console log | instant |
-| `k9:ci:dev:kill` | dev.md | Force kill QEMU process | instant |
+| Task                      | File   | Description                   | Duration |
+| ------------------------- | ------ | ----------------------------- | -------- |
+| `k9:ci:dev:clean`         | dev.md | Reset build state             | <1 min   |
+| `k9:ci:dev:start`         | dev.md | Boot VM for development       | 2-3 min  |
+| `k9:ci:dev:ssh`           | dev.md | SSH into running VM           | instant  |
+| `k9:ci:dev:stop`          | dev.md | Shutdown VM                   | <1 min   |
+| `k9:ci:dev:rebase`        | dev.md | Rebuild NixOS host from flake | 5-10 min |
+| `k9:ci:dev:vendor`        | dev.md | Vendor flake inputs offline   | 2-5 min  |
+| `k9:ci:dev:vendor-online` | dev.md | Online refresh + vendor       | 2-5 min  |
+| `k9:ci:dev:log`           | dev.md | View serial console log       | instant  |
+| `k9:ci:dev:kill`          | dev.md | Force kill QEMU process       | instant  |
 
 ### Verification Tasks (runs inside built VM)
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
-| `k9:ci:qcow2:verify:help` | verify.md | Usage text | instant |
-| `k9:ci:qcow2:verify:provenance` | verify.md | Display /.konductor | instant |
-| `k9:ci:qcow2:verify:git-commit` | verify.md | Verify git commit | instant |
-| `k9:ci:qcow2:verify:flake` | verify.md | Verify flake.lock sha256 | instant |
-| `k9:ci:qcow2:verify:nix` | verify.md | Verify nix derivation | <1 min |
-| `k9:ci:qcow2:verify:all` | verify.md | All verification checks | <1 min |
-| `k9:ci:qcow2:verify:reproduce` | verify.md | Full reproduction build | 30-60 min |
+| Task                            | File      | Description              | Duration  |
+| ------------------------------- | --------- | ------------------------ | --------- |
+| `k9:ci:qcow2:verify:help`       | verify.md | Usage text               | instant   |
+| `k9:ci:qcow2:verify:provenance` | verify.md | Display /.konductor      | instant   |
+| `k9:ci:qcow2:verify:git-commit` | verify.md | Verify git commit        | instant   |
+| `k9:ci:qcow2:verify:flake`      | verify.md | Verify flake.lock sha256 | instant   |
+| `k9:ci:qcow2:verify:nix`        | verify.md | Verify nix derivation    | <1 min    |
+| `k9:ci:qcow2:verify:all`        | verify.md | All verification checks  | <1 min    |
+| `k9:ci:qcow2:verify:reproduce`  | verify.md | Full reproduction build  | 30-60 min |
 
 ### Complete Pipeline
 
-| Task | File | Description | Duration |
-|------|------|-------------|----------|
+| Task                   | File      | Description                                  | Duration  |
+| ---------------------- | --------- | -------------------------------------------- | --------- |
 | `k9:ci:qcow2:pipeline` | README.md | Full end-to-end with parallel build+platform | 45-75 min |
 
 ---
@@ -406,7 +409,8 @@ Complete end-to-end pipeline with parallel build and platform deployment.
 8. **Services**: `k9:ci:qcow2:validate:services` — Web terminal health checks
 9. **Runner**: `k9:ci:qcow2:validate:runner` — Forgejo workflow validation
 
-**Note:** Promotion (`k9:ci:qcow2:promote`) is NOT included. It is a manual gate after validation passes.
+**Note:** Promotion (`k9:ci:qcow2:promote`) is NOT included. It is a manual gate after validation
+passes.
 
 **Duration:** 45-75 minutes (parallel build+platform saves 5-10 min vs sequential)
 
@@ -648,7 +652,7 @@ SOURCE ──► NIX ──► BUILD ──► SEAL ──► OCI ──► PUSH
 
 **Promotion gate:** Manual (`k9:ci:qcow2:promote`)
 
-- Requires explicit credentials (DOCKER_TOKEN or GITHUB_TOKEN)
+- Requires explicit credentials (`DOCKER_TOKEN` or `GITHUB_TOKEN`)
 - Requires validation to have passed
 - Prevents accidental public releases
 

@@ -1,40 +1,18 @@
-# lint.toml - Linting tasks for BrainCraft.io Flake
+# lint.toml - Linting tasks for Konductor
 #
-# Provides:
-# - Nix file linting (statix, deadnix)
-# - Shell script linting (shellcheck)
-# - YAML/TOML validation
-# - Markdown linting
-# - GitHub Actions linting
+# Every task delegates to the runme task of the same name in
+# docs/developer_guide/LINT.md. The runme tasks call the konductor-wrapped,
+# store-pinned tools that lefthook and `nix flake check` use, over git-tracked
+# files. Linting is implemented once; mise only provides aliases.
 #
-# Task naming convention: lint:domain:action
-#
-# Zero-tolerance policy: All linters must pass with zero errors/warnings
+# Task naming convention: lint:domain
 
-# =============================================================================
-# TOP-LEVEL LINT ORCHESTRATION
-# =============================================================================
-
-# Note: The top-level [tasks.lint] is defined in main.toml with depends
-
-# =============================================================================
-# NIX LINTING
-# =============================================================================
+# Note: The top-level [tasks.lint] is defined in main.toml
 
 ["lint:nix"]
-description = "❄️ Lint all Nix files • ln"
+description = "❄️ Lint Nix files (statix, deadnix) • ln"
 alias = ["ln"]
-depends = ["lint:nix:statix", "lint:nix:deadnix", "lint:nix:flake"]
-
-["lint:nix:statix"]
-description = "🔍 Check Nix files with statix • lns"
-alias = ["lns"]
-run = "statix check ."
-
-["lint:nix:deadnix"]
-description = "☠️ Find dead Nix code with deadnix • lnd"
-alias = ["lnd"]
-run = "deadnix --fail ."
+run = "runme run lint:nix"
 
 ["lint:nix:flake"]
 description = "🔎 Check flake with nix flake check • lnf"
@@ -42,79 +20,52 @@ alias = ["lnf"]
 dir = "{{ config_root }}"
 run = "nix flake check --all-systems"
 
-# =============================================================================
-# SHELL SCRIPT LINTING
-# =============================================================================
+["lint:python"]
+description = "🐍 Lint Python (ruff, mypy, bandit) • lp"
+alias = ["lp"]
+run = "runme run lint:python"
+
+["lint:js"]
+description = "📦 Lint JS/TS/JSON (biome) • lj"
+alias = ["lj"]
+run = "runme run lint:js"
 
 ["lint:bash"]
-description = "🐚 Lint shell scripts with ShellCheck • lb"
+description = "🐚 Lint shell scripts (shellcheck) • lb"
 alias = ["lb", "lint:sh", "lint:shell"]
-run = '''
-#!/usr/bin/env bash
-# Find all .sh and .bash files, plus files with shell shebang (excluding .toml files)
-find . -type f \( -name '*.sh' -o -name '*.bash' \) -not -path './.git/*' -not -path './result/*' -not -path './.venv/*' -exec shellcheck -x {} + || \
-find . -type f -not -name '*.toml' -not -name '*.sh' -not -name '*.bash' -not -path './.git/*' -not -path './result/*' -not -path './.venv/*' -exec grep -l '^#!/.*sh' {} \; | xargs -r shellcheck -x
-'''
-
-# =============================================================================
-# YAML LINTING
-# =============================================================================
+run = "runme run lint:bash"
 
 ["lint:yaml"]
-description = "📄 Lint YAML files with yamllint • ly"
+description = "📄 Lint YAML (yamllint) • ly"
 alias = ["ly"]
-run = "yamllint ."
-
-# =============================================================================
-# TOML LINTING
-# =============================================================================
+run = "runme run lint:yaml"
 
 ["lint:toml"]
-description = "📜 Lint TOML files with taplo • lt"
+description = "📜 Lint TOML (taplo) • lt"
 alias = ["lt"]
-run = "taplo lint"
-
-# =============================================================================
-# MARKDOWN LINTING
-# =============================================================================
-
-["lint:markdown"]
-description = "📝 Lint Markdown files with markdownlint-cli2 • lm"
-alias = ["lm", "lint:md"]
-run = "markdownlint-cli2 '**/*.md'"
-
-# =============================================================================
-# GITHUB ACTIONS LINTING
-# =============================================================================
+run = "runme run lint:toml"
 
 ["lint:actions"]
-description = "🎬 Lint GitHub Actions workflows with actionlint • la"
+description = "🎬 Lint GitHub Actions workflows (actionlint) • la"
 alias = ["la", "lint:gha"]
-run = "actionlint"
-
-# =============================================================================
-# DOCKERFILE LINTING
-# =============================================================================
+run = "runme run lint:actions"
 
 ["lint:docker"]
-description = "🐳 Lint Dockerfiles with hadolint (pass files as args) • ld"
+description = "🐳 Lint Dockerfiles (hadolint) • ld"
 alias = ["ld", "lint:dockerfile"]
-run = '''
-#!/usr/bin/env bash
-if [ $# -eq 0 ]; then
-    echo "Usage: mise run lint:docker Dockerfile..."
-    echo "Arguments are passed directly to hadolint"
-    echo ""
-    exec hadolint --help
-fi
-exec hadolint "$@"
-'''
+run = "runme run lint:docker"
 
-# =============================================================================
-# LINK CHECKING
-# =============================================================================
+["lint:markdown"]
+description = "📝 Lint Markdown and check links offline (markdownlint, lychee) • lm"
+alias = ["lm", "lint:md", "lint:docs", "lint:links", "ll"]
+run = "runme run lint:docs"
 
-["lint:links"]
-description = "🔗 Check for broken links with lychee • ll"
-alias = ["ll"]
-run = "lychee '**/*.md' '**/*.html'"
+["lint:spell"]
+description = "🔤 Spell check (cspell) • lsp"
+alias = ["lsp"]
+run = "runme run lint:spell"
+
+["lint:secrets"]
+description = "🔐 Scan for secrets against .secrets.baseline • lsec"
+alias = ["lsec"]
+run = "runme run lint:secrets"

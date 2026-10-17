@@ -1,7 +1,7 @@
 ---
-title: "Building Images"
-description: "Export your development environment as an OCI container or QCOW2 VM."
-section: "Guides"
+title: 'Building Images'
+description: 'Export your development environment as an OCI container or QCOW2 VM.'
+section: 'Guides'
 order: 1
 ---
 
@@ -12,20 +12,20 @@ Konductor exports your exact development environment as a deployable artifact. T
 
 ## Build Targets
 
-<div className="my-8 grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+<div className='my-8 grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch'>
   <RefCard
-    title="OCI Container"
-    description="Lightweight base image. Core tools, linters, formatters, neovim, tmux. Add languages via <code>nix develop</code> inside the container."
-    footer="nix build .#oci"
-    copy="nix build .#oci"
-    meta="x86_64 + aarch64 — linux"
+    title='OCI Container'
+    description='Lightweight base image. Core tools, linters, formatters, neovim, tmux. Add languages via <code>nix develop</code> inside the container.'
+    footer='nix build .#oci'
+    copy='nix build .#oci'
+    meta='x86_64 + aarch64 — linux'
   />
   <RefCard
-    title="QCOW2 Virtual Machine"
-    description="Full NixOS with everything pre-installed. All languages, IDE, docker, qemu, libvirt. SSH in and start working."
-    footer="nix build .#qcow2"
-    copy="nix build .#qcow2"
-    meta="x86_64-linux only (requires KVM)"
+    title='QCOW2 Virtual Machine'
+    description='Full NixOS with everything pre-installed. All languages, IDE, docker, qemu, libvirt. SSH in and start working.'
+    footer='nix build .#qcow2'
+    copy='nix build .#qcow2'
+    meta='x86_64-linux only (requires KVM)'
     metaWarning={true}
   />
 </div>
@@ -59,11 +59,11 @@ Base packages, linters, formatters, AI tools, neovim, and tmux. **No language ru
 
 <div className="overflow-x-auto">
 
-| User | UID | Role |
-|------|-----|------|
-| `kc2` | 1001 | Default user (unprivileged) |
+| User       | UID  | Role                                 |
+| ---------- | ---- | ------------------------------------ |
+| `kc2`      | 1001 | Default user (unprivileged)          |
 | `kc2admin` | 1002 | Admin with passwordless sudo (wheel) |
-| `runner` | 1003 | CI/CD workflows (forgejo-runner) |
+| `runner`   | 1003 | CI/CD workflows (forgejo-runner)     |
 
 </div>
 
@@ -98,13 +98,13 @@ Everything from the `full` shell plus self-hosting tools: docker, docker-compose
 
 <div className="overflow-x-auto">
 
-| User | UID | Role |
-|------|-----|------|
-| *(dynamic)* | 1000 | Your host user — created by cloud-init with SSH key |
-| `kc2` | 1001 | Unprivileged user |
-| `kc2admin` | 1002 | Admin with passwordless sudo (wheel) |
-| `runner` | 1003 | CI/CD runner (forgejo-runner agent) |
-| `forgejo` | 1004 | Git forge server |
+| User        | UID  | Role                                                |
+| ----------- | ---- | --------------------------------------------------- |
+| _(dynamic)_ | 1000 | Your host user — created by cloud-init with SSH key |
+| `kc2`       | 1001 | Unprivileged user                                   |
+| `kc2admin`  | 1002 | Admin with passwordless sudo (wheel)                |
+| `runner`    | 1003 | CI/CD runner (forgejo-runner agent)                 |
+| `forgejo`   | 1004 | Git forge server                                    |
 
 </div>
 
@@ -119,8 +119,10 @@ systemctl start docker
 systemctl start libvirtd
 ```
 
-<Note type="info" title="Fast Builder">
-  The QCOW2 image uses a custom builder that copies files **inside** the VM via virtiofs instead of the standard `cptofs` (which runs a Linux kernel in userspace with 4KB buffers). This is 5-10x faster for large closures — 100k files in minutes instead of 40+.
+<Note type='info' title='Fast Builder'>
+  The QCOW2 image uses a custom builder that copies files **inside** the VM via virtiofs instead of
+  the standard `cptofs` (which runs a Linux kernel in userspace with 4KB buffers). This is 5-10x
+  faster for large closures — 100k files in minutes instead of 40+.
 </Note>
 
 ### Workspace Mount

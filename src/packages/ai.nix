@@ -22,6 +22,11 @@ in
     # Claude Code ecosystem
     claudeCode # Anthropic Claude Code CLI (konductor-wrapped when config present)
 
+    # Prompt spell checking backend (settings.nix spellcheck.checker = "aspell").
+    # aspellWithDicts wires the dictionary search path; a bare aspellDicts.en
+    # in a buildEnv is not discovered by aspell.
+    (pkgs.aspellWithDicts (dicts: [ dicts.en ]))
+
     # MCP servers referenced by the konductor plugin .mcp.json.
     # These must be on PATH for the MCP config to resolve at runtime.
     pkgs.mcp-nixos # NixOS/nixpkgs/home-manager package and option search

@@ -1,0 +1,82 @@
+name: Setup Nix
+description: >
+  Install Determinate Nix, optionally enable FlakeHub Cache, and configure
+  Cachix. Cachix always pulls; it pushes only when an auth token or signing
+  key is supplied and skip-push is not set.
+
+inputs:
+  use-flakehub:
+    description: Enable FlakeHub Cache (caller requires id-token write)
+    required: false
+    default: "false"
+  cachix-name:
+    description: Cachix cache name (override for forks)
+    required: false
+    default: braincraftio
+  cachix-auth-token:
+    description: Cachix API token (empty disables push)
+    required: false
+    default: ""
+  cachix-signing-key:
+    description: Cachix private signing key for self-signed caches
+    required: false
+    default: ""
+  cachix-skip-push:
+    description: Pull only, even when credentials are present
+    required: false
+    default: "false"
+  cachix-extra-pull-names:
+    description: Comma-separated additional Cachix caches to pull from
+    required: false
+    default: "nix-community,scopecreep-zip,usrbinkat"
+  cachix-use-daemon:
+    description: Push store paths as they are built via post-build hook
+    required: false
+    default: "true"
+  cachix-push-filter:
+    description: Regex of store paths to exclude from push
+    required: false
+    default: ""
+
+outputs:
+  cachix-push:
+    description: "'true' when this job pushes to Cachix"
+    value: ${{ steps.cachix-creds.outputs.push }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Determinate Nix
+      uses: DeterminateSystems/determinate-nix-action@e847f25223456b3058e12f7fc9d777b6a6f25060 # v3.23.2
+
+    # GitHub's Nix-store cache is disabled: the closure exceeds its quota.
+    - name: Configure FlakeHub Cache
+      if: inputs.use-flakehub == 'true'
+      uses: DeterminateSystems/flakehub-cache-action@1e32af7023570b86600346bf88feacc99b18ceca # v3.23.2
+      with:
+        use-gha-cache: "false"
+
+    - name: Check Cachix credentials
+      id: cachix-creds
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.cachix-auth-token }}
+        SIGNING_KEY: ${{ inputs.cachix-signing-key }}
+        SKIP_PUSH: ${{ inputs.cachix-skip-push }}
+      run: |
+        if [ "$SKIP_PUSH" != "true" ] && { [ -n "$TOKEN" ] || [ -n "$SIGNING_KEY" ]; }; then
+          echo "push=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "push=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Configure Cachix
+      uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+      with:
+        name: ${{ inputs.cachix-name }}
+        authToken: ${{ inputs.cachix-auth-token }}
+        signingKey: ${{ inputs.cachix-signing-key }}
+        extraPullNames: ${{ inputs.cachix-extra-pull-names }}
+        skipPush: ${{ steps.cachix-creds.outputs.push != 'true' }}
+        useDaemon: ${{ inputs.cachix-use-daemon }}
+        pushFilter: ${{ inputs.cachix-push-filter }}

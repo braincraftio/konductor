@@ -19,7 +19,9 @@ in
     name = "hadolint";
     runtimeInputs = [ pkgs.hadolint ];
     text = ''
-      exec hadolint --config "${configFile}/.hadolint.yaml" "$@"
+      # Explicit failure threshold: info and above fail (hadolint's default,
+      # stated so it cannot drift with upstream defaults).
+      exec hadolint --config "${configFile}/.hadolint.yaml" --failure-threshold info "$@"
     '';
   };
 

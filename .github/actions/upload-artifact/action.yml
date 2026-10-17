@@ -1,0 +1,38 @@
+name: Upload artifact
+description: Upload a build artifact with a single pinned version.
+
+inputs:
+  name:
+    description: Artifact name
+    required: false
+    default: artifact
+  path:
+    description: File, directory, or wildcard pattern to upload
+    required: true
+  if-no-files-found:
+    description: "Behavior if no files found: warn, error, or ignore"
+    required: false
+    default: warn
+  retention-days:
+    description: Days until the artifact expires (0 = repository default)
+    required: false
+    default: "0"
+
+outputs:
+  artifact-id:
+    description: Unique identifier for the uploaded artifact
+    value: ${{ steps.upload.outputs.artifact-id }}
+  artifact-url:
+    description: Download URL for the uploaded artifact
+    value: ${{ steps.upload.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - id: upload
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}

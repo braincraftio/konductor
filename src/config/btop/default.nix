@@ -31,7 +31,10 @@ let
   #
   wrappedBtop = pkgs.writeShellApplication {
     name = "btop";
-    runtimeInputs = [ pkgs.btop pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.btop
+      pkgs.coreutils
+    ];
     text = ''
       # Ensure themes directory exists
       THEMES_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/btop/themes"

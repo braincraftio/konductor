@@ -10,8 +10,7 @@
 # Build uses rust-overlay toolchain pinned in versions.nix.
 #
 # Version bump procedure:
-#   1. src/lib/versions.nix — atuin.version
-#   2. this file — src hash + cargoHash for the new tag
+#   Update atuin.version, hash, and cargoHash together in src/lib/versions.nix.
 
 let
   versions = import ../lib/versions.nix;
@@ -37,12 +36,12 @@ in
       owner = "atuinsh";
       repo = "atuin";
       tag = "v${atuin.version}";
-      hash = "sha256-FjfG2w4HnYNdT7cztVzSGtcgj/9fLupgSu8bzV+uLtE=";
+      inherit (atuin) hash;
     };
 
-    cargoHash = "sha256-HXRFjemrIVuBYpM3ISMtvnNEWFMfmfkhavNFgk5VbI4=";
+    inherit (atuin) cargoHash;
 
-    # atuin's default features include 'check-updates', which do not make sense
+    # atuin's default features include 'check-update', which does not make sense
     # for distribution builds. List all other default features.
     buildNoDefaultFeatures = true;
     buildFeatures = [
@@ -50,7 +49,7 @@ in
       "client"
       "clipboard"
       "daemon"
-      "hex"
+      "pty-proxy"
       "sync"
     ];
 
@@ -61,6 +60,12 @@ in
 
     buildInputs = [
       prev.openssl
+    ];
+
+    # PTY tests clear the terminal and create Git repositories for workspace filters.
+    nativeCheckInputs = [
+      prev.ncurses
+      prev.git
     ];
 
     postInstall = prev.lib.optionalString (prev.stdenv.buildPlatform.canExecute prev.stdenv.hostPlatform) ''
@@ -75,10 +80,14 @@ in
       "--skip=sync"
       "--skip=change_password"
       "--skip=multi_user_test"
+      # Requires a running, password-authenticated PostgreSQL server.
+      "--skip=postgres_authenticates_with_the_password_file"
     ];
 
     preCheck = ''
       export HOME=$(mktemp -d)
+      # The stdenv Bash lacks readline; PTY tests need an interactive editor.
+      export ATUIN_E2E_BASH=${prev.bashInteractive}/bin/bash
     '';
 
     meta = with prev.lib; {

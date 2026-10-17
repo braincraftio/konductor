@@ -1,0 +1,24 @@
+name: Repair Nix hashes
+description: Collect centralized hash repairs as a platform-specific patch
+
+inputs:
+  system:
+    description: Nix system used in the failed build
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Collect hash repairs
+      shell: bash
+      run: |
+        determinate-nixd fix hashes --auto-apply
+        git diff --binary -- src/lib/versions.nix > "$RUNNER_TEMP/hash-repairs.patch"
+
+    - name: Upload hash repairs
+      if: always()
+      uses: ./.github/actions/upload-artifact
+      with:
+        name: hash-repairs-${{ inputs.system }}
+        path: ${{ runner.temp }}/hash-repairs.patch
+        if-no-files-found: ignore

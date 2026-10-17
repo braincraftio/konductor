@@ -1,0 +1,3 @@
+#!/bin/bash
+# Container HEALTHCHECK: healthy while the Nix daemon socket unit is active.
+systemctl is-active --quiet nix-daemon.socket

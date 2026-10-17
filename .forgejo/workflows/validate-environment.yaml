@@ -187,7 +187,10 @@ jobs:
             ' >> $GITHUB_ENV
 
             # Count exported variables
-            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq '
+              to_entries
+              | map(select(.value | type == "string") | select(.value | contains("\n") | not))
+              | length')
             echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
           fi
           echo ""

@@ -315,12 +315,6 @@ in
     '';
   };
 
-  # Override sssd's ExecStartPre with our domain-aware preStart.
-  # This is the SOLE writer of /var/lib/sssd/sssd.conf.
-  # Checks domain.env + keytab → IPA config or standalone config.
-  # Never crashes, never blocks boot.
-  systemd.services.sssd.serviceConfig.ExecStartPre = lib.mkForce sssdPreStart;
-
   # =========================================================================
   # Autofs — NFS home directories (inert without map file)
   # =========================================================================
@@ -343,33 +337,6 @@ in
   security.pam.services.sshd.makeHomeDir = true;
 
   # =========================================================================
-  # /nfshome mountpoint for autofs
-  # =========================================================================
-  systemd.tmpfiles.rules = [ "d /nfshome 0755 root root -" ];
-
-  # =========================================================================
-  # FreeIPA shell symlinks — canonical NixOS IPA pattern
-  # (nixos/modules/security/ipa.nix lines 317-325)
-  #
-  # FreeIPA sets user loginShell to /bin/bash (POSIX convention).
-  # NixOS has no /bin/bash — bash lives in /nix/store. sshd checks
-  # shell existence before allowing login, rejecting domain users
-  # with "shell /bin/bash does not exist".
-  #
-  # Create /bin/bash symlink via tmpfiles (same mechanism as the
-  # upstream NixOS security.ipa module).
-  # =========================================================================
-  systemd.tmpfiles.settings."10-ipa-shells" = lib.foldl' (
-    acc: pkg:
-    (
-      acc
-      // {
-        ${pkg.shellPath}."L+".argument = "${pkg}${pkg.shellPath}";
-      }
-    )
-  ) { } [ pkgs.bash ];
-
-  # =========================================================================
   # Packages for domain operations
   # =========================================================================
   environment.systemPackages = with pkgs; [
@@ -377,76 +344,105 @@ in
     krb5
   ];
 
-  # =========================================================================
-  # Domain services
-  # =========================================================================
-  systemd.services = {
-    # Phase 1: Write domain config files (everything except sssd.conf)
-    # No Before=sssd — sssd does not depend on this service.
-    # sssd's own preStart reads domain.env directly.
-    konductor-domain-config = {
-      description = "Generate FreeIPA domain configuration";
-      after = [
-        "cloud-init.service"
-        "network-online.target"
-      ];
-      wants = [ "network-online.target" ];
-      before = [ "konductor-domain-join.service" ];
-      wantedBy = [ "multi-user.target" ];
-      unitConfig.ConditionPathExists = domainEnv;
-      path = with pkgs; [
-        coreutils
-        gnused
-        hostname
-        curl
-      ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        EnvironmentFile = domainEnv;
-        ExecStart = domainConfigScript;
-      };
+  systemd = {
+    tmpfiles = {
+      # /nfshome mountpoint for autofs
+      rules = [ "d /nfshome 0755 root root -" ];
+
+      # FreeIPA shell symlinks — canonical NixOS IPA pattern
+      # (nixos/modules/security/ipa.nix lines 317-325)
+      #
+      # FreeIPA sets user loginShell to /bin/bash (POSIX convention).
+      # NixOS has no /bin/bash — bash lives in /nix/store. sshd checks
+      # shell existence before allowing login, rejecting domain users
+      # with "shell /bin/bash does not exist".
+      #
+      # Create /bin/bash symlink via tmpfiles (same mechanism as the
+      # upstream NixOS security.ipa module).
+      settings."10-ipa-shells" = lib.foldl' (
+        acc: pkg:
+        (
+          acc
+          // {
+            ${pkg.shellPath}."L+".argument = "${pkg}${pkg.shellPath}";
+          }
+        )
+      ) { } [ pkgs.bash ];
     };
 
-    # Phase 2: Obtain keytab via ipa-join (run-once)
-    # Before=sssd — sssd waits for keytab before starting.
-    # Does NOT restart sssd — Before= ordering handles it.
-    konductor-domain-join = {
-      description = "Join Konductor VM to FreeIPA domain";
-      after = [
-        "konductor-domain-config.service"
-        "network-online.target"
-      ];
-      wants = [
-        "network-online.target"
-        "konductor-domain-config.service"
-      ];
-      before = [ "sssd.service" ];
-      wantedBy = [ "multi-user.target" ];
-      unitConfig.ConditionPathExists = [
-        domainEnv
-        "!/etc/krb5.keytab"
-      ];
-      path = with pkgs; [
-        freeipa
-        krb5
-        coreutils
-        hostname
-      ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        EnvironmentFile = domainEnv;
-        ExecStart = domainJoinScript;
-        # rpc-gssd ConditionPathExists=/etc/krb5.keytab fires at boot before
-        # domain-join creates the keytab, so rpc-gssd skips. Start it now.
-        ExecStartPost = "+${pkgs.systemd}/bin/systemctl start rpc-gssd.service";
+    services = {
+      # sssd: override ExecStartPre with our domain-aware preStart.
+      # This is the SOLE writer of /var/lib/sssd/sssd.conf.
+      # Checks domain.env + keytab → IPA config or standalone config.
+      # Never crashes, never blocks boot.
+      # Ordered after domain-join so the keytab exists before sssd starts.
+      sssd = {
+        serviceConfig.ExecStartPre = lib.mkForce sssdPreStart;
+        after = lib.mkAfter [ "konductor-domain-join.service" ];
+      };
+
+      # Phase 1: Write domain config files (everything except sssd.conf)
+      # No Before=sssd — sssd does not depend on this service.
+      # sssd's own preStart reads domain.env directly.
+      konductor-domain-config = {
+        description = "Generate FreeIPA domain configuration";
+        after = [
+          "cloud-init.service"
+          "network-online.target"
+        ];
+        wants = [ "network-online.target" ];
+        before = [ "konductor-domain-join.service" ];
+        wantedBy = [ "multi-user.target" ];
+        unitConfig.ConditionPathExists = domainEnv;
+        path = with pkgs; [
+          coreutils
+          gnused
+          hostname
+          curl
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          EnvironmentFile = domainEnv;
+          ExecStart = domainConfigScript;
+        };
+      };
+
+      # Phase 2: Obtain keytab via ipa-join (run-once)
+      # Before=sssd — sssd waits for keytab before starting.
+      # Does NOT restart sssd — Before= ordering handles it.
+      konductor-domain-join = {
+        description = "Join Konductor VM to FreeIPA domain";
+        after = [
+          "konductor-domain-config.service"
+          "network-online.target"
+        ];
+        wants = [
+          "network-online.target"
+          "konductor-domain-config.service"
+        ];
+        before = [ "sssd.service" ];
+        wantedBy = [ "multi-user.target" ];
+        unitConfig.ConditionPathExists = [
+          domainEnv
+          "!/etc/krb5.keytab"
+        ];
+        path = with pkgs; [
+          freeipa
+          krb5
+          coreutils
+          hostname
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          EnvironmentFile = domainEnv;
+          ExecStart = domainJoinScript;
+          # rpc-gssd ConditionPathExists=/etc/krb5.keytab fires at boot before
+          # domain-join creates the keytab, so rpc-gssd skips. Start it now.
+          ExecStartPost = "+${pkgs.systemd}/bin/systemctl start rpc-gssd.service";
+        };
       };
     };
   };
-
-  # Order sssd after domain-join so keytab exists before sssd starts
-  systemd.services.sssd.after = lib.mkAfter [
-    "konductor-domain-join.service"
-  ];
 }

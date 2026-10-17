@@ -56,15 +56,14 @@ exclude = [
 ]
 
 # Link checking behavior
-include_verbatim = true  # Check links in verbatim sections (code blocks)
-include_anchor = true    # Check anchors
-include_fragments = true # Check fragments
+include_verbatim = true    # Check links in verbatim sections (code blocks)
+include_fragments = "full" # Check anchor (#section) and text (#:~:text=) fragments
 
 # Network exclusions
 exclude_link_local = true # Skip link-local addresses (169.254.x.x)
 exclude_loopback = true   # Skip localhost and 127.0.0.1
 exclude_private = true    # Exclude private IPs
-exclude_mail = true       # Exclude mail addresses
+# Mail addresses are not checked: lychee's include_mail defaults to false.
 
 # Offline behavior
 skip_missing = true # Skip missing files when offline
@@ -72,20 +71,20 @@ skip_missing = true # Skip missing files when offline
 # Cache results for 1 hour
 cache = true
 
-# Exclude paths
+# Exclude paths (regular expressions matched against the input path).
+# Each entry matches the directory as a whole path component.
 exclude_path = [
   # Dependencies and build artifacts
-  ".npm-global",
-  ".npm-global/**",
-  "node_modules",
-  "node_modules/**",
-  ".git",
-  ".mise",
-  ".cargo",
-  ".cache",
-  "target",
-  "dist",
-  "build",
-  "tmp",
-  ".reports",
+  "(^|/)\\.npm-global(/|$)",
+  "(^|/)node_modules(/|$)",
+  "(^|/)\\.git(/|$)",
+  "(^|/)\\.mise(/|$)",
+  "(^|/)\\.cargo(/|$)",
+  "(^|/)\\.cache(/|$)",
+  "(^|/)target(/|$)",
+  "(^|/)dist(/|$)",
+  "(^|/)build(/|$)",
+  "(^|/)tmp(/|$)",
+  "(^|/)\\.reports(/|$)",
+  "(^|/)_sources(/|$)",
 ]

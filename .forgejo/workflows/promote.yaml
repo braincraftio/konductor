@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       registry:
-        description: 'Target registry'
+        description: "Target registry"
         required: true
-        default: 'docker.io'
+        default: "docker.io"
         type: choice
         options:
           - docker.io

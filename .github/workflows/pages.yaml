@@ -4,65 +4,84 @@ on:
   push:
     branches: [main]
     paths:
-      - 'www/sites/konductor.sh/**'
-      - 'src/lib/versions.nix'
-      - '.github/workflows/pages.yaml'
+      - "www/sites/konductor.sh/**"
+      - "src/lib/versions.nix"
+      - ".github/workflows/pages.yaml"
+      - ".github/actions/setup-nix/**"
+      - ".github/actions/setup-devshell/**"
+      - ".github/actions/upload-pages-artifact/**"
+      - ".github/actions/deploy-pages/**"
+      - "flake.nix"
+      - "flake.lock"
+  # The build job is the Tailwind/Astro compiler gate that stylelint delegates
+  # @theme/@plugin validation to; it must pass before merge, not only on deploy.
+  pull_request:
+    paths:
+      - "www/sites/konductor.sh/**"
+      - "src/lib/versions.nix"
+      - "src/config/linters/stylelint/**"
+      - ".github/workflows/pages.yaml"
+      - ".github/actions/setup-nix/**"
+      - ".github/actions/setup-devshell/**"
+      - "flake.nix"
+      - "flake.lock"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+defaults:
+  run:
+    shell: bash
+
+# Deploys share one group so a newer main build supersedes an older one;
+# pull request builds are grouped per PR and never cancel a deploy.
 concurrency:
-  group: pages
+  group: >-
+    ${{ github.event_name == 'pull_request'
+    && format('pages-pr-{0}', github.event.pull_request.number)
+    || 'pages' }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          nix_path: nixpkgs=channel:nixos-26.05
+          persist-credentials: false
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
+      # node and pnpm come from .#ci; node major follows src/lib/versions.nix.
+      - uses: ./.github/actions/setup-devshell
 
       - name: Install dependencies
-        run: pnpm -C www/sites/konductor.sh install
-
-      - name: Generate versions data
-        run: |
-          mkdir -p www/sites/konductor.sh/src/data
-          cp "$(nix build .#versions-json --print-out-paths --no-link)" www/sites/konductor.sh/src/data/versions.json
+        run: pnpm -C www/sites/konductor.sh install --frozen-lockfile
 
       - name: Build
         run: pnpm -C www/sites/konductor.sh build
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
+      - uses: ./.github/actions/upload-pages-artifact
         with:
           path: www/sites/konductor.sh/dist
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page-url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      # Local actions resolve from the workspace, so deploy needs a checkout.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions
+
+      - id: deployment
+        uses: ./.github/actions/deploy-pages

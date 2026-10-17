@@ -1,0 +1,5 @@
+# Konductor statix configuration (keys per `statix dump`: disabled, ignore).
+# statix also honours .gitignore; ignore is the explicit floor for trees that
+# must never be linted even when invoked with --unrestricted.
+disabled = []
+ignore = [".direnv", "_sources", "result", "result-*"]

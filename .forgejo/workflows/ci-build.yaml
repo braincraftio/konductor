@@ -64,7 +64,10 @@ jobs:
               | select(.value | test("^\\s*(echo|if|then|else|fi|for|while|do|done|case|esac|function)\\s") | not)
               | "\(.key)<<EOF\n\(.value)\nEOF"
             ' >> $GITHUB_ENV
-            VAR_COUNT=$(echo "$DIRENV_JSON" | jq 'to_entries | map(select(.value | type == "string") | select(.value | contains("\n") | not)) | length')
+            VAR_COUNT=$(echo "$DIRENV_JSON" | jq '
+              to_entries
+              | map(select(.value | type == "string") | select(.value | contains("\n") | not))
+              | length')
             echo "✓ Exported ${VAR_COUNT} environment variables to GITHUB_ENV"
           else
             echo "✗ direnv export failed"

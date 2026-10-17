@@ -32,17 +32,18 @@ fi
 
 # Report errors
 for err in "${REPO_ERRORS[@]:-}"; do
-    [[ -n "$err" ]] && echo "[${ENFORCE^^}] $err"
+    [[ -n "${err}" ]] && echo "[${ENFORCE^^}] ${err}"
 done
 
 # Export validation state
-export REPO_POLICY_VALID="$REPO_VALID"
-export REPO_POLICY_ENFORCE="$ENFORCE"
-export REPO_POLICY_DATE="$(date -Iseconds)"
+export REPO_POLICY_VALID="${REPO_VALID}"
+export REPO_POLICY_ENFORCE="${ENFORCE}"
+REPO_POLICY_DATE="$(date -Iseconds)"
+export REPO_POLICY_DATE
 
 # Enforce policy
-if [[ "$REPO_VALID" != "true" ]]; then
-    if [[ "$ENFORCE" == "strict" ]]; then
+if [[ "${REPO_VALID}" != "true" ]]; then
+    if [[ "${ENFORCE}" == "strict" ]]; then
         echo "=== Repository Policy: FAILED (strict mode) ==="
         exit 1
     else

@@ -1,7 +1,7 @@
 ---
-title: "Introduction"
-description: "What Konductor is, how it works, and why the architecture matters."
-section: "Getting Started"
+title: 'Introduction'
+description: 'What Konductor is, how it works, and why the architecture matters.'
+section: 'Getting Started'
 order: 1
 ---
 
@@ -60,7 +60,7 @@ You pick the shell that matches your work. `nix develop .#python` gives you Pyth
 
 ## Multi-Target Output
 
-<p className="spec-line">devshells · containers · VMs · NixOS modules</p>
+<p className='spec-line'>devshells · containers · VMs · NixOS modules</p>
 
 The same Nix expression that produces your devshell also produces deployable artifacts. This is not a separate build system — it's the same `src/packages/` composition consumed by different outputs.
 
@@ -95,21 +95,35 @@ Konductor is not a package manager, a container orchestrator, or a cloud platfor
 
 ## Next Steps
 
-<div className="my-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
-  <a href={href('/manual/getting-started/installation')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
-    <span className="font-semibold text-text-secondary block mb-1">Installation</span>
-    <span className="text-sm text-text-tertiary">Install Nix and enter your first devshell</span>
+<div className='my-8 grid grid-cols-1 sm:grid-cols-2 gap-3'>
+  <a
+    href={href('/manual/getting-started/installation')}
+    className='block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline'
+  >
+    <span className='font-semibold text-text-secondary block mb-1'>Installation</span>
+    <span className='text-sm text-text-tertiary'>Install Nix and enter your first devshell</span>
   </a>
-  <a href={href('/manual/reference/shells')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
-    <span className="font-semibold text-text-secondary block mb-1">Shell Environments</span>
-    <span className="text-sm text-text-tertiary">Which shell to use and what each one provides</span>
+  <a
+    href={href('/manual/reference/shells')}
+    className='block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline'
+  >
+    <span className='font-semibold text-text-secondary block mb-1'>Shell Environments</span>
+    <span className='text-sm text-text-tertiary'>
+      Which shell to use and what each one provides
+    </span>
   </a>
-  <a href={href('/manual/guides/building-images')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
-    <span className="font-semibold text-text-secondary block mb-1">Building Images</span>
-    <span className="text-sm text-text-tertiary">Export your environment as a container or VM</span>
+  <a
+    href={href('/manual/guides/building-images')}
+    className='block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline'
+  >
+    <span className='font-semibold text-text-secondary block mb-1'>Building Images</span>
+    <span className='text-sm text-text-tertiary'>Export your environment as a container or VM</span>
   </a>
-  <a href={href('/specs')} className="block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline">
-    <span className="font-semibold text-text-secondary block mb-1">Specifications</span>
-    <span className="text-sm text-text-tertiary">Current version manifest and supply chain</span>
+  <a
+    href={href('/specs')}
+    className='block p-4 bg-surface-paper border border-border-default rounded-lg hover:border-brand-primary/40 hover:shadow-sm transition-all duration-200 no-underline'
+  >
+    <span className='font-semibold text-text-secondary block mb-1'>Specifications</span>
+    <span className='text-sm text-text-tertiary'>Current version manifest and supply chain</span>
   </a>
 </div>

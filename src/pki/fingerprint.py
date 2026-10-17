@@ -81,15 +81,9 @@ class Fingerprint:
         if not path.exists():
             return cls()
 
-        # Parse TOML -- errors are fatal, not silent
-        try:
-            import tomllib
-        except ModuleNotFoundError:
-            try:
-                import tomli as tomllib  # type: ignore[no-redef]
-            except ModuleNotFoundError:
-                # No TOML library: use line parser (still strict)
-                return cls._parse_strict(path)
+        # Parse TOML -- errors are fatal, not silent. tomllib is stdlib on
+        # every interpreter konductor ships (Python >= 3.11).
+        import tomllib
 
         try:
             with open(path, "rb") as f:
@@ -150,9 +144,7 @@ class Fingerprint:
                 val = val.strip().strip('"')
                 values[key] = val
         except Exception as exc:
-            raise FingerprintError(
-                f"Failed to read {path}: {exc}"
-            ) from exc
+            raise FingerprintError(f"Failed to read {path}: {exc}") from exc
 
         dirty = values.get("git_dirty")
         return cls(
@@ -226,9 +218,7 @@ class Fingerprint:
         flake_lock = src / "flake.lock"
         flake_lock_sha256 = None
         if flake_lock.exists():
-            flake_lock_sha256 = hashlib.sha256(
-                flake_lock.read_bytes()
-            ).hexdigest()
+            flake_lock_sha256 = hashlib.sha256(flake_lock.read_bytes()).hexdigest()
 
         return cls(
             git_commit=git_commit,
@@ -281,9 +271,7 @@ def _run_strict(cmd: list[str], description: str) -> str:
         )
     except Exception as exc:
         raise FingerprintError(
-            f"Discovery command failed: {description}\n"
-            f"  Command: {' '.join(cmd)}\n"
-            f"  Error: {exc}"
+            f"Discovery command failed: {description}\n  Command: {' '.join(cmd)}\n  Error: {exc}"
         ) from exc
 
     if result.returncode != 0:
@@ -301,11 +289,11 @@ def _run_strict(cmd: list[str], description: str) -> str:
 class OSRelease:
     """NixOS version information from /etc/os-release."""
 
-    version_id: str | None = None      # e.g. "25.11"
+    version_id: str | None = None  # e.g. "25.11"
     version_codename: str | None = None  # e.g. "xantusia"
-    version: str | None = None          # e.g. "25.11 (Xantusia)"
-    name: str | None = None             # e.g. "NixOS"
-    hostname: str | None = None         # runtime hostname
+    version: str | None = None  # e.g. "25.11 (Xantusia)"
+    name: str | None = None  # e.g. "NixOS"
+    hostname: str | None = None  # runtime hostname
 
     @classmethod
     def load(cls, path: Path | None = None) -> OSRelease:
