@@ -1,3 +1,26 @@
+## [1.7.0](https://github.com/braincraftio/konductor/compare/v1.6.0...v1.7.0) (2026-10-17)
+
+### ⚠ BREAKING CHANGES
+
+* versions.nix languages.*.version holds the series
+("3.13" not "313"), display fields are removed, and kubernetes.k0s.attr
+is replaced by kubernetes.k0s.version; consumers select packages via
+pkgs.konductor.*.
+* consumers importing konductor.homeManagerModules.default
+must import konductor.homeModules.default.
+
+### Features
+
+* hermetic lint/format toolchain with treefmt as single formatter owner ([206ca7a](https://github.com/braincraftio/konductor/commit/206ca7a9d07832ff5d4ef0f771256fd0ce926903))
+
+### Bug Fixes
+
+* **ci:** call setup-nix directly so cachix-action post step gets inputs ([5ccbda9](https://github.com/braincraftio/konductor/commit/5ccbda9c5b53f63b16b5ef43508bb2e33fc0b80a))
+
+### Refactoring
+
+* consolidate forgejo runner, derive package attrs from versions ([c37356e](https://github.com/braincraftio/konductor/commit/c37356e72c9e3885e9e8450ce974e11c9cb69825))
+
 ## [1.6.0](https://github.com/braincraftio/konductor/compare/v1.5.0...v1.6.0) (2026-09-23)
 
 ### Features
