@@ -21,7 +21,6 @@
 }:
 
 let
-  versions = import ../../../lib/versions.nix;
   # Config file - native YAML, copied to nix store
   configFile = pkgs.writeTextFile {
     name = "ansible-lint-config";
@@ -37,7 +36,7 @@ let
   # Match the pinned interpreter used by packages/ansible. Mixing the nixpkgs
   # default interpreter with pinned native extensions can break rpds imports.
   ansibleLintPkg = pkgs.ansible-lint.override {
-    python3Packages = pkgs."python${versions.languages.python.version}Packages";
+    python3Packages = pkgs.konductor.pythonPackages;
   };
 in
 {

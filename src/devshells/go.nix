@@ -28,7 +28,7 @@ baseShell.overrideAttrs (old: {
     mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
     export PATH="$GOBIN:$PATH"
 
-    echo "Go ${langs.go.display} ready"
+    echo "Go ${langs.go.version} ready"
 
     # Clean up shellHook from env output
     unset shellHook

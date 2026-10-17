@@ -24,7 +24,13 @@ pkgs.mkShell {
   # packages.default from ./packages.nix (single source of truth)
   # Using `packages` (modern) instead of `buildInputs` (legacy)
   # This properly sets up PATH and XDG_DATA_DIRS for CLI tools
-  packages = packages.default;
+  #
+  # nix itself is pinned from the flake lock so evaluation and checks (nix
+  # flake check, nix fmt) behave identically for every contributor regardless
+  # of the host's installed Nix/Lix; the host daemon still owns the store.
+  # Devshell-only: system modules and packages.default must not ship a second
+  # nix that collides with the host's nix.package.
+  packages = packages.default ++ [ pkgs.nix ];
 
   shellHook = ''
     # =========================================================================
@@ -55,7 +61,7 @@ pkgs.mkShell {
 
     # Welcome message (skipped if KONDUCTOR_SKIP_BANNER is set by derived shells)
     if [ -z "$KONDUCTOR_SKIP_BANNER" ]; then
-      echo "konductor-base: py${versions.languages.python.display} go${versions.languages.go.display} node${versions.languages.node.display} rust${versions.languages.rust.display}"
+      echo "konductor-base: py${versions.languages.python.version} go${versions.languages.go.version} node${versions.languages.node.version} rust${versions.languages.rust.version}"
     fi
 
     # Clean up shellHook from env output

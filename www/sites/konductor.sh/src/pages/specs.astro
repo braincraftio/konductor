@@ -21,9 +21,12 @@ function releases(value: unknown, path: string[] = []): { name: string; version:
     ...Object.entries(record).flatMap(([key, child]) => releases(child, [...path, key])),
   ];
 }
+// Languages and the k0s series select runtimes from locked package sets; they
+// are rendered separately, not as locally maintained releases.
 const packages = Object.entries(versions)
   .filter(([key]) => key !== 'languages')
-  .flatMap(([key, value]) => releases(value, [key]));
+  .flatMap(([key, value]) => releases(value, [key]))
+  .filter((release) => release.name !== 'kubernetes / k0s');
 const lock = JSON.parse(lockRaw);
 const nodes = lock.nodes as Record<
   string,
@@ -132,28 +135,28 @@ const inputs = Object.entries(nodes[lock.root].inputs ?? {}).map(([name, node]) 
           <RefCard
             title='Python'
             description='uv, ruff, mypy, bandit. Auto-activates <code>.venv</code>.'
-            footer={languages.python.display}
+            footer={languages.python.version}
             copy='nix develop .#python'
             meta='nix develop .#python'
           />
           <RefCard
             title='Go'
             description='gopls, delve, golangci-lint. Creates workspace dirs.'
-            footer={languages.go.display}
+            footer={languages.go.version}
             copy='nix develop .#go'
             meta='nix develop .#go'
           />
           <RefCard
             title='Node.js'
             description='pnpm, biome, prettier, eslint. Adds pnpm global bin.'
-            footer={languages.node.display}
+            footer={languages.node.version}
             copy='nix develop .#node'
             meta='nix develop .#node'
           />
           <RefCard
             title='Rust'
             description='Pinned via rust-overlay. Cargo, clippy, rust-analyzer.'
-            footer={languages.rust.display}
+            footer={languages.rust.version}
             copy='nix develop .#rust'
             meta='nix develop .#rust'
           />
@@ -163,7 +166,7 @@ const inputs = Object.entries(nodes[lock.root].inputs ?? {}).map(([name, node]) 
       <Section title='Maintained releases' divider>
         <p class='text-sm text-text-tertiary'>
           Exact local release pins. Source, dependency, wheel, and platform hashes remain alongside
-          each release in the manifest above. k0s selects the {versions.kubernetes.k0s.display} series
+          each release in the manifest above. k0s selects the {versions.kubernetes.k0s.version} series
           from its locked flake input.
         </p>
         <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>

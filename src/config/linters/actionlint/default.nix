@@ -10,12 +10,12 @@
 
 {
   pkgs,
-  versions,
   shellcheck,
+  ...
 }:
 
 let
-  pythonPackages = pkgs."python${versions.languages.python.version}Packages";
+  pythonPackages = pkgs.konductor.pythonPackages;
 in
 {
   package = pkgs.writeShellApplication {

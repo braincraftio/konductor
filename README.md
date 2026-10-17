@@ -1081,13 +1081,13 @@ All versions centralized in `src/lib/versions.nix`:
 {
   nixos = { channel = "26.05"; stateVersion = "26.05"; };
   languages = {
-    python = { version = "313"; display = "3.13"; };
-    go     = { version = "1_25"; display = "1.25"; };
-    node   = { version = "22"; display = "22"; };
-    rust   = { version = "1.98.0"; display = "1.98.0"; };
+    python.version = "3.13";
+    go.version = "1.27";
+    node.version = "26";
+    rust.version = "1.99.1";
   };
-  atuin  = { version = "18.20.1"; display = "18.20.1"; };
-  kubernetes.k0s = { attr = "k0s_1_35"; display = "1.35"; };
+  atuin = { version = "18.24.1"; hash = "sha256-..."; cargoHash = "sha256-..."; };
+  kubernetes.k0s.version = "1.36";
 }
 ```
 
@@ -1309,14 +1309,16 @@ devShells = forAllSystems (system: {
 
 ```nix
 languages = {
-  python = { version = "313"; display = "3.13"; };
-  go     = { version = "1_25"; display = "1.25"; };
-  node   = { version = "22"; display = "22"; };
-  rust   = { version = "1.98.0"; display = "1.98.0"; };
+  python.version = "3.13";
+  go.version = "1.27";
+  node.version = "26";
+  rust.version = "1.99.1";
 };
 ```
 
 Changing a version here propagates to all devshells, containers, VMs, and modules.
+`src/overlays/versions.nix` derives the nixpkgs attribute from each version (`python313`, `go_1_27`,
+`nodejs_26`, `rust-bin.stable."1.99.1"`, `k0s_1_36`) and exposes it as `pkgs.konductor.*`.
 
 `src/packages/*.nix`:
 

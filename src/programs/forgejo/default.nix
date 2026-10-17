@@ -2,76 +2,54 @@
 # Forgejo self-hosted git forge tooling
 #
 # Provides:
-#   - forgejo-server: Self-hosted git forge server
-#   - forgejo-runner: CI/CD runner (forked with workspace isolation)
-#   - forgejo-cli: Command-line interface for Forgejo API
+#   - server: Forgejo git forge server (nixpkgs)
+#   - cli: forgejo-cli for the Forgejo API (nixpkgs)
+#   - runner: BrainCraft forgejo-runner fork (runner.nix), or null
 #
-# Usage:
-#   CI runners: Include in ci devshell for self-hosted CI/CD
-#   Development: forgejo-cli for API interactions
-#
-# Runner Fork Features (git.braincraft.io/BrainCraft/runner):
-#   - container.include_server_host: prepends server hostname to workspace path
-#   - container.workspace_repo: clones workspace repo for tooling inheritance
-#   - Collision isolation via /workspace/<random>/<host>/<owner>/<repo>
-#
-# Update runner: nix flake update forgejo-runner-src
+# The runner exists only when the forgejo-runner-src flake input is declared.
+# Flake inputs are fetched lazily and nothing references the input when it is
+# absent, so commenting the input out in flake.nix disables the fork across
+# every consumer (devshell, qcow2 module, flake package) with no other edit.
 
-{ pkgs, inputs, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+}:
 
 let
-  versions = import ../../lib/versions.nix;
-
   # Forgejo packages from nixpkgs
   forgejoServer = pkgs.forgejo; # v13.x - current stable
   forgejoCli = pkgs.forgejo-cli; # v0.3.x - API CLI
 
-  # Forked runner from flake input (auto-updated via nix flake update)
-  # Use buildGoModule directly to ensure our forked source is used
-  # overrideAttrs doesn't reliably propagate src changes for buildGoModule
-  forgejoRunner = pkgs.buildGoModule {
-    pname = "forgejo-runner";
-    inherit (versions.forgejo-runner) version vendorHash;
-    src = inputs.forgejo-runner-src;
-    proxyVendor = true; # Fetch deps via Go proxy, ignore stale vendor/
-    subPackages = [ "." ];
-    ldflags = [
-      "-s"
-      "-w"
-      "-X"
-      "code.forgejo.org/forgejo/runner/v12/internal/pkg/ver.version=v${versions.forgejo-runner.version}"
-    ];
-    nativeBuildInputs = [ pkgs.git ];
-    doCheck = false;
-    # Binary builds as "runner" from directory name; rename to expected "forgejo-runner"
-    postInstall = ''
-      mv $out/bin/runner $out/bin/forgejo-runner
-    '';
-  };
+  forgejoRunner =
+    if inputs ? forgejo-runner-src then
+      pkgs.callPackage ./runner.nix { src = inputs.forgejo-runner-src; }
+    else
+      null;
 
+  runnerPackages = lib.optional (forgejoRunner != null) forgejoRunner;
 in
 {
-  # Direct package exports (for systemd services, etc.)
+  # Direct package exports (runner is null when the fork input is absent)
   runner = forgejoRunner;
   server = forgejoServer;
   cli = forgejoCli;
 
-  # Full package set (server + runner + cli)
+  # Full package set
   packages = [
     forgejoServer
-    forgejoRunner
     forgejoCli
-  ];
+  ]
+  ++ runnerPackages;
 
   # Server-only (for hosting instances)
   serverPackages = [
     forgejoServer
   ];
 
-  # Runner-only (for CI/CD agents)
-  runnerPackages = [
-    forgejoRunner
-  ];
+  # Runner-only (for CI/CD agents); empty when the fork input is absent
+  inherit runnerPackages;
 
   # CLI-only (for development/scripting)
   cliPackages = [

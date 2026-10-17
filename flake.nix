@@ -88,14 +88,16 @@
       url = "github:ScopeCreep-zip/open-sesame";
     };
 
-    # Forked Forgejo runner with workspace isolation
-    # TODO: switch back to git.docker.arpa/containercraft/runner
-    #        once nix daemon git auth for Gitea is resolved (netrc-file or equivalent)
-    # Update: nix flake update forgejo-runner-src
-    forgejo-runner-src = {
-      url = "git+https://git.braincraft.io/braincraft/runner";
-      flake = false;
-    };
+    # Forked Forgejo runner with workspace isolation (pre-release).
+    # Single switch: declaring this input builds the fork
+    # (src/programs/forgejo/runner.nix), enables konductor.forgejoRunner in
+    # the qcow2 image, and exports packages.forgejo-runner. Commented out,
+    # nothing references it and git.braincraft.io is never contacted.
+    # Enable: uncomment, then nix flake lock.
+    # forgejo-runner-src = {
+    #   url = "git+https://git.braincraft.io/braincraft/runner";
+    #   flake = false;
+    # };
 
     # k0s Kubernetes distribution: binary packages (k0s_1_27..k0s_1_35) +
     # services.k0s NixOS module. Tracks main (maintainers treat main as
@@ -461,13 +463,16 @@
           pulumi = sb.packages.languages.pulumiPkg.package;
           pulumi-cli = sb.packages.languages.pulumiPkg.cli;
           trzsz = sb.pkgs.callPackage ./src/packages/trzsz.nix { };
-          forgejo-runner = sb.programs.forgejo.runner;
           prettier-plugin-astro = sb.konductorConfig.formatters.prettier.astroPlugin;
           treefmt = sb.konductorConfig.formatters.treefmt.package;
         }
+        # Present only when the forgejo-runner-src input is declared.
+        // lib.optionalAttrs (sb.programs.forgejo.runner != null) {
+          forgejo-runner = sb.programs.forgejo.runner;
+        }
         // lib.optionalAttrs sb.pkgs.stdenv.hostPlatform.isLinux {
           oci = sb.oci.image;
-          k0s = sb.pkgs.${sb.versions.kubernetes.k0s.attr};
+          k0s = sb.pkgs.konductor.k0s;
         }
         // lib.optionalAttrs (system == "x86_64-linux") {
           qcow2 = sb.qcow2.image;
@@ -526,6 +531,9 @@
         # k0s-nix so konductor consumers get the module from one flake.
         # Disabled by default (mkEnableOption); on-demand capability.
         k0s = inputs.k0s-nix.nixosModules.default;
+        # Forgejo Actions runner daemon (konductor.forgejoRunner.*); disabled
+        # by default, consumer supplies konductor.forgejoRunner.package.
+        forgejo-runner = import ./src/modules/forgejo-runner.nix;
       };
 
       # Home Manager module. `homeModules` is the output name `nix flake check`

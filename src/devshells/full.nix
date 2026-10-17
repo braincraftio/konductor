@@ -78,8 +78,8 @@ baseShell.overrideAttrs (old: {
 
     if [ -z "''${KONDUCTOR_SKIP_BANNER:-}" ]; then
       echo "Full polyglot ready"
-      echo "  Python ${langs.python.display} | Go ${langs.go.display}"
-      echo "  Node.js ${langs.node.display} | Rust ${langs.rust.display}"
+      echo "  Python ${langs.python.version} | Go ${langs.go.version}"
+      echo "  Node.js ${langs.node.version} | Rust ${langs.rust.version}"
     fi
 
     # Clean up shellHook from env output

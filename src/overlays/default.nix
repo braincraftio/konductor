@@ -9,7 +9,7 @@
 
   # k0s Kubernetes distribution binaries (pkgs.k0s, pkgs.k0s_1_27..k0s_1_35)
   # from the k0s-nix flake input. Version selection for konductor consumers:
-  # src/lib/versions.nix kubernetes.k0s.attr. Linux-only packages; Darwin
+  # pkgs.konductor.k0s (src/overlays/versions.nix). Linux-only packages; Darwin
   # surfaces never reference them (k0sctl is the cross-platform client).
   k0s-nix.overlays.default
 

@@ -39,7 +39,7 @@ rec {
   #
   # Downstream flakes extend via extraPythonPackages:
   #   packages = import ../packages { extraPythonPackages = ps: [ ps.playwright ]; ... };
-  pythonEnv = pkgs."python${langs.python.version}".withPackages (
+  pythonEnv = pkgs.konductor.pythonPackages.python.withPackages (
     ps:
     [
       ps.pip
@@ -69,7 +69,7 @@ rec {
   # ===========================================================================
   goPackages = with pkgs; [
     # Runtime
-    pkgs."go_${langs.go.version}"
+    pkgs.konductor.go
 
     # LSP and debugging
     gopls
@@ -96,7 +96,7 @@ rec {
   # Node.js
   # ===========================================================================
   nodejsPackages = with pkgs; [
-    pkgs."nodejs_${langs.node.version}"
+    pkgs.konductor.nodejs
     bun
     pnpm
     yarn

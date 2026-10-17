@@ -27,7 +27,7 @@ baseShell.overrideAttrs (old: {
     mkdir -p "$PNPM_HOME"
     export PATH="$PNPM_HOME:$PATH"
 
-    echo "Node.js ${langs.node.display} ready"
+    echo "Node.js ${langs.node.version} ready"
 
     # Clean up shellHook from env output
     unset shellHook

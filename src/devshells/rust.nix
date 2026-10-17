@@ -37,7 +37,7 @@ baseShell.overrideAttrs (old: {
     mkdir -p "$CARGO_HOME"
     export PATH="$CARGO_HOME/bin:$PATH"
 
-    echo "Rust ${langs.rust.display} ready"
+    echo "Rust ${langs.rust.version} ready"
 
     # Clean up shellHook from env output
     unset shellHook

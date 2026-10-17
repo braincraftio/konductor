@@ -17,7 +17,8 @@ captured from the shipped binaries: k0s v1.35.5+k0s.0, k0sctl v0.31.1.
 ## Delivery facts
 
 - **k0s binary** comes from the `k0s-nix` flake input's overlay (`pkgs.k0s_1_27`..`pkgs.k0s_1_35`;
-  `pkgs.k0s` = latest). Konductor selects via `src/lib/versions.nix` `kubernetes.k0s.attr`. Ships in
+  `pkgs.k0s` = latest). Konductor selects the series via `src/lib/versions.nix`
+  `kubernetes.k0s.version`, exposed as `pkgs.konductor.k0s` (`src/overlays/versions.nix`). Ships in
   the konductor self-hosting tier (`src/packages/konductor.nix`) → `#konductor` devshell and the
   qcow2 VM PATH. Linux-only.
 - **k0sctl** is pinned tip-of-spear in `src/overlays/k0s.nix` (nixpkgs channels lag upstream patch
@@ -166,9 +167,10 @@ Known quirk: `k0sctl version` prints `version: (devel)` with the real version on
 
 ## Version bumps (tip-of-spear policy)
 
-- **k0s**: `nix flake update k0s-nix`, then set `kubernetes.k0s.attr` in `src/lib/versions.nix` if a
-  new minor series landed (e.g. `k0s_1_36`). Embedded Kubernetes tracks k0s upstream (k0s 1.35.x ↔
-  k8s 1.35.x) — not independently pinned. Check upstream: `k0sctl version --k0s`.
+- **k0s**: `nix flake update k0s-nix`, then set `kubernetes.k0s.version` in `src/lib/versions.nix`
+  if a new minor series landed (e.g. `"1.37"` selects `k0s_1_37`). Embedded Kubernetes tracks k0s
+  upstream (k0s 1.35.x ↔ k8s 1.35.x) — not independently pinned. Check upstream:
+  `k0sctl version --k0s`.
 - **k0sctl**: bump `kubernetes.k0sctl.version` and its `hash`/`vendorHash` together in
   `src/lib/versions.nix`. Watch the Go toolchain floor in its go.mod — that is why the overlay
   builds with `unstable.buildGo127Module`.

@@ -25,7 +25,7 @@
 let
   inherit (pkgs) lib;
   versions = import ../lib/versions.nix;
-  pythonPackages = pkgs."python${versions.languages.python.version}Packages";
+  pythonPackages = pkgs.konductor.pythonPackages;
 
   # Reuse nixpkgs' unpack/install/fixup/completion phases. Replace the SDK
   # archive and our six provider archives; additional nixpkgs providers retain

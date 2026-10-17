@@ -4,7 +4,7 @@
 # Config is maintained in native YAML format (.bandit) for easy contribution.
 # The wrapper forces config via --configfile flag with no escape hatch.
 
-{ pkgs, versions, ... }:
+{ pkgs, ... }:
 
 let
   # Config file - native YAML, copied to nix store
@@ -15,7 +15,7 @@ let
   };
 
   # Use version-locked Python package
-  pythonPkgs = pkgs."python${versions.languages.python.version}Packages";
+  pythonPkgs = pkgs.konductor.pythonPackages;
 in
 {
   package = pkgs.writeShellApplication {

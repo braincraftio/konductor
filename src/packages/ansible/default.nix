@@ -17,8 +17,8 @@
 }:
 
 let
-  python3 = pkgs."python${versions.languages.python.version}";
-  python3Packages = python3.pkgs;
+  python3Packages = pkgs.konductor.pythonPackages;
+  inherit (python3Packages) python;
 
   # mitogen — persistent remote Python interpreter + RPC.
   # Zero runtime deps beyond stdlib + setuptools.
@@ -51,7 +51,7 @@ let
   ansibleApp = python3Packages.toPythonApplication ansibleCore;
 
   # Strategy plugin path.
-  strategyPluginsPath = "${mitogen}/${python3.sitePackages}/ansible_mitogen/plugins/strategy";
+  strategyPluginsPath = "${mitogen}/${python.sitePackages}/ansible_mitogen/plugins/strategy";
 
   # serverscom.mitogen Galaxy collection v1.4.1.
   serverscomMitogenCollection = pkgs.stdenvNoCC.mkDerivation {

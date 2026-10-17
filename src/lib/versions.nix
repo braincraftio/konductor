@@ -6,12 +6,14 @@
 # Keep each version, source URL, and source/dependency/platform hash together.
 # Flake-input revisions and source narHashes remain authoritative in flake.lock.
 #
-# Schema: language version fields select package attributes; display fields
-# name the runtime series (Rust is an exact toolchain release). Package version
-# fields pin exact releases. Hashes attest source/dependency contents, not
-# signatures. Platform hash keys describe available upstream artifacts, not
-# necessarily the platforms supported by the complete Konductor flake.
-# The website consumes this data via .#versions-json and displays this source.
+# Schema: each record holds one canonical `version`. Language and k0s versions
+# name the runtime series (Rust is an exact toolchain release); the nixpkgs
+# attribute for each is derived from it in src/overlays/versions.nix
+# (pkgs.konductor.*). Package version fields pin exact releases. Hashes attest
+# source/dependency contents, not signatures. Platform hash keys describe
+# available upstream artifacts, not necessarily the platforms supported by the
+# complete Konductor flake. Banners and the website (.#versions-json) render
+# `version` directly; presentation is not stored here.
 #
 # When changing nixos.channel, also update:
 #   - flake.nix: nixpkgs.url and nixvim.url branches
@@ -25,22 +27,10 @@
   };
 
   languages = {
-    python = {
-      version = "313";
-      display = "3.13";
-    };
-    go = {
-      version = "1_27";
-      display = "1.27";
-    };
-    node = {
-      version = "26";
-      display = "26";
-    };
-    rust = {
-      version = "1.99.1";
-      display = "1.99.1";
-    };
+    python.version = "3.13";
+    go.version = "1.27";
+    node.version = "26";
+    rust.version = "1.99.1";
   };
 
   ansible = {
@@ -55,18 +45,14 @@
   };
 
   # Kubernetes distribution tooling — tip-of-spear policy.
-  # k0s.attr selects the package from the k0s-nix overlay (k0s_1_33..k0s_1_36);
+  # k0s.version selects the series from the k0s-nix overlay (k0s_1_33..k0s_1_36);
   # the embedded Kubernetes version is coupled to k0s upstream (1.36.x ↔ k8s
   # 1.36.x) and is not managed here. k0sctl is pinned via src/overlays/k0s.nix
   # because nixpkgs channels lag upstream releases.
   kubernetes = {
-    k0s = {
-      attr = "k0s_1_36";
-      display = "1.36";
-    };
+    k0s.version = "1.36";
     k0sctl = {
       version = "0.33.1";
-      display = "0.33.1";
       hash = "sha256-g/8rN0UWbUjiIuWKcBb9sr8PjMx+rcq3Hce64cGziU0=";
       vendorHash = "sha256-3TIQ1VY+52DFCVWiJs5U+5A+mVSU3QPyr5Vzrzs7zF8=";
     };
@@ -81,7 +67,6 @@
   # nixpkgs channels. Built by src/overlays/atuin.nix.
   atuin = {
     version = "18.24.1";
-    display = "18.24.1";
     hash = "sha256-p4Vjk4XZDYVaIEp13fz0AfhvtZ9to0H0OJMpdNH34I0=";
     cargoHash = "sha256-tZqIfdcOth0pBIfIvqfeSEtKqsmRPcwtuHWsjoPdt1c=";
   };
@@ -90,7 +75,6 @@
   # Packaged by src/overlays/terminal-browser.nix.
   terminal-browser = {
     version = "0.13.4";
-    display = "0.13.4";
     hashes = {
       x86_64-linux = "sha256-YnfaqrqxZxGrPxlhzf+tnvrF5wrFXVB24shkltZJ06Q=";
       aarch64-linux = "sha256-DPVn2CGJlaJPts5LBsB8z1ioxReQYFgIc1Xx4vrRlp8=";
@@ -103,30 +87,27 @@
   # Packaged by src/overlays/code-server.nix.
   code-server = {
     version = "4.141.0";
-    display = "4.141.0";
     hash = "sha256-ZbzSC1JNA+sbWtt/NgJEWZ7w5bdAiaRqmC0ywHS5eik=";
   };
 
   # Terminal file transfer; built by src/packages/trzsz.nix.
   trzsz = {
     version = "1.2.0";
-    display = "1.2.0";
     hash = "sha256-CokZAXT61UKSsKnzE5mPMdAZecGX/8mgDkG4yDSat5M=";
     vendorHash = "sha256-eqQ5PpHNLp2QebC6fZcVYT9hHAeXfM6GLiji4WzGSRQ=";
   };
 
-  # BrainCraft fork; source revision/narHash belong to forgejo-runner-src
-  # in flake.lock. Update that input alongside this release record.
+  # BrainCraft fork, built by src/programs/forgejo/runner.nix; source
+  # revision/narHash belong to the forgejo-runner-src input in flake.lock.
+  # Update that input alongside this release record.
   forgejo-runner = {
     version = "12.5.3-braincraft";
-    display = "12.5.3-braincraft";
     vendorHash = "sha256-zowZvsjg9k5XO12pip1SbOz3KXXqxFfnLF+y4cf8WOQ=";
   };
 
   # CLI and Python SDK share a release. Wheel paths are content-addressed.
   pulumi = {
     version = "3.270.0";
-    display = "3.270.0";
     cliHashes = {
       x86_64-linux = "sha256-0FiZwlHLBBOpojBPIyKSGMRoUqYSVpE/NPCOvCcmYTk=";
       aarch64-linux = "sha256-tB8ZmhYaukhDMS1M2jFDAk+m+9cyKdQUn1cqF4j4S9o=";
@@ -203,7 +184,6 @@
   # Refresh both with: nix run .#update-prettier-astro-lock [-- VERSION]
   prettier-plugin-astro = {
     version = "0.14.1";
-    display = "0.14.1";
     hash = "sha256-36VjvCBZGAkXyC2ay1/vA4TfuxOMtatOjGnTvAZVcGw=";
     npmDepsHash = "sha256-krz3i/vgIy3Ho34E1LIkndSk3S31lpLxf3zE6O+ukII=";
   };
@@ -211,7 +191,6 @@
   # Python type checker wheel, consumed by src/packages/pulumi.nix.
   pyright = {
     version = "1.1.414";
-    display = "1.1.414";
     url = "https://files.pythonhosted.org/packages/d7/ba/18b6e682ead424ad24bcc134339ae5d1b931cd9ae260540592a058a91279/pyright-1.1.414-py3-none-any.whl";
     hash = "sha256-KmtLMpjJ7sF0xe2DvTON5u7oLfKZLz4ZMOYZnTgb428=";
   };

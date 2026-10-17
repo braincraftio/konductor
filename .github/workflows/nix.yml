@@ -63,7 +63,7 @@ jobs:
         run: |
           packages=(
             ci atuin k0sctl terminal-browser opencode mitogen ansible python-env
-            pulumi pulumi-cli trzsz forgejo-runner
+            pulumi pulumi-cli trzsz
           )
           targets=()
           for package in "${packages[@]}"; do

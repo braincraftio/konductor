@@ -16,12 +16,12 @@
 }:
 
 let
-  pythonPackages = pkgs."python${versions.languages.python.version}Packages";
+  pythonPackages = pkgs.konductor.pythonPackages;
   iniFormat = pkgs.formats.ini { };
 
   configFile = iniFormat.generate "mypy.ini" {
     mypy = {
-      python_version = versions.languages.python.display;
+      python_version = versions.languages.python.version;
       python_executable = "${pythonEnv}/bin/python";
       warn_return_any = true;
       warn_unused_configs = true;

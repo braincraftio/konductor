@@ -157,12 +157,12 @@ All pinned versions live in `src/lib/versions.nix`:
 ```nix
 {
   languages = {
-    python = { version = "313"; display = "3.13"; };
-    go     = { version = "1_25"; display = "1.25"; };
-    node   = { version = "22"; display = "22"; };
-    rust   = { version = "1.98.0"; display = "1.98.0"; };
+    python.version = "3.13";
+    go.version = "1.27";
+    node.version = "26";
+    rust.version = "1.99.1";
   };
-  atuin = { version = "18.20.1"; display = "18.20.1"; };
+  atuin = { version = "18.24.1"; hash = "sha256-..."; cargoHash = "sha256-..."; };
 }
 ```
 

@@ -750,7 +750,16 @@ let
         # ad-hoc `k0s controller --single` runs. Kernel prereqs below are inert
         # until a node actually starts.
         inputs.k0s-nix.nixosModules.default
+        # Forgejo Actions runner (services, registration retry, package)
+        ../modules/forgejo-runner.nix
       ];
+
+      # Enabled exactly when the runner fork is built, i.e. when the
+      # forgejo-runner-src flake input is declared (see src/programs/forgejo).
+      konductor.forgejoRunner = {
+        enable = programs.forgejo.runner != null;
+        package = programs.forgejo.runner;
+      };
 
       # Basic system configuration
       system = {
@@ -1071,11 +1080,7 @@ let
             ];
             # CI toolchain in runner's user profile (/nix/var/nix/profiles/per-user/runner)
             # Defense in depth: packages available even if systemPackages changes
-            packages =
-              devshellPackages.fullPackages
-              ++ programs.forgejo.runnerPackages
-              ++ programs.forgejo.cliPackages
-              ++ konductor.packages;
+            packages = devshellPackages.fullPackages ++ programs.forgejo.cliPackages ++ konductor.packages;
           };
           # Forgejo server user — reserves UID 1004 so cloud-init
           # additional users (1005+) get their expected UIDs.
@@ -1488,8 +1493,7 @@ let
           ++ programs.ttyd.packages
           # Self-hosting tools (docker, qemu, libvirt, etc.)
           ++ konductor.packages
-          # Forgejo CI/CD tools (runner + cli)
-          ++ programs.forgejo.runnerPackages
+          # Forgejo CLI (the runner package comes from konductor.forgejoRunner)
           ++ programs.forgejo.cliPackages
           # Essentials
           ++ (with pkgs; [
@@ -2297,141 +2301,6 @@ let
           };
 
           # =====================================================================
-          # Forgejo Runner Service
-          # =====================================================================
-          # Runs Forgejo Actions runner daemon after cloud-init registration.
-          # Cloud-init Phase 6 creates .runner file, Phase 7 starts this service.
-          #
-          # PKI trust is handled by konductor-pki-trust.service (pki.nix),
-          # which installs the hypervisor CA to the system trust store.
-          # Go's TLS uses the system trust store by default.
-          forgejo-runner = {
-            description = "Forgejo Actions Runner";
-            # Boot ordering: systemd auto-starts via wantedBy, but ConditionPathExists
-            # gates on .runner file (created by cloud-init Phase 6 registration).
-            # On first boot: condition fails → skipped → cloud-init Phase 7 starts it.
-            # On subsequent boots: condition passes → systemd auto-starts it.
-            # ExecStartPre polls Forgejo API to handle server not yet reachable.
-            after = [
-              "network-online.target"
-              "docker.service"
-              "konductor-pki-trust.service"
-              "konductor.service"
-            ];
-            wants = [
-              "network-online.target"
-              "docker.service"
-              "konductor-pki-trust.service"
-              "konductor.service"
-            ];
-            wantedBy = [ "multi-user.target" ];
-            # Generous restart rate limit: runner must survive long CI jobs
-            # and recover from transient Forgejo outages (scale-to-zero, redeploys)
-            startLimitIntervalSec = 300;
-            startLimitBurst = 10;
-            # Don't start until cloud-init Phase 6 creates the .runner registration file
-            unitConfig.ConditionPathExists = "/home/runner/.config/forgejo-runner/.runner";
-            serviceConfig = {
-              Type = "simple";
-              User = "runner";
-              Group = "users";
-              WorkingDirectory = "/home/runner";
-              # Source proxy.env when present (cloud-init writes it on proxy-enabled deployments).
-              # This gives the runner daemon HTTP_PROXY/HTTPS_PROXY/NO_PROXY so it can
-              # clone GitHub-hosted actions (actions/checkout etc.) through corporate proxy.
-              EnvironmentFile = [ "-/etc/konductor/proxy.env" ];
-              Environment = [
-                "HOME=/home/runner"
-                "PATH=/run/wrappers/bin:/run/current-system/sw/bin"
-                "DOCKER_HOST=unix:///var/run/docker.sock"
-                # OVMF EFI firmware for QEMU (required for QCOW2 builds)
-                "OVMF_CODE=${pkgs.OVMF.fd}/FV/OVMF_CODE.fd"
-                "OVMF_VARS=${pkgs.OVMF.fd}/FV/OVMF_VARS.fd"
-                # Build tools
-                "DOCKER_BUILDKIT=1"
-                # CI marker
-                "CI=true"
-                # NixOS /etc/ssl/certs is immutable; konductor-pki-trust writes extended bundle
-                "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
-              ];
-              ExecStart = "${programs.forgejo.runner}/bin/forgejo-runner daemon --config /home/runner/.config/forgejo-runner/config.yaml";
-              # Runner retries connections internally; Restart=always handles crashes/transient failures.
-              Restart = "always";
-              RestartSec = 15;
-            };
-          };
-
-          # =====================================================================
-          # Forgejo Runner Registration Retry Service
-          # =====================================================================
-          # Defense in depth: if cloud-init registration fails (Forgejo not ready),
-          # the timer below retries every 30s until .runner file is created.
-          # Once registered, forgejo-runner.service is started and timer stops.
-          forgejo-runner-register = {
-            description = "Retry Forgejo Runner Registration";
-            after = [
-              "network-online.target"
-              "konductor-pki-trust.service"
-            ];
-            wants = [ "network-online.target" ];
-            # Do NOT add wantedBy — started only by the timer
-            unitConfig.ConditionPathExists = "!/home/runner/.config/forgejo-runner/.runner";
-            serviceConfig = {
-              Type = "oneshot";
-              User = "runner";
-              Group = "users";
-              Environment = [
-                "HOME=/home/runner"
-                "PATH=/run/wrappers/bin:/run/current-system/sw/bin"
-                "SSL_CERT_FILE=/etc/konductor/pki/bundle/ca-bundle.crt"
-              ];
-              ExecStart = pkgs.writeShellScript "forgejo-runner-register-retry" ''
-                CONFIG_DIR="/home/runner/.config/forgejo-runner"
-                RUNNER_FILE="$CONFIG_DIR/.runner"
-
-                # Skip if already registered
-                if [ -f "$RUNNER_FILE" ]; then
-                  echo "forgejo-runner-register: already registered, nothing to do"
-                  exit 0
-                fi
-
-                SECRET_FILE="/etc/konductor/forgejo-runner/secret"
-                URL_FILE="/etc/konductor/forgejo-runner/url"
-
-                if [ ! -f "$SECRET_FILE" ] || [ ! -f "$URL_FILE" ]; then
-                  echo "forgejo-runner-register: secret or url not configured, skipping"
-                  exit 1
-                fi
-
-                SECRET=$(${pkgs.coreutils}/bin/cat "$SECRET_FILE")
-                URL=$(${pkgs.coreutils}/bin/cat "$URL_FILE")
-                NAME=$(${pkgs.hostname}/bin/hostname)
-
-                echo "forgejo-runner-register: attempting registration against $URL..."
-                ${pkgs.coreutils}/bin/mkdir -p "$CONFIG_DIR"
-
-                if ${programs.forgejo.runner}/bin/forgejo-runner \
-                  --config "$CONFIG_DIR/config.yaml" \
-                  create-runner-file \
-                  --secret "$SECRET" \
-                  --instance "$URL" \
-                  --name "$NAME" \
-                  --connect; then
-                  echo "forgejo-runner-register: registration succeeded, starting runner"
-                  # Start the runner service now that .runner exists
-                  /run/current-system/sw/bin/systemctl start forgejo-runner.service || true
-                  # Stop the retry timer — no longer needed
-                  /run/current-system/sw/bin/systemctl stop forgejo-runner-register.timer || true
-                  exit 0
-                else
-                  echo "forgejo-runner-register: registration failed, timer will retry"
-                  exit 1
-                fi
-              '';
-            };
-          };
-
-          # =====================================================================
           # Multi-User Service Orchestration
           # =====================================================================
           # Template units for per-user services with deterministic port allocation.
@@ -2920,29 +2789,6 @@ let
             PathModified = "/var/lib/konductor/services.toml";
             Unit = "konductor-config-reload.service";
           };
-        };
-      };
-
-      # =====================================================================
-      # Forgejo Runner Registration Retry Timer
-      # =====================================================================
-      # Periodically triggers forgejo-runner-register.service to retry
-      # runner registration if .runner file doesn't exist yet.
-      # ConditionPathExists prevents activation once registration succeeds.
-      systemd.timers.forgejo-runner-register = {
-        description = "Retry Forgejo Runner Registration Timer";
-        wantedBy = [ "timers.target" ];
-        unitConfig.ConditionPathExists = [
-          # Only activate when registration credentials exist (profile-provided)
-          "/etc/konductor/forgejo-runner/secret"
-          "/etc/konductor/forgejo-runner/url"
-          # Stop once registration is complete
-          "!/home/runner/.config/forgejo-runner/.runner"
-        ];
-        timerConfig = {
-          OnBootSec = "30s";
-          OnUnitActiveSec = "30s";
-          AccuracySec = "5s";
         };
       };
 

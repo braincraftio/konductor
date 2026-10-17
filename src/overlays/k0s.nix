@@ -11,7 +11,7 @@
 #
 # The k0s binary itself is NOT defined here — it comes from the k0s-nix
 # flake input's overlay (pkgs.k0s, pkgs.k0s_1_33..k0s_1_36), composed in
-# ./default.nix. Version selection: src/lib/versions.nix kubernetes.k0s.attr.
+# ./default.nix. Version selection: pkgs.konductor.k0s (./versions.nix).
 
 let
   versions = import ../lib/versions.nix;

@@ -67,7 +67,7 @@ fullShell.overrideAttrs (old: {
     ${programs.forgejo.shellHook}
 
     if [ -z "''${KONDUCTOR_QUIET:-}" ]; then
-      echo "konductor-${sourceInfo.shortRev}: py${langs.python.display} go${langs.go.display} node${langs.node.display} rust${langs.rust.display} k0s${versions.kubernetes.k0s.display}"
+      echo "konductor-${sourceInfo.shortRev}: py${langs.python.version} go${langs.go.version} node${langs.node.version} rust${langs.rust.version} k0s${versions.kubernetes.k0s.version}"
     fi
 
     # Clean up shellHook from env output

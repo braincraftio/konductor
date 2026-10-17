@@ -26,7 +26,7 @@ baseShell.overrideAttrs (old: {
     # withPackages build deps ahead of the -env wrapper.
     export PATH="${packages.pythonEnv}/bin:$PATH"
 
-    echo "Python ${langs.python.display} ready"
+    echo "Python ${langs.python.version} ready"
 
     # Clean up shellHook from env output
     unset shellHook

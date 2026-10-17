@@ -96,7 +96,7 @@ With [direnv](https://direnv.net) installed, entering the repo directory auto-ac
 
 When you enter a shell, Konductor prints what's available:
 
-<pre><code>konductor-base: py{langs.python.display} go{langs.go.display} node{langs.node.display} rust{langs.rust.display}</code></pre>
+<pre><code>konductor-base: py{langs.python.version} go{langs.go.version} node{langs.node.version} rust{langs.rust.version}</code></pre>
 
 Every tool in that shell is hermetically wrapped. The shellcheck binary has its config baked into the `/nix/store` path — you cannot use a different linter config even if you try. The formatter binary IS the formatting standard. This isn't policy, it's architecture.
 
