@@ -56,7 +56,9 @@ builds pass, `publish-flake` publishes that tag as a public FlakeHub release and
 output paths with `include-output-paths: true`. This is called directly from the release workflow
 because tags created with `GITHUB_TOKEN` do not trigger a separate push workflow. The GitHub
 organization must be authorized on FlakeHub for cache uploads and flake publication; no additional
-long-lived FlakeHub secret is used.
+long-lived FlakeHub secret is used. Publication is opt-in: the job runs only when the repository
+variable `FLAKEHUB_PUBLISH` is `true`
+(`gh variable set FLAKEHUB_PUBLISH --repo braincraftio/konductor --body true`).
 
 ### Shared actions
 
