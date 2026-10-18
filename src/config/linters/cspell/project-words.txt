@@ -74,6 +74,7 @@ chpass
 christoomey
 cidata
 closeoff
+cloudant
 cloudflared
 cloudinit
 cmdheight

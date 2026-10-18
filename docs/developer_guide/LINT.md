@@ -296,9 +296,16 @@ git ls-files -- '*.md' '*.markdown' '*.txt' '*.js' '*.jsx' '*.ts' '*.tsx' '*.py'
 Scan every tracked file with detect-secrets-hook against `.secrets.baseline`, the same gate as the
 lefthook `secrets` job. Fails on any finding not in the baseline.
 
+`--no-verify` keeps detection and disables only vendor liveness checks. With verification on, a
+finding the vendor reports invalid (a revoked key) is filtered out and never fails the gate, every
+candidate is sent to that vendor's API (AWS, Stripe, Slack, Mailchimp, Telegram, IBM, Cloudant,
+SoftLayer), and a network error changes the result. `--no-verify` reports every candidate, offline
+and deterministic. The lefthook job, this task, and `secrets:baseline:update` use the same mode, so
+the baseline filter set is stable across them.
+
 ```sh {"name":"lint:secrets","excludeFromRunAll":"true","tag":"type:entry,scope:ci"}
 set -euo pipefail
-git ls-files -z -- ':!.secrets.baseline' | xargs -0 --no-run-if-empty detect-secrets-hook --baseline .secrets.baseline
+git ls-files -z -- ':!.secrets.baseline' | xargs -0 --no-run-if-empty detect-secrets-hook --no-verify --baseline .secrets.baseline
 echo "Secrets scan passed"
 ```
 
@@ -328,12 +335,24 @@ git --no-pager diff --stat -- '*.nix'
 ### `secrets:baseline:update`
 
 Rescan tracked files and update `.secrets.baseline` in place. Plugin and filter settings (including
-the SRI checksum exclusion) are read from the existing baseline. New entries are unaudited: run
-`secrets:audit` before committing the updated baseline. CI never regenerates the baseline.
+the SRI checksum exclusion) are read from the existing baseline; the scan runs `--no-verify`, the
+same mode as `lint:secrets`. A scan with no finding changes leaves the file byte-identical. New
+entries are unaudited: run `secrets:audit` before committing the updated baseline. CI never
+regenerates the baseline.
 
 ```sh {"name":"secrets:baseline:update","excludeFromRunAll":"true","tag":"type:entry"}
 set -euo pipefail
-detect-secrets scan -n --baseline .secrets.baseline
+previous="$(mktemp)"
+trap 'rm -f "$previous"' EXIT
+# `command cp` bypasses interactive `cp -i` aliases from the user's shell profile.
+command cp .secrets.baseline "$previous"
+detect-secrets scan --no-verify --baseline .secrets.baseline
+# The scan rewrites generated_at on every run; keep the previous file when
+# nothing else changed so an unchanged scan leaves no diff.
+if [ "$(jq -S 'del(.generated_at)' "$previous")" = "$(jq -S 'del(.generated_at)' .secrets.baseline)" ]; then
+    command cp "$previous" .secrets.baseline
+    echo "Baseline unchanged"
+fi
 git --no-pager diff -- .secrets.baseline
 ```
 
