@@ -453,6 +453,7 @@
           # hashes can be refreshed with .#atuin.cargoDeps / .#k0sctl.goModules.
           inherit (sb.pkgs)
             atuin
+            flakehub-push
             k0sctl
             terminal-browser
             opencode
@@ -495,6 +496,15 @@
 
       apps = forAllSystems (
         _system: sb: {
+          update-artifacts =
+            let
+              app = import ./src/apps/update-artifacts.nix { inherit (sb) pkgs versions; };
+            in
+            {
+              type = "app";
+              program = lib.getExe app;
+              meta.description = app.meta.description;
+            };
           update-prettier-astro-lock =
             let
               app = import ./src/apps/update-prettier-astro-lock.nix { inherit (sb) pkgs versions; };

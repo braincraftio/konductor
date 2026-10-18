@@ -1,0 +1,20 @@
+---
+# Commit-SHA pins on third-party actions (workflows and the composite actions
+# under .github/actions) get weekly bump PRs, gated by CI like any change.
+# Nix inputs and src/lib/versions.nix release records are maintained by
+# `runme run update` (docs/developer_guide/UPDATE.md), not Dependabot.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - "*"

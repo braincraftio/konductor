@@ -83,6 +83,18 @@
     };
   };
 
+  # FlakeHub release publisher; built by src/overlays/flakehub-push.nix and
+  # passed to the flakehub-push action as source-binary, so the action never
+  # downloads its binary. rev must equal the DeterminateSystems/flakehub-push
+  # SHA pinned in .github/actions/publish-flake/action.yml (wrapper and binary
+  # from one commit). Bump rev, hash, and cargoHash together.
+  flakehub-push = {
+    version = "0.1.0";
+    rev = "99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567";
+    hash = "sha256-6QyG/PftQbHLOz3AILuoFolqRjFh2JGKRoRwRXgwe30=";
+    cargoHash = "sha256-dZn6g9QYRpLrKMFdpAAsBOwf6F4LMBcGJOVvpySluSQ=";
+  };
+
   # Pre-built VS Code in browser (x86_64-linux).
   # Packaged by src/overlays/code-server.nix.
   code-server = {

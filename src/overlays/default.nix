@@ -20,6 +20,9 @@
   # devshell and home-manager consumers on different nixpkgs channels
   (import ./atuin.nix)
 
+  # flakehub-push — FlakeHub publisher pinned to the publish-flake action SHA
+  (import ./flakehub-push.nix)
+
   # terminal-browser — Chromium in terminal via kitty graphics protocol
   (import ./terminal-browser.nix)
 
