@@ -78,7 +78,8 @@ min_disk_space_gb = "10"
 # Environment configuration
 [env]
 _.file = ".env"
-_.path = ["./.config/bin", "/nix/var/nix/profiles/default/bin"]
+# No _.path: tasks inherit the devshell PATH. Prepending the host default
+# profile would shadow the flake-pinned nix with the host install.
 
 # Core paths
 PROJECT_ROOT = "{{ config_root }}"

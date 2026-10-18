@@ -1,6 +1,6 @@
 ---
 cwd: ../..
-shell: bash
+shell: bash --noprofile --norc
 skipPrompts: true
 tag: k9:ci:test
 runme:

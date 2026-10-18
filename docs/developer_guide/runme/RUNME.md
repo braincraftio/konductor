@@ -287,11 +287,18 @@ For most use cases, minimal frontmatter is sufficient:
 ```yaml
 ---
 cwd: .
-shell: bash
+shell: bash --noprofile --norc
 ---
 ```
 
 Runme auto-populates `runme.id` and `runme.version` on first save.
+
+Konductor task documents use `shell: bash --noprofile --norc`. Interactive cells (the default)
+allocate a TTY, and the runner then invokes the shell with `-i` (runme `runner/command.go`), so a
+plain `bash` reads `~/.bashrc`. A user profile that prepends `~/.nix-profile/bin` or defines aliases
+(`cp -i`) then replaces the devshell's wrapped tools inside every task. The frontmatter shell string
+is split into program and arguments (`parseFileProgram`), so the flags reach bash and tasks run on
+the inherited devshell PATH.
 
 ## Supported Languages
 

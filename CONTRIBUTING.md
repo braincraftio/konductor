@@ -51,38 +51,39 @@ past or future framing.
 
 ## Git Hooks
 
-Lefthook runs 20+ parallel pre-commit checks automatically on `git commit`:
+Lefthook (`lefthook.yml`) runs 19 parallel pre-commit jobs on the staged files of every
+`git commit`:
 
-| Check              | Files                            | Tool              |
-| ------------------ | -------------------------------- | ----------------- |
-| Python style       | `*.py`                           | ruff              |
-| Python types       | `*.py`                           | mypy              |
-| Python security    | `*.py`                           | bandit            |
-| JavaScript quality | `*.{js,jsx,ts,tsx}`              | eslint            |
-| JavaScript style   | `*.{js,jsx,ts,tsx}`              | biome             |
-| Formatting         | `*.{js,ts,json,css,html,md,yml}` | prettier          |
-| Shell syntax       | `*.{sh,bash}`                    | shellcheck        |
-| YAML validation    | `*.{yml,yaml}`                   | yamllint          |
-| TOML validation    | `*.toml`                         | taplo             |
-| Nix formatting     | `*.nix`                          | nixfmt            |
-| Nix linting        | `*.nix`                          | statix            |
-| Nix dead code      | `*.nix`                          | deadnix           |
-| Markdown style     | `*.{md,markdown}`                | markdownlint-cli2 |
-| Spelling           | `*.{md,txt,js,ts,py,go,rs}`      | cspell            |
-| Link validation    | `*.{md,markdown}`                | lychee (offline)  |
-| GitHub Actions     | `.github/workflows/*.yml`        | actionlint        |
-| Dockerfile         | `Dockerfile*`                    | hadolint          |
-| Go                 | `*.go`                           | golangci-lint     |
-| HTML               | `*.html`                         | htmlhint          |
-| CSS                | `*.{css,scss,sass}`              | stylelint         |
-| Secrets            | all files                        | detect-secrets    |
+| Job               | Files                                            | Tool                                   |
+| ----------------- | ------------------------------------------------ | -------------------------------------- |
+| `fmt`             | all staged files                                 | treefmt `--fail-on-change` (`nix fmt`) |
+| `nix-lint`        | `*.nix`                                          | statix                                 |
+| `nix-deadcode`    | `*.nix`                                          | deadnix                                |
+| `python-lint`     | `*.py`                                           | ruff                                   |
+| `python-types`    | `*.py`                                           | mypy                                   |
+| `python-security` | `*.py`                                           | bandit                                 |
+| `js-lint`         | `*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc}`           | biome                                  |
+| `shell-lint`      | `*.{sh,bash}`                                    | shellcheck                             |
+| `yaml-lint`       | `*.{yml,yaml}`                                   | yamllint                               |
+| `toml-lint`       | `*.toml`                                         | taplo                                  |
+| `actions-lint`    | `.github/workflows/*.{yml,yaml}`                 | actionlint                             |
+| `docker-lint`     | `**/Dockerfile*`                                 | hadolint                               |
+| `go-lint`         | `*.go`                                           | golangci-lint                          |
+| `html-lint`       | `*.html`                                         | htmlhint                               |
+| `css-lint`        | `*.{css,scss,sass}`                              | stylelint                              |
+| `markdown-lint`   | `*.{md,markdown}`                                | markdownlint-cli2                      |
+| `spell-check`     | `*.{md,markdown,txt,js,jsx,ts,tsx,py,go,rs,nix}` | cspell                                 |
+| `markdown-links`  | `*.{md,markdown}`                                | lychee (offline)                       |
+| `secrets`         | all files except `.secrets.baseline`             | detect-secrets-hook `--no-verify`      |
 
 Commit messages are validated by commitlint against the conventional commits spec.
 
-Install hooks after cloning:
+Install hooks after cloning, then run every job over all tracked files (the same jobs, without
+staging, failing on any change):
 
 ```bash
 lefthook install
+runme run hooks:run:all   # mise: mise run hooks:run:all (aliases hooks, hra)
 ```
 
 All tools are provided by the konductor devshell. No manual installation required.
@@ -98,6 +99,7 @@ git checkout -b feat/my-improvement
 
 # Verify before push
 nix flake check
+runme run hooks:run:all
 runme run lint
 runme run fmt:check
 
@@ -110,30 +112,33 @@ git push origin feat/my-improvement
 
 ## CI Pipeline
 
-Pull requests trigger the CI workflow:
+Pushes and pull requests to `main` run `ci.yml`, which calls `nix.yml` on x86_64-linux,
+aarch64-linux, and aarch64-darwin runners:
 
-1. `nix flake check` runs all 9 checks (8 per-tool version checks + 1 buildEnv bundle integration
-   check)
-2. `nix build packages.default` verifies the installable buildEnv compiles
-3. All built paths are pushed to `braincraftio.cachix.org` for binary cache warming
+1. `nix flake show` and `nix flake check` (per-tool checks, treefmt, statix, deadnix)
+2. Build the maintained packages and the k0sctl version test
+3. `nix profile install .#default` (the consumer install path)
+4. Build the default and full devshells, plus konductor and frontend on x86_64-linux
 
-Fork PRs run checks but cannot push to cachix (org secrets are not available to forks).
+Pull request builds pull from Cachix and never push; push and release builds push to
+`braincraftio.cachix.org`. A failed pull request build uploads `hash-repairs-<system>` patches for
+`src/lib/versions.nix`. `.github/README.md` documents every workflow, including the weekly
+`update.yml`.
 
 ## Release Process
 
-Releases are fully automated via semantic-release on push to main:
+`release.yml` runs after CI succeeds for a push to `main`, and only when `main` still matches the
+tested revision:
 
 1. semantic-release analyzes commits since the last tag
 2. If releasable commits exist (`feat:`, `fix:`, `perf:`, `revert:`), a version is determined
-3. A git tag is created (e.g. `v1.2.3`)
+3. `CHANGELOG.md` is updated and committed to main; the tag (e.g. `v1.2.3`) points at that commit
 4. A GitHub Release is created with categorized release notes
-5. `CHANGELOG.md` is updated and committed back to main
-6. The nix-cache job builds from post-release main HEAD and pushes to cachix
+5. The Nix Cache jobs build the release tag on all three platforms and push to Cachix
+6. `publish-flake` publishes the tag to FlakeHub with its output paths
 
-The post-release cache build is critical for cache alignment. Consumers fetch
-`github:braincraftio/konductor` which resolves to main HEAD (the post-changelog commit). The
-nix-cache job builds from that same commit so derivation hashes match. Builds from the tag would
-produce different hashes because the changelog commit changes the flake's `self.narHash`.
+The tag includes the changelog commit, so the cached derivations match what consumers of the release
+resolve.
 
 No manual release steps. No version bumps in source. No changelog authoring. Conventional commits
 determine everything.
@@ -142,7 +147,8 @@ determine everything.
 
 Before opening a PR, verify:
 
-- `nix flake check` passes (per-tool + bundle checks)
+- `nix flake check` passes
+- `runme run hooks:run:all` passes
 - `runme run lint` passes
 - `runme run fmt:check` passes
 - Single Source of Truth preserved (versions in `src/lib/versions.nix`)

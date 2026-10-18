@@ -1,6 +1,6 @@
 ---
 cwd: ../..
-shell: /run/current-system/sw/bin/bash
+shell: bash --noprofile --norc
 skipPrompts: true
 tag: k9:ci:dev,k9:ci:dev:qcow2
 runme:

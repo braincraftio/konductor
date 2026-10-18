@@ -1,6 +1,6 @@
 ---
 cwd: ../../..
-shell: bash
+shell: bash --noprofile --norc
 skipPrompts: true
 tag: target:nix,scope:dev,scope:ci
 runme:

@@ -104,6 +104,7 @@ datefmt
 davidanson
 dbaeumer
 dbout
+deadcode
 deadnix
 deepwiki
 devicons
