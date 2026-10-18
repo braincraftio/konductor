@@ -81,10 +81,14 @@ jobs:
     secrets:
       BCIO_CACHIX_PRIVATE_KEY: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
 
+  # Opt-in: requires the braincraftio organization on flakehub.com. Enable with
+  # gh variable set FLAKEHUB_PUBLISH --repo braincraftio/konductor --body true
   flakehub-publish:
     name: Publish release to FlakeHub
     needs: [semantic-release, nix-cache]
-    if: needs.semantic-release.outputs.new_release == 'true'
+    if: >-
+      needs.semantic-release.outputs.new_release == 'true' &&
+      vars.FLAKEHUB_PUBLISH == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
