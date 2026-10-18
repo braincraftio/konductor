@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/braincraftio/konductor/compare/v1.7.0...v1.8.0) (2026-10-18)
+
+### Features
+
+* **update:** automate release-record maintenance and pin flakehub-push ([94a180d](https://github.com/braincraftio/konductor/commit/94a180daf08f1d645fb080420f0452d92fbc678d)), closes [.#update-artifacts](https://github.com/braincraftio/./issues/update-artifacts) [.#update-prettier-astro-lock](https://github.com/braincraftio/./issues/update-prettier-astro-lock) [.#flakehub-push](https://github.com/braincraftio/./issues/flakehub-push)
+
 ## [1.7.0](https://github.com/braincraftio/konductor/compare/v1.6.0...v1.7.0) (2026-10-17)
 
 ### ⚠ BREAKING CHANGES
