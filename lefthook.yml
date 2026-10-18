@@ -150,11 +150,19 @@ pre-commit:
 
     # ------------------------------------------------------------------------
     # Secrets (gate: detect-secrets-hook; baseline maintenance: runme)
+    # --no-verify keeps detection and disables only vendor liveness checks.
+    # With verification on, a finding the vendor reports invalid (revoked key)
+    # is filtered out and never fails the gate; every candidate is sent to that
+    # vendor's API (aws, stripe, slack, mailchimp, telegram, ibm, cloudant,
+    # softlayer); and a network error changes the result. --no-verify reports
+    # every candidate, offline and deterministic. Same mode as runme
+    # lint:secrets and secrets:baseline:update, so the baseline filter set
+    # never churns between them.
     # ------------------------------------------------------------------------
     - name: secrets
       exclude:
         - ".secrets.baseline"
-      run: detect-secrets-hook --baseline .secrets.baseline {staged_files}
+      run: detect-secrets-hook --no-verify --baseline .secrets.baseline {staged_files}
       tags: [security]
       fail_text: |
         Potential secret in staged files.
