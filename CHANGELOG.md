@@ -1,3 +1,15 @@
+## [1.8.1](https://github.com/braincraftio/konductor/compare/v1.8.0...v1.8.1) (2026-10-18)
+
+### Bug Fixes
+
+* **lint:** run detect-secrets without network verification everywhere ([1b77776](https://github.com/braincraftio/konductor/commit/1b77776b1f8ef371dd20cfe8ee4cabc0957f4952))
+* **runme:** run task shells without user rc files ([f2d752f](https://github.com/braincraftio/konductor/commit/f2d752f27512bff761d6ee94c2c20892193148eb))
+
+### CI/CD
+
+* **deps:** bump actions/upload-artifact ([#2](https://github.com/braincraftio/konductor/issues/2)) ([341b75e](https://github.com/braincraftio/konductor/commit/341b75eb48a8d2e24c6e7d0390179bbd43974c9c))
+* **update:** schedule runme update and open a pull request with the result ([eeda764](https://github.com/braincraftio/konductor/commit/eeda764d8c8642b61ac55a1a417e545ff363cdbb)), closes [.#ci](https://github.com/braincraftio/./issues/ci) [.#ci](https://github.com/braincraftio/./issues/ci)
+
 ## [1.8.0](https://github.com/braincraftio/konductor/compare/v1.7.0...v1.8.0) (2026-10-18)
 
 ### Features
