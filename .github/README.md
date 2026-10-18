@@ -34,6 +34,19 @@ branch. Repairs depend on observed mismatches: a build failure unrelated to hash
 empty patch, and a source-hash repair may need another build before a dependency-hash mismatch is
 exposed. Input revisions and `narHash` remain managed through `flake.lock`.
 
+## Version maintenance
+
+`update.yml` runs weekly (Monday 06:00 UTC) and on dispatch. It runs `runme run update`
+(`docs/developer_guide/UPDATE.md`), the same task maintainers run locally: `nix flake update`, then
+`nix-update` and the URL-artifact and prettier-plugin-astro updaters over `src/lib/versions.nix`.
+When anything changed, it commits one `chore(deps)` commit listing input revisions and record
+versions, force-pushes the workflow-owned `update/release-records` branch rebuilt from `main`, opens
+a PR if none is open, and dispatches CI on the branch. Pull request events from `GITHUB_TOKEN` do
+not start workflows; the dispatched run's check runs attach to the branch head and gate the PR.
+Dispatched and PR builds are unreviewed: they pull from caches and never push. Creating the PR
+requires the repository setting "Allow GitHub Actions to create and approve pull requests".
+Dependabot maintains the commit-SHA pins of third-party actions.
+
 ## Releases and website
 
 Release automation runs after successful push CI and verifies that `main` still matches the tested
@@ -64,11 +77,11 @@ exactly one place. Semantic release uses its JavaScript API for version/tag outp
 parsing log text.
 
 Runner tools come from the flake, not marketplace setup actions: `packages.<system>.ci` bundles node
-(the `src/lib/versions.nix` pin), pnpm, git, jq, cachix, and actionlint. Pages and release jobs
-consume it through `setup-devshell`. `nix.yml` builds `.#ci` and installs `.#default` with
-`nix profile install` to exercise the consumer install path. Pages installs frontend dependencies
-with the frozen lockfile and generates website release data through `.#versions-json`. Only the
-deployment job gets Pages and OIDC write permissions.
+(the `src/lib/versions.nix` pin), pnpm, git, jq, cachix, actionlint, gh, runme, and nix-update.
+Pages, release, and update jobs consume it through `setup-devshell`. `nix.yml` builds `.#ci` and
+installs `.#default` with `nix profile install` to exercise the consumer install path. Pages
+installs frontend dependencies with the frozen lockfile and generates website release data through
+`.#versions-json`. Only the deployment job gets Pages and OIDC write permissions.
 
 Validate workflow edits locally with `actionlint` and `git diff --check`. Hosted runs are required
 to verify runner installation, cache authentication, artifact uploads, and publishing.

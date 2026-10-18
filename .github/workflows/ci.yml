@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # update.yml dispatches CI on its branch: pull_request events from
+  # GITHUB_TOKEN-created PRs do not start workflows. Check runs attach to the
+  # branch head commit, so they gate the PR.
+  workflow_dispatch:
 
 permissions:
   contents: read

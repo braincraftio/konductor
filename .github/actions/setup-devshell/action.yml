@@ -1,7 +1,8 @@
 name: Setup devshell
 description: >
   Install the flake's CI toolchain (.#ci: node from src/lib/versions.nix,
-  pnpm, git, jq, cachix, actionlint) into a job-local profile on PATH.
+  pnpm, git, jq, cachix, actionlint, gh, runme, nix-update) into a
+  job-local profile on PATH.
   Requires ./.github/actions/setup-nix as an earlier step of the same job;
   it is not nested here because the runner does not evaluate a nested
   composite's inputs for its post steps (cachix-action post then fails on
@@ -16,6 +17,6 @@ runs:
       run: |
         nix profile install .#ci --no-update-lock-file --accept-flake-config --profile "$RUNNER_TEMP/ci-env" -L
         echo "$RUNNER_TEMP/ci-env/bin" >> "$GITHUB_PATH"
-        for tool in node npm pnpm git jq cachix actionlint; do
+        for tool in node npm pnpm git jq cachix actionlint gh runme nix-update; do
           test -x "$RUNNER_TEMP/ci-env/bin/$tool" || { echo "::error::$tool missing from .#ci profile"; exit 1; }
         done

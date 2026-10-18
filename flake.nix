@@ -265,6 +265,9 @@
               pkgs.jq
               pkgs.cachix
               pkgs.actionlint
+              pkgs.gh
+              pkgs.unstable.runme
+              pkgs.nix-update
             ];
             meta.description = "Konductor CI runner toolchain";
           };
