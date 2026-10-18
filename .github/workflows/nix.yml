@@ -62,8 +62,8 @@ jobs:
           SYSTEM: ${{ matrix.system }}
         run: |
           packages=(
-            ci atuin k0sctl terminal-browser opencode mitogen ansible python-env
-            pulumi pulumi-cli trzsz
+            ci atuin flakehub-push k0sctl terminal-browser opencode mitogen ansible
+            python-env pulumi pulumi-cli trzsz
           )
           targets=()
           for package in "${packages[@]}"; do

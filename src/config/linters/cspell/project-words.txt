@@ -441,6 +441,7 @@ overlayfs
 overridability
 ovmf
 oxalica
+packagetype
 pango
 partx
 parver
