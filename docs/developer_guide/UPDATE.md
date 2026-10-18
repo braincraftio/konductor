@@ -82,7 +82,7 @@ set -euo pipefail
 FAILED=()
 update() {
     echo "=== $* ==="
-    if ! nix run nixpkgs#nix-update -- --flake --override-filename src/lib/versions.nix --build "$@"; then
+    if ! nix-update --flake --override-filename src/lib/versions.nix --build "$@"; then
         FAILED+=("$*")
     fi
     echo ""

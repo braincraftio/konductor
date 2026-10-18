@@ -36,6 +36,10 @@ jobs:
             runner: macos-15
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
+    # Unreviewed revisions: pull requests, and update branches whose CI
+    # update.yml dispatches. Release builds are called from workflow_run.
+    env:
+      UNREVIEWED: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,13 +47,13 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
           persist-credentials: false
 
-      # PR builds pull only; push and release builds push to both caches.
+      # Unreviewed builds pull only; push and release builds push to both caches.
       - uses: ./.github/actions/setup-nix
         with:
-          use-flakehub: ${{ github.event_name != 'pull_request' }}
+          use-flakehub: ${{ env.UNREVIEWED != 'true' }}
           cachix-name: ${{ vars.CACHIX_NAME || 'braincraftio' }}
           cachix-auth-token: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
-          cachix-skip-push: ${{ github.event_name == 'pull_request' }}
+          cachix-skip-push: ${{ env.UNREVIEWED }}
 
       - name: Flake structure
         run: nix flake show --no-update-lock-file --accept-flake-config
@@ -97,7 +101,7 @@ jobs:
 
       # Keep the failed build red. Each platform emits its own reviewable patch.
       - name: Repair hash mismatches
-        if: failure() && github.event_name == 'pull_request'
+        if: failure() && env.UNREVIEWED == 'true'
         uses: ./.github/actions/fix-nix-hashes
         with:
           system: ${{ matrix.system }}

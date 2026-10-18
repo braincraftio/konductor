@@ -72,6 +72,7 @@ in
       unstable.runme # Executable markdown documentation
       nix-prefetch-git # Hash computation for fetchFromGitHub/fetchgit
       nix-prefetch-github # Hash computation for GitHub sources
+      nix-update # Release-record updater for runme update:releases
       nix-diff # Explain why two derivations differ (input/env/arg level)
       terminal-browser # Chromium in terminal via kitty graphics protocol
 
