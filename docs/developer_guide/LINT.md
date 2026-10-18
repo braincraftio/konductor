@@ -1,6 +1,6 @@
 ---
 cwd: ../..
-shell: bash
+shell: bash --noprofile --norc
 skipPrompts: true
 tag: target:lint,target:fmt,scope:dev,scope:ci
 runme:
@@ -344,13 +344,12 @@ regenerates the baseline.
 set -euo pipefail
 previous="$(mktemp)"
 trap 'rm -f "$previous"' EXIT
-# `command cp` bypasses interactive `cp -i` aliases from the user's shell profile.
-command cp .secrets.baseline "$previous"
+cp .secrets.baseline "$previous"
 detect-secrets scan --no-verify --baseline .secrets.baseline
 # The scan rewrites generated_at on every run; keep the previous file when
 # nothing else changed so an unchanged scan leaves no diff.
 if [ "$(jq -S 'del(.generated_at)' "$previous")" = "$(jq -S 'del(.generated_at)' .secrets.baseline)" ]; then
-    command cp "$previous" .secrets.baseline
+    cp "$previous" .secrets.baseline
     echo "Baseline unchanged"
 fi
 git --no-pager diff -- .secrets.baseline

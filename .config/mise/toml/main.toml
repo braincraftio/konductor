@@ -218,6 +218,13 @@ alias = [
 ]
 run = "runme run fmt:check"
 
+["hooks:run:all"]
+# pre-commit and pc are not aliases: mise merges parent-directory configs, and a
+# parent task of that name takes precedence over an alias here.
+description = "🪝 Run every lefthook pre-commit job over all tracked files • hra"
+alias = ["hra", "hooks"]
+run = "runme run hooks:run:all"
+
 [clean]
 description = "🧹 Clean build artifacts and caches • c"
 alias = ["c"]

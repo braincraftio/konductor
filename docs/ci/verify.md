@@ -1,6 +1,6 @@
 ---
 cwd: /opt/konductor
-shell: bash
+shell: bash --noprofile --norc
 skipPrompts: true
 tag: k9:ci:qcow2:verify,k9:ci:qcow2:verify:qcow2
 runme:
