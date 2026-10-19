@@ -195,9 +195,9 @@
   # hash = npm tarball, npmDepsHash = fetchNpmDeps over the vendored lockfile.
   # Refresh both with: nix run .#update-prettier-astro-lock [-- VERSION]
   prettier-plugin-astro = {
-    version = "0.14.1";
-    hash = "sha256-36VjvCBZGAkXyC2ay1/vA4TfuxOMtatOjGnTvAZVcGw=";
-    npmDepsHash = "sha256-krz3i/vgIy3Ho34E1LIkndSk3S31lpLxf3zE6O+ukII=";
+    version = "1.1.1";
+    hash = "sha256-Pgb2NIg/qf9czRrQ4bOKBy42ClAZWftpb208LIHrvPs=";
+    npmDepsHash = "sha256-+F+9OOwdz+B/9C2WLmJn8Zga1XUi84usoN/jNBr5aZM=";
   };
 
   # Python type checker wheel, consumed by src/packages/pulumi.nix.
