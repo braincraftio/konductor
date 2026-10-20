@@ -82,6 +82,8 @@ in
       "--skip=multi_user_test"
       # Requires a running, password-authenticated PostgreSQL server.
       "--skip=postgres_authenticates_with_the_password_file"
+      # PTY sandbox cannot find atuin on PATH; bash reports "atuin: command not found".
+      "--skip=the_shell_widget_resumes_the_session_chosen"
     ];
 
     preCheck = ''
