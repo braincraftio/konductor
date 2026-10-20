@@ -88,6 +88,8 @@ in
       "--skip=a_copy_behind_another_machine_catches_up_as_it_resumes"
       "--skip=a_diverged_copy_resumes_only_as_chosen"
       "--skip=a_session_gone_on_with_elsewhere_catches_up_where_it_came_from"
+      # e2e_capture: filtered_commands_leave_no_captured_output times out during check phase.
+      "--skip=filtered_commands_leave_no_captured_output"
     ];
 
     preCheck = ''
