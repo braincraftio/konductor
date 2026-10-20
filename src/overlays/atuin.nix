@@ -93,6 +93,9 @@ in
       # e2e_pty: all bash_preexec setup variants fail — PTY harness cannot
       # drive bash-preexec integration in the check phase environment.
       "--skip=setup_2_tests_shells_bash_preexec_toml"
+      # atuin-daemon concurrency: timing-sensitive, panics when reload
+      # completes faster than the test's minimum threshold (RELOAD_ROWS).
+      "--skip=end_history_is_not_starved_by_an_index_reload"
     ];
 
     preCheck = ''
