@@ -6,6 +6,9 @@
   lib,
   versions,
   catppuccinSources ? null,
+  # Consumer settings.json overrides (module option konductor.claude-code.settings).
+  # recursiveUpdate onto settings.nix: attrsets merge per leaf, lists replace whole.
+  claudeCodeSettings ? { },
   ...
 }:
 
@@ -97,7 +100,11 @@ in
   # Claude Code harness — wrapped CLI + user-tier config + two plugins.
   # Exposes .package (the wrapped `claude`), .configDirDrv, .devshellHook,
   # .konductorPlugin, .practitionerPlugin, and .extend (lib.makeExtensible).
-  claude-code = import ./claude-code { inherit pkgs lib; };
+  # settingsDrv, configDirDrv and wrappedClaude read final.settings, so they
+  # rebuild from the merged value.
+  claude-code = (import ./claude-code { inherit pkgs lib; }).extend (
+    _final: prev: { settings = lib.recursiveUpdate prev.settings claudeCodeSettings; }
+  );
 
   # ===========================================================================
   # System Info Tools

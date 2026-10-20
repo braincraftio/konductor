@@ -29,7 +29,7 @@ let
   catppuccinSources = konductor.inputs.catppuccin.packages.${pkgs.stdenv.hostPlatform.system};
 in
 {
-  options.konductor = common.mkOptions;
+  options.konductor = common.mkOptions { inherit pkgs; };
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = common.mkPackages {
@@ -39,6 +39,7 @@ in
         versions
         catppuccinSources
         ;
+      claudeCodeSettings = cfg.claude-code.settings;
     };
     environment.variables = common.mkEnv;
   };

@@ -20,9 +20,23 @@
   # Shared Option Definitions
   # ===========================================================================
 
-  mkOptions = {
-    enable = lib.mkEnableOption "Konductor development environment";
-  };
+  # Function of pkgs so claude-code.settings can use the formats.json type
+  # (JSON-serializable values only) instead of types.anything.
+  mkOptions =
+    { pkgs }:
+    {
+      enable = lib.mkEnableOption "Konductor development environment";
+      claude-code.settings = lib.mkOption {
+        inherit (pkgs.formats.json { }) type;
+        default = { };
+        description = ''
+          Overrides for the wrapped Claude Code settings.json, merged onto the
+          konductor defaults (src/config/claude-code/settings.nix) with
+          lib.recursiveUpdate. Attrsets merge per leaf (env keeps unset konductor
+          keys); lists replace whole (availableModels is the full roster).
+        '';
+      };
+    };
 
   # ===========================================================================
   # Package Builder (called by platform modules)
@@ -36,6 +50,7 @@
       lib,
       versions,
       catppuccinSources,
+      claudeCodeSettings ? { },
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -46,6 +61,7 @@
           lib
           versions
           catppuccinSources
+          claudeCodeSettings
           ;
       };
 
