@@ -90,6 +90,9 @@ in
       "--skip=a_session_gone_on_with_elsewhere_catches_up_where_it_came_from"
       # e2e_capture: filtered_commands_leave_no_captured_output times out during check phase.
       "--skip=filtered_commands_leave_no_captured_output"
+      # e2e_pty: all bash_preexec setup variants fail — PTY harness cannot
+      # drive bash-preexec integration in the check phase environment.
+      "--skip=setup_2_tests_shells_bash_preexec_toml"
     ];
 
     preCheck = ''
