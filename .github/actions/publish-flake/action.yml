@@ -25,7 +25,7 @@ runs:
         echo "binary=$out/bin/flakehub-push" >> "$GITHUB_OUTPUT"
 
     - name: Publish to FlakeHub
-      uses: DeterminateSystems/flakehub-push@99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567
+      uses: DeterminateSystems/flakehub-push@dceefcb33cba27bde28f8540d8b4537cb925c46b
       with:
         tag: ${{ inputs.tag }}
         visibility: public
