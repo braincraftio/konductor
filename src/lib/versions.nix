@@ -66,9 +66,9 @@
   # between konductor devshells and home-manager consumers on different
   # nixpkgs channels. Built by src/overlays/atuin.nix.
   atuin = {
-    version = "18.24.1";
-    hash = "sha256-p4Vjk4XZDYVaIEp13fz0AfhvtZ9to0H0OJMpdNH34I0=";
-    cargoHash = "sha256-tZqIfdcOth0pBIfIvqfeSEtKqsmRPcwtuHWsjoPdt1c=";
+    version = "18.24.2";
+    hash = "sha256-b6Uj3cPAu731lhrN8fOv4d0CpehT3bv7IOBmkbYrqfI=";
+    cargoHash = "sha256-HkYI2+Yvjnw9pKeRsteyZeLhHHErTa1mvJL16NQVF3g=";
   };
 
   # Terminal-embedded Chromium browser via kitty graphics protocol.
@@ -90,16 +90,16 @@
   # from one commit). Bump rev, hash, and cargoHash together.
   flakehub-push = {
     version = "0.1.0";
-    rev = "99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567";
-    hash = "sha256-6QyG/PftQbHLOz3AILuoFolqRjFh2JGKRoRwRXgwe30=";
-    cargoHash = "sha256-dZn6g9QYRpLrKMFdpAAsBOwf6F4LMBcGJOVvpySluSQ=";
+    rev = "dceefcb33cba27bde28f8540d8b4537cb925c46b";
+    hash = "sha256-HFKSSFc5QKmcCkuIiKJ/wiTU8yAqOUUvXEcgj7R/IVY=";
+    cargoHash = "sha256-q3xHXgfXh5zVbjrD7BQmr0tqQaiL6KdM82jWImmIzY4=";
   };
 
   # Pre-built VS Code in browser (x86_64-linux).
   # Packaged by src/overlays/code-server.nix.
   code-server = {
-    version = "4.141.0";
-    hash = "sha256-ZbzSC1JNA+sbWtt/NgJEWZ7w5bdAiaRqmC0ywHS5eik=";
+    version = "4.143.1";
+    hash = "sha256-YUh3z3EAXxTqJSvS2bHBIjfPfXNoHvFQ8N/38ThJ/bU=";
   };
 
   # Terminal file transfer; built by src/packages/trzsz.nix.
@@ -119,14 +119,14 @@
 
   # CLI and Python SDK share a release. Wheel paths are content-addressed.
   pulumi = {
-    version = "3.270.0";
+    version = "3.272.0";
     cliHashes = {
-      x86_64-linux = "sha256-0FiZwlHLBBOpojBPIyKSGMRoUqYSVpE/NPCOvCcmYTk=";
-      aarch64-linux = "sha256-tB8ZmhYaukhDMS1M2jFDAk+m+9cyKdQUn1cqF4j4S9o=";
-      aarch64-darwin = "sha256-aIqfTFu2hcvUC4PkXCgnFctTf/Klvpf/tjZ+1vbCazQ=";
+      x86_64-linux = "sha256-WNVF8rmHYQUZIgCOvTgezvlUhNf3pf9/qhXXp4DqhPY=";
+      aarch64-linux = "sha256-TwdBkBuJgsQya3Atq/SDxj0s93yIrELddStyVBKEpTQ=";
+      aarch64-darwin = "sha256-H7VUvzmtg7pu727LesWhS4FYlBzNl9IBg30T3AmAYBQ=";
     };
-    url = "https://files.pythonhosted.org/packages/f3/dc/5f8fa00f894774dd7fac3498cf2e969934b93906ca40bd9ac3392c339456/pulumi-3.270.0-py3-none-any.whl";
-    hash = "sha256-CRvlFb8pf2lTQ0K2SInM5AinqVQUw+2ENieqCRhcTMg=";
+    url = "https://files.pythonhosted.org/packages/be/50/ceba43d892bebd64fbbe173b37e568bcee019c1577a11d528c4877e664fb/pulumi-3.272.0-py3-none-any.whl";
+    hash = "sha256-5hhLLCE+qhO7t2/pRuDPxBPVPIbqFuHnoU1guIWbQaw=";
     providers = {
       kubernetes = {
         version = "4.34.2";
@@ -159,14 +159,14 @@
         hash = "sha256-RuXwiFSyI+ExJylyodooOFMPnHJxyhZStCFrUa2P8a8=";
       };
       cloudflare = {
-        version = "6.22.1";
+        version = "6.23.1";
         pluginHashes = {
-          x86_64-linux = "sha256-IqE4wrYbvJx8egxgH2zTls4zcw5yc3Ol+QYjq08/Osk=";
-          aarch64-linux = "sha256-ScQROF3WYGPxtBc7da4wBQPQNaUFpKxLQgJT950NJhU=";
-          aarch64-darwin = "sha256-FpaVoJMKMBJZBx4YrEouwPDnB63zYAz5kWc2S7y22mk=";
+          x86_64-linux = "sha256-n4b3kNIYucR6V/IGaMDqjwUITeyVW/AEjf2Ji4kXVFU=";
+          aarch64-linux = "sha256-hdTuK7tfD9pYEaYfCjKSxdq9juj0oj/dpcr1b2Jdegw=";
+          aarch64-darwin = "sha256-wsGBBfhaimjluoCmxd4fAZdAKGTiol1mOdv6mWj4FAg=";
         };
-        url = "https://files.pythonhosted.org/packages/2b/6e/bf1ba64a12c742c9bf957d6e0d3a2f2fa7038d6dc5bf0362cb43bc9efcac/pulumi_cloudflare-6.22.1-py3-none-any.whl";
-        hash = "sha256-pF9r/vwHIZH839y9sUe0hSybco4coIh+2l5HcgqwyzE=";
+        url = "https://files.pythonhosted.org/packages/6e/54/cbcbe3cb5ba34b530c0d58fadedfcb2507fb3fdc0c0d7ca895b46f3a27ac/pulumi_cloudflare-6.23.1-py3-none-any.whl";
+        hash = "sha256-dO2OZoZ0r8+7Hnn38clYQLBLDc/XQ2Gt+D8epDWd584=";
       };
       random = {
         version = "4.21.4";
@@ -195,9 +195,9 @@
   # hash = npm tarball, npmDepsHash = fetchNpmDeps over the vendored lockfile.
   # Refresh both with: nix run .#update-prettier-astro-lock [-- VERSION]
   prettier-plugin-astro = {
-    version = "0.14.1";
-    hash = "sha256-36VjvCBZGAkXyC2ay1/vA4TfuxOMtatOjGnTvAZVcGw=";
-    npmDepsHash = "sha256-krz3i/vgIy3Ho34E1LIkndSk3S31lpLxf3zE6O+ukII=";
+    version = "1.1.2";
+    hash = "sha256-FZniSOPpTjZN+fNfnXSyfVIUDcsknOV08HBoSCikcho=";
+    npmDepsHash = "sha256-0j49Flmi/NdaLhrrT6Rx0zP9fL6WDYJ2gzV6VVxCuvY=";
   };
 
   # Python type checker wheel, consumed by src/packages/pulumi.nix.
