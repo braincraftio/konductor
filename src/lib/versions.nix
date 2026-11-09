@@ -66,9 +66,9 @@
   # between konductor devshells and home-manager consumers on different
   # nixpkgs channels. Built by src/overlays/atuin.nix.
   atuin = {
-    version = "18.24.1";
-    hash = "sha256-p4Vjk4XZDYVaIEp13fz0AfhvtZ9to0H0OJMpdNH34I0=";
-    cargoHash = "sha256-tZqIfdcOth0pBIfIvqfeSEtKqsmRPcwtuHWsjoPdt1c=";
+    version = "18.24.5";
+    hash = "sha256-cQmfUN+lrw4Z8LZ6XRYwq6utHCH+ockw81AdEYJ/oqA=";
+    cargoHash = "sha256-2ACFqpVZsEu+vmtpllGYvUDCghH6EbcRYMELs+EEx/g=";
   };
 
   # Terminal-embedded Chromium browser via kitty graphics protocol.

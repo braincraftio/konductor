@@ -42,7 +42,7 @@ def build_ca_certificate(
     Returns:
         Self-signed X.509 CA certificate.
     """
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
 
     subject = issuer = x509.Name(
         [

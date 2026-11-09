@@ -110,13 +110,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # OpenCode v2 AI coding agent
-    # usrbinkat fork: nix integration (bun2nix build, flake outputs, HM/NixOS/darwin modules)
-    opencode = {
-      url = "github:usrbinkat/opencode/v2";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     systems.url = "github:nix-systems/default";
   };
 
@@ -185,7 +178,6 @@
             inherit system;
             overlays = [
               inputs.rust-overlay.overlays.default
-              inputs.opencode.overlays.default
             ]
             ++ overlays;
             config = {

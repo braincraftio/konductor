@@ -328,7 +328,7 @@ def _build_cross_signed_ca(
 
     from cryptography.hazmat.primitives import hashes
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
 
     subject = x509.Name(
         [

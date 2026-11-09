@@ -34,7 +34,7 @@ in
     dust # Disk usage analyzer
     # tree → wrapped in src/config/ (in packages.default via cli.nix)
 
-    # OpenCode v2 AI coding agent (usrbinkat/opencode overlay)
+    # OpenCode v2 AI coding agent from the locked nixpkgs package set
     opencode
 
     # Neovim dependencies (required for plugins)
