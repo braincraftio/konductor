@@ -7,9 +7,11 @@
 # NOT through settings.json. settings.json carries model/behavior, permissions,
 # the statusline pointer, and enabledPlugins (official LSP marketplace plugins).
 #
-# Consumers override any leaf via the home-manager module's `settings` option
-# (lib.recursiveUpdate onto these defaults) or via .extend. `statusline` flows
-# THROUGH final in default.nix so a downstream override recomputes this attrset.
+# Consumers override via the konductor.claude-code.settings module option
+# (home-manager, nix-darwin, NixOS), merged with lib.recursiveUpdate in
+# src/config/default.nix, or via .extend on config.claude-code. `statusline`
+# flows THROUGH final in default.nix so a downstream override recomputes this
+# attrset.
 
 {
   statusline,

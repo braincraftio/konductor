@@ -44,6 +44,7 @@ let
       versions
       catppuccinSources
       ;
+    claudeCodeSettings = cfg.claude-code.settings;
   };
 
   # Programs (neovim, tmux, ttyd) — needs flake inputs for nixvim
@@ -60,7 +61,7 @@ let
   };
 in
 {
-  options.konductor = common.mkOptions;
+  options.konductor = common.mkOptions { inherit pkgs; };
 
   config = lib.mkIf cfg.enable {
     home = {
@@ -73,6 +74,7 @@ in
             versions
             catppuccinSources
             ;
+          claudeCodeSettings = cfg.claude-code.settings;
         }
         # IDE programs: neovim, tmux, ttyd
         ++ common.mkPrograms { inherit programs packages; }

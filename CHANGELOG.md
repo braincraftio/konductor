@@ -1,3 +1,21 @@
+## [1.9.0](https://github.com/braincraftio/konductor/compare/v1.8.1...v1.9.0) (2026-10-20)
+
+### Features
+
+* **modules:** add konductor.claude-code.settings override option ([bb54312](https://github.com/braincraftio/konductor/commit/bb5431204a8c149b13ccd15b5e0d722442903dd2))
+
+### Bug Fixes
+
+* **atuin:** skip bash-preexec e2e_pty variants that lack atuin on PATH ([ad7d3cc](https://github.com/braincraftio/konductor/commit/ad7d3cc163e652b325a9627b787ce1a1e64ae2d9))
+* **atuin:** skip e2e_ai_resume_picker PTY tests that fail in sandbox ([db8d53b](https://github.com/braincraftio/konductor/commit/db8d53b22746b0d7b5546f09ed0dc0b5514bb73b))
+* **atuin:** skip e2e_capture filtered_commands_leave_no_captured_output tests ([98d3499](https://github.com/braincraftio/konductor/commit/98d34991e8cdd37415b16fb3650a3be0b9f1d1a5))
+* **atuin:** skip failing e2e_ai_sessions tests during check phase ([62147a1](https://github.com/braincraftio/konductor/commit/62147a1d564ba828e55c51d69ca840c680126491))
+* **atuin:** skip timing-sensitive concurrency test ([232e30f](https://github.com/braincraftio/konductor/commit/232e30f9b2fe2f28e62d5b18d4cc4ea81d95cbaf))
+
+### CI/CD
+
+* **release:** make flakehub publication opt-in via repository variable ([#4](https://github.com/braincraftio/konductor/issues/4)) ([7b09909](https://github.com/braincraftio/konductor/commit/7b0990977db274face750db4a9196c5508e325da))
+
 ## [1.8.1](https://github.com/braincraftio/konductor/compare/v1.8.0...v1.8.1) (2026-10-18)
 
 ### Bug Fixes
