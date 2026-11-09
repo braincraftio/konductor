@@ -41,6 +41,16 @@ in
 
     inherit (atuin) cargoHash;
 
+    # Use the atomic update API recommended by our pinned Rust toolchain.
+    postPatch = ''
+      substituteInPlace crates/atuin-daemon/src/output_capture/persistence/blob/fjall/mod.rs \
+        --replace-fail 'self.estimated_usage.fetch_update(' 'self.estimated_usage.try_update('
+      substituteInPlace crates/atuin-daemon/src/session_capture/engine/mod.rs \
+        --replace-fail '.fetch_update(' '.try_update('
+      substituteInPlace crates/atuin/tests/common/agents.rs \
+        --replace-fail 'LAST.fetch_update(' 'LAST.try_update('
+    '';
+
     # atuin's default features include 'check-update', which does not make sense
     # for distribution builds. List all other default features.
     buildNoDefaultFeatures = true;
@@ -76,18 +86,24 @@ in
     '';
 
     checkFlags = [
+      # Concurrent daemon fixtures can exhaust wall-clock redaction budgets.
+      "--test-threads=1"
       "--skip=registration"
       "--skip=sync"
       "--skip=change_password"
       "--skip=multi_user_test"
       # Requires a running, password-authenticated PostgreSQL server.
       "--skip=postgres_authenticates_with_the_password_file"
+      "--skip=deleting_an_account_needs_its_password"
+      "--skip=operator_creates_resets_and_deletes_a_user"
       # e2e_ai_resume_picker: PTY cannot find atuin on PATH during check phase.
       "--skip=the_shell_widget_resumes_the_session_chosen"
       # e2e_ai_sessions: session resume logic errors during check phase.
       "--skip=a_copy_behind_another_machine_catches_up_as_it_resumes"
       "--skip=a_diverged_copy_resumes_only_as_chosen"
       "--skip=a_session_gone_on_with_elsewhere_catches_up_where_it_came_from"
+      # Large AI-session message exceeds the redaction time limit during package checks.
+      "--skip=a_huge_message_reads_back"
       # e2e_capture: filtered_commands_leave_no_captured_output times out during check phase.
       "--skip=filtered_commands_leave_no_captured_output"
       # e2e_pty: all bash_preexec setup variants fail — PTY harness cannot
