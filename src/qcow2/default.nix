@@ -3169,11 +3169,6 @@ let
 
         # Virtio drivers for performance
         initrd = {
-          # Enable systemd in initrd for /etc overlay support
-          # Required for system.etc.overlay.enable to work reliably
-          # See: nixos/tests/activation/etc-overlay-mutable.nix
-          systemd.enable = true;
-
           availableKernelModules = [
             "virtio_net"
             "virtio_pci"
