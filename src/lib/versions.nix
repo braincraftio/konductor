@@ -62,9 +62,9 @@
     name = "ghcr.io/braincraftio/konductor";
   };
 
-  # Shell history — tip-of-spear policy to prevent SQLite migration skew
-  # between konductor devshells and home-manager consumers on different
-  # nixpkgs channels. Built by src/overlays/atuin.nix.
+  # Shell history, transitional: built by src/overlays/atuin.nix only until
+  # locked nixpkgs ships >= 18.24.5, then this record is deleted with the
+  # overlay (procedure in src/overlays/atuin.nix). Do not bump.
   atuin = {
     version = "18.24.5";
     hash = "sha256-cQmfUN+lrw4Z8LZ6XRYwq6utHCH+ockw81AdEYJ/oqA=";
