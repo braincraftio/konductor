@@ -238,21 +238,23 @@ sudo launchctl kickstart -k system/org.nixos.nix-daemon  # macOS
 nix flake show github:braincraftio/konductor
 ```
 
-| Output                        | Command                           | Description                       |
-| ----------------------------- | --------------------------------- | --------------------------------- |
-| devShells                     | `nix develop .#full`              | 9 development shells              |
-| packages.default              | `nix profile install`             | Installable toolset via buildEnv  |
-| packages.oci                  | `nix build .#oci`                 | OCI container image, Linux        |
-| packages.qcow2                | `nix build .#qcow2`               | QCOW2 VM image, x86_64-linux      |
-| checks                        | `nix flake check`                 | 8 per-tool, bundle, 3 source lint |
-| templates.konductor           | `nix flake init -t ...`           | Standalone project scaffold       |
-| templates.workspace           | `nix flake init -t ...#workspace` | Multi-repo workspace scaffold     |
-| overlays.default              | `overlays = [...]`                | Konductor package overlay         |
-| nixosModules.default          | `imports = [...]`                 | NixOS system module               |
-| nixosModules.k0s              | `imports = [...]`                 | k0s Kubernetes module             |
-| homeModules.default           | `imports = [...]`                 | Home Manager module               |
-| darwinModules.default         | `imports = [...]`                 | nix-darwin module                 |
-| nixosConfigurations.konductor | `nixos-rebuild switch`            | NixOS VM configuration            |
+| Output                        | Command                           | Description                                 |
+| ----------------------------- | --------------------------------- | ------------------------------------------- |
+| devShells                     | `nix develop .#full`              | 9 development shells                        |
+| packages.default              | `nix profile install`             | Installable toolset via buildEnv            |
+| packages.oci                  | `nix build .#oci`                 | OCI container image, Linux                  |
+| packages.qcow2                | `nix build .#qcow2`               | QCOW2 VM image, x86_64-linux                |
+| packages.harness-skills       | `nix build .#harness-skills`      | Shared skill artifacts for harness adapters |
+| packages.claude-plugins       | `nix build .#claude-plugins`      | Built Claude plugin marketplace             |
+| checks                        | `nix flake check`                 | 8 per-tool, bundle, 3 source lint           |
+| templates.konductor           | `nix flake init -t ...`           | Standalone project scaffold                 |
+| templates.workspace           | `nix flake init -t ...#workspace` | Multi-repo workspace scaffold               |
+| overlays.default              | `overlays = [...]`                | Konductor package overlay                   |
+| nixosModules.default          | `imports = [...]`                 | NixOS system module                         |
+| nixosModules.k0s              | `imports = [...]`                 | k0s Kubernetes module                       |
+| homeModules.default           | `imports = [...]`                 | Home Manager module                         |
+| darwinModules.default         | `imports = [...]`                 | nix-darwin module                           |
+| nixosConfigurations.konductor | `nixos-rebuild switch`            | NixOS VM configuration                      |
 
 All per-system outputs are computed once via `lib.genAttrs` over a single `supportedSystems` list
 and indexed from a shared `systemBindings` table. Both `devShells`/`packages`/`checks` and
@@ -943,6 +945,9 @@ graph TD
     B --> G[src/packages]
     B --> H[src/programs]
     B --> I[src/config]
+    I --> T[src/harness]
+    T --> U[shared skill catalog]
+    T --> V[Claude Code and OpenCode adapters]
 
     G --> J[devShells]
     G --> K[packages.default buildEnv]
@@ -967,7 +972,7 @@ src/lib/versions.nix (SSOT: language versions, NixOS channel, atuin version)
     ↓
 src/overlays/ (atuin, k0s, ttyd, code-server, vim-plugins, lld, direnv CGO)
     ↓
-src/config/ (hermetic linter/formatter configs, Claude Code harness)
+src/config/ (hermetic tool configs, consumes src/harness/)
     ↓
 src/packages/ (category-based composition: core, cli, languages, linters, formatters, ai, ide)
     ↓
@@ -1048,15 +1053,18 @@ flake.nix systemBindings
 │   │   ├── ghostty-web/         # Browser terminal (experimental)
 │   │   ├── forgejo/             # Forgejo runner + CLI
 │   │   └── shell/               # bash wrapper
+│   ├── harness/
+│   │   ├── default.nix          # Shared catalog and harness composition
+│   │   ├── skill/               # One directory per shared skill ID
+│   │   ├── claude-code/         # Claude configuration and plugin adapter
+│   │   └── opencode/            # OpenCode configuration and skill adapter
 │   ├── config/
-│   │   ├── claude-code/         # Claude Code harness, plugins, skills, hooks
 │   │   ├── shell/               # bash, git, ssh, starship, atuin configs
 │   │   ├── linters/             # 13 linters with hermetic configs
 │   │   ├── formatters/          # 4 formatters with configs
 │   │   ├── btop/                # btop with Catppuccin
 │   │   ├── fastfetch/           # System info display
 │   │   ├── k9s/                 # k9s with Catppuccin
-│   │   ├── opencode/            # OpenCode theme
 │   │   └── tree/                # tree with gitignore filtering
 │   ├── oci/
 │   │   └── default.nix          # nix2container OCI image
@@ -1074,6 +1082,10 @@ flake.nix systemBindings
 ```
 
 ### Version Updates
+
+Harness content and adapter contracts are documented in
+[src/harness/README.md](src/harness/README.md). Shared skills are authored once; each harness
+consumes their immutable artifacts through its native delivery format.
 
 All versions centralized in `src/lib/versions.nix`:
 

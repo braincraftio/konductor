@@ -17,6 +17,8 @@ let
   # languages.nix depends only on pkgs and versions (no circular dependency).
   languages = import ../packages/languages.nix { inherit pkgs versions lib; };
 
+  harness = import ../harness { inherit pkgs lib claudeCodeSettings; };
+
   # ===========================================================================
   # Linters
   # ===========================================================================
@@ -95,16 +97,15 @@ in
   # ===========================================================================
   # AI Tools Configuration
   # ===========================================================================
-  opencode = import ./opencode { inherit pkgs lib; };
+  inherit harness;
+  inherit (harness) opencode;
 
   # Claude Code harness — wrapped CLI + user-tier config + two plugins.
   # Exposes .package (the wrapped `claude`), .configDirDrv, .devshellHook,
   # .konductorPlugin, .practitionerPlugin, and .extend (lib.makeExtensible).
   # settingsDrv, configDirDrv and wrappedClaude read final.settings, so they
   # rebuild from the merged value.
-  claude-code = (import ./claude-code { inherit pkgs lib; }).extend (
-    _final: prev: { settings = lib.recursiveUpdate prev.settings claudeCodeSettings; }
-  );
+  inherit (harness) claude-code;
 
   # ===========================================================================
   # System Info Tools

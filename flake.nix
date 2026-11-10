@@ -461,6 +461,8 @@
           trzsz = sb.pkgs.callPackage ./src/packages/trzsz.nix { };
           prettier-plugin-astro = sb.konductorConfig.formatters.prettier.astroPlugin;
           treefmt = sb.konductorConfig.formatters.treefmt.package;
+          harness-skills = sb.konductorConfig.harness.skill.directory;
+          claude-plugins = sb.konductorConfig.claude-code.marketplace;
         }
         # Present only when the forgejo-runner-src input is declared.
         // lib.optionalAttrs (sb.programs.forgejo.runner != null) {

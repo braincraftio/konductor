@@ -196,8 +196,8 @@ For open-ended questions:
 ### Theme Integration
 
 Konductor automatically configures OpenCode with the **Catppuccin Frappe** theme to match Neovim.
-When you enter a Konductor devshell with IDE tools (dev, full, konductor), the theme is deployed to
-`~/.config/opencode/themes/catppuccin-frappe.json`.
+Konductor devshells with IDE tools (dev, full, konductor) export `OPENCODE_TUI_CONFIG` pointing to
+the generated, immutable TUI configuration.
 
 The theme configuration ensures visual consistency:
 
@@ -205,7 +205,7 @@ The theme configuration ensures visual consistency:
 - Colors match the dashboard, syntax highlighting, and diff views
 - Primary accent (mauve) matches the tmux accent color
 
-**Theme source:** `src/config/opencode/catppuccin-frappe.json`
+**Theme source:** `src/harness/opencode/tui.nix`
 
 To use a different theme, run `/theme` in OpenCode and select from built-in themes, or create a
 custom theme in `~/.config/opencode/themes/`.
@@ -436,10 +436,11 @@ Run the plugin health check:
 
 ### Konductor Theme Files
 
-| Path                                         | Contents                         |
-| -------------------------------------------- | -------------------------------- |
-| `src/config/opencode/catppuccin-frappe.json` | Catppuccin Frappe theme (source) |
-| `src/config/opencode/default.nix`            | Theme deployment configuration   |
+| Path                               | Contents                                         |
+| ---------------------------------- | ------------------------------------------------ |
+| `src/harness/opencode/tui.nix`     | Catppuccin Frappe theme selection                |
+| `src/harness/opencode/default.nix` | Generated configuration and shared skill adapter |
+| `src/harness/skill/`               | Harness-independent skill catalog                |
 
 ### Keybinding Summary
 

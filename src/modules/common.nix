@@ -31,7 +31,7 @@
         default = { };
         description = ''
           Overrides for the wrapped Claude Code settings.json, merged onto the
-          konductor defaults (src/config/claude-code/settings.nix) with
+          konductor defaults (src/harness/claude-code/settings.nix) with
           lib.recursiveUpdate. Attrsets merge per leaf (env keeps unset konductor
           keys); lists replace whole (availableModels is the full roster).
         '';

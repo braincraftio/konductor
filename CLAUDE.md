@@ -100,6 +100,8 @@ flake.nix outputs    devShells, packages, modules
   ide
 - `src/devshells/` Shell definitions using `overrideAttrs` pattern
 - `src/config/` Hermetic linter/formatter configs, wrapped tools inject /nix/store paths
+- `src/harness/` Shared `skill/` catalog and product-specific configuration adapters; see
+  `src/harness/README.md` before adding skills or harnesses
 - `src/programs/` Neovim via nixvim, tmux, ttyd, ghostty-web, shell configurations
 - `src/overlays/` Version pins for atuin and k0s, platform fixes for lld and direnv CGO, vim-plugins
 - `src/oci/` nix2container OCI image definition

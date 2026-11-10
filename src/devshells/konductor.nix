@@ -11,7 +11,7 @@
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
-# OpenCode theme from: ../config/opencode/
+# OpenCode theme from: ../harness/opencode/
 # Atuin shell history from: ../config/shell/atuin.nix
 
 {
