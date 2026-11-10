@@ -175,18 +175,19 @@ fi
 cfg="${XDG_CONFIG_HOME:-${HOME}/.config}/konductor-claude"
 mkdir -p "${cfg}"
 
-# Seed read-only harness content from the store (idempotent). rm before ln so an
-# existing real dir/file is replaced, not nested into. ${cfg:?} guards against an
-# empty expansion ever targeting /.
+# GNU ln replaces existing links without an unlink/create window. Never follow
+# directory symlinks or remove real directories at managed paths.
 for item in settings.json CLAUDE.md rules output-styles statusline-command.sh; do
-    rm -rf "${cfg:?}/${item}"
-    ln -s "@configDir@/${item}" "${cfg}/${item}"
+    "@ln@" -sfnT "@configDir@/${item}" "${cfg}/${item}"
 done
 
 # Share auth with the user's personal claude without sharing config. Dangling
 # symlink is intentional: claude materializes ~/.claude.json on first login.
-if [[ ! -e "${cfg}/.claude.json" ]]; then
-    ln -s "${HOME}/.claude.json" "${cfg}/.claude.json"
+if [[ ! -e "${cfg}/.claude.json" && ! -L "${cfg}/.claude.json" ]]; then
+    # Another process may create the link after the check. Accept only an
+    # existing destination; propagate other failures without replacing auth.
+    "@ln@" -sT "${HOME}/.claude.json" "${cfg}/.claude.json" \
+                                                         || [[ -e "${cfg}/.claude.json" || -L "${cfg}/.claude.json" ]]
 fi
 
 export CLAUDE_CONFIG_DIR="${cfg}"

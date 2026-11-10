@@ -142,7 +142,7 @@ lib.makeExtensible (
     # historically-real failure:
     #   - HOME:? guard            → container with no $HOME
     #   - early exec on preset    → --set-default semantics; power-user override
-    #   - ${cfg:?} + rm before ln → never target /, replace not nest
+    #   - GNU ln -sfnT           → concurrent link replacement, never nest
     #   - writable seed dir       → EACCES on store-path writes
     #   - ~/.claude.json passthru → shared auth, no re-login, dangling-ok
     #   - --plugin-dir store path → immutable, zero-install plugin load
@@ -158,6 +158,7 @@ lib.makeExtensible (
           configDir = final.configDirDrv;
           inherit (final) konductorPlugin practitionerPlugin systemPromptFile;
           claude = pkgs.unstable.claude-code;
+          ln = lib.getExe' pkgs.coreutils "ln";
 
           passthru = (pkgs.unstable.claude-code.passthru or { }) // {
             unwrapped = pkgs.unstable.claude-code;
