@@ -59,7 +59,8 @@ jobs:
         run: nix flake show --no-update-lock-file --accept-flake-config
 
       # Source build (src/overlays/atuin.nix), isolated so its link steps do not
-      # run concurrently with flake-check builds.
+      # run concurrently with flake-check builds. Remove with the overlay once
+      # the locked nixpkgs ships atuin >= 18.24.5 (procedure in that file).
       - name: Build atuin
         env:
           SYSTEM: ${{ matrix.system }}
