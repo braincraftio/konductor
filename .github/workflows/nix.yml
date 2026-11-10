@@ -58,6 +58,13 @@ jobs:
       - name: Flake structure
         run: nix flake show --no-update-lock-file --accept-flake-config
 
+      # Source build (src/overlays/atuin.nix), isolated so its link steps do not
+      # run concurrently with flake-check builds.
+      - name: Build atuin
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: nix build --no-link --no-update-lock-file --accept-flake-config -L ".#packages.$SYSTEM.atuin"
+
       - name: Flake checks
         run: nix flake check --no-update-lock-file --accept-flake-config -L
 
@@ -66,7 +73,7 @@ jobs:
           SYSTEM: ${{ matrix.system }}
         run: |
           packages=(
-            ci atuin flakehub-push k0sctl terminal-browser opencode mitogen ansible
+            ci flakehub-push k0sctl terminal-browser opencode mitogen ansible
             python-env pulumi pulumi-cli trzsz
           )
           targets=()

@@ -18,7 +18,7 @@
 # then delete in one change:
 #   - this file and its entry in src/overlays/default.nix
 #   - the atuin record in src/lib/versions.nix
-#   - atuin in the "Build maintained packages" list in .github/workflows/nix.yml
+#   - the "Build atuin" step in .github/workflows/nix.yml
 #   - the .#atuin.cargoDeps note in flake.nix (packages.atuin stays; it
 #     re-exports nixpkgs atuin)
 #   - the atuin pin text in README.md, CLAUDE.md, and CONTRIBUTING.md

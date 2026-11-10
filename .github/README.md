@@ -3,9 +3,10 @@
 ## Build and cache
 
 `ci.yml` calls `nix.yml` on pushes and pull requests to `main`. The reusable workflow builds on
-native x86_64 Linux, ARM Linux, and ARM macOS runners. It runs flake checks, builds the maintained
-package outputs and k0sctl version test, and builds the default package and full devshell.
-Linux-only targets are selected explicitly; the konductor and frontend shells run on x86_64 Linux.
+native x86_64 Linux, ARM Linux, and ARM macOS runners. It builds atuin (`src/overlays/atuin.nix`) in
+a separate step before the flake checks, then builds the maintained package outputs and k0sctl
+version test, and builds the default package and full devshell. Linux-only targets are selected
+explicitly; the konductor and frontend shells run on x86_64 Linux.
 
 `.github/actions/setup-nix` installs Determinate Nix and configures Cachix and optionally FlakeHub
 Cache. Cachix always pulls (including the nix-community, scopecreep-zip, and usrbinkat caches) and
