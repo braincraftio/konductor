@@ -5,11 +5,12 @@
 # system prompt per KONDUCTOR_CLAUDE_SYSTEM_PROMPT_* env vars.
 #
 # Build-time placeholders (substituted by default.nix):
-#   @configDir@           store path of the user-tier config dir (linkFarm)
+#   @configDir@           store path of the materialized user-tier config dir
 #   @konductorPlugin@     store path of the konductor plugin
 #   @practitionerPlugin@  store path of the konductor-practitioner plugin
 #   @systemPromptFile@    store path of the hermetic system-prompt.md
 #   @claude@              the unwrapped claude-code package
+#   @readlink@            store-pinned coreutils readlink
 #
 # ─── Precedence: CLI flag > env var > hermetic default ──────────────────────
 #
@@ -175,10 +176,17 @@ fi
 cfg="${XDG_CONFIG_HOME:-${HOME}/.config}/konductor-claude"
 mkdir -p "${cfg}"
 
-# GNU ln replaces existing links without an unlink/create window. Never follow
-# directory symlinks or remove real directories at managed paths.
+# Keep unchanged links intact so another launch does not invalidate live watchers.
+# GNU ln replaces changed links without following destination directory symlinks.
 for item in settings.json CLAUDE.md rules output-styles statusline-command.sh; do
-    "@ln@" -sfnT "@configDir@/${item}" "${cfg}/${item}"
+    target="@configDir@/${item}"
+    if [[ -L "${cfg}/${item}" ]]; then
+        current_target="$("@readlink@" "${cfg}/${item}")"
+        if [[ "${current_target}" = "${target}" ]]; then
+            continue
+        fi
+    fi
+    "@ln@" -sfnT "${target}" "${cfg}/${item}"
 done
 
 # Share auth with the user's personal claude without sharing config. Dangling

@@ -678,6 +678,10 @@ in
           enable = true;
           installCargo = false;
           installRustc = false;
+          # BeautifulRust §1: clippy owns idiom checks, so on-save diagnostics
+          # run clippy (matching the qcow2 VS Code rust-analyzer.check.command)
+          # and honor the crate's [lints] table and clippy.toml.
+          settings.check.command = "clippy";
         };
         # TypeScript
         ts_ls.enable = true;

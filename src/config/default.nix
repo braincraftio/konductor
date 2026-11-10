@@ -86,6 +86,7 @@ let
           nixfmt
           ;
         inherit (linters) ruff;
+        inherit (languages) rustToolchain;
       };
     };
   };

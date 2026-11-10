@@ -83,6 +83,15 @@
     };
   };
 
+  # Rust skills, references, and lint presets; packaged by
+  # src/overlays/beautiful-rust.nix. version is the upstream plugin.json
+  # version at rev. Bump rev, hash, and version together.
+  beautiful-rust = {
+    version = "1.6.0";
+    rev = "b9718436d77ee7bcf17cdcb6aa27628feb95d97a";
+    hash = "sha256-wXqdHFZ1BgdoVminLY0NvUAKwu1qLol+5bsAGWcggiU=";
+  };
+
   # FlakeHub release publisher; built by src/overlays/flakehub-push.nix and
   # passed to the flakehub-push action as source-binary, so the action never
   # downloads its binary. rev must equal the DeterminateSystems/flakehub-push

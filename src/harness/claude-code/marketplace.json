@@ -17,7 +17,7 @@
     {
       "name": "konductor-practitioner",
       "source": "./plugins/konductor-practitioner",
-      "description": "Authoring discipline for Nix and for commits, usable in any repository. nix-idioms: write and review derivations, flake modules, and config generation (formats.json over toJSON, lib.getExe, linkFarm vs symlinkJoin, makeExtensible, freeformType, content-addressed fetches). git-commit: conventional-commit ceremony with full-diff reading, capacity gates, and diff-derived objective messages, plus a non-blocking commit guard that defers to a repository's own contributing conventions."
+      "description": "Practitioner skills usable in any repository. nix-idioms: derivations, flake modules, and config generation. git-commit: conventional-commit ceremony with full-diff reading and diff-derived messages, plus a non-blocking commit guard. rust-best-practices, rust-review, rust-port: writing, reviewing, and porting idiomatic Rust (BeautifulRust). discovery, deepwiki, opencode-clients: repository survey, DeepWiki research, and OpenCode V2 client operation."
     }
   ]
 }

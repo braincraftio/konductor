@@ -4,7 +4,7 @@
 # Two delivery channels, one wrapper:
 #
 #   1. USER-TIER config (settings.json, CLAUDE.md, rules, output-styles,
-#      statusline) → a content-addressed linkFarm (configDirDrv). The wrapper
+#      statusline) → a materialized store directory (configDirDrv). The wrapper
 #      seeds a WRITABLE per-user dir (~/.config/konductor-claude), symlinks this
 #      read-only content in, and points CLAUDE_CONFIG_DIR at the writable dir.
 #
@@ -54,8 +54,8 @@ lib.makeExtensible (
   let
     jsonFmt = pkgs.formats.json { };
 
-    # Claude's installed-plugin boundary rejects links outside the plugin root.
-    # Materialize the declared layout at delivery, retaining shared source ownership.
+    # Keep resolved files inside their delivery directory: plugins reject external
+    # links, and configuration watchers must not watch the store root as a parent.
     materialize =
       name: entries:
       pkgs.runCommand name { } ''
@@ -124,7 +124,9 @@ lib.makeExtensible (
 
     # USER-TIER config dir (no skills/agents/hooks/mcp — those are plugins).
     # Scripts use lib.getExe → ${drv}/bin/<mainProgram>, never the bare drv dir.
-    configDirDrv = pkgs.linkFarm "konductor-claude-config" {
+    # Claude follows settings symlinks and scans the resolved parent on changes.
+    # Keep that parent bounded: https://github.com/anthropics/claude-code/issues/86935
+    configDirDrv = materialize "konductor-claude-config" {
       "settings.json" = final.settingsDrv;
       "CLAUDE.md" = ./context.md;
       "rules" = ./rules;
@@ -166,11 +168,15 @@ lib.makeExtensible (
       pkgs.runCommand "claude"
         {
           nativeBuildInputs = [ pkgs.shellcheck ];
+          # patchShebangs --host resolves the wrapper's interpreter against
+          # buildInputs; runCommand has no fixup phase to do it implicitly.
+          buildInputs = [ pkgs.bash ];
           # substituteAll replaces @name@ with these (paths coerce to store paths).
           configDir = final.configDirDrv;
           inherit (final) konductorPlugin practitionerPlugin systemPromptFile;
           claude = pkgs.unstable.claude-code;
           ln = lib.getExe' pkgs.coreutils "ln";
+          readlink = lib.getExe' pkgs.coreutils "readlink";
 
           passthru = (pkgs.unstable.claude-code.passthru or { }) // {
             unwrapped = pkgs.unstable.claude-code;
@@ -194,6 +200,9 @@ lib.makeExtensible (
           install -Dm755 ${./claude-wrapper.sh} "$out/bin/claude"
           substituteAllInPlace "$out/bin/claude"
           shellcheck "$out/bin/claude"
+          # Store bash, not /usr/bin/env: the wrapper must run in build
+          # sandboxes and minimal containers that lack /usr/bin/env.
+          patchShebangs --host "$out/bin/claude"
         '';
 
     # The package consumers install (home.packages / systemPackages / ai.nix).

@@ -144,6 +144,7 @@ equibop
 erasedups
 errorlens
 esbenp
+evals
 expandtab
 extauthz
 extensionless
@@ -359,6 +360,7 @@ memfd
 memlock
 menuone
 mhutchie
+miri
 mithril
 mitogen
 mkhl
@@ -370,6 +372,7 @@ mmdc
 mmio
 moby
 mockgen
+morganlinton
 mountpoint
 mousemoveevent
 msdos
@@ -522,7 +525,9 @@ rubocop
 ruff
 runcmd
 runme
+rustdocflags
 rustflags
+rustguide
 rwxrwxr
 ryanoasis
 saddr
@@ -582,6 +587,7 @@ stdpath
 stoken
 stopinsert
 stringop
+styleguide
 stylelint
 stylua
 submounts
@@ -629,6 +635,7 @@ tunables
 tungstenite
 tunl
 typst
+udeps
 uids
 unconfigured
 undofile

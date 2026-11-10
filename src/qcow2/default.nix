@@ -1176,8 +1176,9 @@ let
               . /etc/konductor/proxy.env
               set +a
             fi
-            # Language tool paths (complements profile.d/konductor-env.sh)
-            export PATH="''${GOPATH:-$HOME/go}/bin:''${CARGO_HOME:-$HOME/.cargo}/bin:''${PNPM_HOME:-$HOME/.local/share/pnpm}:$PATH"
+            # Language tool paths (complements profile.d/konductor-env.sh).
+            # Keep Cargo-installed tools behind the Nix toolchain.
+            export PATH="''${GOPATH:-$HOME/go}/bin:''${PNPM_HOME:-$HOME/.local/share/pnpm}:$PATH:''${CARGO_HOME:-$HOME/.cargo}/bin"
           '';
           # Interactive shell initialization
           interactiveShellInit = ''
@@ -1421,8 +1422,9 @@ let
             mkdir -p "$PNPM_HOME" 2>/dev/null || true
             mkdir -p "$CARGO_HOME" 2>/dev/null || true
 
-            # Update PATH with language bin directories
-            export PATH="$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
+            # Update PATH with language bin directories.
+            # Keep Cargo-installed tools behind the Nix toolchain.
+            export PATH="$GOBIN:$PNPM_HOME:$PATH:$CARGO_HOME/bin"
 
             # Python: activate SSOT venv from UV_PROJECT_ENVIRONMENT (set in .envrc/.env.example)
             if [ -n "$UV_PROJECT_ENVIRONMENT" ] && [ -d "$UV_PROJECT_ENVIRONMENT" ]; then

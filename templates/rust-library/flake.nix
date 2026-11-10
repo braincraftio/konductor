@@ -1,0 +1,37 @@
+{
+  description = "Rust library on Konductor's Rust defaults";
+
+  inputs = {
+    konductor.url = "github:braincraftio/konductor";
+    nixpkgs.follows = "konductor/nixpkgs";
+  };
+
+  nixConfig = {
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+      "https://braincraftio.cachix.org"
+      "https://scopecreep-zip.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "braincraftio.cachix.org-1:VOGTfDaVaeIOMpeYYKjBhXxT5gGF2iFCKm9HA7j3WFM="
+      "scopecreep-zip.cachix.org-1:LPiVDsYXJvgljVfZPN43zBWB7ZCGFr2jZ/lBinnPGvU="
+    ];
+  };
+
+  outputs =
+    { konductor, nixpkgs, ... }:
+    let
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+      forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems f;
+    in
+    {
+      devShells = forAllSystems (system: {
+        default = konductor.devShells.${system}.rust;
+      });
+    };
+}

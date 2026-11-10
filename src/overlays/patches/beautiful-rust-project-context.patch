@@ -1,0 +1,110 @@
+Contextualize Google Rust guidance for use across independent projects.
+Source: https://github.com/google/styleguide/blob/72372684427af9861212ee7f1cdbb48b6f497857/rustguide.md
+Google Rust Style Guide, CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
+Downstream adaptation: distinguish project contracts from style preferences,
+preserve application simplicity, and avoid importing Chromium build policy.
+
+--- a/skills/rust-best-practices/SKILL.md
++++ b/skills/rust-best-practices/SKILL.md
+@@ -18,2 +18,22 @@
+ ## 1. Mindset
+ 
++### Apply guidance in the project's context
++
++Read the project's Cargo configuration, formatter settings, contribution guidance,
++and surrounding code before applying these recommendations. Existing API contracts,
++supported targets, framework requirements, and explicit project policy take precedence
++over the defaults below. Do not introduce unrelated style migrations.
++
++Distinguish externally consumed APIs from application internals, including internal
++library targets. Add abstraction for actual callers: concrete parameters and owned
++collections are often clearer than generic conversion or iterator interfaces. Public
++trait implementations, `const` functions, and exhaustive types are compatibility
++commitments, not a checklist of features to add indiscriminately.
++
++The supplied lint presets are deliberately stricter than some source guidance. In
++particular, `max-fn-params-bools = 0` flags every Boolean parameter; Google's rule
++targets unclear call sites. Use meaningful enums for ambiguous modes, but preserve
++required signatures and clear Boolean contracts. Apply a narrowly justified lint
++expectation where needed rather than redesigning an API merely to satisfy the preset.
++These contextual rules also govern review findings and the final checklist below.
++
+@@ -62,3 +82,4 @@
+-**Don't clone to make the borrow checker stop complaining.** A clone that exists only to
+-end a borrow produces a silent copy whose later changes are lost. Try these first, in
+-roughly this order:
++**Choose borrowing or copying by semantics and cost.** Do not clone mutable state when
++callers expect shared updates. A deliberate copy is reasonable when it simplifies
++ownership without unacceptable allocation or copying costs. Before adding a copy merely
++to end a borrow, consider these alternatives:
+@@ -149,7 +170,5 @@
+-- **No `bool` parameters in public or shared signatures.** `report(true)` is unreadable at
+-  the call site and cannot grow a third mode. Use a two-variant enum
+-  (`Verbosity::Summary`, `Verbosity::Full`) or two methods (`report()`,
+-  `report_verbose()`): `Widget::new(Size::Small, Shape::Round)`, not
+-  `Widget::new(true, false)`. The only exception is a private helper whose call sites sit
+-  a few lines away. When refactoring, an existing `bool` parameter is one of the smells to
+-  remove, not a detail to preserve.
++- **Make mode arguments clear at the call site.** Prefer a meaningful enum or separate
++  methods when Boolean arguments hide intent or several flags permit invalid states.
++  A Boolean representing a clear binary property need not become a new abstraction.
++  Preserve existing public and framework-required signatures unless an API change is
++  part of the task; the lint preset's stricter default is not a migration mandate.
+@@ -163,3 +182,5 @@
+-### Derive and implement the standard traits eagerly
++### Implement standard traits with meaningful contracts
+ 
+-Downstream crates cannot add std traits to your types (orphan rule), so you must. Derive
++Anticipate likely callers of reusable libraries; add application trait implementations
++when needed. Derive only when the resulting semantics are appropriate and supportable.
++Downstream crates cannot add std traits to your types (orphan rule). Consider deriving
+@@ -359,2 +380,8 @@
+ - **Logging:** structured events through `tracing` or `log`, not `println!` / `dbg!`,
+   except for a CLI's own stdout output.
++- **Formatter exceptions:** reserve `#[rustfmt::skip]` for meaningful manual alignment
++  or generated code. Do not suppress formatting for personal taste or impose a new
++  formatter configuration on an existing project as an incidental cleanup.
++- **Dependencies' hidden APIs:** treat another crate's `#[doc(hidden)]` items as
++  implementation details, not supported integration points. Prefer its documented API
++  rather than relying on names found only by searching generated or internal code.
+@@ -410,8 +437,9 @@
+-- **Prefer small, single-purpose crates** in a flat `crates/` workspace; never nest a
+-  crate inside another crate's `src/`. Split when a crate grows a second purpose or a
+-  subdirectory. Share versions and lints through `[workspace.dependencies]` and
+-  `[workspace.lints]`.
+-- **Modules:** name a leaf module after its primary item (`Foo` lives in `foo.rs`).
+-  Non-leaf modules contain only `mod` declarations and re-exports. Put the essential items
+-  at the crate root and group the rest by use case (`account`, `network`), not by kind
+-  (`traits`, `errors`). Don't define a prelude.
++- **Crate boundaries:** split for cohesive responsibilities, independent reuse, or
++  demonstrated build benefits, not because a module needs a subdirectory. Chromium's
++  small-crate and flat-file rules serve its build system; use conventional Cargo layouts
++  and the project's workspace organization elsewhere. Share workspace dependencies and
++  lints where appropriate without creating crates merely to organize files.
++- **Modules:** name a focused leaf module after its primary item. Keep routing modules
++  mostly declarations and re-exports, allowing small coordinating implementations.
++  Organize by responsibility rather than mechanically separating traits and errors.
++  Preserve established framework preludes; do not introduce a prelude without a use case.
+@@ -487,4 +515,4 @@
+-- No `bool` parameters in public signatures; no hand-written `Ord` without matching
+-  `PartialEq` and `Hash`.
+-- No `.clone()` whose only job is to satisfy the borrow checker.
+-- No globs (bar a framework's prelude), no preludes of your own, no leaked third-party types.
++- Mode arguments communicate intent.
++- Copies and shared ownership have deliberate semantics and acceptable costs.
++- Hand-written `Ord` agrees with equality and hashing.
++- Imports follow project conventions; public dependency types are deliberate contracts.
+--- a/skills/rust-best-practices/references/google-rust-style-guide.md
++++ b/skills/rust-best-practices/references/google-rust-style-guide.md
+@@ -20,3 +20,4 @@
+-- Prefer small crates, ideally but not necessarily a single file. Larger crates are
+-  allowed for orphan-rule coherence or foundational libraries. Decide crate boundaries
+-  before submodules; the root may re-export from leaf submodules.
++- Chromium prefers small crates to support its build graph and caching. This is not
++  a general requirement for Cargo projects. Choose crate boundaries for responsibility,
++  reuse, and measured build needs; ordinary module subdirectories do not require a split.
++  The root may re-export from leaf modules.
+@@ -113,1 +114,2 @@
+-- Library code should not start threads itself.
++- Chromium uses its own scheduling sequences instead of standard-library threads.
++  Other projects should follow their runtime and lifecycle contracts.

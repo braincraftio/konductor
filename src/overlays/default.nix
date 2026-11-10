@@ -26,6 +26,9 @@
   # terminal-browser — Chromium in terminal via kitty graphics protocol
   (import ./terminal-browser.nix)
 
+  # beautiful-rust — pinned Rust skills, references, and lint presets
+  (import ./beautiful-rust.nix)
+
   # Vim plugin fixes (lualine sandbox test failures)
   (import ./vim-plugins.nix)
 

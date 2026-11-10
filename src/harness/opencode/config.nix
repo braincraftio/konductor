@@ -293,7 +293,9 @@
           disabled = false;
           extensions = [ ".rs" ];
           command = [
-            (lib.getExe' (builtins.head languages.rustPackages) "rustfmt")
+            (lib.getExe' languages.rustToolchain "rustfmt")
+            "--edition"
+            "2024"
             "$FILE"
           ];
         };
