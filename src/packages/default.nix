@@ -114,7 +114,8 @@ rec {
   # IDE PACKAGES (added in dev and full shells)
   # ===========================================================================
 
-  idePackages = ide.packages;
+  opencode = if config == null then pkgs.opencode else config.opencode.wrap runtimePackages;
+  idePackages = ide.packages ++ [ opencode ];
 
   # ===========================================================================
   # CONTAINER TOOLING
@@ -138,15 +139,18 @@ rec {
   # ===========================================================================
   # Single composite for full.nix, konductor.nix, and modules/common.nix.
   # Excludes programs (neovim, tmux) and atuin — composed at the consumer level.
-  fullPackages =
+  # Excludes the OpenCode wrapper itself to keep its runtime closure acyclic.
+  runtimePackages =
     default
-    ++ idePackages
+    ++ ide.packages
     ++ ansiblePackages
     ++ pythonPackages
     ++ goPackages
     ++ nodejsPackages
     ++ rustPackages
     ++ containerPackages;
+
+  fullPackages = runtimePackages ++ [ opencode ];
 
   # ===========================================================================
   # KONDUCTOR SELF-HOSTING (added in konductor shell)

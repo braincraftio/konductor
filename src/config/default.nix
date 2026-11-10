@@ -9,6 +9,9 @@
   # Consumer settings.json overrides (module option konductor.claude-code.settings).
   # recursiveUpdate onto settings.nix: attrsets merge per leaf, lists replace whole.
   claudeCodeSettings ? { },
+  opencodeSettings ? { },
+  opencodeCliSettings ? { },
+  opencodeEnvironment ? { },
   ...
 }:
 
@@ -17,7 +20,17 @@ let
   # languages.nix depends only on pkgs and versions (no circular dependency).
   languages = import ../packages/languages.nix { inherit pkgs versions lib; };
 
-  harness = import ../harness { inherit pkgs lib claudeCodeSettings; };
+  harness = import ../harness {
+    inherit formatters linters languages;
+    inherit
+      pkgs
+      lib
+      claudeCodeSettings
+      opencodeSettings
+      opencodeCliSettings
+      opencodeEnvironment
+      ;
+  };
 
   # ===========================================================================
   # Linters

@@ -26,6 +26,23 @@
     { pkgs }:
     {
       enable = lib.mkEnableOption "Konductor development environment";
+      opencode = {
+        settings = lib.mkOption {
+          inherit (pkgs.formats.json { }) type;
+          default = { };
+          description = "Native V2 server settings merged recursively over Konductor defaults; lists replace whole.";
+        };
+        cli = lib.mkOption {
+          inherit (pkgs.formats.json { }) type;
+          default = { };
+          description = "Native V2 CLI/TUI settings merged recursively over Konductor visibility defaults.";
+        };
+        environment = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          default = { };
+          description = "Explicit OpenCode wrapper environment overrides. Values enter the Nix store; use runtime credential references in settings instead of secrets here.";
+        };
+      };
       claude-code.settings = lib.mkOption {
         inherit (pkgs.formats.json { }) type;
         default = { };
@@ -51,6 +68,9 @@
       versions,
       catppuccinSources,
       claudeCodeSettings ? { },
+      opencodeSettings ? { },
+      opencodeCliSettings ? { },
+      opencodeEnvironment ? { },
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -62,6 +82,9 @@
           versions
           catppuccinSources
           claudeCodeSettings
+          opencodeSettings
+          opencodeCliSettings
+          opencodeEnvironment
           ;
       };
 

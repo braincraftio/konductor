@@ -40,6 +40,9 @@ in
         catppuccinSources
         ;
       claudeCodeSettings = cfg.claude-code.settings;
+      opencodeSettings = cfg.opencode.settings;
+      opencodeCliSettings = cfg.opencode.cli;
+      opencodeEnvironment = cfg.opencode.environment;
     };
     environment.variables = common.mkEnv // {
       SSL_CERT_FILE = "/etc/ssl/cert.pem";

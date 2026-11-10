@@ -73,12 +73,14 @@ chgrp
 chpass
 christoomey
 cidata
+cljfmt
 closeoff
 cloudant
 cloudflared
 cloudinit
 cmdheight
 codegen
+codemode
 codesigning
 colorschemes
 colorterm
@@ -110,6 +112,7 @@ deepwiki
 devicons
 devshell
 devshells
+dfmt
 diffopt
 diffview
 direnv
@@ -206,6 +209,7 @@ gnused
 gnutar
 goaf
 goap
+gofmt
 gofumpt
 goiw
 golangci
@@ -243,6 +247,7 @@ hjkl
 hlsearch
 hocon
 hostfwd
+htmlbeautifier
 htmlhint
 httproute
 hverlin
@@ -275,6 +280,7 @@ kohler
 konductor
 kopuz
 krbeof
+ktlint
 kubecolor
 kubeconfigs
 kubelogin
@@ -282,6 +288,7 @@ kuberouter
 kubevirt
 laktak
 laststatus
+latexindent
 lazyredraw
 lazyvim
 lcount
@@ -427,6 +434,7 @@ nuscht
 nuschtos
 nvme
 nvram
+ocamlformat
 ogen
 oids
 oifname
@@ -444,6 +452,7 @@ overlayfs
 overridability
 ovmf
 oxalica
+oxfmt
 packagetype
 pango
 partx
@@ -509,6 +518,7 @@ rootok
 rpaths
 rpds
 rsynced
+rubocop
 ruff
 runcmd
 runme
@@ -564,6 +574,7 @@ srcnat
 srcs
 ssot
 sssdeof
+standardrb
 statix
 statuscolumn
 stdenv
@@ -619,6 +630,7 @@ tungstenite
 tunl
 typst
 uids
+unconfigured
 undofile
 undolevels
 undoreload

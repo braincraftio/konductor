@@ -451,9 +451,9 @@
             flakehub-push
             k0sctl
             terminal-browser
-            opencode
             ;
           mitogen = sb.packages.ansible.mitogen;
+          opencode = sb.packages.opencode;
           ansible = sb.packages.ansible.package;
           python-env = sb.packages.pythonEnv;
           pulumi = sb.packages.languages.pulumiPkg.package;
