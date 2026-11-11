@@ -45,6 +45,10 @@ let
       catppuccinSources
       ;
     claudeCodeSettings = cfg.claude-code.settings;
+    opencodeSettings = cfg.opencode.settings;
+    opencodeCliSettings = cfg.opencode.cli;
+    opencodeEnvironment = cfg.opencode.environment;
+    opencodePackage = cfg.opencode.package;
   };
 
   # Programs (neovim, tmux, ttyd) — needs flake inputs for nixvim
@@ -75,6 +79,10 @@ in
             catppuccinSources
             ;
           claudeCodeSettings = cfg.claude-code.settings;
+          opencodeSettings = cfg.opencode.settings;
+          opencodeCliSettings = cfg.opencode.cli;
+          opencodeEnvironment = cfg.opencode.environment;
+          opencodePackage = cfg.opencode.package;
         }
         # IDE programs: neovim, tmux, ttyd
         ++ common.mkPrograms { inherit programs packages; }

@@ -110,13 +110,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # OpenCode v2 AI coding agent
-    # usrbinkat fork: nix integration (bun2nix build, flake outputs, HM/NixOS/darwin modules)
-    opencode = {
-      url = "github:usrbinkat/opencode/v2";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     systems.url = "github:nix-systems/default";
   };
 
@@ -185,7 +178,6 @@
             inherit system;
             overlays = [
               inputs.rust-overlay.overlays.default
-              inputs.opencode.overlays.default
             ]
             ++ overlays;
             config = {
@@ -364,6 +356,15 @@
                 test -d ${konductorEnv}/bin && touch $out
               '';
 
+          # BeautifulRust upstream checks, Rust template policy, and skill
+          # delivery, all on the pinned toolchain (src/checks/rust.nix).
+          rustChecks = import ./src/checks/rust.nix {
+            inherit pkgs lib;
+            inherit (packages.languages) rustToolchain;
+            inherit (konductorConfig.claude-code) practitionerPlugin;
+            claude = konductorConfig.claude-code.package;
+          };
+
           # Source quality gates: the same wrapped tools lefthook and runme
           # invoke. The flake source is git-tracked content only, so gitignored
           # trees (_sources/) are absent by construction. Filesets narrow each
@@ -414,6 +415,7 @@
             toolChecks
             bundleCheck
             lintChecks
+            rustChecks
             ;
         }
       );
@@ -456,12 +458,13 @@
           # hashes can be refreshed with .#atuin.cargoDeps / .#k0sctl.goModules.
           inherit (sb.pkgs)
             atuin
+            beautiful-rust
             flakehub-push
             k0sctl
             terminal-browser
-            opencode
             ;
           mitogen = sb.packages.ansible.mitogen;
+          opencode = sb.packages.opencode;
           ansible = sb.packages.ansible.package;
           python-env = sb.packages.pythonEnv;
           pulumi = sb.packages.languages.pulumiPkg.package;
@@ -469,6 +472,9 @@
           trzsz = sb.pkgs.callPackage ./src/packages/trzsz.nix { };
           prettier-plugin-astro = sb.konductorConfig.formatters.prettier.astroPlugin;
           treefmt = sb.konductorConfig.formatters.treefmt.package;
+          rust-toolchain = sb.packages.languages.rustToolchain;
+          harness-skills = sb.konductorConfig.harness.skill.directory;
+          claude-plugins = sb.konductorConfig.claude-code.marketplace;
         }
         # Present only when the forgejo-runner-src input is declared.
         // lib.optionalAttrs (sb.programs.forgejo.runner != null) {
@@ -490,7 +496,7 @@
       # Lint checks gate formatting (treefmt), Nix lints (statix), and dead
       # code (deadnix).
       checks = forAllSystems (
-        _system: sb: sb.toolChecks // sb.lintChecks // { inherit (sb) bundleCheck; }
+        _system: sb: sb.toolChecks // sb.lintChecks // sb.rustChecks // { inherit (sb) bundleCheck; }
       );
 
       # nix fmt [paths] / nix fmt -- --ci: treefmt bound to every konductor
@@ -588,6 +594,28 @@
             Clone repos into this directory. Each repo with its own .envrc
             inherits WORKSPACE_ROOT, vault injection, and nix auth from
             this workspace via source_up_if_exists.
+          '';
+        };
+        rust-application = {
+          path = ./templates/rust-application;
+          description = "Rust application on Konductor's Rust defaults (BeautifulRust lints)";
+          welcomeText = ''
+            # Konductor Rust application
+
+            Run `direnv allow`, rename the package in Cargo.toml, then
+            `cargo clippy --all-targets --all-features -- -D warnings`.
+            Lints follow BeautifulRust; library-only lints are omitted.
+          '';
+        };
+        rust-library = {
+          path = ./templates/rust-library;
+          description = "Rust library on Konductor's Rust defaults (BeautifulRust lints)";
+          welcomeText = ''
+            # Konductor Rust library
+
+            Run `direnv allow`, rename the package in Cargo.toml, then
+            `cargo clippy --all-targets --all-features -- -D warnings`.
+            Lints are BeautifulRust's complete table.
           '';
         };
         default = self.templates.konductor;

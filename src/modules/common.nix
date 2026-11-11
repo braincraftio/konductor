@@ -26,12 +26,35 @@
     { pkgs }:
     {
       enable = lib.mkEnableOption "Konductor development environment";
+      opencode = {
+        package = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.opencode;
+          defaultText = lib.literalExpression "pkgs.opencode";
+          description = "OpenCode executable wrapped with the Konductor harness and runtime dependencies.";
+        };
+        settings = lib.mkOption {
+          inherit (pkgs.formats.json { }) type;
+          default = { };
+          description = "Native V2 server settings merged recursively over Konductor defaults; lists replace whole.";
+        };
+        cli = lib.mkOption {
+          inherit (pkgs.formats.json { }) type;
+          default = { };
+          description = "Native V2 CLI/TUI settings merged recursively over Konductor visibility defaults.";
+        };
+        environment = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          default = { };
+          description = "Explicit OpenCode wrapper environment overrides. Values enter the Nix store; use runtime credential references in settings instead of secrets here.";
+        };
+      };
       claude-code.settings = lib.mkOption {
         inherit (pkgs.formats.json { }) type;
         default = { };
         description = ''
           Overrides for the wrapped Claude Code settings.json, merged onto the
-          konductor defaults (src/config/claude-code/settings.nix) with
+          konductor defaults (src/harness/claude-code/settings.nix) with
           lib.recursiveUpdate. Attrsets merge per leaf (env keeps unset konductor
           keys); lists replace whole (availableModels is the full roster).
         '';
@@ -51,6 +74,10 @@
       versions,
       catppuccinSources,
       claudeCodeSettings ? { },
+      opencodeSettings ? { },
+      opencodeCliSettings ? { },
+      opencodeEnvironment ? { },
+      opencodePackage ? pkgs.opencode,
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -62,6 +89,10 @@
           versions
           catppuccinSources
           claudeCodeSettings
+          opencodeSettings
+          opencodeCliSettings
+          opencodeEnvironment
+          opencodePackage
           ;
       };
 

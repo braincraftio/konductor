@@ -34,9 +34,6 @@ in
     dust # Disk usage analyzer
     # tree → wrapped in src/config/ (in packages.default via cli.nix)
 
-    # OpenCode v2 AI coding agent (usrbinkat/opencode overlay)
-    opencode
-
     # Neovim dependencies (required for plugins)
     tree-sitter # Parser generator for nvim-treesitter (:TSInstallFromGrammar)
     luaEnv # Lua 5.1 with luarocks and rest.nvim dependencies

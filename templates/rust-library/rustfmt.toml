@@ -1,0 +1,7 @@
+# Per-file rustfmt (editors, treefmt, OpenCode) does not read Cargo.toml and
+# otherwise parses as edition 2015. Keep in step with Cargo.toml.
+edition = "2024"
+
+# Google Rust Style Guide formatting options available on stable rustfmt.
+max_width = 100
+hex_literal_case = "Lower"

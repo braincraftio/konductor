@@ -10,6 +10,8 @@ _:
   '';
 
   extraConfigLua = ''
+    require("opencode.navigation").setup()
+
     -- Debug helpers
     _G.dd = function(...)
       Snacks.debug.inspect(...)

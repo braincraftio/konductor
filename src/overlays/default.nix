@@ -16,8 +16,8 @@
   # k0sctl tip-of-spear pin (ahead of both nixpkgs channels)
   (import ./k0s.nix)
 
-  # atuin tip-of-spear pin — prevents SQLite migration skew between
-  # devshell and home-manager consumers on different nixpkgs channels
+  # atuin 18.24.5, transitional until locked nixpkgs ships >= 18.24.5;
+  # removal procedure in ./atuin.nix. Do not bump.
   (import ./atuin.nix)
 
   # flakehub-push — FlakeHub publisher pinned to the publish-flake action SHA
@@ -25,6 +25,9 @@
 
   # terminal-browser — Chromium in terminal via kitty graphics protocol
   (import ./terminal-browser.nix)
+
+  # beautiful-rust — pinned Rust skills, references, and lint presets
+  (import ./beautiful-rust.nix)
 
   # Vim plugin fixes (lualine sandbox test failures)
   (import ./vim-plugins.nix)

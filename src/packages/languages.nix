@@ -109,19 +109,31 @@ rec {
   # ===========================================================================
   # Rust
   # ===========================================================================
+  # The one Rust toolchain: shells, modules, the OpenCode wrapper, treefmt, and
+  # the BeautifulRust/template checks all reference this derivation, so a lint
+  # behavior change on a toolchain bump fails nix flake check.
+  # Minimal profile excludes rust-docs (~700MB); rustdoc itself ships with rustc,
+  # so `cargo doc --no-deps` (BeautifulRust §2) works for project docs.
+  rustToolchain = pkgs.rust-bin.stable."${langs.rust.version}".minimal.override {
+    extensions = [
+      "rust-src"
+      "rust-analyzer"
+      "clippy"
+      "rustfmt"
+    ];
+  };
+
   rustPackages = with pkgs; [
-    # Use minimal profile to exclude rust-docs (saves ~700MB + tens of thousands of small files)
-    (rust-bin.stable."${langs.rust.version}".minimal.override {
-      extensions = [
-        "rust-src"
-        "rust-analyzer"
-        "clippy"
-        "rustfmt"
-      ];
-    })
+    rustToolchain
     cargo-watch
     cargo-edit
     cargo-tauri # Tauri CLI from nixpkgs (properly patched, no cargo install needed)
+    # BeautifulRust §9 dependency audits. cargo-udeps is omitted: it requires a
+    # nightly toolchain and Konductor pins stable; `cargo machete`-style unused
+    # dependency detection is not a BeautifulRust recommendation, so nothing
+    # substitutes for it. Revisit if a stable cargo-udeps mode ships.
+    cargo-deny
+    cargo-audit
   ];
 
   # Runtime libraries for Rust crates that use compression

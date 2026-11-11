@@ -1,0 +1,4 @@
+_: {
+  scope = "practitioner";
+  directory = ./.;
+}

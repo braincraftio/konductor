@@ -73,12 +73,14 @@ chgrp
 chpass
 christoomey
 cidata
+cljfmt
 closeoff
 cloudant
 cloudflared
 cloudinit
 cmdheight
 codegen
+codemode
 codesigning
 colorschemes
 colorterm
@@ -110,6 +112,7 @@ deepwiki
 devicons
 devshell
 devshells
+dfmt
 diffopt
 diffview
 direnv
@@ -141,6 +144,7 @@ equibop
 erasedups
 errorlens
 esbenp
+evals
 expandtab
 extauthz
 extensionless
@@ -154,6 +158,7 @@ filesets
 fillchars
 findutils
 fira
+fjall
 flakehub
 flakeref
 flarectl
@@ -205,6 +210,7 @@ gnused
 gnutar
 goaf
 goap
+gofmt
 gofumpt
 goiw
 golangci
@@ -242,6 +248,7 @@ hjkl
 hlsearch
 hocon
 hostfwd
+htmlbeautifier
 htmlhint
 httproute
 hverlin
@@ -274,6 +281,7 @@ kohler
 konductor
 kopuz
 krbeof
+ktlint
 kubecolor
 kubeconfigs
 kubelogin
@@ -281,6 +289,7 @@ kuberouter
 kubevirt
 laktak
 laststatus
+latexindent
 lazyredraw
 lazyvim
 lcount
@@ -351,6 +360,7 @@ memfd
 memlock
 menuone
 mhutchie
+miri
 mithril
 mitogen
 mkhl
@@ -362,6 +372,7 @@ mmdc
 mmio
 moby
 mockgen
+morganlinton
 mountpoint
 mousemoveevent
 msdos
@@ -426,6 +437,7 @@ nuscht
 nuschtos
 nvme
 nvram
+ocamlformat
 ogen
 oids
 oifname
@@ -443,6 +455,7 @@ overlayfs
 overridability
 ovmf
 oxalica
+oxfmt
 packagetype
 pango
 partx
@@ -508,10 +521,13 @@ rootok
 rpaths
 rpds
 rsynced
+rubocop
 ruff
 runcmd
 runme
+rustdocflags
 rustflags
+rustguide
 rwxrwxr
 ryanoasis
 saddr
@@ -563,6 +579,7 @@ srcnat
 srcs
 ssot
 sssdeof
+standardrb
 statix
 statuscolumn
 stdenv
@@ -570,6 +587,7 @@ stdpath
 stoken
 stopinsert
 stringop
+styleguide
 stylelint
 stylua
 submounts
@@ -617,7 +635,9 @@ tunables
 tungstenite
 tunl
 typst
+udeps
 uids
+unconfigured
 undofile
 undolevels
 undoreload

@@ -62,7 +62,7 @@ def build_leaf_certificate(
     Returns:
         Signed X.509 wildcard certificate.
     """
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
 
     subject = x509.Name(
         [

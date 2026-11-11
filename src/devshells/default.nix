@@ -26,6 +26,7 @@
   inputs,
   sourceInfo,
   extraPythonPackages ? _ps: [ ],
+  opencodePackage ? pkgs.opencode,
   ...
 }:
 
@@ -42,6 +43,7 @@ let
       lib
       versions
       catppuccinSources
+      opencodePackage
       ;
   };
 
@@ -106,6 +108,7 @@ let
         programs
         inputs
         sourceInfo
+        opencodePackage
         ;
       extraPythonPackages = newExtraPython;
     };
@@ -113,8 +116,22 @@ let
   addPassthru =
     shell: shellName:
     shell.overrideAttrs (old: {
-      passthru = (old.passthru or { }) // {
+      passthru = lib.recursiveUpdate (old.passthru or { }) {
         withExtraPython = extraPkgs: (rebuildWith extraPkgs).${shellName};
+        withOpencode =
+          package:
+          (import ./default.nix {
+            inherit
+              pkgs
+              lib
+              versions
+              programs
+              inputs
+              sourceInfo
+              extraPythonPackages
+              ;
+            opencodePackage = package;
+          }).${shellName};
       };
     });
 

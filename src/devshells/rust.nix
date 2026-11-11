@@ -32,10 +32,11 @@ baseShell.overrideAttrs (old: {
       ]
     }"''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-    # Cargo home (dynamic, needs $HOME)
+    # Cargo home (dynamic, needs $HOME).
+    # Keep Cargo-installed tools behind the Nix toolchain.
     CARGO_HOME="''${CARGO_HOME:-$HOME/.cargo}"
     mkdir -p "$CARGO_HOME"
-    export PATH="$CARGO_HOME/bin:$PATH"
+    export PATH="$PATH:$CARGO_HOME/bin"
 
     echo "Rust ${langs.rust.version} ready"
 

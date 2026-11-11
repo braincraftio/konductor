@@ -9,6 +9,10 @@
   # Consumer settings.json overrides (module option konductor.claude-code.settings).
   # recursiveUpdate onto settings.nix: attrsets merge per leaf, lists replace whole.
   claudeCodeSettings ? { },
+  opencodeSettings ? { },
+  opencodeCliSettings ? { },
+  opencodeEnvironment ? { },
+  opencodePackage ? pkgs.opencode,
   ...
 }:
 
@@ -16,6 +20,19 @@ let
   # Import languages to get pythonEnv for pyright wrapper.
   # languages.nix depends only on pkgs and versions (no circular dependency).
   languages = import ../packages/languages.nix { inherit pkgs versions lib; };
+
+  harness = import ../harness {
+    inherit formatters linters languages;
+    inherit
+      pkgs
+      lib
+      claudeCodeSettings
+      opencodeSettings
+      opencodeCliSettings
+      opencodeEnvironment
+      opencodePackage
+      ;
+  };
 
   # ===========================================================================
   # Linters
@@ -71,6 +88,7 @@ let
           nixfmt
           ;
         inherit (linters) ruff;
+        inherit (languages) rustToolchain;
       };
     };
   };
@@ -95,16 +113,15 @@ in
   # ===========================================================================
   # AI Tools Configuration
   # ===========================================================================
-  opencode = import ./opencode { inherit pkgs lib; };
+  inherit harness;
+  inherit (harness) opencode;
 
   # Claude Code harness — wrapped CLI + user-tier config + two plugins.
   # Exposes .package (the wrapped `claude`), .configDirDrv, .devshellHook,
   # .konductorPlugin, .practitionerPlugin, and .extend (lib.makeExtensible).
   # settingsDrv, configDirDrv and wrappedClaude read final.settings, so they
   # rebuild from the merged value.
-  claude-code = (import ./claude-code { inherit pkgs lib; }).extend (
-    _final: prev: { settings = lib.recursiveUpdate prev.settings claudeCodeSettings; }
-  );
+  inherit (harness) claude-code;
 
   # ===========================================================================
   # System Info Tools

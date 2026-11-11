@@ -4,7 +4,7 @@
 #
 # Package composition defined in: ../packages/
 # SSH config from: ../config/shell/ssh.nix
-# OpenCode theme from: ../config/opencode/
+# OpenCode theme from: ../harness/opencode/
 # Atuin shell history from: ../config/shell/atuin.nix
 
 {
@@ -74,7 +74,8 @@ baseShell.overrideAttrs (old: {
     # Update PATH (depends on dynamic vars above)
     # Python env MUST be first — mkShell puts bare python3 in PATH from
     # withPackages build deps; this ensures the -env wrapper wins.
-    export PATH="${packages.pythonEnv}/bin:$GOBIN:$PNPM_HOME:$CARGO_HOME/bin:$PATH"
+    # Keep Cargo-installed tools behind the Nix toolchain.
+    export PATH="${packages.pythonEnv}/bin:$GOBIN:$PNPM_HOME:$PATH:$CARGO_HOME/bin"
 
     if [ -z "''${KONDUCTOR_SKIP_BANNER:-}" ]; then
       echo "Full polyglot ready"

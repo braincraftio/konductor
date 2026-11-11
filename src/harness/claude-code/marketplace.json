@@ -1,0 +1,23 @@
+{
+  "name": "konductor",
+  "owner": {
+    "name": "BrainCraft.io",
+    "url": "https://github.com/braincraftio/konductor"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for the Konductor platform and for Nix/commit engineering.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "konductor",
+      "source": "./plugins/konductor",
+      "description": "Konductor NixOS/QCOW2/KubeVirt platform skills and agents: Pulumi IaC (preview/up, provider SDKs, pyright typechecker), Talos/KubeVirt cluster ops (talosctl, virtctl, context/UID failures), runme task pipelines (docs/ci, cwd/shell frontmatter), and QCOW2 image builds (cloud-init, systemd user services, skel provisioning). Includes read-only k8s-debugger and preview-only pulumi-engineer agents, secret-scan and nix-fmt hooks, and a Nix LSP."
+    },
+    {
+      "name": "konductor-practitioner",
+      "source": "./plugins/konductor-practitioner",
+      "description": "Practitioner skills usable in any repository. nix-idioms: derivations, flake modules, and config generation. git-commit: conventional-commit ceremony with full-diff reading and diff-derived messages, plus a non-blocking commit guard. rust-best-practices, rust-review, rust-port: writing, reviewing, and porting idiomatic Rust (BeautifulRust). discovery, deepwiki, opencode-clients: repository survey, DeepWiki research, and OpenCode V2 client operation."
+    }
+  ]
+}

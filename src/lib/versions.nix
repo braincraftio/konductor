@@ -62,13 +62,13 @@
     name = "ghcr.io/braincraftio/konductor";
   };
 
-  # Shell history — tip-of-spear policy to prevent SQLite migration skew
-  # between konductor devshells and home-manager consumers on different
-  # nixpkgs channels. Built by src/overlays/atuin.nix.
+  # Shell history, transitional: built by src/overlays/atuin.nix only until
+  # locked nixpkgs ships >= 18.24.5, then this record is deleted with the
+  # overlay (procedure in src/overlays/atuin.nix). Do not bump.
   atuin = {
-    version = "18.24.1";
-    hash = "sha256-p4Vjk4XZDYVaIEp13fz0AfhvtZ9to0H0OJMpdNH34I0=";
-    cargoHash = "sha256-tZqIfdcOth0pBIfIvqfeSEtKqsmRPcwtuHWsjoPdt1c=";
+    version = "18.24.5";
+    hash = "sha256-cQmfUN+lrw4Z8LZ6XRYwq6utHCH+ockw81AdEYJ/oqA=";
+    cargoHash = "sha256-2ACFqpVZsEu+vmtpllGYvUDCghH6EbcRYMELs+EEx/g=";
   };
 
   # Terminal-embedded Chromium browser via kitty graphics protocol.
@@ -81,6 +81,15 @@
       aarch64-darwin = "sha256-8BcjDHjGCgfvRFGh6wqScn8LlVqPzYeuw1iRDF0MA8c=";
       x86_64-darwin = "sha256-AbxpkbrRIvQuTypRZKGY2DhLlEwDbeESB4/VH1jcZ+0=";
     };
+  };
+
+  # Rust skills, references, and lint presets; packaged by
+  # src/overlays/beautiful-rust.nix. version is the upstream plugin.json
+  # version at rev. Bump rev, hash, and version together.
+  beautiful-rust = {
+    version = "1.6.0";
+    rev = "b9718436d77ee7bcf17cdcb6aa27628feb95d97a";
+    hash = "sha256-wXqdHFZ1BgdoVminLY0NvUAKwu1qLol+5bsAGWcggiU=";
   };
 
   # FlakeHub release publisher; built by src/overlays/flakehub-push.nix and

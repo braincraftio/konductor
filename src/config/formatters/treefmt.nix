@@ -15,6 +15,7 @@
 #   *.toml                        taplo
 #   *.go                          gofumpt
 #   *.lua                         stylua
+#   *.rs                          rustfmt (Konductor rustToolchain, edition 2024)
 
 { pkgs, formatters }:
 
@@ -129,6 +130,18 @@ in
         stylua = {
           command = exe pkgs.stylua;
           includes = [ "*.lua" ];
+        };
+
+        # BeautifulRust §1/§2: rustfmt owns formatting. Per-file invocation
+        # does not read Cargo.toml, so the edition is explicit and matches the
+        # Rust templates; a crate's rustfmt.toml still applies.
+        rustfmt = {
+          command = lib.getExe' formatters.rustToolchain "rustfmt";
+          options = [
+            "--edition"
+            "2024"
+          ];
+          includes = [ "*.rs" ];
         };
       };
     };

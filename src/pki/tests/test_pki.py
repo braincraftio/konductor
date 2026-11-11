@@ -186,7 +186,7 @@ class TestCACertificate:
         assert len(sn) == 16
 
     def test_validity(self, ca_cert: x509.Certificate) -> None:
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         assert ca_cert.not_valid_before_utc <= now
         assert ca_cert.not_valid_after_utc > now
         delta = ca_cert.not_valid_after_utc - ca_cert.not_valid_before_utc
