@@ -19,6 +19,12 @@ let
   # SHARED CONFIGURATION (SSOT)
   # ===========================================================================
 
+  # Replaces vim-tmux-navigator's root binding, keeping its vim check as the
+  # non-OpenCode branch. Must be emitted after the plugin loads.
+  opencodeNavigatorBinding =
+    key: direction: forward:
+    ''bind-key -n "${key}" if-shell -F "#{&&:#{@opencode_navigation},#{m:*opencode*,#{pane_current_command}}}" { ${forward} } { if-shell 'ps -o state= -o comm= -t "#{pane_tty}" | grep -iqE "^[^TXZ ]+ +(\S+/)?g?\.?(view|l?n?vim?x?|fzf)(diff)?(-wrapped)?$"' { send-keys "${key}" } { select-pane ${direction} } }'';
+
   # Import shared readline configuration (eliminates duplicate inputrc)
   readline = import ../../lib/readline.nix { inherit pkgs; };
 
@@ -651,6 +657,15 @@ let
     # Neovim Integration
     run-shell ${pkgs.tmuxPlugins.vim-tmux-navigator}/share/tmux-plugins/vim-tmux-navigator/vim-tmux-navigator.tmux
     run-shell ${pkgs.tmuxPlugins.vim-tmux-focus-events}/share/tmux-plugins/vim-tmux-focus-events/focus-events.tmux
+
+    # OpenCode sets @opencode_navigation on its pane while it can route these
+    # keys; the command check ignores a flag left behind by a crashed client.
+    # Ctrl+H is sent as kitty CSI 104;5u because legacy 0x08 decodes as Backspace.
+    ${opencodeNavigatorBinding "C-h" "-L" "send-keys -H 1b 5b 31 30 34 3b 35 75"}
+    ${opencodeNavigatorBinding "C-j" "-D" "send-keys C-j"}
+    ${opencodeNavigatorBinding "C-k" "-U" "send-keys C-k"}
+    ${opencodeNavigatorBinding "C-l" "-R" "send-keys C-l"}
+    ${opencodeNavigatorBinding "C-\\\\" "-l" "send-keys C-\\\\"}
 
     # Clipboard & Productivity
     run-shell ${pkgs.tmuxPlugins.yank}/share/tmux-plugins/yank/yank.tmux
