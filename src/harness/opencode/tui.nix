@@ -15,13 +15,13 @@ _:
     grouping = "none";
     verbosity = "high";
     thinking = "show";
-    scrollbar = true;
+    scrollbar = false;
     tps = true;
     permissions = "prompt";
     new_location = "launch";
     image_preview = true;
     markdown = "rendered";
-    sidebar = "auto";
+    sidebar = "hide";
   };
   mini = {
     thinking = "show";
@@ -59,4 +59,8 @@ _:
     indicators = "status";
   };
   mouse = true;
+  experimental = {
+    terminal-left = true;
+    vim-pane-navigation = true;
+  };
 }
