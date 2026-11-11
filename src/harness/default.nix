@@ -8,6 +8,7 @@
   opencodeSettings ? { },
   opencodeCliSettings ? { },
   opencodeEnvironment ? { },
+  opencodePackage ? pkgs.opencode,
 }:
 let
   skill = import ./skill { inherit pkgs lib; };
@@ -19,6 +20,7 @@ in
   );
   opencode =
     (import ./opencode {
+      package = opencodePackage;
       inherit
         pkgs
         lib

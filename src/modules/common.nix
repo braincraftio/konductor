@@ -27,6 +27,12 @@
     {
       enable = lib.mkEnableOption "Konductor development environment";
       opencode = {
+        package = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.opencode;
+          defaultText = lib.literalExpression "pkgs.opencode";
+          description = "OpenCode executable wrapped with the Konductor harness and runtime dependencies.";
+        };
         settings = lib.mkOption {
           inherit (pkgs.formats.json { }) type;
           default = { };
@@ -71,6 +77,7 @@
       opencodeSettings ? { },
       opencodeCliSettings ? { },
       opencodeEnvironment ? { },
+      opencodePackage ? pkgs.opencode,
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -85,6 +92,7 @@
           opencodeSettings
           opencodeCliSettings
           opencodeEnvironment
+          opencodePackage
           ;
       };
 

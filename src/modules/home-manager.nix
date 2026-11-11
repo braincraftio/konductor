@@ -48,6 +48,7 @@ let
     opencodeSettings = cfg.opencode.settings;
     opencodeCliSettings = cfg.opencode.cli;
     opencodeEnvironment = cfg.opencode.environment;
+    opencodePackage = cfg.opencode.package;
   };
 
   # Programs (neovim, tmux, ttyd) — needs flake inputs for nixvim
@@ -81,6 +82,7 @@ in
           opencodeSettings = cfg.opencode.settings;
           opencodeCliSettings = cfg.opencode.cli;
           opencodeEnvironment = cfg.opencode.environment;
+          opencodePackage = cfg.opencode.package;
         }
         # IDE programs: neovim, tmux, ttyd
         ++ common.mkPrograms { inherit programs packages; }

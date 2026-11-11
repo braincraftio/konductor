@@ -43,6 +43,7 @@ in
       opencodeSettings = cfg.opencode.settings;
       opencodeCliSettings = cfg.opencode.cli;
       opencodeEnvironment = cfg.opencode.environment;
+      opencodePackage = cfg.opencode.package;
     };
     environment.variables = common.mkEnv // {
       SSL_CERT_FILE = "/etc/ssl/cert.pem";

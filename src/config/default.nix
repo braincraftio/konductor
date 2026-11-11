@@ -12,6 +12,7 @@
   opencodeSettings ? { },
   opencodeCliSettings ? { },
   opencodeEnvironment ? { },
+  opencodePackage ? pkgs.opencode,
   ...
 }:
 
@@ -29,6 +30,7 @@ let
       opencodeSettings
       opencodeCliSettings
       opencodeEnvironment
+      opencodePackage
       ;
   };
 

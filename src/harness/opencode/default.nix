@@ -13,6 +13,7 @@
   formatters,
   linters,
   languages,
+  package ? pkgs.opencode,
 }:
 
 lib.makeExtensible (
@@ -48,9 +49,9 @@ lib.makeExtensible (
       runtimeInputs:
       pkgs.writeShellApplication {
         name = "opencode";
+        # writeShellApplication prepends these while preserving the caller's PATH.
         inherit runtimeInputs;
         text = ''
-          export PATH=${lib.escapeShellArg (lib.makeBinPath runtimeInputs)}
           ${lib.concatStringsSep "\n" (
             lib.mapAttrsToList (name: value: ''
               # JSON keys and runtime substitution tokens remain literal.
@@ -58,15 +59,15 @@ lib.makeExtensible (
               export ${name}=${lib.escapeShellArg value}
             '') final.env
           )}
-          exec ${lib.getExe pkgs.opencode} "$@"
+          exec ${lib.getExe package} "$@"
         '';
-        passthru = lib.recursiveUpdate (pkgs.opencode.passthru or { }) {
-          unwrapped = pkgs.opencode;
+        passthru = lib.recursiveUpdate (package.passthru or { }) {
+          unwrapped = package;
           inherit (final) configDrv tuiDrv;
         };
-        meta = lib.recursiveUpdate pkgs.opencode.meta {
+        meta = lib.recursiveUpdate package.meta {
           mainProgram = "opencode";
-          priority = (pkgs.opencode.meta.priority or lib.meta.defaultPriority) - 1;
+          priority = (package.meta.priority or lib.meta.defaultPriority) - 1;
         };
       };
 
