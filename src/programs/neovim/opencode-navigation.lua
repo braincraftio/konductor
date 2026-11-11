@@ -39,7 +39,7 @@ local function send(direction)
 	end
 	local payload = vim.json.encode({
 		token = token,
-		request = { op = "notify_controller", id = id, message = "pane.focus." .. directions[direction] },
+		request = { op = "notify_controller", id = id, message = "pane.navigate." .. directions[direction] },
 	})
 	local length = #payload
 	local frame = string.char(
@@ -123,7 +123,10 @@ function M.navigate(direction)
 end
 
 function M.setup()
-	if not vim.env.OPENCODE_PTY_CONTROL_SOCKET then
+	local socket = vim.env.OPENCODE_PTY_CONTROL_SOCKET
+	local token = vim.env.OPENCODE_PTY_CONTROL_TOKEN
+	local id = tonumber(vim.env.OPENCODE_PTY_ID)
+	if not socket or socket == "" or not token or token == "" or not id or id <= 0 or id % 1 ~= 0 then
 		return
 	end
 	for _, direction in ipairs({ "h", "j", "k", "l", "p" }) do
