@@ -15,6 +15,7 @@
 { pkgs, ... }:
 
 let
+  navigation = import ../../harness/opencode/navigation.nix { inherit pkgs; };
   # ===========================================================================
   # SHARED CONFIGURATION (SSOT)
   # ===========================================================================
@@ -23,7 +24,7 @@ let
   # non-OpenCode branch. Must be emitted after the plugin loads.
   opencodeNavigatorBinding =
     key: direction: forward:
-    ''bind-key -n "${key}" if-shell -F "#{&&:#{@opencode_navigation},#{m:*opencode*,#{pane_current_command}}}" { ${forward} } { if-shell 'ps -o state= -o comm= -t "#{pane_tty}" | grep -iqE "^[^TXZ ]+ +(\S+/)?g?\.?(view|l?n?vim?x?|fzf)(diff)?(-wrapped)?$"' { send-keys "${key}" } { select-pane ${direction} } }'';
+    ''bind-key -n "${key}" if-shell '${pkgs.lib.getExe navigation} admitted #{pane_id}' { ${forward} } { if-shell 'ps -o state= -o comm= -t "#{pane_tty}" | grep -iqE "^[^TXZ ]+ +(\S+/)?g?\.?(view|l?n?vim?x?|fzf)(diff)?(-wrapped)?$"' { send-keys "${key}" } { run-shell '${pkgs.lib.getExe navigation} step ${direction} #{pane_id} --client #{q:client_tty}' } }'';
 
   # Import shared readline configuration (eliminates duplicate inputrc)
   readline = import ../../lib/readline.nix { inherit pkgs; };
@@ -658,14 +659,16 @@ let
     run-shell ${pkgs.tmuxPlugins.vim-tmux-navigator}/share/tmux-plugins/vim-tmux-navigator/vim-tmux-navigator.tmux
     run-shell ${pkgs.tmuxPlugins.vim-tmux-focus-events}/share/tmux-plugins/vim-tmux-focus-events/focus-events.tmux
 
-    # OpenCode sets @opencode_navigation on its pane while it can route these
-    # keys; the command check ignores a flag left behind by a crashed client.
+    # The client-local plugin answers admission only while navigation is enabled
+    # and its process group owns the terminal; kernel lifetime tracking rejects stale claims.
     # Ctrl+H is sent as kitty CSI 104;5u because legacy 0x08 decodes as Backspace.
-    ${opencodeNavigatorBinding "C-h" "-L" "send-keys -H 1b 5b 31 30 34 3b 35 75"}
-    ${opencodeNavigatorBinding "C-j" "-D" "send-keys C-j"}
-    ${opencodeNavigatorBinding "C-k" "-U" "send-keys C-k"}
-    ${opencodeNavigatorBinding "C-l" "-R" "send-keys C-l"}
-    ${opencodeNavigatorBinding "C-\\\\" "-l" "send-keys C-\\\\"}
+    set-hook -g client-attached[731] 'run-shell "${pkgs.lib.getExe navigation} claim-client #{pane_id} #{q:hook_client}"'
+    set-hook -g client-session-changed[731] 'run-shell "${pkgs.lib.getExe navigation} claim-client #{pane_id} #{q:hook_client}"'
+    ${opencodeNavigatorBinding "C-h" "left" "send-keys -H 1b 5b 31 30 34 3b 35 75"}
+    ${opencodeNavigatorBinding "C-j" "down" "send-keys C-j"}
+    ${opencodeNavigatorBinding "C-k" "up" "send-keys C-k"}
+    ${opencodeNavigatorBinding "C-l" "right" "send-keys C-l"}
+    ${opencodeNavigatorBinding "C-\\\\" "previous" "send-keys C-\\\\"}
 
     # Clipboard & Productivity
     run-shell ${pkgs.tmuxPlugins.yank}/share/tmux-plugins/yank/yank.tmux

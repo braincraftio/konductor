@@ -9,8 +9,12 @@
 # - Optional encrypted sync across machines
 #
 # Design decisions:
-# - LOCAL-ONLY by default (no sync/telemetry) for complete privacy
-# - Sync can be enabled via ATUIN_SYNC=true environment variable
+# - LOCAL-ONLY by default (auto_sync = false); `atuin login` + auto_sync opts in
+# - Daemon autostarts: daemon-fuzzy search, output capture (via pty-proxy,
+#   which `atuin init` re-execs the shell into), and agent thread capture
+# - Agent integration lives in the harnesses, from the same pkgs.atuin:
+#   Claude Code hooks + MCP (src/harness/claude-code), OpenCode server plugin
+#   + MCP (src/harness/opencode). Nothing runs `atuin hook install`.
 # - Config is maintained in native TOML (atuin.toml) for easy contribution
 # - bash-preexec is bundled for Bash integration
 #

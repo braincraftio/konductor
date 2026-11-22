@@ -1,0 +1,8 @@
+{
+  "name": "konductor-pane-navigation",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./tui": "./tui.ts"
+  }
+}

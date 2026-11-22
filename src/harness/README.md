@@ -73,6 +73,42 @@ interfaces and exposes the composition as `config.harness`.
 Both outputs consume the same skill sources. Installing the wrapped Claude CLI continues to load
 both plugins through their immutable store paths.
 
+## Atuin integration
+
+`default.nix` passes one `pkgs.atuin` to both adapters; shells install the same package, so hook
+writers, the MCP server, and the history database share one schema version. Each adapter renders
+what `atuin hook install` / `atuin mcp install` would write, with store paths, and nothing mutates
+`~/.claude` or `~/.config/opencode`:
+
+- Claude Code: `settings.nix` adds `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` hooks
+  (matcher `^Bash$`) running `atuin hook claude-code`; the konductor plugin's `.mcp.json` is
+  generated with an `atuin` server (`atuin mcp`).
+- OpenCode: `atuinPlugin` packages `atuin.v2.ts` from `atuin.src` as a local plugin directory
+  (`exports["./server"]`) listed in `plugins`; `config.nix` adds the `atuin` MCP server. The plugin
+  spawns `atuin` by name from the wrapper's runtime PATH.
+
+Agent commands are recorded with author `claude-code` / `opencode` and are hidden from interactive
+search by default; `atuin search --author '$all-agent'` lists them. Thread and output capture are
+enabled in `src/config/shell/atuin.toml` and require the autostarted daemon.
+
+## rtk integration (opt-in)
+
+`konductor.rtk.enable` (home-manager, NixOS, nix-darwin) adds rtk command rewriting; `package`
+defaults to the Apache-2.0 build (`buildNoDefaultFeatures`, no BUSL `rtk-engine`), `settings` merges
+over `src/config/shell/rtk.nix` defaults: recall store disabled, telemetry off, no Pro hint, hook
+warning suppressed. Home-manager writes `~/.config/rtk/config.toml`; harness wrappers export the
+matching `RTK_*` kill switches. Nothing runs `rtk init`.
+
+- Claude Code: `rtk hook claude` is a second `PreToolUse` group after Atuin's. Atuin records the
+  command as the agent wrote it; rtk's rewrite runs. rtk reads Claude rules from
+  `CLAUDE_CONFIG_DIR`, so its allow verdicts never exceed `permissions.nix`.
+- OpenCode: the rtk plugin (from `rtk.src/hooks/opencode/rtk.ts`) loads **before** Atuin's. Atuin
+  pairs `execute.before` with `create.before` by exact command text; with rtk second the call is
+  never recorded. Atuin therefore records `rtk <cmd>`. rtk declines any rewrite that would change
+  the verdict of OpenCode's own rules, so allowed commands (`git status*`) run as typed.
+- `src/harness/rtk.md` is added to both harnesses' instructions: full output comes from
+  `atuin_output` or `rtk bypass <cmd>`.
+
 ## OpenCode V2 configuration
 
 `nix build .#opencode` produces the configured CLI wrapper. Its runtime PATH is the full Konductor

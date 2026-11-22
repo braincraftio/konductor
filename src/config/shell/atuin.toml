@@ -12,8 +12,7 @@
 #
 # The goal: Make local history so excellent that users WANT to enable sync
 #
-# To enable sync (optional):
-#   export ATUIN_SYNC=true
+# To enable sync (optional): set auto_sync = true, then
 #   atuin login  # or: atuin register
 
 # ===========================================================================
@@ -66,8 +65,10 @@ cwd_filter = []
 # ===========================================================================
 # SEARCH BEHAVIOR - Fuzzy search with workspace awareness
 # ===========================================================================
-# Search algorithm: prefix, fulltext, fuzzy, skim
-search_mode = "fuzzy"
+# Search algorithm: prefix, fulltext, fuzzy, daemon-fuzzy
+# daemon-fuzzy uses the daemon's in-memory index; non-interactive `atuin search`
+# behaves as fuzzy.
+search_mode = "daemon-fuzzy"
 
 # Default filter scope: global, host, session, directory, workspace
 filter_mode = "workspace"
@@ -241,10 +242,26 @@ ignored_commands = [
   "history",
 ]
 
-# Daemon settings (disabled by default)
+# Daemon: search index, output capture, and thread capture. autostart starts it
+# on first use; keys match `atuin config enable daemon` (atuin 18.24.5).
 [daemon]
-enabled = false
+enabled = true
+autostart = true
 sync_frequency = 300
+
+# Re-exec the shell inside `atuin pty-proxy` from `atuin init`, which output
+# capture requires. Keys match `atuin config enable output-capture`.
+[pty_proxy]
+enabled = true
+
+# Capture command output locally. Output never syncs in this release.
+[output]
+enabled = true
+
+# Capture agent threads (Claude Code, OpenCode) into the record store.
+# Sync stays governed by auto_sync above.
+[threads]
+capture = true
 
 # Theme configuration
 [theme]

@@ -13,6 +13,10 @@
   opencodeCliSettings ? { },
   opencodeEnvironment ? { },
   opencodePackage ? pkgs.opencode,
+  # Module options konductor.rtk.{enable,package,settings}.
+  rtkEnable ? false,
+  rtkSettings ? { },
+  rtkPackage ? null,
   ...
 }:
 
@@ -21,8 +25,15 @@ let
   # languages.nix depends only on pkgs and versions (no circular dependency).
   languages = import ../packages/languages.nix { inherit pkgs versions lib; };
 
+  rtk = import ./shell/rtk.nix {
+    inherit pkgs lib;
+    settings = rtkSettings;
+    package = rtkPackage;
+  };
+
   harness = import ../harness {
     inherit formatters linters languages;
+    rtk = if rtkEnable then rtk else null;
     inherit
       pkgs
       lib
@@ -103,7 +114,9 @@ in
     git = import ./shell/git.nix { inherit pkgs lib; };
     ssh = import ./shell/ssh.nix { inherit pkgs; };
     atuin = import ./shell/atuin.nix { inherit pkgs; };
+    inherit rtk;
   };
+  rtkEnabled = rtkEnable;
 
   # ===========================================================================
   # CLI Tools Configuration

@@ -14,8 +14,43 @@
 # attrset.
 
 {
+  lib,
   statusline,
+  atuin,
+  rtk ? null,
 }:
+
+let
+  # `rtk hook claude` returns updatedInput (`git status` → `rtk git status`)
+  # under Claude Code's own permission rules, read from CLAUDE_CONFIG_DIR.
+  # Separate matcher group after Atuin's; Atuin pairs PreToolUse/PostToolUse
+  # by tool_use_id, so either command text still yields one record.
+  rtkHook = lib.optional (rtk != null) {
+    matcher = "^Bash$";
+    hooks = [
+      {
+        type = "command";
+        command = "${lib.getExe rtk.package} hook claude";
+      }
+    ];
+  };
+
+  # `atuin hook claude-code` records each Bash tool call in Atuin history with
+  # author claude-code. Same three events and matcher `atuin hook install
+  # claude-code` writes (atuin-common json_hooks.rs), with a store path in
+  # place of current_exe so no ~/.claude/settings.json mutation is needed.
+  atuinHook = [
+    {
+      matcher = "^Bash$";
+      hooks = [
+        {
+          type = "command";
+          command = "${lib.getExe atuin} hook claude-code";
+        }
+      ];
+    }
+  ];
+in
 
 {
   # ── Model / behavior — konductor defaults ──
@@ -89,7 +124,9 @@
 
   # NOTE: outputStyle is intentionally UNSET (opt-in via /output-style).
 
-  env = {
+  # rtk kill switches (recall store, telemetry, missing-hook warning) for
+  # Bash commands Claude runs; rtk reads them from its process environment.
+  env = lib.recursiveUpdate (lib.optionalAttrs (rtk != null) rtk.env) {
     COLORTERM = "truecolor";
 
     # ── Pin alias → model-ID resolution explicitly (no implicit "latest"). ──
@@ -112,6 +149,13 @@
   statusLine = {
     type = "command";
     command = "${statusline}/bin/claude-statusline";
+  };
+
+  # ── Atuin agent-command capture (user tier, so it applies in every repo). ──
+  hooks = {
+    PreToolUse = atuinHook ++ rtkHook;
+    PostToolUse = atuinHook;
+    PostToolUseFailure = atuinHook;
   };
 
   # ── Permissions (security surface, defined in permissions.nix) ──

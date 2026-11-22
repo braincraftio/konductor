@@ -7,7 +7,7 @@ local function report(message)
 	end)
 end
 
-local function send(direction)
+local function request(operation, done)
 	local socket = vim.env.OPENCODE_PTY_CONTROL_SOCKET
 	local token = vim.env.OPENCODE_PTY_CONTROL_TOKEN
 	local id = tonumber(vim.env.OPENCODE_PTY_ID)
@@ -36,10 +36,14 @@ local function send(direction)
 		if err then
 			report(err)
 		end
+		if done then
+			done(err)
+		end
 	end
+	operation.id = id
 	local payload = vim.json.encode({
 		token = token,
-		request = { op = "notify_controller", id = id, message = "pane.navigate." .. directions[direction] },
+		request = operation,
 	})
 	local length = #payload
 	local frame = string.char(
@@ -107,6 +111,10 @@ local function send(direction)
 	end
 end
 
+local function send(direction)
+	request({ op = "notify_controller", message = "pane.navigate." .. directions[direction] })
+end
+
 function M.navigate(direction)
 	if not directions[direction] then
 		error("direction must be h, j, k, l, or p")
@@ -129,6 +137,42 @@ function M.setup()
 	if not socket or socket == "" or not token or token == "" or not id or id <= 0 or id % 1 ~= 0 then
 		return
 	end
+	local group = vim.api.nvim_create_augroup("OpenCodeNavigation", { clear = true })
+	local claimed = {}
+	local function claim_ui()
+		for _, ui in ipairs(vim.api.nvim_list_uis()) do
+			local info = vim.api.nvim_get_chan_info(ui.chan)
+			local client = info.client
+			if client and client.name == "nvim-tui" and client.attributes and client.attributes.pid then
+				local pid = client.attributes.pid
+				if not claimed[pid] then
+					claimed[pid] = true
+					request({ op = "claim_navigation", pid = pid }, function(err)
+						if err then
+							claimed[pid] = nil
+						end
+					end)
+				end
+			end
+		end
+	end
+	vim.api.nvim_create_autocmd({ "UIEnter", "ChanInfo" }, { group = group, callback = claim_ui })
+	claim_ui()
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		group = group,
+		callback = function()
+			local pending = 0
+			for pid in pairs(claimed) do
+				pending = pending + 1
+				request({ op = "release_navigation", pid = pid }, function()
+					pending = pending - 1
+				end)
+			end
+			vim.wait(1000, function()
+				return pending == 0
+			end, 10)
+		end,
+	})
 	for _, direction in ipairs({ "h", "j", "k", "l", "p" }) do
 		local key = direction == "p" and "\\" or direction
 		local modes = direction == "p" and { "n" } or { "n", "i", "t" }

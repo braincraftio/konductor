@@ -44,6 +44,9 @@ in
       opencodeCliSettings = cfg.opencode.cli;
       opencodeEnvironment = cfg.opencode.environment;
       opencodePackage = cfg.opencode.package;
+      rtkEnable = cfg.rtk.enable;
+      rtkSettings = cfg.rtk.settings;
+      rtkPackage = cfg.rtk.package;
     };
     environment.variables = common.mkEnv;
   };

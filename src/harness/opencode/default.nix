@@ -10,6 +10,8 @@
   pkgs,
   lib,
   skill,
+  atuin,
+  rtk ? null,
   formatters,
   linters,
   languages,
@@ -24,19 +26,75 @@ lib.makeExtensible (
       inherit
         pkgs
         lib
+        atuin
         formatters
         linters
         languages
         ;
     };
     baseTui = import ./tui.nix { };
+    navigation = import ./navigation.nix { inherit pkgs lib; };
   in
   {
+    # Atuin's OpenCode 2 server plugin, taken from the source of the atuin
+    # package in use so its `atuin history start/end` flags match the binary.
+    # `atuin hook install opencode` would write the same file into
+    # ~/.config/opencode/plugins; the store directory replaces that mutation.
+    # The plugin spawns `atuin` by name, which the wrapper's runtime PATH provides.
+    atuinPlugin = pkgs.runCommand "konductor-opencode-atuin-plugin" { } ''
+      install -Dm644 ${atuin.src}/crates/atuin-common/res/harnesstools/opencode/atuin.v2.ts "$out/atuin.ts"
+      install -Dm644 ${
+        jsonFmt.generate "package.json" {
+          name = "konductor-atuin";
+          inherit (atuin) version;
+          type = "module";
+          exports."./server" = "./atuin.ts";
+        }
+      } "$out/package.json"
+    '';
+
+    # rtk's OpenCode plugin from the source of the rtk package in use. It
+    # delegates to `rtk hook opencode`, which reads OpenCode's rules from
+    # OPENCODE_CONFIG and answers no rewrite whenever the rewritten command
+    # would get a different verdict, so the shell rules need no `rtk *` mirror.
+    rtkPlugin =
+      if rtk == null then
+        null
+      else
+        pkgs.runCommand "konductor-opencode-rtk-plugin" { } ''
+          install -Dm644 ${rtk.package.src}/hooks/opencode/rtk.ts "$out/rtk.ts"
+          install -Dm644 ${
+            jsonFmt.generate "package.json" {
+              name = "konductor-rtk";
+              inherit (rtk.package) version;
+              type = "module";
+              exports."./server" = "./rtk.ts";
+            }
+          } "$out/package.json"
+        '';
+
     config = lib.recursiveUpdate baseConfig {
       skills = [ (builtins.toString skill.directory) ];
-      instructions = [ (builtins.toString final.instructionsFile) ];
+      instructions = [
+        (builtins.toString final.instructionsFile)
+      ]
+      ++ lib.optional (rtk != null) (builtins.toString ../rtk.md);
+      # rtk before Atuin: Atuin pairs its execute.before proposal with
+      # shell create.before by exact command text, so it must see the command
+      # after rtk's rewrite or the call is never recorded. Atuin then records
+      # `rtk <cmd>`.
+      plugins = lib.optional (final.rtkPlugin != null) (builtins.toString final.rtkPlugin) ++ [
+        (builtins.toString final.atuinPlugin)
+      ];
     };
-    tui = baseTui;
+    tui = lib.recursiveUpdate baseTui {
+      plugins = [
+        {
+          package = builtins.toString ./navigation;
+          options.helper = lib.getExe navigation;
+        }
+      ];
+    };
     instructionsFile = ./instructions.md;
 
     configDrv = jsonFmt.generate "opencode.json" final.config;
@@ -75,11 +133,17 @@ lib.makeExtensible (
     shellHook = "";
 
     # Consumed by full.nix as config.opencode.env
-    env = {
-      OPENCODE_CONFIG = "${final.configDrv}";
-      OPENCODE_CLI_CONFIG_CONTENT = builtins.toJSON final.tui;
-      OPENCODE_DISABLE_AUTOUPDATE = "1";
-    };
+    # RTK_BIN pins the plugin's binary lookup when rtk is not first on PATH.
+    env =
+      lib.recursiveUpdate
+        (lib.optionalAttrs (rtk != null) (
+          lib.recursiveUpdate rtk.env { RTK_BIN = lib.getExe rtk.package; }
+        ))
+        {
+          OPENCODE_CONFIG = "${final.configDrv}";
+          OPENCODE_CLI_CONFIG_CONTENT = builtins.toJSON final.tui;
+          OPENCODE_DISABLE_AUTOUPDATE = "1";
+        };
 
     meta = {
       description = "Konductor OpenCode harness";

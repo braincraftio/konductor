@@ -47,6 +47,8 @@
   pkgs,
   lib,
   skill,
+  atuin,
+  rtk ? null,
 }:
 
 lib.makeExtensible (
@@ -67,8 +69,20 @@ lib.makeExtensible (
     # settings.json content. statusline flows THROUGH final so a downstream
     # .extend on it recomputes settings → settingsDrv → configDirDrv.
     baseSettings = import ./settings.nix {
+      inherit lib atuin rtk;
       inherit (final) statusline;
     };
+
+    # Static servers from .mcp.json plus Atuin's history/output/threads MCP
+    # server, launched by store path (the harness may not inherit a PATH with atuin).
+    mcpDrv = jsonFmt.generate "konductor-mcp.json" (
+      lib.recursiveUpdate (lib.importJSON ./plugins/konductor/.mcp.json) {
+        mcpServers.atuin = {
+          command = lib.getExe atuin;
+          args = [ "mcp" ];
+        };
+      }
+    );
   in
   {
     # =========================================================================
@@ -83,7 +97,7 @@ lib.makeExtensible (
     # =========================================================================
     konductorPlugin = materialize "konductor-plugin" {
       ".claude-plugin" = ./plugins/konductor/.claude-plugin;
-      ".mcp.json" = ./plugins/konductor/.mcp.json;
+      ".mcp.json" = mcpDrv;
       ".lsp.json" = ./plugins/konductor/.lsp.json;
       agents = ./plugins/konductor/agents;
       hooks = ./plugins/konductor/hooks;
@@ -129,7 +143,18 @@ lib.makeExtensible (
     configDirDrv = materialize "konductor-claude-config" {
       "settings.json" = final.settingsDrv;
       "CLAUDE.md" = ./context.md;
-      "rules" = ./rules;
+      # rules/ is the source directory plus rtk.md when rtk is enabled.
+      "rules" =
+        if rtk == null then
+          ./rules
+        else
+          pkgs.symlinkJoin {
+            name = "konductor-claude-rules";
+            paths = [
+              ./rules
+              (pkgs.linkFarm "konductor-claude-rules-rtk" { "rtk.md" = ../rtk.md; })
+            ];
+          };
       "output-styles" = ./output-styles;
       "statusline-command.sh" = lib.getExe final.statusline;
     };

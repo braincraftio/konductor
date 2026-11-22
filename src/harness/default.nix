@@ -9,15 +9,28 @@
   opencodeCliSettings ? { },
   opencodeEnvironment ? { },
   opencodePackage ? pkgs.opencode,
+  # src/config/shell/rtk.nix result when konductor.rtk.enable, else null.
+  rtk ? null,
 }:
 let
   skill = import ./skill { inherit pkgs lib; };
+  # One atuin for shells, hooks, MCP, and the OpenCode plugin: hook writers and
+  # the history database must agree on schema version.
+  inherit (pkgs) atuin;
 in
 {
   inherit skill;
-  claude-code = (import ./claude-code { inherit pkgs lib skill; }).extend (
-    _final: prev: { settings = lib.recursiveUpdate prev.settings claudeCodeSettings; }
-  );
+  claude-code =
+    (import ./claude-code {
+      inherit
+        pkgs
+        lib
+        skill
+        atuin
+        rtk
+        ;
+    }).extend
+      (_final: prev: { settings = lib.recursiveUpdate prev.settings claudeCodeSettings; });
   opencode =
     (import ./opencode {
       package = opencodePackage;
@@ -25,6 +38,8 @@ in
         pkgs
         lib
         skill
+        atuin
+        rtk
         formatters
         linters
         languages

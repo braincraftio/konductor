@@ -7,6 +7,7 @@
 {
   pkgs,
   lib,
+  atuin,
   formatters,
   linters,
   languages,
@@ -102,6 +103,14 @@
           kubernetes = {
             type = "local";
             command = [ (lib.getExe pkgs.mcp-k8s-go) ];
+          };
+          # Read-only search over shell history, captured output, and agent threads.
+          atuin = {
+            type = "local";
+            command = [
+              (lib.getExe atuin)
+              "mcp"
+            ];
           };
         };
   };

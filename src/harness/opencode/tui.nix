@@ -62,5 +62,6 @@ _:
   experimental = {
     terminal-left = true;
     vim-pane-navigation = true;
+    keyboard-copy-mode = true;
   };
 }

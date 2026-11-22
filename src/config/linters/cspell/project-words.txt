@@ -25,6 +25,8 @@ autocommands
 autofs
 automount
 autopairs
+autostarted
+autostarts
 autoread
 autoupdater
 autowrite
@@ -153,6 +155,7 @@ fastfetch
 fetchgit
 fetchurl
 fetchzip
+fflags
 fileset
 filesets
 fillchars
@@ -237,6 +240,7 @@ guestmount
 guestunmount
 gvim
 hadolint
+harnesstools
 headerpad
 helicone
 heredocs
@@ -469,6 +473,8 @@ patchshebangs
 pcall
 perc
 pflash
+pgid
+pidfd
 pidfile
 pipeweaver
 pkgs
@@ -477,6 +483,7 @@ pkinit
 plaintex
 pname
 pnet
+pollin
 postrouting
 powerline
 poweroff
@@ -611,6 +618,7 @@ talosctl
 tamasfe
 tapi
 taplo
+tcgetpgrp
 tauri
 tauri's
 technicals
@@ -623,6 +631,7 @@ tlnp
 tmpfiles
 tmux
 tmuxp
+tpgid
 toggleterm
 topdelete
 treefmt
@@ -631,6 +640,7 @@ truecolor
 trzsz
 tssh
 ttyd
+ttyname
 tunables
 tungstenite
 tunl
@@ -648,6 +658,7 @@ unreviewed
 updatetime
 upstreamability
 upstreamable
+upsell
 usernamehw
 usrbinkat
 utftex

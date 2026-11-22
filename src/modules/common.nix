@@ -49,6 +49,24 @@
           description = "Explicit OpenCode wrapper environment overrides. Values enter the Nix store; use runtime credential references in settings instead of secrets here.";
         };
       };
+      rtk = {
+        enable = lib.mkEnableOption ''
+          rtk command rewriting in the Claude Code and OpenCode harnesses
+          (agent shell commands run as `rtk <cmd>` and return condensed output;
+          Atuin keeps the full output)
+        '';
+        package = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.rtk.overrideAttrs { buildNoDefaultFeatures = true; };
+          defaultText = lib.literalExpression "pkgs.rtk.overrideAttrs { buildNoDefaultFeatures = true; }";
+          description = "rtk build. The default is the Apache-2.0 edition without the BUSL-1.1 rtk-engine.";
+        };
+        settings = lib.mkOption {
+          inherit (pkgs.formats.toml { }) type;
+          default = { };
+          description = "rtk config.toml settings merged recursively over Konductor defaults (src/config/shell/rtk.nix); lists replace whole.";
+        };
+      };
       claude-code.settings = lib.mkOption {
         inherit (pkgs.formats.json { }) type;
         default = { };
@@ -78,6 +96,9 @@
       opencodeCliSettings ? { },
       opencodeEnvironment ? { },
       opencodePackage ? pkgs.opencode,
+      rtkEnable ? false,
+      rtkSettings ? { },
+      rtkPackage ? null,
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -93,6 +114,9 @@
           opencodeCliSettings
           opencodeEnvironment
           opencodePackage
+          rtkEnable
+          rtkSettings
+          rtkPackage
           ;
       };
 
@@ -109,7 +133,9 @@
     # fullPackages = base + IDE + all languages + container tooling (SSOT with full.nix)
     packages.fullPackages
     ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux packages.konductor.packages
-    ++ [ pkgs.nerd-fonts.jetbrains-mono ];
+    ++ [ pkgs.nerd-fonts.jetbrains-mono ]
+    # Rewritten agent commands invoke bare `rtk`.
+    ++ lib.optional rtkEnable config.shell.rtk.package;
 
   # ===========================================================================
   # Program Packages (IDE tools: neovim, tmux, ttyd)
@@ -130,13 +156,22 @@
 
   mkHomeFiles =
     { config }:
-    {
-      ".config/starship.toml".text = config.shell.starship.configContent;
-      ".config/atuin/config.toml" = {
-        text = config.shell.atuin.configContent;
-        force = true;
-      };
-    };
+    lib.recursiveUpdate
+      {
+        ".config/starship.toml".text = config.shell.starship.configContent;
+        ".config/atuin/config.toml" = {
+          text = config.shell.atuin.configContent;
+          force = true;
+        };
+      }
+      (
+        lib.optionalAttrs config.rtkEnabled {
+          ".config/rtk/config.toml" = {
+            source = config.shell.rtk.configFile;
+            force = true;
+          };
+        }
+      );
 
   # ===========================================================================
   # programs.bash configuration
