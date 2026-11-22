@@ -49,6 +49,24 @@
           description = "Explicit OpenCode wrapper environment overrides. Values enter the Nix store; use runtime credential references in settings instead of secrets here.";
         };
       };
+      atuin = {
+        package = lib.mkOption {
+          type = lib.types.package;
+          default = pkgs.atuin;
+          defaultText = lib.literalExpression "pkgs.atuin";
+          description = "Atuin build used by shells, the daemon, agent hooks, the MCP server, and the OpenCode plugin.";
+        };
+        settings = lib.mkOption {
+          inherit (pkgs.formats.toml { }) type;
+          default = { };
+          example = lib.literalExpression "{ pty_proxy.enabled = false; output.enabled = false; }";
+          description = ''
+            Atuin config.toml settings merged recursively over Konductor defaults
+            (src/config/shell/atuin.toml); lists replace whole. Defaults run one
+            per-user daemon and one pty-proxy per interactive shell.
+          '';
+        };
+      };
       rtk = {
         enable = lib.mkEnableOption ''
           rtk command rewriting in the Claude Code and OpenCode harnesses
@@ -99,6 +117,8 @@
       rtkEnable ? false,
       rtkSettings ? { },
       rtkPackage ? null,
+      atuinSettings ? { },
+      atuinPackage ? pkgs.atuin,
     }:
     let
       # Config provides wrapped linters/formatters with hermetic configuration
@@ -117,6 +137,8 @@
           rtkEnable
           rtkSettings
           rtkPackage
+          atuinSettings
+          atuinPackage
           ;
       };
 
@@ -160,7 +182,7 @@
       {
         ".config/starship.toml".text = config.shell.starship.configContent;
         ".config/atuin/config.toml" = {
-          text = config.shell.atuin.configContent;
+          source = "${config.shell.atuin.configFile}/config.toml";
           force = true;
         };
       }

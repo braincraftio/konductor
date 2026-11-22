@@ -17,10 +17,19 @@
   rtkEnable ? false,
   rtkSettings ? { },
   rtkPackage ? null,
+  # Module options konductor.atuin.{package,settings}.
+  atuinSettings ? { },
+  atuinPackage ? pkgs.atuin,
   ...
 }:
 
 let
+  atuin = import ./shell/atuin.nix {
+    inherit pkgs lib;
+    settings = atuinSettings;
+    package = atuinPackage;
+  };
+
   # Import languages to get pythonEnv for pyright wrapper.
   # languages.nix depends only on pkgs and versions (no circular dependency).
   languages = import ../packages/languages.nix { inherit pkgs versions lib; };
@@ -34,6 +43,7 @@ let
   harness = import ../harness {
     inherit formatters linters languages;
     rtk = if rtkEnable then rtk else null;
+    atuin = atuin.package;
     inherit
       pkgs
       lib
@@ -113,8 +123,7 @@ in
     starship = import ./shell/starship.nix { inherit pkgs; };
     git = import ./shell/git.nix { inherit pkgs lib; };
     ssh = import ./shell/ssh.nix { inherit pkgs; };
-    atuin = import ./shell/atuin.nix { inherit pkgs; };
-    inherit rtk;
+    inherit atuin rtk;
   };
   rtkEnabled = rtkEnable;
 

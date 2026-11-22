@@ -11,12 +11,12 @@
   opencodePackage ? pkgs.opencode,
   # src/config/shell/rtk.nix result when konductor.rtk.enable, else null.
   rtk ? null,
+  # One atuin for shells, hooks, MCP, and the OpenCode plugin: hook writers and
+  # the history database must agree on schema version (konductor.atuin.package).
+  atuin ? pkgs.atuin,
 }:
 let
   skill = import ./skill { inherit pkgs lib; };
-  # One atuin for shells, hooks, MCP, and the OpenCode plugin: hook writers and
-  # the history database must agree on schema version.
-  inherit (pkgs) atuin;
 in
 {
   inherit skill;

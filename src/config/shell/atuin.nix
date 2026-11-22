@@ -36,15 +36,25 @@
 #   configFile    - Nix store path to config.toml
 #   configContent - Raw TOML content for other consumers
 
-{ pkgs, ... }:
+{
+  pkgs,
+  lib,
+  # Module options konductor.atuin.{package,settings}. settings merges over
+  # atuin.toml with lib.recursiveUpdate; lists replace whole. Example escape
+  # hatch: { pty_proxy.enabled = false; } drops the per-shell pty-proxy
+  # process (and output capture with it).
+  settings ? { },
+  package ? pkgs.atuin,
+  ...
+}:
 
 let
-  # Config file - native TOML, copied to nix store
-  configFile = pkgs.writeTextFile {
-    name = "konductor-atuin-config";
-    destination = "/config.toml";
-    text = builtins.readFile ./atuin.toml;
-  };
+  finalSettings = lib.recursiveUpdate (builtins.fromTOML (builtins.readFile ./atuin.toml)) settings;
+
+  # ATUIN_CONFIG_DIR names a directory holding config.toml.
+  configFile = pkgs.runCommand "konductor-atuin-config" { } ''
+    install -Dm644 ${(pkgs.formats.toml { }).generate "config.toml" finalSettings} "$out/config.toml"
+  '';
 
   # Shell initialization script - creates data dir (needs $HOME at runtime)
   # ATUIN_CONFIG_DIR and KONDUCTOR_PREEXEC_PATH set via env attribute (static nix paths)
@@ -61,17 +71,18 @@ in
   # Packages required for Atuin functionality
   # bash-preexec provides preexec/precmd hooks for Bash
   packages = [
-    pkgs.atuin
+    package
     pkgs.bash-preexec
   ];
 
-  # Unwrapped package for reference
-  unwrapped = pkgs.atuin;
+  inherit package;
+  unwrapped = package;
+  settings = finalSettings;
 
-  # Config file path in nix store (for consumers like qcow2, oci)
+  # Directory holding the merged config.toml (ATUIN_CONFIG_DIR, home.file source)
   inherit configFile;
 
-  # Raw TOML content for embedding in other configs
+  # Konductor default TOML without module overrides (qcow2 skel)
   configContent = builtins.readFile ./atuin.toml;
 
   # Shell hook for devshell integration

@@ -52,6 +52,8 @@ let
     rtkEnable = cfg.rtk.enable;
     rtkSettings = cfg.rtk.settings;
     rtkPackage = cfg.rtk.package;
+    atuinSettings = cfg.atuin.settings;
+    atuinPackage = cfg.atuin.package;
   };
 
   # Programs (neovim, tmux, ttyd) — needs flake inputs for nixvim
@@ -89,6 +91,8 @@ in
           rtkEnable = cfg.rtk.enable;
           rtkSettings = cfg.rtk.settings;
           rtkPackage = cfg.rtk.package;
+          atuinSettings = cfg.atuin.settings;
+          atuinPackage = cfg.atuin.package;
         }
         # IDE programs: neovim, tmux, ttyd
         ++ common.mkPrograms { inherit programs packages; }

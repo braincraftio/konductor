@@ -47,6 +47,8 @@ in
       rtkEnable = cfg.rtk.enable;
       rtkSettings = cfg.rtk.settings;
       rtkPackage = cfg.rtk.package;
+      atuinSettings = cfg.atuin.settings;
+      atuinPackage = cfg.atuin.package;
     };
     environment.variables = common.mkEnv // {
       SSL_CERT_FILE = "/etc/ssl/cert.pem";
