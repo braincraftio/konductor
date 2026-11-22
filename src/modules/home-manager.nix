@@ -52,7 +52,7 @@ let
     rtkEnable = cfg.rtk.enable;
     rtkSettings = cfg.rtk.settings;
     rtkPackage = cfg.rtk.package;
-    atuinSettings = cfg.atuin.settings;
+    atuinSettings = common.mkAtuinSettings cfg.atuin;
     atuinPackage = cfg.atuin.package;
   };
 
@@ -91,7 +91,7 @@ in
           rtkEnable = cfg.rtk.enable;
           rtkSettings = cfg.rtk.settings;
           rtkPackage = cfg.rtk.package;
-          atuinSettings = cfg.atuin.settings;
+          atuinSettings = common.mkAtuinSettings cfg.atuin;
           atuinPackage = cfg.atuin.package;
         }
         # IDE programs: neovim, tmux, ttyd

@@ -91,6 +91,26 @@ Agent commands are recorded with author `claude-code` / `opencode` and are hidde
 search by default; `atuin search --author '$all-agent'` lists them. Thread and output capture are
 enabled in `src/config/shell/atuin.toml` and require the autostarted daemon.
 
+### Atuin options
+
+`konductor.atuin.package` selects the one Atuin build. `konductor.atuin.settings` merges over
+`src/config/shell/atuin.toml`; defaults run one per-user daemon and one pty-proxy per interactive
+shell (`pty_proxy.enabled = false` removes it, along with output capture).
+
+Sync is off by default. `konductor.atuin.sync.enable` sets `auto_sync`, `sync_address`
+(`sync.address`, default `https://api.atuin.sh`) and both sync intervals (`sync.frequency`). History
+and agent threads sync end-to-end encrypted; captured output does not sync. Each machine needs a
+one-time `atuin login` (or `atuin register`) and the same encryption key. `sync.keyFile` points
+`key_path` at a runtime secret path (sops-nix, agenix); it is a string so the key never enters the
+store.
+
+```nix
+konductor.atuin.sync = {
+  enable = true;
+  keyFile = "/run/user/1000/secrets/atuin-key";
+};
+```
+
 ## rtk integration (opt-in)
 
 `konductor.rtk.enable` (home-manager, NixOS, nix-darwin) adds rtk command rewriting; `package`

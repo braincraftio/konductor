@@ -63,8 +63,36 @@
           description = ''
             Atuin config.toml settings merged recursively over Konductor defaults
             (src/config/shell/atuin.toml); lists replace whole. Defaults run one
-            per-user daemon and one pty-proxy per interactive shell.
+            per-user daemon and one pty-proxy per interactive shell. Applied
+            after the sync options, so raw keys here win.
           '';
+        };
+        sync = {
+          enable = lib.mkEnableOption ''
+            Atuin end-to-end encrypted sync of history and agent threads
+            (auto_sync). Requires a one-time `atuin login` or `atuin register`
+            per machine; every machine must use the same encryption key
+          '';
+          address = lib.mkOption {
+            type = lib.types.str;
+            default = "https://api.atuin.sh";
+            description = "Sync server (sync_address): Atuin cloud or a self-hosted atuin-server.";
+          };
+          frequency = lib.mkOption {
+            type = lib.types.str;
+            default = "5m";
+            description = "Sync interval for shells and the daemon (sync_frequency, daemon.sync_frequency).";
+          };
+          keyFile = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "/run/user/1000/secrets/atuin-key";
+            description = ''
+              Runtime path to the Atuin encryption key (key_path), e.g. a
+              sops-nix or agenix secret. A string, never a Nix path, so the key
+              is not copied into the store. null keeps Atuin's default location.
+            '';
+          };
         };
       };
       rtk = {
@@ -96,6 +124,23 @@
         '';
       };
     };
+
+  # ===========================================================================
+  # Atuin settings: typed sync options mapped to config.toml keys, then the
+  # raw konductor.atuin.settings on top.
+  # ===========================================================================
+
+  mkAtuinSettings =
+    atuin:
+    lib.recursiveUpdate (
+      lib.optionalAttrs atuin.sync.enable {
+        auto_sync = true;
+        sync_address = atuin.sync.address;
+        sync_frequency = atuin.sync.frequency;
+        daemon.sync_frequency = atuin.sync.frequency;
+      }
+      // lib.optionalAttrs (atuin.sync.keyFile != null) { key_path = atuin.sync.keyFile; }
+    ) atuin.settings;
 
   # ===========================================================================
   # Package Builder (called by platform modules)

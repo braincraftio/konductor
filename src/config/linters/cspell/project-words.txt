@@ -1,4 +1,5 @@
 actionlint
+agenix
 agentic
 airgap
 airgapped
