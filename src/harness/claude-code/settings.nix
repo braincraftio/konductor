@@ -35,6 +35,19 @@ let
     ];
   };
 
+  # konductor.rtk.posthook.enable: `rtk hook claude` on PostToolUse runs the
+  # rtk:posthook pipeline and returns updatedToolOutput. After Atuin's group,
+  # so Atuin records before rtk rewrites what the model reads.
+  rtkPostHook = lib.optional (rtk != null && rtk.posthook) {
+    matcher = rtk.postMatcher;
+    hooks = [
+      {
+        type = "command";
+        command = "${lib.getExe rtk.package} hook claude";
+      }
+    ];
+  };
+
   # `atuin hook claude-code` records each Bash tool call in Atuin history with
   # author claude-code. Same three events and matcher `atuin hook install
   # claude-code` writes (atuin-common json_hooks.rs), with a store path in
@@ -154,7 +167,7 @@ in
   # ── Atuin agent-command capture (user tier, so it applies in every repo). ──
   hooks = {
     PreToolUse = atuinHook ++ rtkHook;
-    PostToolUse = atuinHook;
+    PostToolUse = atuinHook ++ rtkPostHook;
     PostToolUseFailure = atuinHook;
   };
 

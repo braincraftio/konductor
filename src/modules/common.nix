@@ -112,6 +112,15 @@
           default = { };
           description = "rtk config.toml settings merged recursively over Konductor defaults (src/config/shell/rtk.nix); lists replace whole.";
         };
+        posthook.enable = lib.mkEnableOption ''
+          rtk PostToolUse output compression in Claude Code: writes
+          ~/.config/rtk/pipeline.toml extending rtk:posthook and adds a
+          PostToolUse `rtk hook claude` group (Bash, Read, Grep, Glob, WebFetch,
+          WebSearch) after Atuin's. The model reads condensed tool output; Atuin
+          output capture keeps raw Bash output. Requires an rtk-engine build
+          (BUSL-1.1), e.g. konductor.rtk.package = pkgs.rtk; evaluation fails on
+          the Apache-only default
+        '';
       };
       claude-code.settings = lib.mkOption {
         inherit (pkgs.formats.json { }) type;
@@ -162,6 +171,7 @@
       rtkEnable ? false,
       rtkSettings ? { },
       rtkPackage ? null,
+      rtkPosthook ? false,
       atuinSettings ? { },
       atuinPackage ? pkgs.atuin,
     }:
@@ -182,6 +192,7 @@
           rtkEnable
           rtkSettings
           rtkPackage
+          rtkPosthook
           atuinSettings
           atuinPackage
           ;
@@ -235,6 +246,12 @@
         lib.optionalAttrs config.rtkEnabled {
           ".config/rtk/config.toml" = {
             source = config.shell.rtk.configFile;
+            force = true;
+          };
+        }
+        // lib.optionalAttrs (config.rtkEnabled && config.shell.rtk.posthook) {
+          ".config/rtk/pipeline.toml" = {
+            source = config.shell.rtk.pipelineFile;
             force = true;
           };
         }

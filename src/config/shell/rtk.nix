@@ -3,13 +3,16 @@
 # agent reads condensed output. Opt-in; Atuin remains the system of record for
 # commands and full output.
 #
-# Edition: Apache-2.0 only (no BUSL rtk-engine): command rewriting and built-in
-# filters; no pipelines, PostToolUse compression, proxy, or model routing.
+# Edition: default Apache-2.0 only (no BUSL rtk-engine): command rewriting and
+# built-in filters; no pipelines, PostToolUse compression, proxy, or model
+# routing. posthook = true requires an engine build and rewrites tool output
+# the agent reads (Atuin output capture keeps the raw Bash output).
 #
 # Delivery:
 #   configFile    → ~/.config/rtk/config.toml via home-manager (mkHomeFiles).
 #     rtk reads config only from dirs::config_dir()/rtk/config.toml; there is
 #     no path override variable.
+#   pipelineFile  → ~/.config/rtk/pipeline.toml when posthook is set.
 #   env           → kill switches for surfaces without a managed home
 #     (devshells, CI, harness wrappers). These match the config defaults.
 #
@@ -25,6 +28,9 @@
   lib,
   settings ? { },
   package ? null,
+  # konductor.rtk.posthook.enable: PostToolUse output compression through the
+  # rtk-engine `rtk:posthook` pipeline. Requires an engine build.
+  posthook ? false,
 }:
 
 let
@@ -33,6 +39,15 @@ let
   # buildNoDefaultFeatures drops the default `engine` feature. Applied through
   # overrideAttrs so it holds for every nixpkgs rtk revision the lock can carry.
   defaultPackage = pkgs.rtk.overrideAttrs { buildNoDefaultFeatures = true; };
+
+  finalPackage = if package == null then defaultPackage else package;
+
+  # ~/.config/rtk/pipeline.toml (user scope, first in rtk's load order;
+  # pipelines/*.toml and project .rtk/ files still layer on top).
+  pipelineFile = tomlFmt.generate "rtk-pipeline.toml" { pipeline.extends = "rtk:posthook"; };
+
+  # Matcher `rtk init -g` writes for rtk:posthook (rtk 1.2.1).
+  postMatcher = "^(Bash|Read|Grep|Glob|WebFetch|WebSearch)$";
 
   baseSettings = {
     tracking.enabled = true;
@@ -46,9 +61,17 @@ let
   configFile = tomlFmt.generate "rtk-config.toml" finalSettings;
 in
 {
-  package = if package == null then defaultPackage else package;
+  package =
+    lib.throwIf (posthook && (finalPackage.buildNoDefaultFeatures or false))
+      "konductor.rtk.posthook.enable requires an rtk build with the engine feature (e.g. konductor.rtk.package = pkgs.rtk)"
+      finalPackage;
   settings = finalSettings;
-  inherit configFile;
+  inherit
+    configFile
+    posthook
+    pipelineFile
+    postMatcher
+    ;
 
   env = {
     RTK_RECALL = "0";

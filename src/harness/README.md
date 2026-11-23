@@ -129,6 +129,21 @@ matching `RTK_*` kill switches. Nothing runs `rtk init`.
 - `src/harness/rtk.md` is added to both harnesses' instructions: full output comes from
   `atuin_output` or `rtk bypass <cmd>`.
 
+`konductor.rtk.posthook.enable` (off by default) adds PostToolUse output compression in Claude Code.
+Home-manager writes `~/.config/rtk/pipeline.toml` with `extends = "rtk:posthook"`, and
+`settings.nix` adds a `PostToolUse` group running `rtk hook claude` after Atuin's, matching
+`^(Bash|Read|Grep|Glob|WebFetch|WebSearch)$` (what `rtk init -g` writes for that pipeline). The
+model reads condensed tool output; Atuin output capture still holds raw Bash output. The engine is
+BUSL-1.1, so evaluation fails unless `package` is an engine build:
+
+```nix
+konductor.rtk = {
+  enable = true;
+  package = pkgs.rtk;
+  posthook.enable = true;
+};
+```
+
 ## OpenCode V2 configuration
 
 `nix build .#opencode` produces the configured CLI wrapper. Its runtime PATH is the full Konductor

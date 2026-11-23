@@ -47,6 +47,7 @@ in
       rtkEnable = cfg.rtk.enable;
       rtkSettings = cfg.rtk.settings;
       rtkPackage = cfg.rtk.package;
+      rtkPosthook = cfg.rtk.posthook.enable;
       atuinSettings = common.mkAtuinSettings cfg.atuin;
       atuinPackage = cfg.atuin.package;
     };

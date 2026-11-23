@@ -13,10 +13,11 @@
   opencodeCliSettings ? { },
   opencodeEnvironment ? { },
   opencodePackage ? pkgs.opencode,
-  # Module options konductor.rtk.{enable,package,settings}.
+  # Module options konductor.rtk.{enable,package,settings,posthook.enable}.
   rtkEnable ? false,
   rtkSettings ? { },
   rtkPackage ? null,
+  rtkPosthook ? false,
   # Module options konductor.atuin.{package,settings}.
   atuinSettings ? { },
   atuinPackage ? pkgs.atuin,
@@ -38,6 +39,7 @@ let
     inherit pkgs lib;
     settings = rtkSettings;
     package = rtkPackage;
+    posthook = rtkPosthook;
   };
 
   harness = import ../harness {
