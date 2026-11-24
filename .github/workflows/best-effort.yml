@@ -1,0 +1,30 @@
+name: Best-effort builds
+
+# Platforms outside the CI workflow: release.yml runs on CI success only, so
+# these builds never delay or gate a release. They build, push to the caches
+# and report on the same events as CI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: best-effort-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/nix.yml
+    with:
+      systems: '["aarch64-linux"]'
+    secrets:
+      BCIO_CACHIX_PRIVATE_KEY: ${{ secrets.BCIO_CACHIX_PRIVATE_KEY }}
