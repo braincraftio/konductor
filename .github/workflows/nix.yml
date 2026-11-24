@@ -27,14 +27,20 @@ jobs:
       fail-fast: false
       matrix:
         # x86_64-darwin is not in flake supportedSystems; see flake.nix.
+        # release-blocking: a failure fails CI, which gates release.yml.
+        # Non-blocking platforms build, push to the caches and report only.
         include:
           - system: x86_64-linux
             runner: ubuntu-24.04
+            release-blocking: true
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
+            release-blocking: false
           - system: aarch64-darwin
             runner: macos-15
+            release-blocking: true
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ !matrix.release-blocking }}
     timeout-minutes: 180
     # Unreviewed revisions: pull requests, and update branches whose CI
     # update.yml dispatches. Release builds are called from workflow_run.
