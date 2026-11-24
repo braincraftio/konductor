@@ -68,9 +68,20 @@ jobs:
 
       # biome links with fat LTO (~8-10 GB per target, nixpkgs
       # pkgs/by-name/bi/biome/package.nix). The locked nixpkgs fork has no
-      # cache.nixos.org substitute, so it builds from source; concurrent with
-      # flake-check builds, rustc is killed on the aarch64-linux runner.
-      # Built alone; push builds then cache it for later runs.
+      # cache.nixos.org substitute, so it builds from source, and rustc was
+      # killed on the aarch64-linux runner even with the build running alone.
+      # Swap gives the link headroom without changing the derivation, so the
+      # store path stays identical to the devshell's and push builds cache it.
+      - name: Add swap
+        if: matrix.system == 'aarch64-linux'
+        run: |
+          free -h
+          sudo fallocate -l 16G /konductor.swap
+          sudo chmod 600 /konductor.swap
+          sudo mkswap /konductor.swap
+          sudo swapon /konductor.swap
+          free -h
+
       - name: Build biome
         env:
           SYSTEM: ${{ matrix.system }}
@@ -116,6 +127,14 @@ jobs:
             targets+=(".#devShells.$SYSTEM.konductor" ".#devShells.$SYSTEM.frontend")
           fi
           nix build --no-link --no-update-lock-file --keep-going --accept-flake-config -L "${targets[@]}"
+
+      # Evidence for killed builds (rustc "terminated by a deadly signal"): the
+      # kernel log names OOM kills explicitly.
+      - name: Kernel OOM report
+        if: failure() && runner.os == 'Linux'
+        run: |
+          free -h
+          sudo dmesg --ctime | grep -iE 'out of memory|oom-kill|killed process' || echo "no OOM kill recorded"
 
       # Keep the failed build red. Each platform emits its own reviewable patch.
       - name: Repair hash mismatches

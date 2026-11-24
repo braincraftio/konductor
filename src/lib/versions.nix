@@ -209,6 +209,21 @@
     npmDepsHash = "sha256-krz3i/vgIy3Ho34E1LIkndSk3S31lpLxf3zE6O+ukII=";
   };
 
+  # Shareable stylelint configs resolved by the stylelint wrapper from the
+  # store (src/config/linters/stylelint). Both are dependency-free npm tarballs
+  # whose peer range must accept the nixpkgs stylelint major: standard extends
+  # recommended; bump them together within one stylelint major.
+  stylelint-config = {
+    standard = {
+      version = "40.0.0";
+      hash = "sha256-uidJILqy6j+k700+CB9ZzsS9uRNiIBWQSmiAPqxXvns=";
+    };
+    recommended = {
+      version = "18.0.0";
+      hash = "sha256-VxkTRq2Yz85cIBv0a6g5qqLcg7jDg8Q7d+wU8LFyVnA=";
+    };
+  };
+
   # Python type checker wheel, consumed by src/packages/pulumi.nix.
   pyright = {
     version = "1.1.414";

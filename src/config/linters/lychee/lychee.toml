@@ -87,6 +87,9 @@ skip_missing = true # Skip missing files when offline
 # between runs. Entries older than max_cache_age are discarded.
 cache = true
 max_cache_age = "1d"
+# Rate limits and server errors are transient; caching them would replay one
+# failure into every run until the entry expires.
+cache_exclude_status = "429, 500.."
 
 # Exclude paths (regular expressions matched against the input path).
 # Each entry matches the directory as a whole path component.
@@ -105,3 +108,9 @@ exclude_path = [
   "(^|/)\\.reports(/|$)",
   "(^|/)_sources(/|$)",
 ]
+
+# Per-host request limits (tables last: keys after a table header belong to
+# it). github.com answers bursts of concurrent page requests with 503.
+[hosts."github.com"]
+concurrency = 2
+request_interval = "250ms"

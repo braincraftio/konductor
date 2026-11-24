@@ -74,7 +74,7 @@ let
     markdownlint = import ./linters/markdownlint { inherit pkgs; };
     lychee = import ./linters/lychee { inherit pkgs; };
     commitlint = import ./linters/commitlint { inherit pkgs; };
-    stylelint = import ./linters/stylelint { inherit pkgs; };
+    stylelint = import ./linters/stylelint { inherit pkgs versions; };
     htmlhint = import ./linters/htmlhint { inherit pkgs; };
     deadnix = import ./linters/deadnix { inherit pkgs; };
     statix = import ./linters/statix { inherit pkgs; };
