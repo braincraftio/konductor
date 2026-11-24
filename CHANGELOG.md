@@ -1,3 +1,51 @@
+## [1.10.0](https://github.com/braincraftio/konductor/compare/v1.9.0...v1.10.0) (2026-11-24)
+
+### ⚠ BREAKING CHANGES
+
+* **harness:** the repository root no longer contains
+.claude-plugin/marketplace.json. Marketplace consumers use the built
+output from nix build .#claude-plugins.
+
+### Features
+
+* **harness:** integrate atuin and opt-in rtk with client-local pane navigation ([0a1b7bb](https://github.com/braincraftio/konductor/commit/0a1b7bb6186b8c0135fd15572c24d4f9e2f8fa82))
+* **harness:** integrate atuin and opt-in rtk with client-local pane navigation ([0821101](https://github.com/braincraftio/konductor/commit/0821101dd92584413a5dccfca18734fbeb47be85))
+* **harness:** share one skill catalog across harness adapters ([c4a7935](https://github.com/braincraftio/konductor/commit/c4a793511b592b45103e24dd9a1fee9d8de60773))
+* **lint:** gate ci through shared runme tasks and sync versioned docs ([f5d5b60](https://github.com/braincraftio/konductor/commit/f5d5b600867c464e0ed9cfbc73ad59e82efde23d))
+* **modules:** add konductor.atuin.sync options for cross-device sync ([64ad7cb](https://github.com/braincraftio/konductor/commit/64ad7cbc29f4344b4c6cd77a6edb1282630ec48a))
+* **modules:** add konductor.rtk.posthook.enable option ([e811ff9](https://github.com/braincraftio/konductor/commit/e811ff9c73ec136874f38cfbd6a11f710db12539))
+* **neovim:** integrate authenticated opencode pane navigation ([2b7eaf2](https://github.com/braincraftio/konductor/commit/2b7eaf2fb1af1044155a4fd478a1e688a42a7219))
+* **opencode:** ship native v2 config and hermetic runtime ([843971e](https://github.com/braincraftio/konductor/commit/843971e9e210e6331eb1e075ee3289a658d5704e))
+* **opencode:** support custom packages in harness modules and shells ([ae0c222](https://github.com/braincraftio/konductor/commit/ae0c22249cd9244b931a243a38b4dc8ddec88d6f))
+* **rust:** integrate shared guidance, tooling, and project templates ([b566f76](https://github.com/braincraftio/konductor/commit/b566f76143b2f71eef9dae73dfe1df492de8cbbe))
+* **tmux:** forward navigation keys to admitted opencode panes ([7a405e4](https://github.com/braincraftio/konductor/commit/7a405e461953637c896188050ba8f56e946935c6))
+* **tree:** replace eza wrapper with a repository renderer in rust ([0ac83af](https://github.com/braincraftio/konductor/commit/0ac83afe4f7e37286466a53ed3ccd86aef969036))
+
+### Bug Fixes
+
+* **atuin:** update atomics and constrain package tests ([6f42957](https://github.com/braincraftio/konductor/commit/6f429573af86f7c2665f0e389ce21fb62882fd55))
+* **claude-code:** make concurrent configuration seeding safe ([bbfcb62](https://github.com/braincraftio/konductor/commit/bbfcb625ddcf99cd622afe9b9de84bbba0b197e2))
+* **lint:** make stylelint and cspell hermetic and give aarch64 biome swap ([7a92d74](https://github.com/braincraftio/konductor/commit/7a92d748463cb8c1d28b3005a680872f00df0bb7))
+* **neovim:** send gated navigation messages and validate capability ([e79264a](https://github.com/braincraftio/konductor/commit/e79264a2f193d62012177f0856d4802a51050eee))
+* **qcow2:** remove obsolete systemd initrd option ([0f64e37](https://github.com/braincraftio/konductor/commit/0f64e37ab8b18982806455dc1034b3202894369a))
+* **tree:** report unused .tree.toml patterns only within the listed root ([4836209](https://github.com/braincraftio/konductor/commit/4836209343463c86d4cdb60229b13a5eacda5398))
+
+### Documentation
+
+* **atuin:** mark overlay transitional until nixpkgs ships 18.24.5 ([78dd137](https://github.com/braincraftio/konductor/commit/78dd1371c5fdf721f5012a7a1a0308c77a4c4249))
+
+### Build
+
+* **deps:** use nixpkgs opencode and update atuin ([5784512](https://github.com/braincraftio/konductor/commit/5784512d3cd683e15c9567fc942603192fa0ef2d))
+
+### CI/CD
+
+* build aarch64-linux in a separate best-effort workflow ([2570bdf](https://github.com/braincraftio/konductor/commit/2570bdfb59122dd22ec4aba3283924b4ceeba06e))
+* **nix:** build atuin in a separate step before flake checks ([f5d9e47](https://github.com/braincraftio/konductor/commit/f5d9e4751575b4ac6cb867787ff0544d0f91ded8))
+* **nix:** document removal condition for the atuin build step ([a8613cc](https://github.com/braincraftio/konductor/commit/a8613cc7c9de62084475985c51ea4ef288c760e4))
+* **nix:** make aarch64-linux builds non-release-blocking ([b095982](https://github.com/braincraftio/konductor/commit/b0959822ab379d41c9ba031d32c0cc364f1a7be0))
+* **release:** make flakehub publication opt-in via repository variable ([426c353](https://github.com/braincraftio/konductor/commit/426c35368fd4ced844384a323d47fc313352a8c6))
+
 ## [1.9.0](https://github.com/braincraftio/konductor/compare/v1.8.1...v1.9.0) (2026-10-20)
 
 ### Features
