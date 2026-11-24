@@ -797,16 +797,18 @@ fn omission_lines(report: &Report) -> Vec<String> {
             names(&report.unreadable)
         ));
     }
-    for (path, unused) in &report.configs {
-        lines.push(if unused.is_empty() {
-            format!("config: {}", escape_os(path.as_os_str()))
-        } else {
-            format!(
-                "config: {}; unused patterns: {}",
-                escape_os(path.as_os_str()),
-                names(unused)
-            )
-        });
+    for (path, usage) in &report.configs {
+        let mut line = format!("config: {}", escape_os(path.as_os_str()));
+        if !usage.unused.is_empty() {
+            line = format!("{line}; unused patterns: {}", names(&usage.unused));
+        }
+        if usage.out_of_scope > 0 {
+            line = format!(
+                "{line}; {} outside this root",
+                plural(usage.out_of_scope, "pattern", "patterns")
+            );
+        }
+        lines.push(line);
     }
     lines
 }
@@ -982,9 +984,10 @@ pub(crate) fn json(out: &mut impl Write, listings: &[Listing], opts: &Options) -
                     }).collect::<Vec<_>>(),
                 "git_marker_scope": "unvalidated .git entries in enumerated directories; includes presentation-collapsed descendants; excludes ignored and unscanned subtrees and bare repositories",
                 "read_limit_scope": "per_root",
-                "configs": report.configs.iter().map(|(path, unused)| json!({
+                "configs": report.configs.iter().map(|(path, usage)| json!({
                     "path": path.display().to_string(),
-                    "unused": unused,
+                    "unused": usage.unused,
+                    "out_of_scope": usage.out_of_scope,
                 })).collect::<Vec<_>>(),
                 "summary": footer(report, &listing.root, opts),
                 }));

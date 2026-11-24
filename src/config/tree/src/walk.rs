@@ -178,7 +178,7 @@ pub(crate) struct Report {
     /// Absolute listing root; footer paths are relative to it.
     pub(crate) root: PathBuf,
     pub(crate) rules_off: Option<RulesOff>,
-    pub(crate) configs: Vec<(PathBuf, Vec<String>)>,
+    pub(crate) configs: Vec<(PathBuf, crate::config::Usage)>,
     pub(crate) git_error: Option<String>,
     pub(crate) reshown_inventory: Vec<(String, Inventory)>,
 }
@@ -1161,7 +1161,7 @@ impl Builder<'_> {
         if let Some(config) = &self.config {
             self.report.configs.push((
                 provenance::relative(&config.path, &self.abs),
-                config.unused(),
+                config.usage(&self.abs),
             ));
         }
     }

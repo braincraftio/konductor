@@ -431,22 +431,99 @@ impl Config {
         presentation
     }
 
-    /// Patterns that matched nothing during this run.
-    pub(crate) fn unused(&self) -> Vec<String> {
+    /// Patterns that matched nothing during this run, limited to patterns
+    /// that can match at or below `root` (absolute). Anchored patterns whose
+    /// literal path diverges from `root` are counted in `out_of_scope`.
+    pub(crate) fn usage(&self, root: &Path) -> Usage {
+        let dir = self.path.parent().unwrap_or(Path::new(""));
+        let rel = root.strip_prefix(dir).unwrap_or(Path::new(""));
         let used = self.used.lock().unwrap_or_else(PoisonError::into_inner);
-        self.ignore_lines
+        let mut usage = Usage::default();
+        let candidates = self
+            .ignore_lines
             .iter()
             .enumerate()
             .filter(|(index, _)| !used.contains(&RuleId::Visibility(*index)))
-            .map(|(index, line)| format!("ignore[{index}] '{line}'"))
+            .map(|(index, line)| {
+                (
+                    format!("ignore[{index}] '{line}'"),
+                    in_scope(
+                        line.strip_prefix('!').unwrap_or(line),
+                        rel,
+                        Matching::WithParents,
+                    ),
+                )
+            })
             .chain(
                 self.sections
                     .iter()
                     .enumerate()
                     .filter(|(index, _)| !used.contains(&RuleId::Presentation(*index)))
-                    .map(|(_, s)| format!("[\"{}\"]", s.key)),
-            )
-            .collect()
+                    .map(|(_, s)| {
+                        (
+                            format!("[\"{}\"]", s.key),
+                            in_scope(&s.key, rel, Matching::PathOnly),
+                        )
+                    }),
+            );
+        for (label, scope) in candidates {
+            match scope {
+                Scope::Inside => usage.unused.push(label),
+                Scope::Outside => usage.out_of_scope += 1,
+            }
+        }
+        usage
+    }
+}
+
+/// Unused-rule accounting for one listing root.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct Usage {
+    pub(crate) unused: Vec<String>,
+    pub(crate) out_of_scope: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Scope {
+    Inside,
+    Outside,
+}
+
+/// Visibility rules apply to descendants of a matched directory
+/// (`matched_path_or_any_parents`); path sections match the path itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Matching {
+    WithParents,
+    PathOnly,
+}
+
+/// Whether a gitignore-syntax pattern, relative to the configuration
+/// directory, can match `root` (relative to that directory) or a path below
+/// it. Unanchored patterns and patterns whose components cannot be compared
+/// literally (glob metacharacters) are inside.
+fn in_scope(pattern: &str, root: &Path, matching: Matching) -> Scope {
+    let body = pattern.trim_end_matches('/');
+    let anchored = pattern.starts_with('/') || body.contains('/');
+    if !anchored || body.starts_with("**/") || root.as_os_str().is_empty() {
+        return Scope::Inside;
+    }
+    let parts: Vec<&str> = body.trim_start_matches('/').split('/').collect();
+    let roots: Vec<_> = root
+        .components()
+        .map(std::path::Component::as_os_str)
+        .collect();
+    for (part, root_part) in parts.iter().zip(&roots) {
+        if part.contains(['*', '?', '[', '\\']) {
+            return Scope::Inside;
+        }
+        if std::ffi::OsStr::new(part) != *root_part {
+            return Scope::Outside;
+        }
+    }
+    if parts.len() < roots.len() && matching == Matching::PathOnly {
+        Scope::Outside
+    } else {
+        Scope::Inside
     }
 }
 
@@ -480,7 +557,7 @@ mod tests {
             cfg.visibility(&dir.join("same"), EntryKind::Other),
             Some(Visibility::Hidden)
         );
-        assert_eq!(cfg.unused(), ["ignore[0] 'same'", "[\"same\"]"]);
+        assert_eq!(cfg.usage(&dir).unused, ["ignore[0] 'same'", "[\"same\"]"]);
     }
 
     #[test]
@@ -541,6 +618,41 @@ mod tests {
         let p = cfg.presentation(&dir.join("src"), EntryKind::Dir);
         assert_eq!(p.note.as_deref(), Some("sources"));
         assert!(!p.collapse, "later section wins");
-        assert_eq!(cfg.unused(), ["[\"never/\"]"]);
+        assert_eq!(cfg.usage(&dir).unused, ["[\"never/\"]"]);
+    }
+
+    #[test]
+    fn scope_excludes_anchored_rules_outside_the_root() {
+        let root = Path::new("src/inner");
+        let scope = |p, m| in_scope(p, root, m);
+        assert_eq!(scope("/docs/", Matching::PathOnly), Scope::Outside);
+        assert_eq!(scope("docs/x", Matching::PathOnly), Scope::Outside);
+        assert_eq!(
+            scope("/src/", Matching::PathOnly),
+            Scope::Outside,
+            "ancestor section"
+        );
+        assert_eq!(
+            scope("/src/", Matching::WithParents),
+            Scope::Inside,
+            "ancestor rule"
+        );
+        assert_eq!(scope("/src/inner/x", Matching::PathOnly), Scope::Inside);
+        assert_eq!(
+            scope("/src/inner", Matching::PathOnly),
+            Scope::Inside,
+            "the root"
+        );
+        assert_eq!(
+            scope("node_modules/", Matching::PathOnly),
+            Scope::Inside,
+            "unanchored"
+        );
+        assert_eq!(scope("**/gen/", Matching::PathOnly), Scope::Inside);
+        assert_eq!(scope("/s*/x", Matching::PathOnly), Scope::Inside, "glob");
+        assert_eq!(
+            in_scope("/docs/", Path::new(""), Matching::PathOnly),
+            Scope::Inside
+        );
     }
 }

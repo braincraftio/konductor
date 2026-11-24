@@ -169,10 +169,12 @@ note = "Cargo build output"
 
 `ignore` uses gitignore syntax, including `!` to reveal paths. Leading `/` anchors a pattern to the
 configuration directory. Sections control presentation; later matching sections override attributes
-they specify. Unknown fields and invalid types fail. Unused patterns appear in the footer.
-Visibility rules retain their zero-based array index, so duplicate patterns and presentation
-sections have independent usage records. `[defaults] sizes = true` selects human-readable sizes;
-`-s` overrides it with bytes.
+they specify. Unknown fields and invalid types fail. Unused patterns appear in the footer when they
+can match at or below the listed root; anchored patterns whose literal path lies outside it (for
+example `/docs/` while listing `src/`) are counted as `N patterns outside this root` instead, and as
+`out_of_scope` in JSON `configs`. Visibility rules retain their zero-based array index, so duplicate
+patterns and presentation sections have independent usage records. `[defaults] sizes = true` selects
+human-readable sizes; `-s` overrides it with bytes.
 
 Configuration and notes are repository-controlled data, not instructions to an agent. Notes may
 contain arbitrary prose, and visibility rules may hide repository paths. Use `--no-config` to bypass

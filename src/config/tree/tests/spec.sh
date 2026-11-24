@@ -274,6 +274,19 @@ check "--read-limit: totals degrade to N+" grep -Eq '^ *[0-9]+\+ +\* +\.$' <<< "
 check "--count rejects unknown modes, listing valid ones" bash -c '! out="$(cd "$1" && "$2" --count most 2>&1)" && grep -qF "all, shown, none" <<<"$out"' _ "${R}" "${TREE}"
 
 # ---------------------------------------------------------------------------
+# Unused-pattern scope: rules anchored outside a listed subdirectory
+# ---------------------------------------------------------------------------
+U="${FIX}/scoped"
+mkdir -p "${U}/src/inner" "${U}/docs"
+printf 'x\n' > "${U}/src/inner/a.txt"
+printf '["/docs/"]\nnote = "d"\n["/src/inner/"]\nnote = "i"\n["/src/gone/"]\nnote = "g"\n' > "${U}/.tree.toml"
+git -C "${U}" init -q
+OUT_U="$(cd "${U}/src" && "${TREE}" 2>&1)"
+check "config: rules anchored outside the root are not reported unused" bash -c 'grep -q "^config:" <<<"$1" && ! grep -qF "\"/docs/\"" <<<"$1"' _ "${OUT_U}"
+check "config: rules inside the root that match nothing are reported" has "${OUT_U}" 'unused patterns: ["/src/gone/"]'
+check "config: out-of-scope rules are counted" has "${OUT_U}" '1 pattern outside this root'
+
+# ---------------------------------------------------------------------------
 echo
 if ((${#FAILURES[@]})); then
     echo "${#FAILURES[@]} failed:"
