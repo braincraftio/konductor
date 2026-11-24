@@ -66,6 +66,16 @@ jobs:
           SYSTEM: ${{ matrix.system }}
         run: nix build --no-link --no-update-lock-file --accept-flake-config -L ".#packages.$SYSTEM.atuin"
 
+      # biome links with fat LTO (~8-10 GB per target, nixpkgs
+      # pkgs/by-name/bi/biome/package.nix). The locked nixpkgs fork has no
+      # cache.nixos.org substitute, so it builds from source; concurrent with
+      # flake-check builds, rustc is killed on the aarch64-linux runner.
+      # Built alone; push builds then cache it for later runs.
+      - name: Build biome
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: nix build --no-link --no-update-lock-file --accept-flake-config --max-jobs 1 -L ".#packages.$SYSTEM.biome"
+
       - name: Flake checks
         run: nix flake check --no-update-lock-file --accept-flake-config -L
 

@@ -899,7 +899,7 @@ networking.firewall = {
 
 - [Compose Networking](https://docs.docker.com/compose/networking/)
 - [Network Configuration Reference](https://docs.docker.com/compose/compose-file/06-networks/)
-- [Service Network Configuration](https://docs.docker.com/compose/compose-file/05-services/#networks)
+- [Service Network Configuration](https://docs.docker.com/reference/compose-file/networks/)
 
 ### Docker Network Drivers
 

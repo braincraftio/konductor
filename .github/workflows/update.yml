@@ -91,7 +91,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
-          git add -- flake.lock src/lib/versions.nix src/config/formatters/prettier
+          # Tracked files `runme run update` modified (flake.lock, versions.nix,
+          # prettier lock, sync-versions blocks); never untracked files.
+          git add --update
           git commit -F "$RUNNER_TEMP/commit-msg.txt"
           git --no-pager show --stat HEAD
 

@@ -72,7 +72,7 @@ run_with_spinner() {
     local exit_code=$?
 
     # Clear spinner line
-    printf '\r%*s\r' "$((${#message} + 3))"   ''
+    printf '\r%*s\r' "$((${#message} + 3))" ''
 
     return "${exit_code}"
 }
@@ -99,7 +99,7 @@ print_progress_bar() {
     printf '%*s' "${filled}" '' | tr ' ' '='
     if [ "${filled}" -lt "${width}" ]; then
         printf '>'
-        printf '%*s' "$((empty - 1))"   '' | tr ' ' ' '
+        printf '%*s' "$((empty - 1))" '' | tr ' ' ' '
     fi
     printf '] %3d%%' "${percent}"
 }

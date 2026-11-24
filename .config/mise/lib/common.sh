@@ -140,7 +140,7 @@ print_status() {
     local context="${3:-}"
 
     local prefix=""
-    local stream=1  # stdout by default
+    local stream=1 # stdout by default
 
     case "${status_type}" in
         success | ok | pass)
@@ -148,11 +148,11 @@ print_status() {
             ;;
         error | fail | failure)
             prefix="${CROSS}"
-            stream=2  # stderr
+            stream=2 # stderr
             ;;
         warning | warn)
             prefix="${WARN}"
-            stream=2  # stderr
+            stream=2 # stderr
             ;;
         info)
             prefix="${INFO}"
@@ -216,7 +216,7 @@ print_box() {
     printf '%b║%b' "${BLUE}" "${NC}"
     printf '%*s' "${padding}" ''
     printf '%b%s%b' "${BOLD}" "${title}" "${NC}"
-    printf '%*s' "$((width - padding - ${#title}))"   ''
+    printf '%*s' "$((width - padding - ${#title}))" ''
     printf '%b║%b\n' "${BLUE}" "${NC}"
 
     printf '%b╚' "${BLUE}"

@@ -38,49 +38,49 @@ Language shells (`python`, `go`, `node`, `rust`) and `dev` each extend `default`
     description='Foundation. Core tools, linters, formatters, AI. No languages, no IDE.'
     footer='nix develop'
     copy='nix develop'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='python'
     description={`Python ${langs.python.version} + uv, ruff, mypy, bandit. Auto-activates <code>.venv</code>.`}
     footer='nix develop .#python'
     copy='nix develop .#python'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='go'
     description={`Go ${langs.go.version} + gopls, delve, golangci-lint. Creates workspace dirs.`}
     footer='nix develop .#go'
     copy='nix develop .#go'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='node'
-    description={`Node.js ${langs.node.version} + pnpm, biome, prettier, eslint. Adds pnpm global bin.`}
+    description={`Node.js ${langs.node.version} + pnpm, biome, prettier. Adds pnpm global bin.`}
     footer='nix develop .#node'
     copy='nix develop .#node'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='rust'
     description={`Rust ${langs.rust.version} pinned via rust-overlay. Cargo, clippy, rust-analyzer.`}
     footer='nix develop .#rust'
     copy='nix develop .#rust'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='dev'
     description='IDE tools only. Neovim (20+ plugins), Tmux (Catppuccin), forgejo-cli.'
     footer='nix develop .#dev'
     copy='nix develop .#dev'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
   />
   <RefCard
     title='full'
     description='Everything. All languages + IDE + container tooling. Recommended for most work.'
     footer='nix develop .#full'
     copy='nix develop .#full'
-    meta='x86_64 + aarch64 — linux, darwin'
+    meta='x86_64-linux, aarch64-linux, aarch64-darwin'
     badge='recommended'
     badgeColor='success'
   />

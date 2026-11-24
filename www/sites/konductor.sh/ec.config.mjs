@@ -7,11 +7,8 @@ export default defineEcConfig({
   // Aurora's existing theme switching mechanism.
   themes: ["github-dark", "github-light"],
   customizeTheme: (theme) => {
-    if (theme.type === "dark") {
-      theme.name = "dark";
-    } else {
-      theme.name = "light";
-    }
+    // biome-ignore lint/style/noParameterAssign: customizeTheme mutates the ExpressiveCodeTheme in place (@expressive-code/core: (theme) => ExpressiveCodeTheme | void)
+    theme.name = theme.type === "dark" ? "dark" : "light";
   },
 
   // Aurora design system integration via CSS custom properties.

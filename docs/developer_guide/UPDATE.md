@@ -23,7 +23,7 @@ hash.
 
 | Task              | Description                                                        |
 | ----------------- | ------------------------------------------------------------------ |
-| `update`          | Update flake inputs, then every release record                     |
+| `update`          | Update flake inputs, release records, then synced version blocks   |
 | `update:inputs`   | `nix flake update`: every input revision and narHash in flake.lock |
 | `update:releases` | `nix-update` every release record in `src/lib/versions.nix`, build |
 
@@ -40,14 +40,16 @@ newest release is left unchanged after its hashes are recomputed and verified.
 
 ### `update`
 
-Update flake inputs, then every release record. Review `git diff` and run `nix flake check` before
-committing.
+Update flake inputs, then every release record, then the documentation and crate-manifest blocks
+that restate versions (`nix run .#sync-versions`, gated by `checks.versions-sync`). Review
+`git diff` and run `nix flake check` before committing.
 
 ```sh {"name":"update","excludeFromRunAll":"true","tag":"type:entry,scope:ci"}
 set -euo pipefail
 runme run update:inputs
 runme run update:releases
-git --no-pager diff --stat -- flake.lock src/lib/versions.nix
+nix run .#sync-versions
+git --no-pager diff --stat
 ```
 
 `runme run update`
@@ -77,6 +79,10 @@ wheels) are refreshed by `nix run .#update-artifacts`, which prefetches every pl
 from one host; prettier-plugin-astro by `nix run .#update-prettier-astro-lock`. Every updater runs;
 the task fails if any failed.
 
+`atuin` is not updated here: its record is a transitional pin (`src/overlays/atuin.nix`) that is
+never bumped. A newer atuin arrives through a nixpkgs lock update, after which the overlay is
+removed by the procedure in that file.
+
 ```sh {"name":"update:releases","excludeFromRunAll":"true","tag":"type:entry,scope:ci"}
 set -euo pipefail
 FAILED=()
@@ -88,7 +94,6 @@ update() {
     echo ""
 }
 
-update atuin
 update k0sctl
 update trzsz
 update flakehub-push --version=branch

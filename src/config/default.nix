@@ -65,7 +65,6 @@ let
     ruff = import ./linters/ruff { inherit pkgs; };
     yamllint = import ./linters/yamllint { inherit pkgs; };
     hadolint = import ./linters/hadolint { inherit pkgs; };
-    eslint = import ./linters/eslint { inherit pkgs; };
     golangci-lint = import ./linters/golangci-lint { inherit pkgs; };
     mypy = import ./linters/mypy {
       inherit pkgs versions;

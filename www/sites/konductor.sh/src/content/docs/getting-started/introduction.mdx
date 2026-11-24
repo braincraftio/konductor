@@ -7,6 +7,9 @@ order: 1
 
 import Note from '../../../components/docs/Note.astro';
 import { href } from '../../../utils/paths';
+import versions from '../../../data/versions.json';
+
+export const langs = versions.languages;
 
 Konductor is a Nix flake that produces hermetic development environments. One expression defines your tools, versions, linters, formatters, and IDE configuration. That expression outputs devshells for your laptop, OCI containers for CI, NixOS virtual machines for self-hosting, and system modules for permanent installations.
 
@@ -30,7 +33,7 @@ When you change a version in `versions.nix`, that change propagates to every dev
 
 ## Hermetic Wrappers
 
-Konductor manages 13 linters and 8 formatters. Each one is wrapped with a Nix derivation that injects its configuration at build time. The shellcheck binary doesn't read `.shellcheckrc` from your project directory — its config is sealed inside the `/nix/store` hash. The prettier binary carries its `.prettierrc.yaml` and plugin dependencies baked in.
+Konductor manages its linters and formatters the same way. Each one is wrapped with a Nix derivation that injects its configuration at build time. The shellcheck binary doesn't read `.shellcheckrc` from your project directory — its config is sealed inside the `/nix/store` hash. The prettier binary carries its `.prettierrc.yaml` and plugin dependencies baked in.
 
 This means:
 
@@ -44,17 +47,17 @@ The debate over tool configuration becomes a code review on one Nix file, not a 
 
 Shells build on each other using Nix's `overrideAttrs` pattern. The base shell provides core tools. Language shells extend it with a runtime and its toolchain. The full shell combines everything. Each layer adds packages and environment variables without duplicating what came before.
 
-```text frame="none"
-default
-  ├── python               Python 3.13 + uv, ruff, mypy, bandit
-  ├── go                   Go 1.25 + gopls, delve, golangci-lint
-  ├── node                 Node.js 22 + pnpm, biome, prettier
-  ├── rust                 Rust 1.92.0 + cargo, clippy, rust-analyzer
+<div className='my-6 overflow-x-auto rounded-xl border border-border-default bg-surface-paper'>
+  <pre className='p-5 font-mono text-sm leading-relaxed text-text-secondary m-0 bg-transparent border-none'>{`default
+  ├── python               Python ${langs.python.version} + uv, ruff, mypy, bandit
+  ├── go                   Go ${langs.go.version} + gopls, delve, golangci-lint
+  ├── node                 Node.js ${langs.node.version} + pnpm, biome, prettier
+  ├── rust                 Rust ${langs.rust.version} + cargo, clippy, rust-analyzer
   ├── dev                  neovim, tmux, forgejo-cli
   └── full                 all languages + IDE + containers
        └── konductor       +qemu, libvirt, OVMF        (x86_64-linux)
-            └── frontend   +Playwright, Tauri 2.x      (x86_64-linux)
-```
+            └── frontend   +Playwright, Tauri 2.x      (x86_64-linux)`}</pre>
+</div>
 
 You pick the shell that matches your work. `nix develop .#python` gives you Python with everything the base shell provides. `nix develop .#full` gives you everything. The <a href={href('/manual/reference/shells')}>shell reference</a> documents what each shell includes, the environment variables it sets, and the platforms it supports.
 
@@ -74,11 +77,10 @@ The same Nix expression that produces your devshell also produces deployable art
 
 ## Cross-Platform Support
 
-The flake targets four architectures via `nix-systems/default`:
+The flake targets three systems (`supportedSystems` in `flake.nix`):
 
 - `x86_64-linux` — full support, all outputs including QCOW2 and konductor shell
 - `aarch64-linux` — devshells and OCI containers
-- `x86_64-darwin` — devshells (macOS Intel)
 - `aarch64-darwin` — devshells (macOS Apple Silicon)
 
 The `.envrc` at the repo root detects your platform and auto-selects the appropriate shell — `konductor` on Linux with KVM, `full` on macOS, `full` inside containers.

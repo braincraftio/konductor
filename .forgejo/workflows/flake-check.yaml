@@ -18,6 +18,4 @@ jobs:
       - name: Flake Check
         run: nix flake check --no-build .
       - name: Lint
-        run: |
-          statix check .
-          deadnix --fail --exclude _sources .
+        run: runme run lint:nix

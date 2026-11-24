@@ -18,6 +18,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Gates are the runme task ci:gates (docs/developer_guide/LINT.md); this job
+  # supplies only full history, Nix, and the Actions cache for .lycheecache.
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-nix
+        with:
+          cachix-name: ${{ vars.CACHIX_NAME || 'braincraftio' }}
+          cachix-skip-push: "true"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.run_id }}
+          restore-keys: lychee-
+      - run: nix develop .#default --no-update-lock-file --accept-flake-config -c runme run ci:gates
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.run_id }}
+
   check:
     permissions:
       contents: read

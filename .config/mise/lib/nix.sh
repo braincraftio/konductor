@@ -335,8 +335,8 @@ list_shells() {
     # Try to get shells from flake
     local shells
     shells=$(nix flake show "${dir}" --json 2> /dev/null \
-                                                         | jq -r '.devShells | to_entries[].value | keys[]' 2> /dev/null \
-                                                                      | sort -u | tr '\n' ' ')
+        | jq -r '.devShells | to_entries[].value | keys[]' 2> /dev/null \
+        | sort -u | tr '\n' ' ')
 
     if [ -n "${shells}" ]; then
         printf '%s' "${shells}"

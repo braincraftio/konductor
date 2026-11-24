@@ -23,8 +23,8 @@ BG_YELLOW=$'\033[48;2;229;200;144m'
 BG_MAUVE=$'\033[48;2;202;158;230m'
 BG_TEAL=$'\033[48;2;129;200;190m'
 BG_PEACH=$'\033[48;2;239;159;118m'
-FG_BASE=$'\033[38;2;48;52;70m'      # base — text on colored segments
-FG_DIM=$'\033[38;2;115;121;148m'    # overlay0 — empty bar portion
+FG_BASE=$'\033[38;2;48;52;70m'   # base — text on colored segments
+FG_DIM=$'\033[38;2;115;121;148m' # overlay0 — empty bar portion
 
 FG_BLUE=$'\033[38;2;140;170;238m'
 FG_GREEN=$'\033[38;2;166;209;137m'
@@ -93,8 +93,8 @@ IFS='|' read -r IS_GIT BRANCH_NAME STAGED MODIFIED < "${CACHE_FILE}"
 repeat_glyph() {
     local glyph=$1 count=$2 out=""
     while [[ "${count}" -gt 0 ]]; do
-                               out="${out}${glyph}"
-                                                     count=$((count - 1))
+        out="${out}${glyph}"
+        count=$((count - 1))
     done
     printf '%s' "${out}"
 }
@@ -113,19 +113,19 @@ DURATION_FMT=$(awk -v ms="${DURATION_MS}" 'BEGIN {
 
 # ── Git segment color reflects dirty state ────────────────────────────────
 GIT_BG="${BG_GREEN}"
-                    GIT_FG="${FG_GREEN}"
+GIT_FG="${FG_GREEN}"
 if [[ "${IS_GIT:-0}" = "1" ]]; then
     if [[ "${STAGED:-0}" -gt 0 ]] || [[ "${MODIFIED:-0}" -gt 0 ]]; then
         GIT_BG="${BG_YELLOW}"
-                         GIT_FG="${FG_YELLOW}"
+        GIT_FG="${FG_YELLOW}"
     fi
 fi
 
 VIM_BG="${BG_GREEN}"
-                    VIM_FG="${FG_GREEN}"
+VIM_FG="${FG_GREEN}"
 [[ "${VIM_MODE}" = "NORMAL" ]] && {
-                                VIM_BG="${BG_YELLOW}"
-                                                     VIM_FG="${FG_YELLOW}"
+    VIM_BG="${BG_YELLOW}"
+    VIM_FG="${FG_YELLOW}"
 }
 
 # ── Build the line ────────────────────────────────────────────────────────

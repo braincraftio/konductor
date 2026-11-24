@@ -195,7 +195,7 @@ if [[ ! -e "${cfg}/.claude.json" && ! -L "${cfg}/.claude.json" ]]; then
     # Another process may create the link after the check. Accept only an
     # existing destination; propagate other failures without replacing auth.
     "@ln@" -sT "${HOME}/.claude.json" "${cfg}/.claude.json" \
-                                                         || [[ -e "${cfg}/.claude.json" || -L "${cfg}/.claude.json" ]]
+        || [[ -e "${cfg}/.claude.json" || -L "${cfg}/.claude.json" ]]
 fi
 
 export CLAUDE_CONFIG_DIR="${cfg}"

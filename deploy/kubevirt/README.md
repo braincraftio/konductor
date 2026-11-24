@@ -8,7 +8,7 @@ The base configuration uses pod networking and ephemeral storage (containerDisk)
 
 ```bash
 # 1. Deploy the VM
-kubectl apply -k https://github.com/containercraft/konductor//deploy/kubevirt/base
+kubectl apply -k https://github.com/braincraftio/konductor//deploy/kubevirt/base
 
 # 2. Create SSH key secret from your public key
 kubectl create secret generic konductor-ssh-key -n konductor \
@@ -67,7 +67,7 @@ The advanced overlay adds:
 
 ```bash
 # 1. Deploy the VM with persistent storage and advanced networking
-kubectl apply -k https://github.com/containercraft/konductor//deploy/kubevirt/overlays/advanced
+kubectl apply -k https://github.com/braincraftio/konductor//deploy/kubevirt/overlays/advanced
 
 # 2. Create SSH key secret
 kubectl create secret generic konductor-ssh-key -n konductor \
@@ -140,7 +140,7 @@ deploy/kubevirt/
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - https://github.com/containercraft/konductor//deploy/kubevirt/base
+  - https://github.com/braincraftio/konductor//deploy/kubevirt/base
 patches:
   - target:
       kind: VirtualMachine

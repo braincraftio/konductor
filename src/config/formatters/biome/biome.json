@@ -39,11 +39,17 @@
       "complexity": {
         "noImplicitCoercions": "error"
       },
+      "nursery": {
+        "noPromiseExecutorReturn": "error"
+      },
       "style": {
         "useConst": "error",
         "useBlockStatements": "error",
         "useThrowOnlyError": "error",
-        "noParameterAssign": "error",
+        "noParameterAssign": {
+          "level": "error",
+          "options": { "propertyAssignment": "deny" }
+        },
         "useAsConstAssertion": "error",
         "useDefaultParameterLast": "error",
         "useEnumInitializers": "error",

@@ -194,7 +194,7 @@ get_ssh_key() {
 # =============================================================================
 wait_for_job() {
     local job_name="$1"
-    local timeout=300  # 5 minutes
+    local timeout=300 # 5 minutes
 
     log_info "Waiting for Job ${job_name} to complete (timeout: ${timeout}s)..."
 

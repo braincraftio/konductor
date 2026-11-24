@@ -14,18 +14,19 @@ commands from documentation, developers can run code blocks directly from their 
 
 ## Installation
 
+Every Konductor devshell ships runme (`src/packages/cli.nix`); `nix develop` puts it on `PATH`.
+Outside Konductor, upstream documents these methods; binaries for other platforms are on the
+[releases page](https://github.com/runmedev/runme/releases).
+
 ```sh {"name":"_example:install-runme","excludeFromRunAll":"true"}
 # macOS
 brew install runme
-
-# Linux (via script)
-curl -sSL https://runme.dev/install.sh | sh
 
 # npm
 npm install -g runme
 
 # Go
-go install github.com/stateful/runme/v3@latest
+go install github.com/runmedev/runme/v3@main
 ```
 
 ## Quick Start

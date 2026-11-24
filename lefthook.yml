@@ -81,9 +81,10 @@ pre-commit:
     # ------------------------------------------------------------------------
     # Shell
     # ------------------------------------------------------------------------
+    # shfmt -f=0 selects staged shell files by extension or shebang (same
+    # discovery as runme lint:bash), so extensionless scripts are linted.
     - name: shell-lint
-      glob: "*.{sh,bash}"
-      run: shellcheck {staged_files}
+      run: shfmt -f=0 {staged_files} | xargs -0 --no-run-if-empty shellcheck
       tags: [shell, lint]
 
     # ------------------------------------------------------------------------

@@ -36,6 +36,21 @@ exclude = [
   "^https://github\\.com/.*/edit/",
   "^https://github\\.com/.*/new/",
 
+  # deepwiki.com serves a Vercel bot challenge (429, x-vercel-mitigated: challenge)
+  # to every client without JavaScript, whatever the headers or request rate
+  "^https://deepwiki\\.com/",
+
+  # kustomize/go-getter remote refs (repo//subdir): resolved by kustomize, not HTTP
+  "^https://github\\.com/[^/]+/[^/]+//",
+
+  # Unexpanded ${...} templates in code blocks (Nix, shell)
+  "\\$%7B",
+
+  # Non-public names: .arpa (RFC 8375 home.arpa and similar internal zones)
+  # and single-label hosts (placeholders such as https://ttyd-rw.<user>...)
+  "^https?://[^/]+\\.arpa(/|:|$)",
+  "^https?://[^./:]+(:[0-9]+)?(/|$)",
+
   # Anchors in markdown (handled separately)
   "^#",
 
@@ -68,8 +83,10 @@ exclude_private = true    # Exclude private IPs
 # Offline behavior
 skip_missing = true # Skip missing files when offline
 
-# Cache results for 1 hour
+# Request cache on disk (.lycheecache in the working directory); CI restores it
+# between runs. Entries older than max_cache_age are discarded.
 cache = true
+max_cache_age = "1d"
 
 # Exclude paths (regular expressions matched against the input path).
 # Each entry matches the directory as a whole path component.

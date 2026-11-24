@@ -5,7 +5,11 @@ complete configuration isolation and reproducible builds.
 
 [![Nix Flake](https://img.shields.io/badge/Nix-Flake-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<!-- sync-versions:begin badge -->
+
 [![NixOS 26.05](https://img.shields.io/badge/NixOS-26.05-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
+<!-- sync-versions:end badge -->
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/braincraftio/konductor)
 
 ---
@@ -268,10 +272,10 @@ overlays.
 | Shell       | Command                   | Description      | Key Packages                                          |
 | ----------- | ------------------------- | ---------------- | ----------------------------------------------------- |
 | `default`   | `nix develop`             | Foundation shell | git, jq, ripgrep, fzf, atuin                          |
-| `python`    | `nix develop .#python`    | Python 3.13 dev  | uv, poetry, pipx, pip, ipython, pytest                |
-| `go`        | `nix develop .#go`        | Go 1.25 dev      | gopls, delve, gotools, goreleaser, git-cliff          |
-| `node`      | `nix develop .#node`      | Node.js 22 dev   | pnpm, yarn, bun, `typescript-language-server`         |
-| `rust`      | `nix develop .#rust`      | Rust 1.98.0 dev  | cargo, clippy, rust-analyzer, cargo-watch, cargo-edit |
+| `python`    | `nix develop .#python`    | Python dev       | uv, poetry, pipx, pip, ipython, pytest                |
+| `go`        | `nix develop .#go`        | Go dev           | gopls, delve, gotools, goreleaser, git-cliff          |
+| `node`      | `nix develop .#node`      | Node.js dev      | pnpm, yarn, bun, `typescript-language-server`         |
+| `rust`      | `nix develop .#rust`      | Rust dev         | cargo, clippy, rust-analyzer, cargo-watch, cargo-edit |
 | `dev`       | `nix develop .#dev`       | IDE tools        | Neovim, tmux, lazygit, opencode                       |
 | `full`      | `nix develop .#full`      | Everything       | All languages + IDE                                   |
 | `konductor` | `nix develop .#konductor` | Self-hosting     | full + docker/qemu/libvirt                            |
@@ -281,31 +285,39 @@ overlays.
 
 Each shell extends the base using `overrideAttrs`:
 
+<!-- sync-versions:begin shell-hierarchy -->
+
 ```text
 base (default)
   ├── python    base + Python 3.13 + uv + ruff + mypy
-  ├── go        base + Go 1.25 + gopls + delve
-  ├── node      base + Node 22 + pnpm + biome
-  ├── rust      base + Rust 1.98.0 + cargo + clippy
+  ├── go        base + Go 1.27 + gopls + delve
+  ├── node      base + Node 26 + pnpm + biome
+  ├── rust      base + Rust 1.99.1 + cargo + clippy
   ├── dev       base + neovim + tmux + IDE tools
   ├── full      all languages + dev
   ├── konductor full + docker + qemu + libvirt, x86_64-linux
   └── frontend  konductor + Playwright + Tauri, x86_64-linux
 ```
 
+<!-- sync-versions:end shell-hierarchy -->
+
 The devshell banner shows the active commit and all pinned versions:
 
+<!-- sync-versions:begin banner -->
+
 ```text
-konductor-ab21b11: py3.13 go1.25 node22 rust1.98.0 k0s1.35
+konductor-ab21b11: py3.13 go1.27 node26 rust1.99.1 k0s1.36
 ```
+
+<!-- sync-versions:end banner -->
 
 The banner revision comes from `self.shortRev` at flake evaluation time, threaded through
 `sourceInfo` to the devshell. When the working tree has uncommitted changes, the revision reads
 `dirty`. This follows the same pattern as nixpkgs' own `lib/flake-version-info.nix`.
 
 The Rust toolchain comes from oxalica/rust-overlay, pinned in `src/lib/versions.nix`, not the
-nixpkgs-bundled `rustc`. These track different release cadences. The nixpkgs channel (26.05) ships
-rustc 1.95.0. The rust-overlay provides 1.98.0.
+nixpkgs-bundled `rustc`. These track different release cadences; the channel's `rustc` trails the
+overlay's stable releases.
 
 ---
 
@@ -313,15 +325,15 @@ rustc 1.95.0. The rust-overlay provides 1.98.0.
 
 ### Python Shell
 
-Python 3.13 development environment. The interpreter is pinned via `python313` in
-`src/lib/versions.nix`, not the nixpkgs `python3` default (which tracks 3.14 on nixpkgs master and
-3.13 on nixos-26.05). This pin ensures the same Python version across all konductor surfaces
-regardless of channel.
+Python development environment. The interpreter series is `languages.python.version` in
+`src/lib/versions.nix`, not the nixpkgs `python3` default, which moves with the channel. This pin
+ensures the same Python version across all konductor surfaces regardless of channel.
 
-Language packages (added by the `python` shell): Python 3.13, uv, poetry, pipx, pip, ipython,
-pytest, cryptography, pylatexenc
+Language packages (added by the `python` shell): Python, uv, poetry, pipx, pip, ipython, pytest,
+cryptography, pylatexenc
 
-Linters and formatters (from base shell, available in all shells): ruff, mypy, bandit, black, isort
+Linters and formatters (from base shell, available in all shells): ruff (lint, import sorting,
+format), mypy, bandit
 
 Environment variables:
 
@@ -333,10 +345,9 @@ Auto-setup: Sources `.venv/bin/activate` if present. Tolerates failure for proje
 
 ### Go Shell
 
-Go 1.25 development with full toolchain. The version is pinned via `go_1_25` in
-`src/lib/versions.nix`.
+Go development with full toolchain. The series is `languages.go.version` in `src/lib/versions.nix`.
 
-Packages: Go 1.25, gopls (LSP), delve (debugger), gotools, goreleaser, git-cliff, ogen, cobra-cli,
+Packages: Go, gopls (LSP), delve (debugger), gotools, goreleaser, git-cliff, ogen, cobra-cli,
 go-swag, mockgen
 
 Environment variables:
@@ -351,9 +362,10 @@ to PATH.
 
 ### Node Shell
 
-Node.js 22 development with pnpm as the primary package manager.
+Node.js development with pnpm as the primary package manager. The major version is
+`languages.node.version` in `src/lib/versions.nix`.
 
-Packages: Node.js 22, pnpm, yarn, bun, `typescript-language-server`
+Packages: Node.js, pnpm, yarn, bun, `typescript-language-server`
 
 Environment variables:
 
@@ -364,9 +376,10 @@ Auto-setup: Creates `$PNPM_HOME`. Adds `$PNPM_HOME` to PATH for global pnpm pack
 
 ### Rust Shell
 
-Rust 1.98.0 development with precise version control via oxalica/rust-overlay.
+Rust development with an exact toolchain release (`languages.rust.version` in
+`src/lib/versions.nix`) via oxalica/rust-overlay.
 
-Packages: Rust 1.98.0 stable (via rust-overlay), cargo, rustfmt, clippy, rust-analyzer, rust-src,
+Packages: Rust stable (via rust-overlay), cargo, rustfmt, clippy, rust-analyzer, rust-src,
 cargo-watch, cargo-edit, cargo-tauri
 
 Environment variables:
@@ -376,11 +389,10 @@ Environment variables:
 
 Auto-setup: Creates `$CARGO_HOME`. Adds `$CARGO_HOME/bin` to PATH.
 
-The Rust toolchain is not the nixpkgs-bundled `rustc` (which ships 1.95.0 on nixos-26.05). It comes
-from oxalica/rust-overlay, which tracks upstream Rust releases independently and provides
-`rust-bin.stable."1.98.0"`. This is pinned in `src/lib/versions.nix` and consumed by
-`src/packages/languages.nix` and `src/overlays/atuin.nix` (which requires rustc >= 1.96.1 for
-atuin's MSRV).
+The Rust toolchain is not the nixpkgs-bundled `rustc`. It comes from oxalica/rust-overlay, which
+tracks upstream Rust releases independently and provides `rust-bin.stable."<version>"`. The version
+is pinned in `src/lib/versions.nix` and consumed by `src/packages/languages.nix` and
+`src/overlays/atuin.nix` (atuin's MSRV is above the channel `rustc`).
 
 ### Dev Shell
 
@@ -1091,6 +1103,8 @@ consumes their immutable artifacts through its native delivery format.
 
 All versions centralized in `src/lib/versions.nix`:
 
+<!-- sync-versions:begin versions-excerpt -->
+
 ```nix
 {
   nixos = { channel = "26.05"; stateVersion = "26.05"; };
@@ -1100,10 +1114,12 @@ All versions centralized in `src/lib/versions.nix`:
     node.version = "26";
     rust.version = "1.99.1";
   };
-  atuin = { version = "18.24.1"; hash = "sha256-..."; cargoHash = "sha256-..."; };
+  atuin = { version = "18.24.5"; hash = "sha256-..."; cargoHash = "sha256-..."; };
   kubernetes.k0s.version = "1.36";
 }
 ```
+
+<!-- sync-versions:end versions-excerpt -->
 
 Bump procedure:
 
@@ -1167,24 +1183,23 @@ as nixpkgs' own `lib/flake-version-info.nix`.
 
 ## Linting and Formatting
 
-13 linters with hermetic configuration:
+Linters with hermetic configuration:
 
-- shellcheck, ruff, mypy, eslint, golangci-lint, yamllint, markdownlint
-- hadolint, htmlhint, stylelint, statix, deadnix, lychee
+- shellcheck, ruff, mypy, bandit, pyright, golangci-lint, biome, yamllint, taplo, actionlint
+- hadolint, htmlhint, stylelint, markdownlint, cspell, lychee, statix, deadnix, commitlint
+- detect-secrets (against `.secrets.baseline`)
 
-8 formatters:
-
-- nixfmt, shfmt, ruff, black, prettier, taplo, biome, gofumpt
+Formatting has one entrypoint, treefmt (`nix fmt`), with one formatter per file type: nixfmt, ruff
+(import sorting, then format), biome, prettier (with the Astro plugin), shfmt, taplo, gofumpt,
+stylua, rustfmt.
 
 All tools wrapped with `/nix/store` config paths injected at runtime. No user override possible.
 Configuration files live in `src/config/linters/` and `src/config/formatters/`, each tool in its own
 directory with config file plus wrapper script.
 
-Nix sources are gated identically at three layers: lefthook on staged files, `runme run lint:nix` on
-the working tree, and `nix flake check` (`checks.nixfmt`, `checks.statix`, `checks.deadnix`) on
-every tracked file. `nix fmt` formats the tree with treefmt bound to nixfmt.
-
-Lefthook runs 20+ parallel pre-commit checks automatically.
+Lefthook on staged files, the runme tasks in `docs/developer_guide/LINT.md` on tracked files, and
+`nix flake check` (`checks.treefmt`, `checks.statix`, `checks.deadnix`) call the same wrapped
+binaries.
 
 ```bash
 runme run lint           # Run all linters
@@ -1321,6 +1336,8 @@ devShells = forAllSystems (system: {
 
 `src/lib/versions.nix`:
 
+<!-- sync-versions:begin languages-excerpt -->
+
 ```nix
 languages = {
   python.version = "3.13";
@@ -1330,9 +1347,21 @@ languages = {
 };
 ```
 
+<!-- sync-versions:end languages-excerpt -->
+
 Changing a version here propagates to all devshells, containers, VMs, and modules.
-`src/overlays/versions.nix` derives the nixpkgs attribute from each version (`python313`, `go_1_27`,
-`nodejs_26`, `rust-bin.stable."1.99.1"`, `k0s_1_36`) and exposes it as `pkgs.konductor.*`.
+`src/lib/version-attrs.nix` derives the nixpkgs attribute name from each version, and
+`src/overlays/versions.nix` exposes the packages as `pkgs.konductor.*`:
+
+<!-- sync-versions:begin overlay-attrs -->
+
+```text
+python "3.13" -> python313       go "1.27" -> go_1_27
+node   "26"   -> nodejs_26       k0s "1.36" -> k0s_1_36
+rust   "1.99.1" -> rust-bin.stable."1.99.1"
+```
+
+<!-- sync-versions:end overlay-attrs -->
 
 `src/packages/*.nix`:
 

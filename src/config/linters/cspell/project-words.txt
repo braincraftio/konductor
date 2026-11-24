@@ -287,6 +287,7 @@ journalctl
 jsonls
 k0s
 k0sctl
+keepends
 keyid
 keytab
 kmod
@@ -359,6 +360,7 @@ luasql
 lutil
 lvim
 lychee
+lycheecache
 macchina
 macvlan
 macvtap
@@ -538,6 +540,7 @@ resizefs
 resolv
 restty
 rgignore
+rootfs
 rootok
 rpaths
 rpds
@@ -546,6 +549,7 @@ rubocop
 ruff
 runcmd
 runme
+runmedev
 rustdocflags
 rustflags
 rustguide
@@ -646,6 +650,7 @@ tmpfiles
 tmux
 tmuxp
 tpgid
+tofile
 toggleterm
 topdelete
 treefmt

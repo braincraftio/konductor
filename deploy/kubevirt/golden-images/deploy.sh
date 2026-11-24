@@ -135,7 +135,7 @@ main() {
         apply_registry_credentials
         apply_datavolume
         wait_for_datavolume
-        echo ""  # Newline after progress
+        echo "" # Newline after progress
         apply_snapshot
         wait_for_snapshot
     fi

@@ -11,7 +11,7 @@
 #   *.js *.jsx *.ts *.tsx *.mjs *.cjs *.json *.jsonc   biome
 #   *.md *.yaml *.yml *.html *.css *.scss *.astro       prettier (+ astro plugin)
 #   *.mdx                         not formatted (prettier rewraps <pre> content)
-#   *.sh *.bash .forgejo/envrc    shfmt (extensionless shell scripts listed explicitly)
+#   *.sh *.bash + listed paths    shfmt (extensionless scripts: shellIncludes)
 #   *.toml                        taplo
 #   *.go                          gofumpt
 #   *.lua                         stylua
@@ -22,8 +22,19 @@
 let
   inherit (pkgs) lib;
   exe = drv: lib.getExe drv;
+
+  # treefmt matches by glob, not shebang: extensionless scripts are listed by
+  # path. checks.shell-discovery fails when shfmt finds one missing here.
+  shellIncludes = [
+    "*.sh"
+    "*.bash"
+    ".forgejo/envrc"
+    ".devcontainer/rootfs/usr/local/bin/healthcheck"
+  ];
 in
 {
+  inherit shellIncludes;
+
   package = pkgs.treefmt.withConfig {
     name = "konductor-treefmt";
     settings = {
@@ -108,11 +119,7 @@ in
         shfmt = {
           command = exe formatters.shfmt.package;
           options = [ "-w" ];
-          includes = [
-            "*.sh"
-            "*.bash"
-            ".forgejo/envrc"
-          ];
+          includes = shellIncludes;
         };
 
         taplo = {

@@ -111,6 +111,8 @@ flake.nix outputs    devShells, packages, modules
 
 ### Shell Hierarchy
 
+<!-- sync-versions:begin shell-hierarchy -->
+
 ```text
 base (default)
   ├── python    base + Python 3.13 + uv + ruff + mypy
@@ -122,6 +124,8 @@ base (default)
   ├── konductor full + docker + qemu + libvirt, x86_64-linux
   └── frontend  konductor + Playwright + Tauri, x86_64-linux
 ```
+
+<!-- sync-versions:end shell-hierarchy -->
 
 ### Dependency Chain
 

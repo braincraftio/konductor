@@ -5,7 +5,10 @@
 # in the child shell from its positional arguments, not here.
 # SC2312: command substitutions supply the output under assertion; a failing
 # tree run yields output the assertion rejects, so the check fails visibly.
-# shellcheck disable=SC2016,SC2312
+# SC2310: byte_fixture is called as an `if` condition by design; it returns
+# explicitly on every path and counts its own failures, so set -e is not
+# relied on inside it.
+# shellcheck disable=SC2016,SC2310,SC2312
 set -euo pipefail
 TREE="${1:?usage: consumers.sh /absolute/path/to/tree}"
 FIX="$(mktemp -d)"
@@ -35,6 +38,23 @@ check() {
         printf 'FAIL %s\n' "${name}"
         FAILURES=$((FAILURES + 1))
     fi
+}
+# Runs a fixture command that writes non-UTF-8 bytes into a name. Filesystems
+# that enforce UTF-8 names (APFS on Darwin) refuse it with EILSEQ; that refusal
+# alone skips the contracts that depend on the fixture. Any other failure is a
+# suite failure.
+byte_fixture() {
+    local error
+    if error="$("$@" 2>&1)"; then
+        return 0
+    fi
+    if [[ "${error}" == *'Illegal byte sequence'* ]]; then
+        printf 'skip byte-name fixture: filesystem enforces UTF-8 names\n'
+        return 1
+    fi
+    printf 'FAIL byte-name fixture: %s\n' "${error}"
+    FAILURES=$((FAILURES + 1))
+    return 1
 }
 OUT="$("${TREE}" "${R}")"
 JSON="$("${TREE}" -J "${R}")"
@@ -82,11 +102,12 @@ terminal = re.sub(rb"\x1b\[[0-9;]*m", b"", b"".join(chunks)).replace(b"\r\n", b"
 piped = subprocess.check_output([tree, root])
 assert terminal == piped, "terminal and pipe differ beyond ANSI and terminal newline translation"
 PY
-printf 'one\n' > "${R}/src/"$'invalid\xff'
-check 'non-UTF-8 paths retain exact bytes' jq -e '
-  [.. | objects | select(.path_bytes? == [115,114,99,47,105,110,118,97,108,105,100,255])] | length == 1' <<< "$("${TREE}" -J "${R}")"
-check 'non-UTF-8 names have reversible text escapes' grep -F 'invalid\xff' <<< "$("${TREE}" "${R}")"
-rm "${R}/src/"$'invalid\xff'
+if byte_fixture bash -c 'printf "one\n" > "$1"' _ "${R}/src/"$'invalid\xff'; then
+    check 'non-UTF-8 paths retain exact bytes' jq -e '
+      [.. | objects | select(.path_bytes? == [115,114,99,47,105,110,118,97,108,105,100,255])] | length == 1' <<< "$("${TREE}" -J "${R}")"
+    check 'non-UTF-8 names have reversible text escapes' grep -F 'invalid\xff' <<< "$("${TREE}" "${R}")"
+    rm "${R}/src/"$'invalid\xff'
+fi
 check 'footer categories have no semicolon wall' bash -c '! grep -q "^hidden:.*;" <<< "$1"' _ "${OUT}"
 check 'directory JSON classifies binary without incomplete counts' jq -e '
   [.. | objects | select(.path? == "src")][0].lines_complete == true' <<< "${JSON}"
@@ -165,9 +186,10 @@ check 'multiple roots preserve their own effective settings' jq -e '
   [.[] | select(.type == "report")] | length == 2 and
   .[0].level == null and .[0].budget == 12000 and
   .[1].level == 3 and .[1].budget == 7' <<< "$("${TREE}" -J "${R}" "${FIX}/second")"
-mkdir -p "${FIX}/invalid-init/"$'invalid\xff'
-check 'init tolerates invalid UTF-8 directory names' "${TREE}" --init "${FIX}/invalid-init"
-check 'init comments the skipped byte name' grep -F 'invalid\xff' "${FIX}/invalid-init/.tree.toml"
+if byte_fixture mkdir -p "${FIX}/invalid-init/"$'invalid\xff'; then
+    check 'init tolerates invalid UTF-8 directory names' "${TREE}" --init "${FIX}/invalid-init"
+    check 'init comments the skipped byte name' grep -F 'invalid\xff' "${FIX}/invalid-init/.tree.toml"
+fi
 cp "${R}/.git/index" "${FIX}/index"
 printf 'corrupt\n' > "${R}/.git/index"
 check 'git failure is explicit in text' grep -F 'git: status unavailable' <<< "$("${TREE}" "${R}")"
@@ -183,10 +205,11 @@ check 'hidden annotation precedes repository note' grep -E 'hidden-only/.*\[hidd
 mkdir -p "${FIX}/outside/child"
 printf 'dotfiles = true\n' > "${FIX}/outside/.tree.toml"
 check 'non-Git discovery stops at listed root' jq -e '.config == null and .dotfiles.value == false' <<< "$("${TREE}" --print-config "${FIX}/outside/child")"
-ln -s $'target\xff' "${R}/byte-link"
-check 'symlink target bytes survive text' grep -F 'byte-link -> target\xff' <<< "$("${TREE}" "${R}")"
-check 'symlink target bytes survive JSON' jq -e '
-  [.. | objects | select(.path? == "byte-link")][0].target_bytes == [116,97,114,103,101,116,255]' <<< "$("${TREE}" -J "${R}")"
+if byte_fixture ln -s $'target\xff' "${R}/byte-link"; then
+    check 'symlink target bytes survive text' grep -F 'byte-link -> target\xff' <<< "$("${TREE}" "${R}")"
+    check 'symlink target bytes survive JSON' jq -e '
+      [.. | objects | select(.path? == "byte-link")][0].target_bytes == [116,97,114,103,101,116,255]' <<< "$("${TREE}" -J "${R}")"
+fi
 printf 'staged\n' > "${R}/staged-delete"
 printf 'unstaged\n' > "${R}/unstaged-delete"
 git -C "${R}" add staged-delete unstaged-delete
@@ -296,14 +319,14 @@ root = pathlib.Path(root)
 out = subprocess.check_output([tree, str(root)], text=True)
 assert "\u202e" not in out and r"name\u{202e}" in out and r"note\u{202e}" in out, out
 PY
-check 'ignored byte paths retain identity and real parent counts' python3 - "${TREE}" "${R}" << 'PY'
+if byte_fixture mkdir "${R}/parent"$'\xff'; then
+    check 'ignored byte paths retain identity and real parent counts' python3 - "${TREE}" "${R}" << 'PY'
 import json
 import os
 import subprocess
 import sys
 tree, root = sys.argv[1:]
 parent = os.fsencode(root) + b"/parent\xff"
-os.mkdir(parent)
 with open(parent + b"/hidden\xfe.qcow2", "wb") as f:
     f.write(b"x")
 out = subprocess.check_output([tree, root], text=True)
@@ -315,6 +338,7 @@ assert record["category"] == "ignore", record
 node = next(n for n in data[0]["contents"] if n.get("path_bytes") == list(b"parent\xff"))
 assert node["hidden_entries"] == 1, node
 PY
+fi
 check 'inventory states distinguish omitted scans from partial and complete scans' python3 - "${TREE}" "${FIX}" << 'PY'
 import json
 import pathlib

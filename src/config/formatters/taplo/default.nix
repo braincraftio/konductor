@@ -2,7 +2,8 @@
 # Hermetic wrapper for taplo
 #
 # Config is maintained in native TOML format (taplo.toml) for easy contribution.
-# The wrapper forces config via --config flag with no escape hatch.
+# The wrapper forces config via the TAPLO_CONFIG environment variable, which it
+# sets unconditionally, so no caller value applies.
 
 { pkgs, ... }:
 

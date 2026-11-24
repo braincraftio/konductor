@@ -88,7 +88,7 @@
   # version at rev. Bump rev, hash, and version together.
   beautiful-rust = {
     version = "1.6.0";
-    rev = "b9718436d77ee7bcf17cdcb6aa27628feb95d97a";
+    rev = "b9718436d77ee7bcf17cdcb6aa27628feb95d97a"; # pragma: allowlist secret (public git revision)
     hash = "sha256-wXqdHFZ1BgdoVminLY0NvUAKwu1qLol+5bsAGWcggiU=";
   };
 
@@ -99,7 +99,7 @@
   # from one commit). Bump rev, hash, and cargoHash together.
   flakehub-push = {
     version = "0.1.0";
-    rev = "99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567";
+    rev = "99ef15d19ce5deb24d62f5d1d6f5a81d9bf03567"; # pragma: allowlist secret (public git revision)
     hash = "sha256-6QyG/PftQbHLOz3AILuoFolqRjFh2JGKRoRwRXgwe30=";
     cargoHash = "sha256-dZn6g9QYRpLrKMFdpAAsBOwf6F4LMBcGJOVvpySluSQ=";
   };

@@ -21,7 +21,6 @@ in
         config.linters.ruff.package
         config.linters.yamllint.package
         config.linters.hadolint.package
-        config.linters.eslint.package
         config.linters.golangci-lint.package
         config.linters.mypy.package
         config.linters.bandit.package

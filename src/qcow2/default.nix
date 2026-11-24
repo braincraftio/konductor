@@ -126,7 +126,7 @@ let
       rust-lang.rust-analyzer # Rust analyzer
 
       # Language support — JavaScript/TypeScript
-      dbaeumer.vscode-eslint # ESLint integration
+      biomejs.biome # Biome lint/format (repository JS/TS/JSON owner)
 
       # Language support — Nix
       jnoortheen.nix-ide # Nix language support

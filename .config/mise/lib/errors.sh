@@ -41,21 +41,21 @@ readonly ERR_GENERAL=1
 readonly ERR_MISUSE=2
 
 # BSD sysexits.h compatible (64-78)
-readonly ERR_USAGE=64        # Command line usage error
-readonly ERR_DATAERR=65      # Data format error
-readonly ERR_NOINPUT=66      # Cannot open input
-readonly ERR_NOUSER=67       # Addressee unknown
-readonly ERR_NOHOST=68       # Host name unknown
-readonly ERR_UNAVAILABLE=69  # Service unavailable
-readonly ERR_SOFTWARE=70     # Internal software error
-readonly ERR_OSERR=71        # System error
-readonly ERR_OSFILE=72       # Critical OS file missing
-readonly ERR_CANTCREAT=73    # Cannot create output file
-readonly ERR_IOERR=74        # Input/output error
-readonly ERR_TEMPFAIL=75     # Temporary failure
-readonly ERR_PROTOCOL=76     # Remote error in protocol
-readonly ERR_NOPERM=77       # Permission denied
-readonly ERR_CONFIG=78       # Configuration error
+readonly ERR_USAGE=64       # Command line usage error
+readonly ERR_DATAERR=65     # Data format error
+readonly ERR_NOINPUT=66     # Cannot open input
+readonly ERR_NOUSER=67      # Addressee unknown
+readonly ERR_NOHOST=68      # Host name unknown
+readonly ERR_UNAVAILABLE=69 # Service unavailable
+readonly ERR_SOFTWARE=70    # Internal software error
+readonly ERR_OSERR=71       # System error
+readonly ERR_OSFILE=72      # Critical OS file missing
+readonly ERR_CANTCREAT=73   # Cannot create output file
+readonly ERR_IOERR=74       # Input/output error
+readonly ERR_TEMPFAIL=75    # Temporary failure
+readonly ERR_PROTOCOL=76    # Remote error in protocol
+readonly ERR_NOPERM=77      # Permission denied
+readonly ERR_CONFIG=78      # Configuration error
 
 # Custom application errors (100-113)
 readonly ERR_NIX_NOT_INSTALLED=100

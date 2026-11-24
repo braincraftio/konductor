@@ -160,19 +160,27 @@ Before opening a PR, verify:
 
 All pinned versions live in `src/lib/versions.nix`:
 
+<!-- sync-versions:begin versions-excerpt -->
+
 ```nix
 {
+  nixos = { channel = "26.05"; stateVersion = "26.05"; };
   languages = {
     python.version = "3.13";
     go.version = "1.27";
     node.version = "26";
     rust.version = "1.99.1";
   };
-  atuin = { version = "18.24.1"; hash = "sha256-..."; cargoHash = "sha256-..."; };
+  atuin = { version = "18.24.5"; hash = "sha256-..."; cargoHash = "sha256-..."; };
+  kubernetes.k0s.version = "1.36";
 }
 ```
 
-Changing a version propagates to all devshells, containers, VMs, and modules.
+<!-- sync-versions:end versions-excerpt -->
+
+Changing a version propagates to all devshells, containers, VMs, and modules. Documentation and
+crate manifests that restate versions are generated blocks: run `nix run .#sync-versions` after a
+bump; `checks.versions-sync` fails until they match.
 
 Keep locally maintained versions and their source/dependency/platform hashes together in
 `src/lib/versions.nix`. Overlays and packages consume these records:

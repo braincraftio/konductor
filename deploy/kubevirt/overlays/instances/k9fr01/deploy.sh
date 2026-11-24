@@ -107,11 +107,11 @@ register_runner() {
 
     kubectl exec -n "${FORGEJO_NAMESPACE}" "deployment/${FORGEJO_DEPLOYMENT}" -- \
         forgejo forgejo-cli actions register \
-            --config /var/lib/gitea/custom/conf/app.ini \
-            --secret "${secret}" \
-            --name "${INSTANCE}" \
-            --scope "" \
-            --labels "${RUNNER_LABELS}" \
+        --config /var/lib/gitea/custom/conf/app.ini \
+        --secret "${secret}" \
+        --name "${INSTANCE}" \
+        --scope "" \
+        --labels "${RUNNER_LABELS}" \
         2> /dev/null || true
 
     log_info "Runner registered"
@@ -190,7 +190,7 @@ create_userdata_secret() {
 
     local userdata
     userdata=$(
-               cat << EOF
+        cat << EOF
 #cloud-config
 # Forgejo Runner ${INSTANCE} Cloud-Init Configuration
 

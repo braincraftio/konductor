@@ -44,8 +44,8 @@ for f in \
     "${root}/.commitlintrc.js" "${root}/.commitlintrc.cjs" "${root}/.commitlintrc.yml" \
     "${root}/.claude/rules/commits.md"; do
     if [[ -e "${f}" ]]; then
-                       repo_has_convention=1
-                                              break
+        repo_has_convention=1
+        break
     fi
 done
 # commitlint config nested under package.json is also a signal.

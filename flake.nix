@@ -381,6 +381,10 @@
             claude = konductorConfig.claude-code.package;
           };
 
+          # Version blocks in docs and crate manifests (src/apps/sync-versions.nix):
+          # apps.sync-versions rewrites them, checks.versions-sync gates drift.
+          syncVersions = import ./src/apps/sync-versions.nix { inherit pkgs versions; };
+
           # Source quality gates: the same wrapped tools lefthook and runme
           # invoke. The flake source is git-tracked content only, so gitignored
           # trees (_sources/) are absent by construction. Filesets narrow each
@@ -413,6 +417,55 @@
                   deadnix --fail -- ${nixSources}
                   touch $out
                 '';
+            versions-sync = pkgs.runCommand "check-versions-sync" { } ''
+              ${lib.getExe syncVersions.run} --check --root ${./.}
+              touch $out
+            '';
+            # Repository .editorconfig equals the shfmt settings rendered by
+            # src/config/formatters/shfmt.nix (flags are the enforced source).
+            editorconfig =
+              let
+                expected = pkgs.writeText "editorconfig" (
+                  "root = true\n\n" + konductorConfig.formatters.shfmt.editorconfig
+                );
+              in
+              pkgs.runCommand "check-editorconfig" { } ''
+                if ! diff -u ${expected} ${./.editorconfig}; then
+                  echo ".editorconfig differs from src/config/formatters/shfmt.nix editorconfig" >&2
+                  exit 1
+                fi
+                touch $out
+              '';
+            # Every extensionless script shfmt detects (shebang) is formatted by
+            # treefmt, which matches paths, not shebangs.
+            shell-discovery =
+              pkgs.runCommand "check-shell-discovery"
+                { nativeBuildInputs = [ konductorConfig.formatters.shfmt.package ]; }
+                ''
+                  listed=(${lib.escapeShellArgs konductorConfig.formatters.treefmt.shellIncludes})
+                  missing=()
+                  cd ${./.}
+                  while IFS= read -r -d "" path; do
+                    path=''${path#./}
+                    case "$path" in
+                      *.sh | *.bash) continue ;;
+                    esac
+                    found=0
+                    for entry in "''${listed[@]}"; do
+                      if [ "$entry" = "$path" ]; then
+                        found=1
+                      fi
+                    done
+                    if [ "$found" -eq 0 ]; then
+                      missing+=("$path")
+                    fi
+                  done < <(shfmt -f=0 .)
+                  if [ "''${#missing[@]}" -gt 0 ]; then
+                    printf 'shell script missing from treefmt shellIncludes: %s\n' "''${missing[@]}" >&2
+                    exit 1
+                  fi
+                  touch $out
+                '';
           };
         in
         {
@@ -432,6 +485,7 @@
             bundleCheck
             lintChecks
             rustChecks
+            syncVersions
             ;
         }
       );
@@ -493,6 +547,7 @@
           inherit (sb.pkgs)
             atuin
             beautiful-rust
+            biome
             flakehub-push
             k0sctl
             terminal-browser
@@ -558,6 +613,11 @@
               program = lib.getExe app;
               meta.description = app.meta.description;
             };
+          sync-versions = {
+            type = "app";
+            program = lib.getExe sb.syncVersions;
+            meta.description = sb.syncVersions.meta.description;
+          };
         }
       );
     }

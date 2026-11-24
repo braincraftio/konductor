@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 pass() { echo -e "${GREEN}PASS${NC}"; }
 fail() {
-         echo -e "${RED}FAIL${NC}"
-                                    exit 1
+    echo -e "${RED}FAIL${NC}"
+    exit 1
 }
 warn() { echo -e "${YELLOW}WARN${NC}"; }
 
@@ -160,7 +160,7 @@ fi
 # Test 14: Alt-1 through Alt-9 bindings present
 echo -n "14. Alt-1 through Alt-9 bindings... "
 if grep -q 'bind -n M-1 select-window' "${KONDUCTOR_TMUX_CONF}" \
-                                                              && grep -q 'bind -n M-9 select-window' "${KONDUCTOR_TMUX_CONF}"; then
+    && grep -q 'bind -n M-9 select-window' "${KONDUCTOR_TMUX_CONF}"; then
     pass
 else
     echo -e "${RED}FAIL${NC} (direct window access bindings missing)"
@@ -181,7 +181,7 @@ echo -n "16. ASCII fallback mode support... "
 if grep -q 'KONDUCTOR_ASCII_MODE' "${KONDUCTOR_TMUX_CONF}"; then
     # Check for ASCII fallback icons in run-shell commands
     if grep -q '@catppuccin_window_status_style "basic"' "${KONDUCTOR_TMUX_CONF}" \
-                                                                              && grep -q '@catppuccin_session_icon "\[S\]"' "${KONDUCTOR_TMUX_CONF}"; then
+        && grep -q '@catppuccin_session_icon "\[S\]"' "${KONDUCTOR_TMUX_CONF}"; then
         pass
     else
         echo -e "${YELLOW}WARN${NC} (ASCII mode detected but icons may be incomplete)"
@@ -205,7 +205,7 @@ echo -n "18. Rounded separator glyphs... "
 # Check that separator lines contain actual UTF-8 bytes for the glyphs
 # U+E0B6 = ee 82 b6, U+E0B4 = ee 82 b4
 if grep 'status_left_separator' "${KONDUCTOR_TMUX_CONF}" | xxd | grep -q 'ee82 b6' \
-                                                                                 && grep 'status_right_separator' "${KONDUCTOR_TMUX_CONF}" | xxd | grep -q 'ee82 b4'; then
+    && grep 'status_right_separator' "${KONDUCTOR_TMUX_CONF}" | xxd | grep -q 'ee82 b4'; then
     pass
 else
     echo -e "${RED}FAIL${NC} (rounded separator glyphs not found in config)"
@@ -215,9 +215,9 @@ fi
 # Test 19: Nested tmux F12 toggle configured
 echo -n "19. Nested tmux F12 toggle... "
 if grep -q 'bind -T root F12' "${KONDUCTOR_TMUX_CONF}" \
-                                                     && grep -q 'bind -T off F12' "${KONDUCTOR_TMUX_CONF}" \
-                                                    && grep -q 'set prefix None' "${KONDUCTOR_TMUX_CONF}" \
-                                                    && grep -q 'set key-table off' "${KONDUCTOR_TMUX_CONF}"; then
+    && grep -q 'bind -T off F12' "${KONDUCTOR_TMUX_CONF}" \
+    && grep -q 'set prefix None' "${KONDUCTOR_TMUX_CONF}" \
+    && grep -q 'set key-table off' "${KONDUCTOR_TMUX_CONF}"; then
     pass
 else
     echo -e "${RED}FAIL${NC} (nested tmux F12 toggle not configured)"
@@ -228,7 +228,7 @@ fi
 echo -n "20. F12 hardcoded colors... "
 # Theme variables like #{@thm_*} don't expand reliably in bind context
 if grep -q 'bind -T root F12' "${KONDUCTOR_TMUX_CONF}" \
-                                                     && ! grep -A5 'bind -T root F12' "${KONDUCTOR_TMUX_CONF}" | grep -q '@thm_'; then
+    && ! grep -A5 'bind -T root F12' "${KONDUCTOR_TMUX_CONF}" | grep -q '@thm_'; then
     pass
 else
     echo -e "${RED}FAIL${NC} (F12 binding uses theme variables - should use hardcoded colors)"
@@ -238,7 +238,7 @@ fi
 # Test 21: Nested tmux C-b bindings (C-a b and C-a C-b send inner prefix)
 echo -n "21. Nested tmux C-b bindings... "
 if grep -q 'bind b send-keys C-b' "${KONDUCTOR_TMUX_CONF}" \
-                                                         && grep -q 'bind C-b send-keys C-b' "${KONDUCTOR_TMUX_CONF}"; then
+    && grep -q 'bind C-b send-keys C-b' "${KONDUCTOR_TMUX_CONF}"; then
     pass
 else
     echo -e "${RED}FAIL${NC} (nested tmux C-b bindings not configured)"
@@ -249,7 +249,7 @@ fi
 echo -n "22. Catppuccin options use blocking run-shell... "
 # CRITICAL: if-shell is async, run-shell blocks. Options must be set before catppuccin loads.
 if grep -q 'run-shell.*@catppuccin_status_left_separator' "${KONDUCTOR_TMUX_CONF}" \
-                                                                                 && grep -q 'run-shell.*@catppuccin_session_icon' "${KONDUCTOR_TMUX_CONF}"; then
+    && grep -q 'run-shell.*@catppuccin_session_icon' "${KONDUCTOR_TMUX_CONF}"; then
     pass
 else
     echo -e "${RED}FAIL${NC} (catppuccin options not using blocking run-shell)"
