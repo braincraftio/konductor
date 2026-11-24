@@ -340,6 +340,22 @@
                 ''
                   kubectl version --client > /dev/null && touch $out
                 '';
+            # The renderer's build runs cargo test, then tests/spec.sh as its
+            # install check (src/config/tree/default.nix).
+            tree = konductorConfig.tree.package;
+            # rustfmt and clippy -D warnings on the same vendored sources.
+            tree-lint = konductorConfig.tree.package.overrideAttrs {
+              pname = "konductor-tree-lint";
+              buildPhase = ''
+                runHook preBuild
+                cargo fmt --check -p konductor-tree
+                cargo clippy -p konductor-tree --offline --all-targets --all-features -- -D warnings
+                runHook postBuild
+              '';
+              doCheck = false;
+              doInstallCheck = false;
+              installPhase = "touch $out";
+            };
           };
 
           # Bundle integration: verifies buildEnv composition succeeds without
@@ -430,6 +446,24 @@
       devShells = forAllSystems (
         system: sb:
         {
+          # Independent of the renderer and harness closures, including during
+          # deliberately failing regressions and compiler errors.
+          tree-development = sb.pkgs.mkShell {
+            packages = [
+              sb.packages.languages.rustToolchain
+              sb.pkgs.git
+              sb.pkgs.eza
+              sb.pkgs.ripgrep
+              sb.pkgs.jq
+              sb.pkgs.python3
+              sb.pkgs.time
+            ]
+            ++ lib.optionals sb.pkgs.stdenv.hostPlatform.isLinux [
+              sb.pkgs.strace
+              sb.pkgs.heaptrack
+              sb.pkgs.perf
+            ];
+          };
           inherit (sb.devshells)
             default
             python
@@ -472,6 +506,7 @@
           trzsz = sb.pkgs.callPackage ./src/packages/trzsz.nix { };
           prettier-plugin-astro = sb.konductorConfig.formatters.prettier.astroPlugin;
           treefmt = sb.konductorConfig.formatters.treefmt.package;
+          tree = sb.konductorConfig.tree.package;
           rust-toolchain = sb.packages.languages.rustToolchain;
           harness-skills = sb.konductorConfig.harness.skill.directory;
           claude-plugins = sb.konductorConfig.claude-code.marketplace;

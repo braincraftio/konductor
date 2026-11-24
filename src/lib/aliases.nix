@@ -13,7 +13,7 @@
   cat = "bat --paging=never";
   top = "btm";
   du = "dust";
-  # tree - removed, using wrapped eza --tree from src/config/tree/
+  # tree is the repository renderer from src/config/tree/, not an alias.
 
   # ===========================================================================
   # Editor Shortcuts

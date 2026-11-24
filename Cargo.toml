@@ -1,0 +1,6 @@
+# Cargo workspace for Rust crates owned by Konductor. The root location keeps
+# Cargo.lock and target/ outside src/, which .envrc watches (watch_dir src):
+# a target/ under src/ re-evaluates the devshell on every cargo build.
+[workspace]
+resolver = "3"
+members = ["src/config/tree"]

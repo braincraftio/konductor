@@ -132,7 +132,10 @@ in
   # ===========================================================================
   # CLI Tools Configuration
   # ===========================================================================
-  tree = import ./tree { inherit pkgs; };
+  tree = import ./tree {
+    inherit pkgs lib;
+    inherit (languages) rustToolchain;
+  };
 
   # ===========================================================================
   # AI Tools Configuration

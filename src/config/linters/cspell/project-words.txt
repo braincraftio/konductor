@@ -77,6 +77,7 @@ chpass
 christoomey
 cidata
 cljfmt
+CLICOLOR
 closeoff
 cloudant
 cloudflared
@@ -88,6 +89,7 @@ codesigning
 colorschemes
 colorterm
 commitlint
+commondir
 completeopt
 conceallevel
 configfile
@@ -129,6 +131,8 @@ docstrings
 docsy
 dogfooding
 dosfstools
+dotgit
+dotignore
 dport
 drac
 dropin
@@ -201,11 +205,14 @@ gcroots
 gecos
 genisoimage
 getfsize
+getdents
 gethostname
 ghostscript
 ghostty
 gitbrowse
 gitea
+gitdir
+gitonly
 gitsigns
 globalstatus
 gnugrep
@@ -248,6 +255,7 @@ heredocs
 hermeticity
 hiddenoff
 higroup
+Hinnant
 histappend
 hjkl
 hlsearch
@@ -364,6 +372,7 @@ memdev
 memfd
 memlock
 menuone
+metafirst
 mhutchie
 miri
 mithril
@@ -430,6 +439,7 @@ nopasswd
 noreport
 noselect
 nosplit
+NOSYSTEM
 nptl
 nslookup
 nspr
@@ -485,6 +495,7 @@ plaintex
 pname
 pnet
 pollin
+porcelain
 posthook
 postrouting
 powerline
@@ -522,6 +533,7 @@ relativenumber
 reloadable
 reqwest
 rescan
+reshown
 resizefs
 resolv
 restty
@@ -657,6 +669,8 @@ unfindable
 unkeyed
 unnamedplus
 unreviewed
+unscanned
+unvalidated
 updatetime
 upstreamability
 upstreamable

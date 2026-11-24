@@ -398,7 +398,9 @@ MCP servers (packages in devshell, configured via `.mcp.json` for Claude Code): 
 `gitea-mcp-server`, `mcp-k8s-go`, `mcp-nixos`, `deepwiki` (HTTP)
 
 Neovim dependencies: tree-sitter, imagemagick, ghostscript, tectonic, mermaid-cli, lua 5.1 with
-luarocks, tree
+luarocks. Repository discovery uses Konductor's Rust `tree` renderer with line totals, Git status,
+omission provenance, and `.tree.toml` configuration; see
+[Repository tree](docs/developer_guide/TREE.md).
 
 Use case: Projects that provide their own language tooling via a project-local flake. The dev shell
 gives the IDE without conflicting with project-managed language versions.
@@ -1065,7 +1067,7 @@ flake.nix systemBindings
 │   │   ├── btop/                # btop with Catppuccin
 │   │   ├── fastfetch/           # System info display
 │   │   ├── k9s/                 # k9s with Catppuccin
-│   │   └── tree/                # tree with gitignore filtering
+│   │   └── tree/                # Rust repository inventory and omission provenance
 │   ├── oci/
 │   │   └── default.nix          # nix2container OCI image
 │   ├── qcow2/

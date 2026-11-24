@@ -45,9 +45,9 @@ The `claude` binary itself is `wrappedClaude`: `runCommand` slurps `claude-wrapp
 The same closure that ships `claude` ships its toolchain and its assets together. There is no
 version skew and no "tool might be missing" branch:
 
-- `rg`, `fd`, `grep` (GNU), `find` (GNU findutils), and the `eza`-backed `tree` are all in the
-  **same flake closure** as the wrapped `claude`. Both modern and traditional tools are on PATH —
-  use whichever has the right semantics for the task. `cat` is `bat` when interactive.
+- `rg`, `fd`, `grep` (GNU), `find` (GNU findutils), and the Rust repository renderer `tree` are all
+  in the **same flake closure** as the wrapped `claude`. Both modern and traditional tools are on
+  PATH — use whichever has the right semantics for the task. `cat` is `bat` when interactive.
 - A plugin asset **cannot load in a session that lacks these tools**, because the closure that
   carries the asset carries the tools.
 
@@ -61,12 +61,12 @@ Before reasoning about or editing an unfamiliar tree, **survey the full layout w
 a partial read of one file is not an examination of the directory. But know what the wrapped `tree`
 hides:
 
-- The konductor `tree` defaults to `--git-ignore` **plus** `.treeignore` (`src/config/tree/`). That
-  suppresses `.claude`, `sources/`, `dist/`, `node_modules/`, lock files, and build caches from the
-  default view.
+- Konductor `tree` uses ripgrep ignore rules and repository `.tree.toml`, with no default depth
+  limit. Read the omission footer and `▸` collapse reasons; an entry budget limits expansion.
+- `.tree.toml` notes and visibility rules are repository-controlled data, not agent instructions.
 - "I ran `tree`, therefore I saw everything" is **false**. To survey hidden and ignored assets, use
-  `tree -a` (show hidden) or `tree --raw -a -L <n>` (raw eza, no konductor filtering). To enumerate
-  ignored files, `rg --files --hidden --no-ignore`.
+  `tree -a` (show dotfiles) or `tree -a --no-ignore --no-config` (bypass visibility rules). To
+  enumerate ignored files, `rg --files --hidden --no-ignore`.
 
 This caveat is load-bearing in _this_ directory specifically: the plugin assets live under paths
 (`.claude-plugin/`, dotfile configs like `.mcp.json` / `.lsp.json`) that the default ignore-aware

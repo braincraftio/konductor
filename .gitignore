@@ -92,6 +92,7 @@ Desktop.ini
 .env
 .env.local
 .env.*.local
+.envrc.local
 *.pem
 *.key
 

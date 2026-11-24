@@ -1,0 +1,59 @@
+# .tree.toml — how `tree` presents this repository (src/config/tree).
+# ignore: gitignore syntax over .gitignore; "!" shows what .gitignore hides.
+# Path sections set presentation only: collapse to one summary line, note.
+
+dotfiles = true
+ignore = ["!/_sources/", "!/target/"]
+
+["/_sources/"]
+collapse = true
+note = "vendored flake input trees (gitignored)"
+
+["/target/"]
+collapse = true
+note = "Cargo build output (gitignored)"
+
+["/src/apps/"]
+note = "flake apps: artifact and lock updaters"
+
+["/src/checks/"]
+note = "nix flake check: Rust policy and template checks"
+
+["/src/config/"]
+note = "hermetic tool wrappers and configs (linters, formatters, shell, tree)"
+
+["/src/devshells/"]
+note = "devshells: base, language shells, full, konductor, frontend"
+
+["/src/harness/"]
+note = "Claude Code and OpenCode adapters, shared skill catalog"
+
+["/src/lib/"]
+note = "versions SSOT, env, aliases, theme, users"
+
+["/src/modules/"]
+note = "NixOS, home-manager, nix-darwin modules"
+
+["/src/overlays/"]
+note = "package pins and fixes (atuin, k0s, ttyd, ...)"
+
+["/src/packages/"]
+note = "package composition by category (SSOT for every target)"
+
+["/src/programs/"]
+note = "neovim, tmux, ttyd, web terminals, forgejo"
+
+["/src/qcow2/"]
+note = "QCOW2 VM image"
+
+["/src/oci/"]
+note = "OCI container image"
+
+["/src/pki/"]
+note = "PKI trust bundle tooling (Python)"
+
+["/templates/"]
+note = "nix flake init templates"
+
+["/docs/"]
+note = "developer guide, CI pipelines (runme)"

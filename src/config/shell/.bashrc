@@ -65,9 +65,10 @@ alias gs='git status'
 alias gd='git diff'
 alias gl='git log --oneline -20'
 
-# Note: All standard aliases (ll, la, l, cat, find, top, du, tree, vi, vim, lg, k, mr, rr, rl)
+# Note: Standard aliases (ll, la, l, cat, top, du, vi, vim, lg, k, mr)
 # are provided as wrapper scripts by src/lib/alias-wrappers.nix with completions.
 # This ensures hermetic behavior and special handling (e.g., cat with TTY detection).
+# tree is the Rust repository renderer; find is GNU findutils.
 
 # ===========================================================================
 # Prompt (Starship)
@@ -103,4 +104,3 @@ export DIRENV_LOG_FORMAT="${DIRENV_LOG_FORMAT:-}"
 if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook bash)"
 fi
-
